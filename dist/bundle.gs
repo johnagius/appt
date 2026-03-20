@@ -209,6 +209,8 @@ var _HTML_TEMPLATES = {
     .has-error{ border-color: var(--bad) !important; }
     .has-error:focus{ box-shadow: 0 0 0 3px rgba(239,68,68,0.15) !important; }
     .phoneWrap.has-error{ border-color: var(--bad) !important; }
+    .phoneRow.has-error .ccBtn{ border-color: var(--bad) !important; }
+    .phoneRow.has-error .phoneWrap{ border-color: var(--bad) !important; }
 
     select, input, textarea{
       width:100%;
@@ -227,13 +229,19 @@ var _HTML_TEMPLATES = {
     }
     textarea{ min-height:80px; resize:vertical; }
 
+    .phoneRow{
+      display:flex;
+      align-items:center;
+      position:relative;
+    }
     .phoneWrap{
       display:flex;
       align-items:center;
       border:1px solid var(--line);
-      border-radius:12px;
+      border-radius:0 12px 12px 0;
       background:#fff;
       overflow:hidden;
+      flex:1;
     }
     .phoneWrap .dialCode{
       font-size:13px;
@@ -253,13 +261,19 @@ var _HTML_TEMPLATES = {
     }
     .ccPicker{position:relative;}
     .ccBtn{
-      border:none;
-      background:transparent;
+      border:1px solid var(--line);
+      border-right:none;
+      background:#f9fafb;
       font-size:18px;
-      padding:10px 6px 10px 10px;
+      padding:10px 8px 10px 10px;
       min-height:44px;
       cursor:pointer;
       line-height:1;
+      border-radius:12px 0 0 12px;
+      transition: background 0.15s ease;
+    }
+    .ccBtn:hover{
+      background:#f0f0f0;
     }
     .ccDrop{
       display:none;
@@ -697,18 +711,20 @@ var _HTML_TEMPLATES = {
         </div>
         <div style="flex: 1 1 220px;">
           <label class="label" data-i18n="phoneLabel">Phone *</label>
-          <div class="phoneWrap" id="phoneWrap">
+          <div class="phoneRow">
             <div class="ccPicker" id="ccPicker">
               <button type="button" class="ccBtn" id="ccBtn" aria-label="Country code">🇲🇹</button>
               <div class="ccDrop" id="ccDrop" role="listbox" aria-label="Country code">
                 <div class="ccSearchWrap">
-                  <input type="text" class="ccSearch" id="ccSearch" placeholder="Search country\\u2026" autocomplete="off" data-i18n-ph="searchCountryPh">
+                  <input type="text" class="ccSearch" id="ccSearch" placeholder="Search country&#8230;" autocomplete="off" data-i18n-ph="searchCountryPh">
                 </div>
                 <div class="ccList" id="ccList"></div>
               </div>
             </div>
-            <span id="dialCode" class="dialCode">+356</span>
-            <input id="phone" type="tel" autocomplete="tel-national" placeholder="7900 1234">
+            <div class="phoneWrap" id="phoneWrap">
+              <span id="dialCode" class="dialCode">+356</span>
+              <input id="phone" type="tel" autocomplete="tel-national" placeholder="7900 1234">
+            </div>
           </div>
           <div class="field-error" id="phoneError"></div>
         </div>
@@ -2129,7 +2145,7 @@ var _HTML_TEMPLATES = {
       });
       els.fullName.classList.remove('has-error');
       els.phone.classList.remove('has-error');
-      document.getElementById('phoneWrap').classList.remove('has-error');
+      document.getElementById('phoneWrap').closest('.phoneRow').classList.remove('has-error');
       els.email.classList.remove('has-error');
     }
 
@@ -2152,7 +2168,7 @@ var _HTML_TEMPLATES = {
 
       let hasError = false;
       if (!fullName) { setFieldError(els.fullName, 'fullNameError', t('valName')); hasError = true; }
-      if (!phone) { setFieldError(els.phone, 'phoneError', t('valPhone')); document.getElementById('phoneWrap').classList.add('has-error'); hasError = true; }
+      if (!phone) { setFieldError(els.phone, 'phoneError', t('valPhone')); document.getElementById('phoneWrap').closest('.phoneRow').classList.add('has-error'); hasError = true; }
       if (!email) { setFieldError(els.email, 'emailError', t('valEmail')); hasError = true; }
       else if (!email.includes('@')) { setFieldError(els.email, 'emailError', t('valEmailFormat')); hasError = true; }
 
@@ -2198,7 +2214,7 @@ var _HTML_TEMPLATES = {
         inp.classList.remove('has-error');
         var errEl = document.getElementById(id + 'Error');
         if (errEl) errEl.textContent = '';
-        if (id === 'phone') document.getElementById('phoneWrap').classList.remove('has-error');
+        if (id === 'phone') document.getElementById('phoneWrap').closest('.phoneRow').classList.remove('has-error');
       });
     });
 
