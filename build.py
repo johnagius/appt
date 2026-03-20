@@ -160,6 +160,13 @@ def build_json():
     print(f'\n  => {OUTPUT_JSON} ({len(files)} files)')
 
 
+def sanitize_smart_quotes(s):
+    """Replace Unicode smart quotes with straight ASCII equivalents."""
+    return (s
+        .replace('\u2018', "'").replace('\u2019', "'")   # ' '
+        .replace('\u201C', '"').replace('\u201D', '"'))   # " "
+
+
 def js_string_escape(s):
     """Escape a string for embedding inside a JS string literal (backtick template)."""
     return s.replace('\\', '\\\\').replace('`', '\\`').replace('${', '\\${')
@@ -180,6 +187,9 @@ def build_bundle():
 
         with open(filepath, 'r') as f:
             source = f.read()
+
+        # Sanitize smart quotes that GAS editor may silently introduce
+        source = sanitize_smart_quotes(source)
 
         parts.append(f'// ===== {filename} =====')
         parts.append(source)
