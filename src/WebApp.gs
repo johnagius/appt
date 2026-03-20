@@ -183,6 +183,7 @@ function apiGetAvailability(dateKey) {
 
   var extraMap = getDoctorExtraSlots_();
   var extras = extraMap[dateKey] || null;
+  var extraKeys = Object.keys(extraMap);
   var baseSlots = buildSlotsForDate_(d, extras);
 
   var appts = listAppointmentsForDate_(dateKey);
@@ -226,7 +227,7 @@ function apiGetAvailability(dateKey) {
     });
   }
 
-  return { ok: true, dateKey: dateKey, slots: outSlots };
+  return { ok: true, dateKey: dateKey, slots: outSlots, _debug: { extraKeys: extraKeys, extras: extras, slotCount: baseSlots.length } };
 }
 
 function getDoctorOffEntryForDate_(offMap, dateKey) {
