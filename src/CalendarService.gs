@@ -39,7 +39,9 @@ function deleteCalendarEvent_(eventId) {
   try {
     var ev = cal.getEventById(eventId);
     if (ev) ev.deleteEvent();
-  } catch (e) {}
+  } catch (e) {
+    Logger.log('WARN: Failed to delete calendar event ' + eventId + ': ' + e.message);
+  }
 }
 
 function updateCalendarEventLocation_(eventId, newLocation, newTitleOptional, newDescriptionOptional) {

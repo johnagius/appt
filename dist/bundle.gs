@@ -2852,7 +2852,7 @@ var _HTML_TEMPLATES = {
     :root{--bg:#f6f7fb;--card:#fff;--muted:#6b7280;--text:#111827;--line:#e5e7eb;--bad:#ef4444;--good:#10b981;--blue:#2563eb;--shadow:0 10px 30px rgba(17,24,39,0.08);--radius:18px;}
     *{box-sizing:border-box;}
     body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial;background:var(--bg);color:var(--text);}
-    .wrap{max-width:900px;margin:0 auto;padding:14px 14px 40px;}
+    .wrap{max-width:900px;margin:0 auto;padding:14px 14px 60px;}
     h1{margin:0 0 6px;font-size:20px;font-weight:900;}
     h2{margin:18px 0 8px;font-size:16px;font-weight:800;}
     h3{margin:14px 0 6px;font-size:14px;font-weight:700;}
@@ -2909,9 +2909,16 @@ var _HTML_TEMPLATES = {
     .badge-red{background:rgba(239,68,68,0.1);color:#dc2626;}
     .badge-green{background:rgba(16,185,129,0.1);color:#059669;}
 
+    /* Auto-refresh bar */
+    .refresh-bar{position:fixed;bottom:0;left:0;right:0;background:rgba(17,24,39,0.92);color:#e5e7eb;font-size:12px;padding:6px 14px;display:flex;justify-content:space-between;align-items:center;z-index:1500;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);font-weight:500;}
+    .refresh-bar .refresh-info{display:flex;gap:16px;align-items:center;}
+    .refresh-bar .refresh-dot{width:6px;height:6px;border-radius:50%;background:var(--good);display:inline-block;margin-right:4px;animation:pulse-dot 2s ease-in-out infinite;}
+    @keyframes pulse-dot{0%,100%{opacity:1;}50%{opacity:0.3;}}
+    .refresh-bar .refresh-countdown{color:#9ca3af;font-variant-numeric:tabular-nums;}
+
     /* Responsive */
     @media(max-width:600px){
-      .wrap{padding:10px 10px 30px;}
+      .wrap{padding:10px 10px 56px;}
       .stats{gap:8px;}
       .stat{min-width:0;flex:1 1 calc(50% - 4px);padding:10px 12px;}
       .stat .num{font-size:22px;}
@@ -3153,6 +3160,14 @@ var _HTML_TEMPLATES = {
   </div>
 </div>
 
+<div class="refresh-bar" id="refreshBar">
+  <div class="refresh-info">
+    <span><span class="refresh-dot"></span> Auto-refresh</span>
+    <span id="refreshLastText">Last refreshed: just now</span>
+  </div>
+  <span class="refresh-countdown" id="refreshCountdown">Refreshes in: 30s</span>
+</div>
+
 <script>
 const SIG = "<?= adminSig ?>";
 
@@ -3337,6 +3352,11 @@ function loadDashboard() {
       loadActionAppts();
       document.getElementById('notifyDate').value = res.todayKey;
       loadNotifyAppts();
+
+      // Reset auto-refresh timer after manual load
+      _lastRefreshTime = Date.now();
+      if (_refreshTimerId) { clearInterval(_refreshTimerId); }
+      _refreshTimerId = setInterval(doAutoRefresh, REFRESH_INTERVAL_SEC * 1000);
     })
     .withFailureHandler(function(err) {
       hideLoading();
@@ -3780,6 +3800,59 @@ if (document.readyState === 'complete' || document.readyState === 'interactive')
 } else {
   document.addEventListener('DOMContentLoaded', loadDashboard);
 }
+
+// ========== Auto-Refresh ==========
+var REFRESH_INTERVAL_SEC = 30;
+var _lastRefreshTime = Date.now();
+var _refreshTimerId = null;
+var _isRefreshing = false;
+
+function doAutoRefresh() {
+  if (_isRefreshing) return;
+  _isRefreshing = true;
+
+  google.script.run
+    .withSuccessHandler(function(res) {
+      _isRefreshing = false;
+      _lastRefreshTime = Date.now();
+      if (!res || !res.ok) return;
+
+      document.getElementById('statBooked').textContent = res.stats.weekBooked;
+      document.getElementById('statCancelled').textContent = res.stats.weekCancelled;
+      document.getElementById('statToday').textContent = res.todayAppointments.length;
+      document.getElementById('statTomorrow').textContent = res.tomorrowAppointments.length;
+
+      document.getElementById('todayHeader').textContent = "Today's Appointments (" + res.todayKey + ')';
+      document.getElementById('tomorrowHeader').textContent = "Tomorrow's Appointments (" + res.tomorrowKey + ')';
+
+      renderApptTable(res.todayAppointments, 'todayTable', false);
+      renderApptTable(res.tomorrowAppointments, 'tomorrowTable', false);
+      renderOverrides(res.doctorOffEntries, res.extraSlotEntries);
+    })
+    .withFailureHandler(function() {
+      _isRefreshing = false;
+      _lastRefreshTime = Date.now();
+    })
+    .apiAdminGetDashboard(SIG);
+}
+
+function updateRefreshDisplay() {
+  var elapsed = Math.floor((Date.now() - _lastRefreshTime) / 1000);
+  var remaining = Math.max(0, REFRESH_INTERVAL_SEC - elapsed);
+
+  var lastEl = document.getElementById('refreshLastText');
+  if (lastEl) {
+    if (elapsed < 5) lastEl.textContent = 'Last refreshed: just now';
+    else if (elapsed < 60) lastEl.textContent = 'Last refreshed: ' + elapsed + 's ago';
+    else lastEl.textContent = 'Last refreshed: ' + Math.floor(elapsed / 60) + 'm ago';
+  }
+
+  var countEl = document.getElementById('refreshCountdown');
+  if (countEl) countEl.textContent = 'Refreshes in: ' + remaining + 's';
+}
+
+_refreshTimerId = setInterval(doAutoRefresh, REFRESH_INTERVAL_SEC * 1000);
+setInterval(updateRefreshDisplay, 1000);
 </script>
 </body>
 </html>
@@ -4825,7 +4898,9 @@ function deleteCalendarEvent_(eventId) {
   try {
     var ev = cal.getEventById(eventId);
     if (ev) ev.deleteEvent();
-  } catch (e) {}
+  } catch (e) {
+    Logger.log('WARN: Failed to delete calendar event ' + eventId + ': ' + e.message);
+  }
 }
 
 function updateCalendarEventLocation_(eventId, newLocation, newTitleOptional, newDescriptionOptional) {
@@ -5403,17 +5478,25 @@ function apiGetAvailability(dateKey) {
 
   var appts = listAppointmentsForDate_(dateKey);
   var taken = {};
+  var cancelledSlots = {};
   for (var i = 0; i < appts.length; i++) {
     var st = String(appts[i].startTime || '').trim();
     if (apptIsActive_(appts[i])) {
       taken[st] = true;
+    } else {
+      cancelledSlots[st] = true;
     }
   }
 
   var dc = (getScriptProps_().getProperty(CFG().PROP_DOUBLECHECK_CALENDAR) || 'true') === 'true';
   if (dc) {
     var calTaken = listCalendarTakenSlots_(dateKey);
-    Object.keys(calTaken).forEach(function(k) { taken[k] = true; });
+    Object.keys(calTaken).forEach(function(k) {
+      // DB is source of truth: don't let stale calendar events block cancelled slots
+      if (!cancelledSlots[k]) {
+        taken[k] = true;
+      }
+    });
   }
 
   var nowMin = nowMinutesLocal_();
@@ -5553,8 +5636,14 @@ function apiBook(payload) {
       }
     }
 
+    var cancelledSlotsBook = {};
+    for (var c = 0; c < appts.length; c++) {
+      if (!apptIsActive_(appts[c])) {
+        cancelledSlotsBook[String(appts[c].startTime || '').trim()] = true;
+      }
+    }
     var calTaken = listCalendarTakenSlots_(dateKey);
-    if (calTaken[startTime]) {
+    if (calTaken[startTime] && !cancelledSlotsBook[startTime]) {
       throw new Error('That slot was just taken. Please pick another.');
     }
 
