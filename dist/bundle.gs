@@ -376,12 +376,42 @@ var _HTML_TEMPLATES = {
       border:1px solid var(--line);
       border-radius:10px;
       box-shadow:0 6px 20px rgba(0,0,0,.15);
-      width:200px;
-      max-height:320px;
+      width:240px;
+      max-height:400px;
       overflow-y:auto;
       margin-top:4px;
     }
     .langDrop.open{display:block;}
+    .langQuickFlags{
+      display:flex;
+      flex-wrap:wrap;
+      gap:4px;
+      padding:10px 10px 6px;
+      border-bottom:1px solid var(--line);
+    }
+    .langFlag{
+      font-size:22px;
+      width:38px;
+      height:38px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      cursor:pointer;
+      border-radius:10px;
+      transition: background 0.12s ease, transform 0.1s ease;
+    }
+    .langFlag:hover{background:rgba(17,24,39,0.06);transform:scale(1.15);}
+    .langFlag.active{background:var(--accent);transform:scale(1.1);}
+    .langDivider{
+      padding:6px 12px;
+      font-size:10px;
+      font-weight:700;
+      text-transform:uppercase;
+      color:var(--muted);
+      letter-spacing:0.5px;
+      border-bottom:1px solid var(--line);
+      background:#fafafa;
+    }
     .langItem{
       display:flex;
       align-items:center;
@@ -393,7 +423,6 @@ var _HTML_TEMPLATES = {
       white-space:nowrap;
       transition: background 0.12s ease;
     }
-    .langItem:first-child{border-radius:10px 10px 0 0;}
     .langItem:last-child{border-radius:0 0 10px 10px;}
     .langItem:hover,.langItem.active{background:var(--accent);color:#fff;}
     [dir="rtl"] .langDrop{right:auto;left:0;}
@@ -865,28 +894,31 @@ var _HTML_TEMPLATES = {
     var currentLang = 'en';
 
     const LANGUAGES = [
-      {code:'en',name:'English'},
-      {code:'fr',name:'Français'},
-      {code:'es',name:'Español'},
-      {code:'it',name:'Italiano'},
-      {code:'zh',name:'中文'},
-      {code:'hi',name:'हिन्दी'},
-      {code:'pt',name:'Português'},
-      {code:'ru',name:'Русский'},
-      {code:'ja',name:'日本語'},
-      {code:'pa',name:'ਪੰਜਾਬੀ'},
-      {code:'tr',name:'Türkçe'},
-      {code:'ar',name:'العربية'},
-      {code:'pl',name:'Polski'},
-      {code:'sr',name:'Srpski'},
-      {code:'hr',name:'Hrvatski'},
-      {code:'bs',name:'Bosanski'},
-      {code:'uk',name:'Українська'},
-      {code:'fil',name:'Filipino'},
-      {code:'bg',name:'Български'},
-      {code:'ro',name:'Română'},
-      {code:'mt',name:'Malti'}
+      {code:'en',name:'English',flag:'🇬🇧'},
+      {code:'fr',name:'Français',flag:'🇫🇷'},
+      {code:'es',name:'Español',flag:'🇪🇸'},
+      {code:'pt',name:'Português',flag:'🇧🇷'},
+      {code:'it',name:'Italiano',flag:'🇮🇹'},
+      {code:'ru',name:'Русский',flag:'🇷🇺'},
+      {code:'zh',name:'中文',flag:'🇨🇳'},
+      {code:'ja',name:'日本語',flag:'🇯🇵'},
+      {code:'hi',name:'हिन्दी',flag:'🇮🇳'},
+      {code:'pa',name:'ਪੰਜਾਬੀ',flag:'🇮🇳'},
+      {code:'tr',name:'Türkçe',flag:'🇹🇷'},
+      {code:'ar',name:'العربية',flag:'🇸🇦'},
+      {code:'pl',name:'Polski',flag:'🇵🇱'},
+      {code:'sr',name:'Srpski',flag:'🇷🇸'},
+      {code:'hr',name:'Hrvatski',flag:'🇭🇷'},
+      {code:'bs',name:'Bosanski',flag:'🇧🇦'},
+      {code:'uk',name:'Українська',flag:'🇺🇦'},
+      {code:'fil',name:'Filipino',flag:'🇵🇭'},
+      {code:'bg',name:'Български',flag:'🇧🇬'},
+      {code:'ro',name:'Română',flag:'🇷🇴'},
+      {code:'lt',name:'Lietuvių',flag:'🇱🇹'},
+      {code:'mt',name:'Malti',flag:'🇲🇹'}
     ];
+
+    const POPULAR_LANGS = ['en','es','pt','fr','it','ru','zh','ja'];
 
     const TR = {};
 
@@ -1431,6 +1463,33 @@ var _HTML_TEMPLATES = {
       valEmailFormat:'Introduceți un e-mail valid.',timeDash:'—'
     };
 
+    TR.lt = {
+      summary:'Santrauka',clinicHours:'Klinikos darbo laikas',services:'Paslaugos',selectDate:'Pasirinkite datą',
+      availableDates:'Galimos datos (artimiausios 7 dienos)',selectTime:'Pasirinkite laiką',yourDetails:'Jūsų duomenys',
+      fullNameLabel:'Vardas ir pavardė *',phoneLabel:'Telefonas *',emailLabel:'El. paštas *',commentsLabel:'Komentarai',
+      confirmBtn:'Patvirtinti',appointmentConfirmed:'Vizitas patvirtintas',okBtn:'Gerai',
+      clinicMF:'Pr–Pn:',clinicSat:'Šešt:',clinicSun:'Sekm:',closed:'Uždaryta',
+      slotInfo:'Kiekvienas vizitas trunka 10 minučių.',ready:'Paruošta',
+      fullNamePh:'Vardas ir pavardė',emailPh:'jusu@pastas.lt',commentsPh:'Papildomos pastabos…',searchCountryPh:'Ieškoti šalies…',
+      serviceTemplate:'Paslauga: {0} ({1} min)',dateTemplate:'Data: {0}',timeTemplate:'Laikas: {0} - {1}',
+      locationTemplate:'Vieta: {0}',mins:'min',
+      loadingTitle:'Kraunama…',loadingDesc:'Prašome palaukti.',
+      loadingBookingTitle:'Kraunamas registracijos puslapis…',loadingBookingDesc:'Prašome palaukti, kol paruošime sistemą.',
+      loadingSlotsTitle:'Kraunami laiko tarpai…',loadingSlotsDesc:'Prašome palaukti, kol patikriname prieinamumą.',
+      confirmingTitle:'Tvirtinamas vizitas…',confirmingDesc:'Siunčiamas patvirtinimo el. laiškas.',
+      noSlots:'Laisvų laikų nėra.',noDates:'Artimiausiomis 7 dienomis laisvų datų nėra.',
+      serviceSelected:'Paslauga pasirinkta',loadingSlots:'Kraunama…',slotsLoaded:'Laikai įkelti',
+      timeSelected:'Laikas pasirinktas',missingFields:'Trūksta duomenų',bookingStatus:'Registruojama…',
+      unavailable:'Nepasiekiama',errorLoadingSlots:'Klaida kraunant laikus',noDatesAvailable:'Laisvų datų nėra',
+      loadError:'Įkėlimo klaida',bookingFailed:'Registracija nepavyko',bookingError:'Registracijos klaida',
+      confirmMsg:'Jūsų vizitas patvirtintas.\\n\\nPaslauga: {0}\\nData: {1}\\nLaikas: {2} - {3}\\nVieta: {4}\\n\\nPatvirtinimo el. laiškas išsiųstas. Galite atšaukti vizitą naudodami nuorodą laiške.',
+      couldNotBook:'Nepavyko užregistruoti. Bandykite dar kartą.',errorLoadingApp:'Klaida kraunant: ',
+      noAvailability:'Nėra prieinamumo.',
+      valService:'Prašome pasirinkti paslaugą.',valDate:'Prašome pasirinkti datą.',valTime:'Prašome pasirinkti laiką.',
+      valName:'Vardas ir pavardė privalomi.',valPhone:'Telefono numeris privalomas.',valEmail:'El. paštas privalomas.',
+      valEmailFormat:'Įveskite galiojantį el. paštą.',timeDash:'—'
+    };
+
     TR.mt = {
       summary:'Sommarju',clinicHours:'Sigħat tal-klinika',services:'Servizzi',selectDate:'Agħżel data',
       availableDates:'Dati disponibbli (7 ijiem li ġejjin)',selectTime:'Agħżel ħin',yourDetails:'Id-dettalji tiegħek',
@@ -1492,6 +1551,9 @@ var _HTML_TEMPLATES = {
       document.querySelectorAll('.langItem').forEach(function(el) {
         el.classList.toggle('active', el.dataset.lang === lang);
       });
+      document.querySelectorAll('.langFlag').forEach(function(el) {
+        el.classList.toggle('active', el.dataset.lang === lang);
+      });
       // Re-apply dynamic summary text if state is loaded
       if (state.selectedServiceName) {
         els.sumService.textContent = t('serviceTemplate', state.selectedServiceName, state.selectedServiceMinutes);
@@ -1516,16 +1578,49 @@ var _HTML_TEMPLATES = {
       var langDrop = document.getElementById('langDrop');
       var langBtn = document.getElementById('langBtn');
 
+      function selectLang(code) {
+        applyLanguage(code);
+        langDrop.classList.remove('open');
+        // Update flag highlights
+        langDrop.querySelectorAll('.langFlag').forEach(function(f) {
+          f.classList.toggle('active', f.dataset.lang === code);
+        });
+        langDrop.querySelectorAll('.langItem').forEach(function(f) {
+          f.classList.toggle('active', f.dataset.lang === code);
+        });
+      }
+
+      // Popular flags row
+      var flagRow = document.createElement('div');
+      flagRow.className = 'langQuickFlags';
+      POPULAR_LANGS.forEach(function(code) {
+        var lang = LANGUAGES.find(function(l) { return l.code === code; });
+        if (!lang) return;
+        var f = document.createElement('div');
+        f.className = 'langFlag';
+        if (code === 'en') f.classList.add('active');
+        f.dataset.lang = code;
+        f.textContent = lang.flag;
+        f.title = lang.name;
+        f.addEventListener('click', function() { selectLang(code); });
+        flagRow.appendChild(f);
+      });
+      langDrop.appendChild(flagRow);
+
+      // Divider
+      var div = document.createElement('div');
+      div.className = 'langDivider';
+      div.textContent = 'All languages';
+      langDrop.appendChild(div);
+
+      // Full language list
       LANGUAGES.forEach(function(lang) {
         var d = document.createElement('div');
         d.className = 'langItem';
         d.dataset.lang = lang.code;
-        d.textContent = lang.name;
+        d.textContent = lang.flag + '  ' + lang.name;
         if (lang.code === 'en') d.classList.add('active');
-        d.addEventListener('click', function() {
-          applyLanguage(lang.code);
-          langDrop.classList.remove('open');
-        });
+        d.addEventListener('click', function() { selectLang(lang.code); });
         langDrop.appendChild(d);
       });
 
@@ -3068,13 +3163,14 @@ function showMsg(id, type, text) {
 }
 
 var _confirmCb = null;
-function styledConfirm(title, body, btnLabel, btnClass) {
+function styledConfirm(title, body, btnLabel, btnClass, dismissLabel) {
   return new Promise(function(resolve) {
     document.getElementById('confirmTitle').textContent = title;
     document.getElementById('confirmBody').textContent = body;
     var okBtn = document.getElementById('confirmOk');
     okBtn.className = 'btn ' + (btnClass || 'btn-danger');
     okBtn.textContent = btnLabel || 'Confirm';
+    document.getElementById('confirmCancel').textContent = dismissLabel || 'Go Back';
     var overlay = document.getElementById('confirmOverlay');
     overlay.style.display = 'flex';
     requestAnimationFrame(function(){ requestAnimationFrame(function(){ overlay.classList.add('show'); }); });
@@ -3578,7 +3674,7 @@ function cancelSingleAppt(appointmentId, containerId) {
     ? document.getElementById('actionDate').value
     : document.getElementById('notifyDate').value;
   if (!dateKey) return;
-  styledConfirm('Cancel Appointment', 'Cancel this appointment?', 'Cancel', 'btn-danger').then(function(ok){
+  styledConfirm('Cancel Appointment', 'Are you sure you want to cancel this appointment?', 'Yes, Cancel', 'btn-danger', 'Go Back').then(function(ok){
   if (!ok) return;
 
   showLoading('Cancelling...', 'Cancelling appointment.');
