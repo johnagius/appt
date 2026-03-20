@@ -62,6 +62,7 @@ function updateCalendarEventLocation_(eventId, newLocation, newTitleOptional, ne
 function listCalendarTakenSlots_(dateKey) {
   var cal = getKevinCalendar_();
   var dateObj = parseDateKey_(dateKey);
+  var dur = CFG().APPT_DURATION_MIN;
 
   var start = new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate(), 0, 0, 0, 0);
   var end = addMinutes_(start, 24 * 60);
@@ -71,9 +72,14 @@ function listCalendarTakenSlots_(dateKey) {
 
   for (var i = 0; i < events.length; i++) {
     var ev = events[i];
-    var st = ev.getStartTime();
-    var s = Utilities.formatDate(st, getTimeZone_(), 'HH:mm');
-    taken[s] = true;
+    var evStartMin = parseTimeToMinutes_(Utilities.formatDate(ev.getStartTime(), getTimeZone_(), 'HH:mm'));
+    var evEndMin = parseTimeToMinutes_(Utilities.formatDate(ev.getEndTime(), getTimeZone_(), 'HH:mm'));
+    // Handle events that end at or after midnight
+    if (evEndMin <= evStartMin) evEndMin = 1440;
+    // Mark every slot that overlaps with this event
+    for (var m = evStartMin; m + dur <= evEndMin; m += dur) {
+      taken[minutesToTime_(m)] = true;
+    }
   }
   return taken;
 }

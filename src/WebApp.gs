@@ -114,6 +114,8 @@ function apiGetDateOptions(extraMap) {
         disabled = true;
         reason = 'Closed';
       } else if (dk === todayKey) {
+        // Only disable today if the last slot has already ended.
+        // Detailed per-slot availability (taken, past, blocked) is handled by apiGetAvailability.
         var lastEnd = 0;
         for (var s = 0; s < slots.length; s++) {
           var endM = parseTimeToMinutes_(slots[s].end);
@@ -122,18 +124,6 @@ function apiGetDateOptions(extraMap) {
         if (nowMin >= lastEnd) {
           disabled = true;
           reason = 'No slots remaining today';
-        } else {
-          var remainingToday = 0;
-          for (var t = 0; t < slots.length; t++) {
-            var stMin = parseTimeToMinutes_(slots[t].start);
-            if (stMin < nowMin) continue;
-            if (slotBlockedByDoctorOff_(offEntry, slots[t].start, slots[t].end)) continue;
-            remainingToday++;
-          }
-          if (remainingToday === 0) {
-            disabled = true;
-            reason = offEntry ? doctorOffReason_(offEntry) : 'No slots available';
-          }
         }
       } else {
         var remaining = 0;

@@ -4848,6 +4848,7 @@ function updateCalendarEventLocation_(eventId, newLocation, newTitleOptional, ne
 function listCalendarTakenSlots_(dateKey) {
   var cal = getKevinCalendar_();
   var dateObj = parseDateKey_(dateKey);
+  var dur = CFG().APPT_DURATION_MIN;
 
   var start = new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate(), 0, 0, 0, 0);
   var end = addMinutes_(start, 24 * 60);
@@ -4857,9 +4858,14 @@ function listCalendarTakenSlots_(dateKey) {
 
   for (var i = 0; i < events.length; i++) {
     var ev = events[i];
-    var st = ev.getStartTime();
-    var s = Utilities.formatDate(st, getTimeZone_(), 'HH:mm');
-    taken[s] = true;
+    var evStartMin = parseTimeToMinutes_(Utilities.formatDate(ev.getStartTime(), getTimeZone_(), 'HH:mm'));
+    var evEndMin = parseTimeToMinutes_(Utilities.formatDate(ev.getEndTime(), getTimeZone_(), 'HH:mm'));
+    // Handle events that end at or after midnight
+    if (evEndMin <= evStartMin) evEndMin = 1440;
+    // Mark every slot that overlaps with this event
+    for (var m = evStartMin; m + dur <= evEndMin; m += dur) {
+      taken[minutesToTime_(m)] = true;
+    }
   }
   return taken;
 }
@@ -5324,6 +5330,8 @@ function apiGetDateOptions(extraMap) {
         disabled = true;
         reason = 'Closed';
       } else if (dk === todayKey) {
+        // Only disable today if the last slot has already ended.
+        // Detailed per-slot availability (taken, past, blocked) is handled by apiGetAvailability.
         var lastEnd = 0;
         for (var s = 0; s < slots.length; s++) {
           var endM = parseTimeToMinutes_(slots[s].end);
@@ -5332,18 +5340,6 @@ function apiGetDateOptions(extraMap) {
         if (nowMin >= lastEnd) {
           disabled = true;
           reason = 'No slots remaining today';
-        } else {
-          var remainingToday = 0;
-          for (var t = 0; t < slots.length; t++) {
-            var stMin = parseTimeToMinutes_(slots[t].start);
-            if (stMin < nowMin) continue;
-            if (slotBlockedByDoctorOff_(offEntry, slots[t].start, slots[t].end)) continue;
-            remainingToday++;
-          }
-          if (remainingToday === 0) {
-            disabled = true;
-            reason = offEntry ? doctorOffReason_(offEntry) : 'No slots available';
-          }
         }
       } else {
         var remaining = 0;
