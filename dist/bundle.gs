@@ -2842,9 +2842,11 @@ var _HTML_TEMPLATES = {
     .override-item.past{opacity:0.4;}
     .override-item .ov-remove{border:none;background:none;color:var(--muted);cursor:pointer;font-size:16px;padding:4px 8px;border-radius:8px;transition:all 0.15s ease;}
     .override-item .ov-remove:hover{background:rgba(239,68,68,0.1);color:var(--bad);}
-    .allday-row{display:flex;align-items:center;gap:6px;margin-bottom:8px;}
-    .allday-row label{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;cursor:pointer;}
-    .allday-row input[type=checkbox]{width:auto;margin:0;}
+    .time-pills{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;}
+    .time-pill{padding:8px 14px;border-radius:999px;border:1px solid var(--line);background:#fff;cursor:pointer;font-size:12px;font-weight:600;transition:all 0.15s ease;user-select:none;}
+    .time-pill:hover{border-color:#d1d5db;background:rgba(17,24,39,0.03);}
+    .time-pill.active{background:#111827;color:#fff;border-color:#111827;}
+    .time-label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px;font-weight:600;}
 
     /* Overlay animation */
     .overlay{opacity:0;transition:opacity 0.2s ease;}
@@ -2905,12 +2907,16 @@ var _HTML_TEMPLATES = {
           <div class="form-group"><label>Start date</label><input type="date" id="avStartDate"></div>
           <div class="form-group"><label>End date</label><input type="date" id="avEndDate"></div>
         </div>
-        <div class="allday-row">
-          <label><input type="checkbox" id="avAllDay" checked onchange="toggleAllDay()"> All day</label>
+        <div class="time-label">Time range</div>
+        <div class="time-pills" id="timePills">
+          <div class="time-pill active" onclick="pickTime('allday')">All day</div>
+          <div class="time-pill" onclick="pickTime('morning')">Morning 09:00-12:00</div>
+          <div class="time-pill" onclick="pickTime('afternoon')">Afternoon 17:00-19:00</div>
+          <div class="time-pill" onclick="pickTime('custom')">Custom</div>
         </div>
         <div class="form-row" id="avTimeRow" style="display:none;">
-          <div class="form-group"><label>Start time</label><input type="time" id="avStartTime"></div>
-          <div class="form-group"><label>End time</label><input type="time" id="avEndTime"></div>
+          <div class="form-group"><label>Start time</label><input type="time" id="avStartTime" step="600"></div>
+          <div class="form-group"><label>End time</label><input type="time" id="avEndTime" step="600"></div>
         </div>
         <div class="form-row">
           <div class="form-group"><label>Reason (optional)</label><input type="text" id="avReason" placeholder="e.g. Personal leave, Conference"></div>
@@ -3187,7 +3193,6 @@ function setAvailMode(mode) {
   var blockBtn = document.getElementById('toggleBlock');
   var addBtn = document.getElementById('toggleAdd');
   var submitBtn = document.getElementById('avSubmitBtn');
-  var allDayRow = document.querySelector('.allday-row');
 
   blockBtn.className = 'toggle-btn' + (mode === 'block' ? ' active-block' : '');
   addBtn.className = 'toggle-btn' + (mode === 'add' ? ' active-add' : '');
@@ -3195,14 +3200,18 @@ function setAvailMode(mode) {
   if (mode === 'block') {
     submitBtn.className = 'btn btn-danger';
     submitBtn.textContent = 'Block Time';
-    allDayRow.style.display = 'flex';
+    // Show all-day pill
+    var allDayPill = document.querySelector('#timePills .time-pill');
+    if (allDayPill) allDayPill.style.display = '';
+    pickTime('allday');
   } else {
     submitBtn.className = 'btn btn-good';
     submitBtn.textContent = 'Add Extra Time';
-    // Extra time always needs time range
-    document.getElementById('avAllDay').checked = false;
-    toggleAllDay();
-    allDayRow.style.display = 'none';
+    // Hide all-day pill — extra time needs specific hours
+    var allDayPill = document.querySelector('#timePills .time-pill');
+    if (allDayPill) allDayPill.style.display = 'none';
+    // Default to morning if currently on all-day
+    if (_selectedTime === 'allday') pickTime('morning');
   }
 }
 
@@ -3236,31 +3245,48 @@ function applyPreset(preset) {
     endDate.value = '';
   }
 
-  document.getElementById('avAllDay').checked = true;
-  toggleAllDay();
+  // Reset time to all-day (block mode) or morning (add mode)
+  if (_availMode === 'add') {
+    pickTime('morning');
+  } else {
+    pickTime('allday');
+  }
   document.getElementById('avReason').value = '';
   document.getElementById('availForm').style.display = 'block';
   document.getElementById('availMsg').className = 'msg';
 
-  // Re-apply mode in case extra was selected (needs time)
-  if (_availMode === 'add') setAvailMode('add');
+  // Re-apply mode visibility (hides all-day pill for extra)
+  setAvailMode(_availMode);
 }
 
 function toDateStr(d) {
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 }
 
-function toggleAllDay() {
-  var allDay = document.getElementById('avAllDay').checked;
-  document.getElementById('avTimeRow').style.display = allDay ? 'none' : 'flex';
+var _selectedTime = 'allday';
+
+function pickTime(mode) {
+  _selectedTime = mode;
+  var pills = document.querySelectorAll('#timePills .time-pill');
+  pills.forEach(function(p) { p.classList.remove('active'); });
+  // Find and activate the matching pill
+  var labels = {allday: 'All day', morning: 'Morning 09:00-12:00', afternoon: 'Afternoon 17:00-19:00', custom: 'Custom'};
+  pills.forEach(function(p) { if (p.textContent === labels[mode]) p.classList.add('active'); });
+
+  document.getElementById('avTimeRow').style.display = mode === 'custom' ? 'flex' : 'none';
+}
+
+function getTimeRange() {
+  if (_selectedTime === 'allday') return {start: '', end: ''};
+  if (_selectedTime === 'morning') return {start: '09:00', end: '12:00'};
+  if (_selectedTime === 'afternoon') return {start: '17:00', end: '19:00'};
+  return {start: document.getElementById('avStartTime').value, end: document.getElementById('avEndTime').value};
 }
 
 function submitAvailability() {
   var startDate = document.getElementById('avStartDate').value;
   var endDate = document.getElementById('avEndDate').value;
-  var allDay = document.getElementById('avAllDay').checked;
-  var startTime = document.getElementById('avStartTime').value;
-  var endTime = document.getElementById('avEndTime').value;
+  var times = getTimeRange();
   var reason = document.getElementById('avReason').value;
 
   if (!startDate) { showMsg('availMsg', 'bad', 'Please select a start date.'); return; }
@@ -3287,13 +3313,13 @@ function submitAvailability() {
       .apiAdminMarkDoctorOff(SIG, {
         startDate: startDate,
         endDate: endDate || startDate,
-        startTime: allDay ? '' : startTime,
-        endTime: allDay ? '' : endTime,
+        startTime: times.start,
+        endTime: times.end,
         reason: reason || 'Doctor not available'
       });
   } else {
-    if (!startTime) { showMsg('availMsg', 'bad', 'Please select a start time.'); return; }
-    if (!endTime) { showMsg('availMsg', 'bad', 'Please select an end time.'); return; }
+    if (!times.start) { showMsg('availMsg', 'bad', 'Please select a time range.'); return; }
+    if (!times.end) { showMsg('availMsg', 'bad', 'Please select a time range.'); return; }
 
     showLoading('Adding extra time...', 'Adding extra working hours.');
     google.script.run
@@ -3312,8 +3338,8 @@ function submitAvailability() {
       .apiAdminAddExtraSlots(SIG, {
         date: startDate,
         endDate: endDate || '',
-        startTime: startTime,
-        endTime: endTime,
+        startTime: times.start,
+        endTime: times.end,
         reason: reason
       });
   }
