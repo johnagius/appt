@@ -286,6 +286,58 @@ var _HTML_TEMPLATES = {
     .ccItem .ccCode{color:var(--muted);margin-left:auto;font-size:12px;}
     .ccItem:hover .ccCode,.ccItem.hl .ccCode{color:rgba(255,255,255,.8);}
 
+    /* Language picker */
+    .langPicker{position:relative;flex:0 0 auto;}
+    .langBtn{
+      border:none;
+      background:#fff;
+      font-size:20px;
+      padding:6px 10px;
+      cursor:pointer;
+      line-height:1;
+      border-radius:999px;
+      border:1px solid var(--line);
+      display:flex;
+      align-items:center;
+      gap:6px;
+    }
+    .langBtn .langLabel{
+      font-size:12px;
+      font-weight:800;
+      color:var(--muted);
+    }
+    .langDrop{
+      display:none;
+      position:absolute;
+      top:100%;
+      right:0;
+      z-index:999;
+      background:#fff;
+      border:1px solid var(--line);
+      border-radius:10px;
+      box-shadow:0 6px 20px rgba(0,0,0,.15);
+      width:200px;
+      max-height:320px;
+      overflow-y:auto;
+      margin-top:4px;
+    }
+    .langDrop.open{display:block;}
+    .langItem{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      padding:9px 12px;
+      cursor:pointer;
+      font-size:13px;
+      white-space:nowrap;
+    }
+    .langItem:first-child{border-radius:10px 10px 0 0;}
+    .langItem:last-child{border-radius:0 0 10px 10px;}
+    .langItem:hover,.langItem.active{background:var(--accent);color:#fff;}
+    [dir="rtl"] .langDrop{right:auto;left:0;}
+    [dir="rtl"] .headerBox{flex-direction:row-reverse;}
+    [dir="rtl"] .headerLeft{flex-direction:row-reverse;}
+
     .serviceRow{
       display:flex;
       align-items:center;
@@ -498,9 +550,14 @@ var _HTML_TEMPLATES = {
         </div>
       </div>
 
+      <div class="langPicker" id="langPicker">
+        <button type="button" class="langBtn" id="langBtn">🌐 <span class="langLabel">EN</span></button>
+        <div class="langDrop" id="langDrop"></div>
+      </div>
+
       <span class="pill" id="statusPill" style="display:none;">
         <span class="dot" id="statusDot"></span>
-        <span id="statusText">Ready</span>
+        <span id="statusText" data-i18n="ready">Ready</span>
       </span>
     </div>
 
@@ -508,7 +565,7 @@ var _HTML_TEMPLATES = {
     <div class="topRow">
       <!-- Summary -->
       <div class="card topCard">
-        <p class="topTitle">Summary</p>
+        <p class="topTitle" data-i18n="summary">Summary</p>
         <p class="topLine" id="sumService">Service: Clinic Consultation (10 mins)</p>
         <p class="topLine" id="sumDate">Date: —</p>
         <p class="topLine" id="sumTime">Time: —</p>
@@ -517,24 +574,24 @@ var _HTML_TEMPLATES = {
 
       <!-- Clinic hours -->
       <div class="card topCard">
-        <p class="topTitle">Clinic hours</p>
-        <p class="topLine"><b>Mon–Fri:</b> 09:00–12:00 & 17:00–19:00</p>
-        <p class="topLine"><b>Sat:</b> 10:00–12:00</p>
-        <p class="topLine"><b>Sun:</b> Closed</p>
-        <p class="topLine">Slots are 10 minutes each.</p>
+        <p class="topTitle" data-i18n="clinicHours">Clinic hours</p>
+        <p class="topLine"><b data-i18n="clinicMF">Mon–Fri:</b> 09:00–12:00 & 17:00–19:00</p>
+        <p class="topLine"><b data-i18n="clinicSat">Sat:</b> 10:00–12:00</p>
+        <p class="topLine"><b data-i18n="clinicSun">Sun:</b> <span data-i18n="closed">Closed</span></p>
+        <p class="topLine" data-i18n="slotInfo">Slots are 10 minutes each.</p>
       </div>
 
       <!-- Services + Date moved into the empty third column -->
       <div class="card topCard pickCard">
         <div class="pickGrid">
           <div>
-            <div class="sectionTitle">Services</div>
+            <div class="sectionTitle" data-i18n="services">Services</div>
             <div id="services"></div>
           </div>
 
           <div>
-            <div class="sectionTitle">Select a date</div>
-            <div class="label">Available dates (next 7 days)</div>
+            <div class="sectionTitle" data-i18n="selectDate">Select a date</div>
+            <div class="label" data-i18n="availableDates">Available dates (next 7 days)</div>
             <select id="dateSelect"></select>
             <div id="dateHint" class="msg"></div>
           </div>
@@ -544,24 +601,24 @@ var _HTML_TEMPLATES = {
 
     <!-- Main -->
     <div class="card main">
-      <div class="sectionTitle">Select a time</div>
+      <div class="sectionTitle" data-i18n="selectTime">Select a time</div>
       <div id="timeGrid" class="timeGrid"></div>
       <div id="timeHint" class="msg"></div>
 
-      <div class="sectionTitle" style="margin-top:12px;">Your details</div>
+      <div class="sectionTitle" style="margin-top:12px;" data-i18n="yourDetails">Your details</div>
 
       <div class="row">
         <div style="flex: 1 1 280px;">
-          <div class="label">Full name *</div>
-          <input id="fullName" type="text" autocomplete="name" placeholder="Full name">
+          <div class="label" data-i18n="fullNameLabel">Full name *</div>
+          <input id="fullName" type="text" autocomplete="name" placeholder="Full name" data-i18n-ph="fullNamePh">
         </div>
         <div style="flex: 1 1 220px;">
-          <div class="label">Phone *</div>
+          <div class="label" data-i18n="phoneLabel">Phone *</div>
           <div class="phoneWrap">
             <div class="ccPicker" id="ccPicker">
               <button type="button" class="ccBtn" id="ccBtn" aria-label="Country code">\\u{1F1F2}\\u{1F1F9}</button>
               <div class="ccDrop" id="ccDrop">
-                <input type="text" class="ccSearch" id="ccSearch" placeholder="Search country\\u2026" autocomplete="off">
+                <input type="text" class="ccSearch" id="ccSearch" placeholder="Search country\\u2026" autocomplete="off" data-i18n-ph="searchCountryPh">
                 <div class="ccList" id="ccList"></div>
               </div>
             </div>
@@ -570,18 +627,18 @@ var _HTML_TEMPLATES = {
           </div>
         </div>
         <div style="flex: 1 1 280px;">
-          <div class="label">Email *</div>
-          <input id="email" type="email" autocomplete="email" placeholder="you@example.com">
+          <div class="label" data-i18n="emailLabel">Email *</div>
+          <input id="email" type="email" autocomplete="email" placeholder="you@example.com" data-i18n-ph="emailPh">
         </div>
       </div>
 
       <div style="margin-top:10px;">
-        <div class="label">Comments</div>
-        <textarea id="comments" placeholder="Optional notes…"></textarea>
+        <div class="label" data-i18n="commentsLabel">Comments</div>
+        <textarea id="comments" placeholder="Optional notes…" data-i18n-ph="commentsPh"></textarea>
       </div>
 
       <div class="row" style="margin-top:10px; justify-content:flex-start;">
-        <button class="btn btnAccent" id="confirmBtn">Confirm</button>
+        <button class="btn btnAccent" id="confirmBtn" data-i18n="confirmBtn">Confirm</button>
       </div>
 
       <div id="resultMsg" class="msg"></div>
@@ -592,10 +649,10 @@ var _HTML_TEMPLATES = {
   <!-- Confirmation modal -->
   <div class="overlay" id="confirmOverlay">
     <div class="modal">
-      <h3>Appointment Confirmed</h3>
+      <h3 data-i18n="appointmentConfirmed">Appointment Confirmed</h3>
       <p id="confirmText"></p>
       <div class="modalActions">
-        <button class="btn btnAccent" id="confirmOk">OK</button>
+        <button class="btn btnAccent" id="confirmOk" data-i18n="okBtn">OK</button>
       </div>
     </div>
   </div>
@@ -701,6 +758,688 @@ var _HTML_TEMPLATES = {
       slots: []
     };
 
+    // ─── i18n Translation System ───
+    var currentLang = 'en';
+
+    const LANGUAGES = [
+      {code:'en',name:'English'},
+      {code:'fr',name:'Français'},
+      {code:'es',name:'Español'},
+      {code:'it',name:'Italiano'},
+      {code:'zh',name:'中文'},
+      {code:'hi',name:'हिन्दी'},
+      {code:'pt',name:'Português'},
+      {code:'ru',name:'Русский'},
+      {code:'ja',name:'日本語'},
+      {code:'pa',name:'ਪੰਜਾਬੀ'},
+      {code:'tr',name:'Türkçe'},
+      {code:'ar',name:'العربية'},
+      {code:'pl',name:'Polski'},
+      {code:'sr',name:'Srpski'},
+      {code:'hr',name:'Hrvatski'},
+      {code:'bs',name:'Bosanski'},
+      {code:'uk',name:'Українська'},
+      {code:'fil',name:'Filipino'},
+      {code:'bg',name:'Български'},
+      {code:'ro',name:'Română'},
+      {code:'mt',name:'Malti'}
+    ];
+
+    const TR = {};
+
+    TR.en = {
+      summary:'Summary',clinicHours:'Clinic hours',services:'Services',selectDate:'Select a date',
+      availableDates:'Available dates (next 7 days)',selectTime:'Select a time',yourDetails:'Your details',
+      fullNameLabel:'Full name *',phoneLabel:'Phone *',emailLabel:'Email *',commentsLabel:'Comments',
+      confirmBtn:'Confirm',appointmentConfirmed:'Appointment Confirmed',okBtn:'OK',
+      clinicMF:'Mon–Fri:',clinicSat:'Sat:',clinicSun:'Sun:',closed:'Closed',
+      slotInfo:'Slots are 10 minutes each.',ready:'Ready',
+      fullNamePh:'Full name',emailPh:'you@example.com',commentsPh:'Optional notes…',searchCountryPh:'Search country…',
+      serviceTemplate:'Service: {0} ({1} mins)',dateTemplate:'Date: {0}',timeTemplate:'Time: {0} - {1}',
+      locationTemplate:'Location: {0}',mins:'mins',
+      loadingTitle:'Loading…',loadingDesc:'Please wait.',
+      loadingBookingTitle:'Loading booking page…',loadingBookingDesc:'Please wait while we prepare the booking system.',
+      loadingSlotsTitle:'Loading time slots…',loadingSlotsDesc:'Please wait while we fetch availability.',
+      confirmingTitle:'Confirming appointment…',confirmingDesc:'Sending confirmation email and reserving your slot.',
+      noSlots:'No slots available.',noDates:'No available dates in the next 7 days.',
+      serviceSelected:'Service selected',loadingSlots:'Loading slots…',slotsLoaded:'Slots loaded',
+      timeSelected:'Time selected',missingFields:'Missing fields',bookingStatus:'Booking…',
+      unavailable:'Unavailable',errorLoadingSlots:'Error loading slots',noDatesAvailable:'No dates available',
+      loadError:'Load error',bookingFailed:'Booking failed',bookingError:'Booking error',
+      confirmMsg:'Your appointment has been confirmed.\\n\\nService: {0}\\nDate: {1}\\nTime: {2} - {3}\\nLocation: {4}\\n\\nA confirmation email has been sent. You can cancel from the link in that email.',
+      couldNotBook:'Could not book. Please try again.',errorLoadingApp:'Error loading app: ',
+      noAvailability:'No availability.',
+      valService:'Please select a service.',valDate:'Please select a date.',valTime:'Please select a time slot.',
+      valName:'Full name is required.',valPhone:'Phone number is required.',valEmail:'Email is required.',
+      valEmailFormat:'Please enter a valid email.',timeDash:'—'
+    };
+
+    TR.fr = {
+      summary:'Résumé',clinicHours:'Heures de la clinique',services:'Services',selectDate:'Sélectionner une date',
+      availableDates:'Dates disponibles (7 prochains jours)',selectTime:'Sélectionner une heure',yourDetails:'Vos coordonnées',
+      fullNameLabel:'Nom complet *',phoneLabel:'Téléphone *',emailLabel:'E-mail *',commentsLabel:'Commentaires',
+      confirmBtn:'Confirmer',appointmentConfirmed:'Rendez-vous confirmé',okBtn:'OK',
+      clinicMF:'Lun–Ven :',clinicSat:'Sam :',clinicSun:'Dim :',closed:'Fermé',
+      slotInfo:'Les créneaux sont de 10 minutes chacun.',ready:'Prêt',
+      fullNamePh:'Nom complet',emailPh:'vous@exemple.com',commentsPh:'Notes facultatives…',searchCountryPh:'Rechercher un pays…',
+      serviceTemplate:'Service : {0} ({1} min)',dateTemplate:'Date : {0}',timeTemplate:'Heure : {0} - {1}',
+      locationTemplate:'Lieu : {0}',mins:'min',
+      loadingTitle:'Chargement…',loadingDesc:'Veuillez patienter.',
+      loadingBookingTitle:'Chargement de la page…',loadingBookingDesc:'Préparation du système de réservation.',
+      loadingSlotsTitle:'Chargement des créneaux…',loadingSlotsDesc:'Récupération des disponibilités.',
+      confirmingTitle:'Confirmation du rendez-vous…',confirmingDesc:'Envoi de l\\'e-mail de confirmation et réservation.',
+      noSlots:'Aucun créneau disponible.',noDates:'Aucune date disponible dans les 7 prochains jours.',
+      serviceSelected:'Service sélectionné',loadingSlots:'Chargement…',slotsLoaded:'Créneaux chargés',
+      timeSelected:'Heure sélectionnée',missingFields:'Champs manquants',bookingStatus:'Réservation…',
+      unavailable:'Indisponible',errorLoadingSlots:'Erreur de chargement',noDatesAvailable:'Aucune date disponible',
+      loadError:'Erreur de chargement',bookingFailed:'Échec de la réservation',bookingError:'Erreur de réservation',
+      confirmMsg:'Votre rendez-vous a été confirmé.\\n\\nService : {0}\\nDate : {1}\\nHeure : {2} - {3}\\nLieu : {4}\\n\\nUn e-mail de confirmation a été envoyé. Vous pouvez annuler via le lien dans cet e-mail.',
+      couldNotBook:'Impossible de réserver. Veuillez réessayer.',errorLoadingApp:'Erreur de chargement : ',
+      noAvailability:'Pas de disponibilité.',
+      valService:'Veuillez sélectionner un service.',valDate:'Veuillez sélectionner une date.',valTime:'Veuillez sélectionner un créneau.',
+      valName:'Le nom complet est requis.',valPhone:'Le numéro de téléphone est requis.',valEmail:'L\\'e-mail est requis.',
+      valEmailFormat:'Veuillez entrer un e-mail valide.',timeDash:'—'
+    };
+
+    TR.es = {
+      summary:'Resumen',clinicHours:'Horario de la clínica',services:'Servicios',selectDate:'Seleccionar fecha',
+      availableDates:'Fechas disponibles (próximos 7 días)',selectTime:'Seleccionar hora',yourDetails:'Sus datos',
+      fullNameLabel:'Nombre completo *',phoneLabel:'Teléfono *',emailLabel:'Correo electrónico *',commentsLabel:'Comentarios',
+      confirmBtn:'Confirmar',appointmentConfirmed:'Cita confirmada',okBtn:'OK',
+      clinicMF:'Lun–Vie:',clinicSat:'Sáb:',clinicSun:'Dom:',closed:'Cerrado',
+      slotInfo:'Los turnos son de 10 minutos cada uno.',ready:'Listo',
+      fullNamePh:'Nombre completo',emailPh:'tu@ejemplo.com',commentsPh:'Notas opcionales…',searchCountryPh:'Buscar país…',
+      serviceTemplate:'Servicio: {0} ({1} min)',dateTemplate:'Fecha: {0}',timeTemplate:'Hora: {0} - {1}',
+      locationTemplate:'Ubicación: {0}',mins:'min',
+      loadingTitle:'Cargando…',loadingDesc:'Por favor espere.',
+      loadingBookingTitle:'Cargando página…',loadingBookingDesc:'Preparando el sistema de reservas.',
+      loadingSlotsTitle:'Cargando horarios…',loadingSlotsDesc:'Obteniendo disponibilidad.',
+      confirmingTitle:'Confirmando cita…',confirmingDesc:'Enviando correo de confirmación y reservando su turno.',
+      noSlots:'No hay turnos disponibles.',noDates:'No hay fechas disponibles en los próximos 7 días.',
+      serviceSelected:'Servicio seleccionado',loadingSlots:'Cargando…',slotsLoaded:'Turnos cargados',
+      timeSelected:'Hora seleccionada',missingFields:'Campos faltantes',bookingStatus:'Reservando…',
+      unavailable:'No disponible',errorLoadingSlots:'Error al cargar',noDatesAvailable:'Sin fechas disponibles',
+      loadError:'Error de carga',bookingFailed:'Error en la reserva',bookingError:'Error de reserva',
+      confirmMsg:'Su cita ha sido confirmada.\\n\\nServicio: {0}\\nFecha: {1}\\nHora: {2} - {3}\\nUbicación: {4}\\n\\nSe ha enviado un correo de confirmación. Puede cancelar desde el enlace en ese correo.',
+      couldNotBook:'No se pudo reservar. Inténtelo de nuevo.',errorLoadingApp:'Error al cargar: ',
+      noAvailability:'Sin disponibilidad.',
+      valService:'Seleccione un servicio.',valDate:'Seleccione una fecha.',valTime:'Seleccione un turno.',
+      valName:'El nombre completo es obligatorio.',valPhone:'El teléfono es obligatorio.',valEmail:'El correo es obligatorio.',
+      valEmailFormat:'Ingrese un correo válido.',timeDash:'—'
+    };
+
+    TR.it = {
+      summary:'Riepilogo',clinicHours:'Orari della clinica',services:'Servizi',selectDate:'Seleziona una data',
+      availableDates:'Date disponibili (prossimi 7 giorni)',selectTime:'Seleziona un orario',yourDetails:'I tuoi dati',
+      fullNameLabel:'Nome completo *',phoneLabel:'Telefono *',emailLabel:'Email *',commentsLabel:'Commenti',
+      confirmBtn:'Conferma',appointmentConfirmed:'Appuntamento confermato',okBtn:'OK',
+      clinicMF:'Lun–Ven:',clinicSat:'Sab:',clinicSun:'Dom:',closed:'Chiuso',
+      slotInfo:'Gli slot sono di 10 minuti ciascuno.',ready:'Pronto',
+      fullNamePh:'Nome completo',emailPh:'tu@esempio.com',commentsPh:'Note facoltative…',searchCountryPh:'Cerca paese…',
+      serviceTemplate:'Servizio: {0} ({1} min)',dateTemplate:'Data: {0}',timeTemplate:'Orario: {0} - {1}',
+      locationTemplate:'Luogo: {0}',mins:'min',
+      loadingTitle:'Caricamento…',loadingDesc:'Attendere prego.',
+      loadingBookingTitle:'Caricamento pagina…',loadingBookingDesc:'Preparazione del sistema di prenotazione.',
+      loadingSlotsTitle:'Caricamento orari…',loadingSlotsDesc:'Recupero disponibilità.',
+      confirmingTitle:'Conferma appuntamento…',confirmingDesc:'Invio email di conferma e prenotazione.',
+      noSlots:'Nessuno slot disponibile.',noDates:'Nessuna data disponibile nei prossimi 7 giorni.',
+      serviceSelected:'Servizio selezionato',loadingSlots:'Caricamento…',slotsLoaded:'Orari caricati',
+      timeSelected:'Orario selezionato',missingFields:'Campi mancanti',bookingStatus:'Prenotazione…',
+      unavailable:'Non disponibile',errorLoadingSlots:'Errore di caricamento',noDatesAvailable:'Nessuna data disponibile',
+      loadError:'Errore di caricamento',bookingFailed:'Prenotazione fallita',bookingError:'Errore di prenotazione',
+      confirmMsg:'Il tuo appuntamento è stato confermato.\\n\\nServizio: {0}\\nData: {1}\\nOrario: {2} - {3}\\nLuogo: {4}\\n\\nÈ stata inviata un\\'email di conferma. Puoi cancellare dal link nell\\'email.',
+      couldNotBook:'Impossibile prenotare. Riprova.',errorLoadingApp:'Errore di caricamento: ',
+      noAvailability:'Nessuna disponibilità.',
+      valService:'Seleziona un servizio.',valDate:'Seleziona una data.',valTime:'Seleziona un orario.',
+      valName:'Il nome completo è obbligatorio.',valPhone:'Il telefono è obbligatorio.',valEmail:'L\\'email è obbligatoria.',
+      valEmailFormat:'Inserisci un\\'email valida.',timeDash:'—'
+    };
+
+    TR.zh = {
+      summary:'摘要',clinicHours:'诊所时间',services:'服务',selectDate:'选择日期',
+      availableDates:'可用日期（未来7天）',selectTime:'选择时间',yourDetails:'您的信息',
+      fullNameLabel:'全名 *',phoneLabel:'电话 *',emailLabel:'邮箱 *',commentsLabel:'备注',
+      confirmBtn:'确认',appointmentConfirmed:'预约已确认',okBtn:'确定',
+      clinicMF:'周一至周五：',clinicSat:'周六：',clinicSun:'周日：',closed:'休息',
+      slotInfo:'每个时段为10分钟。',ready:'就绪',
+      fullNamePh:'全名',emailPh:'you@example.com',commentsPh:'可选备注…',searchCountryPh:'搜索国家…',
+      serviceTemplate:'服务：{0}（{1}分钟）',dateTemplate:'日期：{0}',timeTemplate:'时间：{0} - {1}',
+      locationTemplate:'地点：{0}',mins:'分钟',
+      loadingTitle:'加载中…',loadingDesc:'请稍候。',
+      loadingBookingTitle:'加载预约页面…',loadingBookingDesc:'正在准备预约系统。',
+      loadingSlotsTitle:'加载时段…',loadingSlotsDesc:'正在获取可用时间。',
+      confirmingTitle:'确认预约中…',confirmingDesc:'正在发送确认邮件并预留时段。',
+      noSlots:'没有可用时段。',noDates:'未来7天没有可用日期。',
+      serviceSelected:'已选服务',loadingSlots:'加载中…',slotsLoaded:'时段已加载',
+      timeSelected:'已选时间',missingFields:'缺少信息',bookingStatus:'预约中…',
+      unavailable:'不可用',errorLoadingSlots:'加载错误',noDatesAvailable:'无可用日期',
+      loadError:'加载错误',bookingFailed:'预约失败',bookingError:'预约错误',
+      confirmMsg:'您的预约已确认。\\n\\n服务：{0}\\n日期：{1}\\n时间：{2} - {3}\\n地点：{4}\\n\\n确认邮件已发送。您可以通过邮件中的链接取消预约。',
+      couldNotBook:'无法预约，请重试。',errorLoadingApp:'加载错误：',
+      noAvailability:'无可用时间。',
+      valService:'请选择服务。',valDate:'请选择日期。',valTime:'请选择时段。',
+      valName:'请填写全名。',valPhone:'请填写电话号码。',valEmail:'请填写邮箱。',
+      valEmailFormat:'请输入有效的邮箱地址。',timeDash:'—'
+    };
+
+    TR.hi = {
+      summary:'सारांश',clinicHours:'क्लिनिक समय',services:'सेवाएँ',selectDate:'तारीख चुनें',
+      availableDates:'उपलब्ध तारीखें (अगले 7 दिन)',selectTime:'समय चुनें',yourDetails:'आपकी जानकारी',
+      fullNameLabel:'पूरा नाम *',phoneLabel:'फ़ोन *',emailLabel:'ईमेल *',commentsLabel:'टिप्पणियाँ',
+      confirmBtn:'पुष्टि करें',appointmentConfirmed:'अपॉइंटमेंट की पुष्टि हो गई',okBtn:'ठीक है',
+      clinicMF:'सोम–शुक्र:',clinicSat:'शनि:',clinicSun:'रवि:',closed:'बंद',
+      slotInfo:'प्रत्येक स्लॉट 10 मिनट का है।',ready:'तैयार',
+      fullNamePh:'पूरा नाम',emailPh:'you@example.com',commentsPh:'वैकल्पिक नोट्स…',searchCountryPh:'देश खोजें…',
+      serviceTemplate:'सेवा: {0} ({1} मिनट)',dateTemplate:'तारीख: {0}',timeTemplate:'समय: {0} - {1}',
+      locationTemplate:'स्थान: {0}',mins:'मिनट',
+      loadingTitle:'लोड हो रहा है…',loadingDesc:'कृपया प्रतीक्षा करें।',
+      loadingBookingTitle:'बुकिंग पेज लोड हो रहा है…',loadingBookingDesc:'बुकिंग सिस्टम तैयार हो रहा है।',
+      loadingSlotsTitle:'समय स्लॉट लोड हो रहे हैं…',loadingSlotsDesc:'उपलब्धता प्राप्त हो रही है।',
+      confirmingTitle:'अपॉइंटमेंट की पुष्टि हो रही है…',confirmingDesc:'पुष्टि ईमेल भेजा जा रहा है।',
+      noSlots:'कोई स्लॉट उपलब्ध नहीं।',noDates:'अगले 7 दिनों में कोई तारीख उपलब्ध नहीं।',
+      serviceSelected:'सेवा चयनित',loadingSlots:'लोड हो रहा है…',slotsLoaded:'स्लॉट लोड हो गए',
+      timeSelected:'समय चयनित',missingFields:'जानकारी अधूरी',bookingStatus:'बुकिंग…',
+      unavailable:'अनुपलब्ध',errorLoadingSlots:'लोड त्रुटि',noDatesAvailable:'कोई तारीख उपलब्ध नहीं',
+      loadError:'लोड त्रुटि',bookingFailed:'बुकिंग विफल',bookingError:'बुकिंग त्रुटि',
+      confirmMsg:'आपकी अपॉइंटमेंट की पुष्टि हो गई है।\\n\\nसेवा: {0}\\nतारीख: {1}\\nसमय: {2} - {3}\\nस्थान: {4}\\n\\nपुष्टि ईमेल भेजा गया है। आप उस ईमेल में दिए गए लिंक से रद्द कर सकते हैं।',
+      couldNotBook:'बुकिंग नहीं हो सकी। कृपया पुनः प्रयास करें।',errorLoadingApp:'लोड त्रुटि: ',
+      noAvailability:'कोई उपलब्धता नहीं।',
+      valService:'कृपया एक सेवा चुनें।',valDate:'कृपया एक तारीख चुनें।',valTime:'कृपया एक समय स्लॉट चुनें।',
+      valName:'पूरा नाम आवश्यक है।',valPhone:'फ़ोन नंबर आवश्यक है।',valEmail:'ईमेल आवश्यक है।',
+      valEmailFormat:'कृपया एक मान्य ईमेल दर्ज करें।',timeDash:'—'
+    };
+
+    TR.pt = {
+      summary:'Resumo',clinicHours:'Horário da clínica',services:'Serviços',selectDate:'Selecionar data',
+      availableDates:'Datas disponíveis (próximos 7 dias)',selectTime:'Selecionar horário',yourDetails:'Seus dados',
+      fullNameLabel:'Nome completo *',phoneLabel:'Telefone *',emailLabel:'E-mail *',commentsLabel:'Comentários',
+      confirmBtn:'Confirmar',appointmentConfirmed:'Consulta confirmada',okBtn:'OK',
+      clinicMF:'Seg–Sex:',clinicSat:'Sáb:',clinicSun:'Dom:',closed:'Fechado',
+      slotInfo:'Os horários são de 10 minutos cada.',ready:'Pronto',
+      fullNamePh:'Nome completo',emailPh:'voce@exemplo.com',commentsPh:'Notas opcionais…',searchCountryPh:'Pesquisar país…',
+      serviceTemplate:'Serviço: {0} ({1} min)',dateTemplate:'Data: {0}',timeTemplate:'Horário: {0} - {1}',
+      locationTemplate:'Local: {0}',mins:'min',
+      loadingTitle:'Carregando…',loadingDesc:'Por favor aguarde.',
+      loadingBookingTitle:'Carregando página…',loadingBookingDesc:'Preparando o sistema de agendamento.',
+      loadingSlotsTitle:'Carregando horários…',loadingSlotsDesc:'Buscando disponibilidade.',
+      confirmingTitle:'Confirmando consulta…',confirmingDesc:'Enviando e-mail de confirmação e reservando horário.',
+      noSlots:'Nenhum horário disponível.',noDates:'Nenhuma data disponível nos próximos 7 dias.',
+      serviceSelected:'Serviço selecionado',loadingSlots:'Carregando…',slotsLoaded:'Horários carregados',
+      timeSelected:'Horário selecionado',missingFields:'Campos faltando',bookingStatus:'Agendando…',
+      unavailable:'Indisponível',errorLoadingSlots:'Erro ao carregar',noDatesAvailable:'Sem datas disponíveis',
+      loadError:'Erro de carregamento',bookingFailed:'Falha no agendamento',bookingError:'Erro no agendamento',
+      confirmMsg:'Sua consulta foi confirmada.\\n\\nServiço: {0}\\nData: {1}\\nHorário: {2} - {3}\\nLocal: {4}\\n\\nUm e-mail de confirmação foi enviado. Você pode cancelar pelo link no e-mail.',
+      couldNotBook:'Não foi possível agendar. Tente novamente.',errorLoadingApp:'Erro ao carregar: ',
+      noAvailability:'Sem disponibilidade.',
+      valService:'Selecione um serviço.',valDate:'Selecione uma data.',valTime:'Selecione um horário.',
+      valName:'Nome completo é obrigatório.',valPhone:'Telefone é obrigatório.',valEmail:'E-mail é obrigatório.',
+      valEmailFormat:'Insira um e-mail válido.',timeDash:'—'
+    };
+
+    TR.ru = {
+      summary:'Сводка',clinicHours:'Часы работы клиники',services:'Услуги',selectDate:'Выберите дату',
+      availableDates:'Доступные даты (ближайшие 7 дней)',selectTime:'Выберите время',yourDetails:'Ваши данные',
+      fullNameLabel:'ФИО *',phoneLabel:'Телефон *',emailLabel:'Эл. почта *',commentsLabel:'Комментарии',
+      confirmBtn:'Подтвердить',appointmentConfirmed:'Запись подтверждена',okBtn:'ОК',
+      clinicMF:'Пн–Пт:',clinicSat:'Сб:',clinicSun:'Вс:',closed:'Закрыто',
+      slotInfo:'Каждый слот — 10 минут.',ready:'Готово',
+      fullNamePh:'ФИО',emailPh:'you@example.com',commentsPh:'Необязательные заметки…',searchCountryPh:'Поиск страны…',
+      serviceTemplate:'Услуга: {0} ({1} мин)',dateTemplate:'Дата: {0}',timeTemplate:'Время: {0} - {1}',
+      locationTemplate:'Место: {0}',mins:'мин',
+      loadingTitle:'Загрузка…',loadingDesc:'Пожалуйста, подождите.',
+      loadingBookingTitle:'Загрузка страницы…',loadingBookingDesc:'Подготовка системы записи.',
+      loadingSlotsTitle:'Загрузка слотов…',loadingSlotsDesc:'Получение доступных слотов.',
+      confirmingTitle:'Подтверждение записи…',confirmingDesc:'Отправка подтверждения и бронирование.',
+      noSlots:'Нет доступных слотов.',noDates:'Нет доступных дат в ближайшие 7 дней.',
+      serviceSelected:'Услуга выбрана',loadingSlots:'Загрузка…',slotsLoaded:'Слоты загружены',
+      timeSelected:'Время выбрано',missingFields:'Не все поля заполнены',bookingStatus:'Запись…',
+      unavailable:'Недоступно',errorLoadingSlots:'Ошибка загрузки',noDatesAvailable:'Нет доступных дат',
+      loadError:'Ошибка загрузки',bookingFailed:'Ошибка записи',bookingError:'Ошибка записи',
+      confirmMsg:'Ваша запись подтверждена.\\n\\nУслуга: {0}\\nДата: {1}\\nВремя: {2} - {3}\\nМесто: {4}\\n\\nПисьмо с подтверждением отправлено. Отменить можно по ссылке в письме.',
+      couldNotBook:'Не удалось записаться. Попробуйте снова.',errorLoadingApp:'Ошибка загрузки: ',
+      noAvailability:'Нет доступного времени.',
+      valService:'Выберите услугу.',valDate:'Выберите дату.',valTime:'Выберите время.',
+      valName:'ФИО обязательно.',valPhone:'Телефон обязателен.',valEmail:'Эл. почта обязательна.',
+      valEmailFormat:'Введите корректный адрес эл. почты.',timeDash:'—'
+    };
+
+
+    TR.ja = {
+      summary:'概要',clinicHours:'診療時間',services:'サービス',selectDate:'日付を選択',
+      availableDates:'予約可能な日付（7日間）',selectTime:'時間を選択',yourDetails:'お客様情報',
+      fullNameLabel:'氏名 *',phoneLabel:'電話番号 *',emailLabel:'メール *',commentsLabel:'コメント',
+      confirmBtn:'確認',appointmentConfirmed:'予約が確定しました',okBtn:'OK',
+      clinicMF:'月〜金：',clinicSat:'土：',clinicSun:'日：',closed:'休診',
+      slotInfo:'各スロットは10分間です。',ready:'準備完了',
+      fullNamePh:'氏名',emailPh:'you@example.com',commentsPh:'メモ（任意）…',searchCountryPh:'国を検索…',
+      serviceTemplate:'サービス：{0}（{1}分）',dateTemplate:'日付：{0}',timeTemplate:'時間：{0} - {1}',
+      locationTemplate:'場所：{0}',mins:'分',
+      loadingTitle:'読み込み中…',loadingDesc:'お待ちください。',
+      loadingBookingTitle:'予約ページを読み込み中…',loadingBookingDesc:'予約システムを準備しています。',
+      loadingSlotsTitle:'時間枠を読み込み中…',loadingSlotsDesc:'空き状況を取得しています。',
+      confirmingTitle:'予約を確認中…',confirmingDesc:'確認メールを送信し、予約を確保しています。',
+      noSlots:'利用可能な時間枠がありません。',noDates:'7日間に利用可能な日付がありません。',
+      serviceSelected:'サービス選択済み',loadingSlots:'読み込み中…',slotsLoaded:'時間枠を読み込みました',
+      timeSelected:'時間選択済み',missingFields:'未入力の項目があります',bookingStatus:'予約中…',
+      unavailable:'利用不可',errorLoadingSlots:'読み込みエラー',noDatesAvailable:'利用可能な日付なし',
+      loadError:'読み込みエラー',bookingFailed:'予約に失敗しました',bookingError:'予約エラー',
+      confirmMsg:'ご予約が確定しました。\\n\\nサービス：{0}\\n日付：{1}\\n時間：{2} - {3}\\n場所：{4}\\n\\n確認メールが送信されました。メール内のリンクからキャンセルできます。',
+      couldNotBook:'予約できませんでした。もう一度お試しください。',errorLoadingApp:'読み込みエラー：',
+      noAvailability:'空きがありません。',
+      valService:'サービスを選択してください。',valDate:'日付を選択してください。',valTime:'時間枠を選択してください。',
+      valName:'氏名は必須です。',valPhone:'電話番号は必須です。',valEmail:'メールは必須です。',
+      valEmailFormat:'有効なメールアドレスを入力してください。',timeDash:'—'
+    };
+
+    TR.pa = {
+      summary:'ਸਾਰ',clinicHours:'ਕਲੀਨਿਕ ਦੇ ਸਮੇਂ',services:'ਸੇਵਾਵਾਂ',selectDate:'ਤਾਰੀਖ ਚੁਣੋ',
+      availableDates:'ਉਪਲਬਧ ਤਾਰੀਖਾਂ (ਅਗਲੇ 7 ਦਿਨ)',selectTime:'ਸਮਾਂ ਚੁਣੋ',yourDetails:'ਤੁਹਾਡੀ ਜਾਣਕਾਰੀ',
+      fullNameLabel:'ਪੂਰਾ ਨਾਮ *',phoneLabel:'ਫ਼ੋਨ *',emailLabel:'ਈਮੇਲ *',commentsLabel:'ਟਿੱਪਣੀਆਂ',
+      confirmBtn:'ਪੁਸ਼ਟੀ ਕਰੋ',appointmentConfirmed:'ਅਪੌਇੰਟਮੈਂਟ ਦੀ ਪੁਸ਼ਟੀ ਹੋ ਗਈ',okBtn:'ਠੀਕ ਹੈ',
+      clinicMF:'ਸੋਮ–ਸ਼ੁੱਕਰ:',clinicSat:'ਸ਼ਨੀ:',clinicSun:'ਐਤ:',closed:'ਬੰਦ',
+      slotInfo:'ਹਰ ਸਲਾਟ 10 ਮਿੰਟ ਦਾ ਹੈ।',ready:'ਤਿਆਰ',
+      fullNamePh:'ਪੂਰਾ ਨਾਮ',emailPh:'you@example.com',commentsPh:'ਵਿਕਲਪਿਕ ਨੋਟਸ…',searchCountryPh:'ਦੇਸ਼ ਖੋਜੋ…',
+      serviceTemplate:'ਸੇਵਾ: {0} ({1} ਮਿੰਟ)',dateTemplate:'ਤਾਰੀਖ: {0}',timeTemplate:'ਸਮਾਂ: {0} - {1}',
+      locationTemplate:'ਸਥਾਨ: {0}',mins:'ਮਿੰਟ',
+      loadingTitle:'ਲੋਡ ਹੋ ਰਿਹਾ ਹੈ…',loadingDesc:'ਕਿਰਪਾ ਕਰਕੇ ਉਡੀਕ ਕਰੋ।',
+      loadingBookingTitle:'ਬੁਕਿੰਗ ਪੇਜ ਲੋਡ ਹੋ ਰਿਹਾ ਹੈ…',loadingBookingDesc:'ਬੁਕਿੰਗ ਸਿਸਟਮ ਤਿਆਰ ਹੋ ਰਿਹਾ ਹੈ।',
+      loadingSlotsTitle:'ਸਮਾਂ ਸਲਾਟ ਲੋਡ ਹੋ ਰਹੇ ਹਨ…',loadingSlotsDesc:'ਉਪਲਬਧਤਾ ਪ੍ਰਾਪਤ ਹੋ ਰਹੀ ਹੈ।',
+      confirmingTitle:'ਅਪੌਇੰਟਮੈਂਟ ਦੀ ਪੁਸ਼ਟੀ ਹੋ ਰਹੀ ਹੈ…',confirmingDesc:'ਪੁਸ਼ਟੀ ਈਮੇਲ ਭੇਜੀ ਜਾ ਰਹੀ ਹੈ।',
+      noSlots:'ਕੋਈ ਸਲਾਟ ਉਪਲਬਧ ਨਹੀਂ।',noDates:'ਅਗਲੇ 7 ਦਿਨਾਂ ਵਿੱਚ ਕੋਈ ਤਾਰੀਖ ਉਪਲਬਧ ਨਹੀਂ।',
+      serviceSelected:'ਸੇਵਾ ਚੁਣੀ ਗਈ',loadingSlots:'ਲੋਡ ਹੋ ਰਿਹਾ ਹੈ…',slotsLoaded:'ਸਲਾਟ ਲੋਡ ਹੋ ਗਏ',
+      timeSelected:'ਸਮਾਂ ਚੁਣਿਆ ਗਿਆ',missingFields:'ਜਾਣਕਾਰੀ ਅਧੂਰੀ',bookingStatus:'ਬੁਕਿੰਗ…',
+      unavailable:'ਅਣਉਪਲਬਧ',errorLoadingSlots:'ਲੋਡ ਗਲਤੀ',noDatesAvailable:'ਕੋਈ ਤਾਰੀਖ ਉਪਲਬਧ ਨਹੀਂ',
+      loadError:'ਲੋਡ ਗਲਤੀ',bookingFailed:'ਬੁਕਿੰਗ ਅਸਫਲ',bookingError:'ਬੁਕਿੰਗ ਗਲਤੀ',
+      confirmMsg:'ਤੁਹਾਡੀ ਅਪੌਇੰਟਮੈਂਟ ਦੀ ਪੁਸ਼ਟੀ ਹੋ ਗਈ ਹੈ।\\n\\nਸੇਵਾ: {0}\\nਤਾਰੀਖ: {1}\\nਸਮਾਂ: {2} - {3}\\nਸਥਾਨ: {4}\\n\\nਪੁਸ਼ਟੀ ਈਮੇਲ ਭੇਜੀ ਗਈ ਹੈ। ਤੁਸੀਂ ਈਮੇਲ ਵਿੱਚ ਦਿੱਤੇ ਲਿੰਕ ਤੋਂ ਰੱਦ ਕਰ ਸਕਦੇ ਹੋ।',
+      couldNotBook:'ਬੁਕਿੰਗ ਨਹੀਂ ਹੋ ਸਕੀ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।',errorLoadingApp:'ਲੋਡ ਗਲਤੀ: ',
+      noAvailability:'ਕੋਈ ਉਪਲਬਧਤਾ ਨਹੀਂ।',
+      valService:'ਕਿਰਪਾ ਕਰਕੇ ਇੱਕ ਸੇਵਾ ਚੁਣੋ।',valDate:'ਕਿਰਪਾ ਕਰਕੇ ਇੱਕ ਤਾਰੀਖ ਚੁਣੋ।',valTime:'ਕਿਰਪਾ ਕਰਕੇ ਇੱਕ ਸਮਾਂ ਸਲਾਟ ਚੁਣੋ।',
+      valName:'ਪੂਰਾ ਨਾਮ ਜ਼ਰੂਰੀ ਹੈ।',valPhone:'ਫ਼ੋਨ ਨੰਬਰ ਜ਼ਰੂਰੀ ਹੈ।',valEmail:'ਈਮੇਲ ਜ਼ਰੂਰੀ ਹੈ।',
+      valEmailFormat:'ਕਿਰਪਾ ਕਰਕੇ ਇੱਕ ਵੈਧ ਈਮੇਲ ਦਰਜ ਕਰੋ।',timeDash:'—'
+    };
+
+    TR.tr = {
+      summary:'Özet',clinicHours:'Klinik saatleri',services:'Hizmetler',selectDate:'Tarih seçin',
+      availableDates:'Müsait tarihler (önümüzdeki 7 gün)',selectTime:'Saat seçin',yourDetails:'Bilgileriniz',
+      fullNameLabel:'Ad Soyad *',phoneLabel:'Telefon *',emailLabel:'E-posta *',commentsLabel:'Yorumlar',
+      confirmBtn:'Onayla',appointmentConfirmed:'Randevu onaylandı',okBtn:'Tamam',
+      clinicMF:'Pzt–Cum:',clinicSat:'Cmt:',clinicSun:'Paz:',closed:'Kapalı',
+      slotInfo:'Her slot 10 dakikadır.',ready:'Hazır',
+      fullNamePh:'Ad Soyad',emailPh:'siz@ornek.com',commentsPh:'İsteğe bağlı notlar…',searchCountryPh:'Ülke ara…',
+      serviceTemplate:'Hizmet: {0} ({1} dk)',dateTemplate:'Tarih: {0}',timeTemplate:'Saat: {0} - {1}',
+      locationTemplate:'Konum: {0}',mins:'dk',
+      loadingTitle:'Yükleniyor…',loadingDesc:'Lütfen bekleyin.',
+      loadingBookingTitle:'Sayfa yükleniyor…',loadingBookingDesc:'Randevu sistemi hazırlanıyor.',
+      loadingSlotsTitle:'Saatler yükleniyor…',loadingSlotsDesc:'Müsaitlik kontrol ediliyor.',
+      confirmingTitle:'Randevu onaylanıyor…',confirmingDesc:'Onay e-postası gönderiliyor.',
+      noSlots:'Müsait saat yok.',noDates:'Önümüzdeki 7 günde müsait tarih yok.',
+      serviceSelected:'Hizmet seçildi',loadingSlots:'Yükleniyor…',slotsLoaded:'Saatler yüklendi',
+      timeSelected:'Saat seçildi',missingFields:'Eksik bilgiler',bookingStatus:'Randevu alınıyor…',
+      unavailable:'Müsait değil',errorLoadingSlots:'Yükleme hatası',noDatesAvailable:'Müsait tarih yok',
+      loadError:'Yükleme hatası',bookingFailed:'Randevu başarısız',bookingError:'Randevu hatası',
+      confirmMsg:'Randevunuz onaylandı.\\n\\nHizmet: {0}\\nTarih: {1}\\nSaat: {2} - {3}\\nKonum: {4}\\n\\nOnay e-postası gönderildi. E-postadaki bağlantıdan iptal edebilirsiniz.',
+      couldNotBook:'Randevu alınamadı. Lütfen tekrar deneyin.',errorLoadingApp:'Yükleme hatası: ',
+      noAvailability:'Müsaitlik yok.',
+      valService:'Lütfen bir hizmet seçin.',valDate:'Lütfen bir tarih seçin.',valTime:'Lütfen bir saat seçin.',
+      valName:'Ad Soyad gereklidir.',valPhone:'Telefon gereklidir.',valEmail:'E-posta gereklidir.',
+      valEmailFormat:'Geçerli bir e-posta girin.',timeDash:'—'
+    };
+
+    TR.ar = {
+      summary:'الملخص',clinicHours:'ساعات العيادة',services:'الخدمات',selectDate:'اختر تاريخًا',
+      availableDates:'التواريخ المتاحة (7 أيام القادمة)',selectTime:'اختر وقتًا',yourDetails:'بياناتك',
+      fullNameLabel:'الاسم الكامل *',phoneLabel:'الهاتف *',emailLabel:'البريد الإلكتروني *',commentsLabel:'ملاحظات',
+      confirmBtn:'تأكيد',appointmentConfirmed:'تم تأكيد الموعد',okBtn:'موافق',
+      clinicMF:'الإثنين–الجمعة:',clinicSat:'السبت:',clinicSun:'الأحد:',closed:'مغلق',
+      slotInfo:'كل فترة 10 دقائق.',ready:'جاهز',
+      fullNamePh:'الاسم الكامل',emailPh:'you@example.com',commentsPh:'ملاحظات اختيارية…',searchCountryPh:'البحث عن بلد…',
+      serviceTemplate:'الخدمة: {0} ({1} دقيقة)',dateTemplate:'التاريخ: {0}',timeTemplate:'الوقت: {0} - {1}',
+      locationTemplate:'الموقع: {0}',mins:'دقيقة',
+      loadingTitle:'جارٍ التحميل…',loadingDesc:'يرجى الانتظار.',
+      loadingBookingTitle:'جارٍ تحميل صفحة الحجز…',loadingBookingDesc:'جارٍ تحضير نظام الحجز.',
+      loadingSlotsTitle:'جارٍ تحميل الأوقات…',loadingSlotsDesc:'جارٍ جلب الأوقات المتاحة.',
+      confirmingTitle:'جارٍ تأكيد الموعد…',confirmingDesc:'جارٍ إرسال بريد التأكيد وحجز الموعد.',
+      noSlots:'لا توجد أوقات متاحة.',noDates:'لا توجد تواريخ متاحة في الأيام السبعة القادمة.',
+      serviceSelected:'تم اختيار الخدمة',loadingSlots:'جارٍ التحميل…',slotsLoaded:'تم تحميل الأوقات',
+      timeSelected:'تم اختيار الوقت',missingFields:'حقول ناقصة',bookingStatus:'جارٍ الحجز…',
+      unavailable:'غير متاح',errorLoadingSlots:'خطأ في التحميل',noDatesAvailable:'لا تواريخ متاحة',
+      loadError:'خطأ في التحميل',bookingFailed:'فشل الحجز',bookingError:'خطأ في الحجز',
+      confirmMsg:'تم تأكيد موعدك.\\n\\nالخدمة: {0}\\nالتاريخ: {1}\\nالوقت: {2} - {3}\\nالموقع: {4}\\n\\nتم إرسال بريد التأكيد. يمكنك الإلغاء من الرابط في البريد.',
+      couldNotBook:'تعذر الحجز. يرجى المحاولة مرة أخرى.',errorLoadingApp:'خطأ في التحميل: ',
+      noAvailability:'لا توجد أوقات متاحة.',
+      valService:'يرجى اختيار خدمة.',valDate:'يرجى اختيار تاريخ.',valTime:'يرجى اختيار وقت.',
+      valName:'الاسم الكامل مطلوب.',valPhone:'رقم الهاتف مطلوب.',valEmail:'البريد الإلكتروني مطلوب.',
+      valEmailFormat:'يرجى إدخال بريد إلكتروني صحيح.',timeDash:'—'
+    };
+
+    TR.pl = {
+      summary:'Podsumowanie',clinicHours:'Godziny pracy kliniki',services:'Usługi',selectDate:'Wybierz datę',
+      availableDates:'Dostępne daty (najbliższe 7 dni)',selectTime:'Wybierz godzinę',yourDetails:'Twoje dane',
+      fullNameLabel:'Imię i nazwisko *',phoneLabel:'Telefon *',emailLabel:'E-mail *',commentsLabel:'Komentarze',
+      confirmBtn:'Potwierdź',appointmentConfirmed:'Wizyta potwierdzona',okBtn:'OK',
+      clinicMF:'Pon–Pt:',clinicSat:'Sob:',clinicSun:'Niedz:',closed:'Zamknięte',
+      slotInfo:'Każdy slot trwa 10 minut.',ready:'Gotowe',
+      fullNamePh:'Imię i nazwisko',emailPh:'ty@przyklad.pl',commentsPh:'Opcjonalne notatki…',searchCountryPh:'Szukaj kraju…',
+      serviceTemplate:'Usługa: {0} ({1} min)',dateTemplate:'Data: {0}',timeTemplate:'Godzina: {0} - {1}',
+      locationTemplate:'Lokalizacja: {0}',mins:'min',
+      loadingTitle:'Ładowanie…',loadingDesc:'Proszę czekać.',
+      loadingBookingTitle:'Ładowanie strony…',loadingBookingDesc:'Przygotowanie systemu rezerwacji.',
+      loadingSlotsTitle:'Ładowanie godzin…',loadingSlotsDesc:'Pobieranie dostępności.',
+      confirmingTitle:'Potwierdzanie wizyty…',confirmingDesc:'Wysyłanie e-maila z potwierdzeniem.',
+      noSlots:'Brak dostępnych godzin.',noDates:'Brak dostępnych dat w najbliższych 7 dniach.',
+      serviceSelected:'Usługa wybrana',loadingSlots:'Ładowanie…',slotsLoaded:'Godziny załadowane',
+      timeSelected:'Godzina wybrana',missingFields:'Brakujące pola',bookingStatus:'Rezerwacja…',
+      unavailable:'Niedostępne',errorLoadingSlots:'Błąd ładowania',noDatesAvailable:'Brak dostępnych dat',
+      loadError:'Błąd ładowania',bookingFailed:'Rezerwacja nieudana',bookingError:'Błąd rezerwacji',
+      confirmMsg:'Twoja wizyta została potwierdzona.\\n\\nUsługa: {0}\\nData: {1}\\nGodzina: {2} - {3}\\nLokalizacja: {4}\\n\\nWysłano e-mail z potwierdzeniem. Możesz anulować z linku w e-mailu.',
+      couldNotBook:'Nie udało się zarezerwować. Spróbuj ponownie.',errorLoadingApp:'Błąd ładowania: ',
+      noAvailability:'Brak dostępności.',
+      valService:'Wybierz usługę.',valDate:'Wybierz datę.',valTime:'Wybierz godzinę.',
+      valName:'Imię i nazwisko jest wymagane.',valPhone:'Telefon jest wymagany.',valEmail:'E-mail jest wymagany.',
+      valEmailFormat:'Wprowadź prawidłowy e-mail.',timeDash:'—'
+    };
+
+    TR.sr = {
+      summary:'Rezime',clinicHours:'Radno vreme klinike',services:'Usluge',selectDate:'Izaberite datum',
+      availableDates:'Dostupni datumi (narednih 7 dana)',selectTime:'Izaberite vreme',yourDetails:'Vaši podaci',
+      fullNameLabel:'Ime i prezime *',phoneLabel:'Telefon *',emailLabel:'E-mail *',commentsLabel:'Komentari',
+      confirmBtn:'Potvrdi',appointmentConfirmed:'Termin je potvrđen',okBtn:'OK',
+      clinicMF:'Pon–Pet:',clinicSat:'Sub:',clinicSun:'Ned:',closed:'Zatvoreno',
+      slotInfo:'Svaki termin traje 10 minuta.',ready:'Spremno',
+      fullNamePh:'Ime i prezime',emailPh:'vi@primer.com',commentsPh:'Opcione napomene…',searchCountryPh:'Pretraži državu…',
+      serviceTemplate:'Usluga: {0} ({1} min)',dateTemplate:'Datum: {0}',timeTemplate:'Vreme: {0} - {1}',
+      locationTemplate:'Lokacija: {0}',mins:'min',
+      loadingTitle:'Učitavanje…',loadingDesc:'Molimo sačekajte.',
+      loadingBookingTitle:'Učitavanje stranice…',loadingBookingDesc:'Priprema sistema za zakazivanje.',
+      loadingSlotsTitle:'Učitavanje termina…',loadingSlotsDesc:'Preuzimanje dostupnosti.',
+      confirmingTitle:'Potvrđivanje termina…',confirmingDesc:'Slanje e-maila za potvrdu.',
+      noSlots:'Nema dostupnih termina.',noDates:'Nema dostupnih datuma u narednih 7 dana.',
+      serviceSelected:'Usluga izabrana',loadingSlots:'Učitavanje…',slotsLoaded:'Termini učitani',
+      timeSelected:'Vreme izabrano',missingFields:'Nedostaju polja',bookingStatus:'Zakazivanje…',
+      unavailable:'Nedostupno',errorLoadingSlots:'Greška pri učitavanju',noDatesAvailable:'Nema dostupnih datuma',
+      loadError:'Greška pri učitavanju',bookingFailed:'Zakazivanje neuspešno',bookingError:'Greška zakazivanja',
+      confirmMsg:'Vaš termin je potvrđen.\\n\\nUsluga: {0}\\nDatum: {1}\\nVreme: {2} - {3}\\nLokacija: {4}\\n\\nPotvrda je poslata na e-mail. Možete otkazati putem linka u e-mailu.',
+      couldNotBook:'Nije moguće zakazati. Pokušajte ponovo.',errorLoadingApp:'Greška pri učitavanju: ',
+      noAvailability:'Nema dostupnosti.',
+      valService:'Izaberite uslugu.',valDate:'Izaberite datum.',valTime:'Izaberite termin.',
+      valName:'Ime i prezime je obavezno.',valPhone:'Telefon je obavezan.',valEmail:'E-mail je obavezan.',
+      valEmailFormat:'Unesite ispravnu e-mail adresu.',timeDash:'—'
+    };
+
+    TR.hr = {
+      summary:'Sažetak',clinicHours:'Radno vrijeme klinike',services:'Usluge',selectDate:'Odaberite datum',
+      availableDates:'Dostupni datumi (sljedećih 7 dana)',selectTime:'Odaberite vrijeme',yourDetails:'Vaši podaci',
+      fullNameLabel:'Ime i prezime *',phoneLabel:'Telefon *',emailLabel:'E-mail *',commentsLabel:'Komentari',
+      confirmBtn:'Potvrdi',appointmentConfirmed:'Termin je potvrđen',okBtn:'OK',
+      clinicMF:'Pon–Pet:',clinicSat:'Sub:',clinicSun:'Ned:',closed:'Zatvoreno',
+      slotInfo:'Svaki termin traje 10 minuta.',ready:'Spremno',
+      fullNamePh:'Ime i prezime',emailPh:'vi@primjer.com',commentsPh:'Neobavezne napomene…',searchCountryPh:'Pretraži državu…',
+      serviceTemplate:'Usluga: {0} ({1} min)',dateTemplate:'Datum: {0}',timeTemplate:'Vrijeme: {0} - {1}',
+      locationTemplate:'Lokacija: {0}',mins:'min',
+      loadingTitle:'Učitavanje…',loadingDesc:'Molimo pričekajte.',
+      loadingBookingTitle:'Učitavanje stranice…',loadingBookingDesc:'Priprema sustava za naručivanje.',
+      loadingSlotsTitle:'Učitavanje termina…',loadingSlotsDesc:'Dohvaćanje dostupnosti.',
+      confirmingTitle:'Potvrđivanje termina…',confirmingDesc:'Slanje e-maila za potvrdu.',
+      noSlots:'Nema dostupnih termina.',noDates:'Nema dostupnih datuma u sljedećih 7 dana.',
+      serviceSelected:'Usluga odabrana',loadingSlots:'Učitavanje…',slotsLoaded:'Termini učitani',
+      timeSelected:'Vrijeme odabrano',missingFields:'Nedostaju polja',bookingStatus:'Naručivanje…',
+      unavailable:'Nedostupno',errorLoadingSlots:'Greška učitavanja',noDatesAvailable:'Nema dostupnih datuma',
+      loadError:'Greška učitavanja',bookingFailed:'Naručivanje neuspjelo',bookingError:'Greška naručivanja',
+      confirmMsg:'Vaš termin je potvrđen.\\n\\nUsluga: {0}\\nDatum: {1}\\nVrijeme: {2} - {3}\\nLokacija: {4}\\n\\nPotvrda je poslana na e-mail. Možete otkazati putem linka u e-mailu.',
+      couldNotBook:'Nije moguće naručiti. Pokušajte ponovo.',errorLoadingApp:'Greška učitavanja: ',
+      noAvailability:'Nema dostupnosti.',
+      valService:'Odaberite uslugu.',valDate:'Odaberite datum.',valTime:'Odaberite termin.',
+      valName:'Ime i prezime je obavezno.',valPhone:'Telefon je obavezan.',valEmail:'E-mail je obavezan.',
+      valEmailFormat:'Unesite ispravnu e-mail adresu.',timeDash:'—'
+    };
+
+    TR.bs = {
+      summary:'Sažetak',clinicHours:'Radno vrijeme klinike',services:'Usluge',selectDate:'Odaberite datum',
+      availableDates:'Dostupni datumi (narednih 7 dana)',selectTime:'Odaberite vrijeme',yourDetails:'Vaši podaci',
+      fullNameLabel:'Ime i prezime *',phoneLabel:'Telefon *',emailLabel:'E-mail *',commentsLabel:'Komentari',
+      confirmBtn:'Potvrdi',appointmentConfirmed:'Termin je potvrđen',okBtn:'OK',
+      clinicMF:'Pon–Pet:',clinicSat:'Sub:',clinicSun:'Ned:',closed:'Zatvoreno',
+      slotInfo:'Svaki termin traje 10 minuta.',ready:'Spremno',
+      fullNamePh:'Ime i prezime',emailPh:'vi@primjer.com',commentsPh:'Neobavezne napomene…',searchCountryPh:'Pretraži državu…',
+      serviceTemplate:'Usluga: {0} ({1} min)',dateTemplate:'Datum: {0}',timeTemplate:'Vrijeme: {0} - {1}',
+      locationTemplate:'Lokacija: {0}',mins:'min',
+      loadingTitle:'Učitavanje…',loadingDesc:'Molimo pričekajte.',
+      loadingBookingTitle:'Učitavanje stranice…',loadingBookingDesc:'Priprema sistema za naručivanje.',
+      loadingSlotsTitle:'Učitavanje termina…',loadingSlotsDesc:'Dohvatanje dostupnosti.',
+      confirmingTitle:'Potvrđivanje termina…',confirmingDesc:'Slanje e-maila za potvrdu.',
+      noSlots:'Nema dostupnih termina.',noDates:'Nema dostupnih datuma u narednih 7 dana.',
+      serviceSelected:'Usluga odabrana',loadingSlots:'Učitavanje…',slotsLoaded:'Termini učitani',
+      timeSelected:'Vrijeme odabrano',missingFields:'Nedostaju polja',bookingStatus:'Naručivanje…',
+      unavailable:'Nedostupno',errorLoadingSlots:'Greška učitavanja',noDatesAvailable:'Nema dostupnih datuma',
+      loadError:'Greška učitavanja',bookingFailed:'Naručivanje neuspjelo',bookingError:'Greška naručivanja',
+      confirmMsg:'Vaš termin je potvrđen.\\n\\nUsluga: {0}\\nDatum: {1}\\nVrijeme: {2} - {3}\\nLokacija: {4}\\n\\nPotvrda je poslana na e-mail. Možete otkazati putem linka u e-mailu.',
+      couldNotBook:'Nije moguće naručiti. Pokušajte ponovo.',errorLoadingApp:'Greška učitavanja: ',
+      noAvailability:'Nema dostupnosti.',
+      valService:'Odaberite uslugu.',valDate:'Odaberite datum.',valTime:'Odaberite termin.',
+      valName:'Ime i prezime je obavezno.',valPhone:'Telefon je obavezan.',valEmail:'E-mail je obavezan.',
+      valEmailFormat:'Unesite ispravnu e-mail adresu.',timeDash:'—'
+    };
+
+    TR.uk = {
+      summary:'Підсумок',clinicHours:'Години роботи клініки',services:'Послуги',selectDate:'Оберіть дату',
+      availableDates:'Доступні дати (наступні 7 днів)',selectTime:'Оберіть час',yourDetails:'Ваші дані',
+      fullNameLabel:'Повне ім\\'я *',phoneLabel:'Телефон *',emailLabel:'Ел. пошта *',commentsLabel:'Коментарі',
+      confirmBtn:'Підтвердити',appointmentConfirmed:'Запис підтверджено',okBtn:'OK',
+      clinicMF:'Пн–Пт:',clinicSat:'Сб:',clinicSun:'Нд:',closed:'Зачинено',
+      slotInfo:'Кожен слот — 10 хвилин.',ready:'Готово',
+      fullNamePh:'Повне ім\\'я',emailPh:'you@example.com',commentsPh:'Необов\\'язкові нотатки…',searchCountryPh:'Пошук країни…',
+      serviceTemplate:'Послуга: {0} ({1} хв)',dateTemplate:'Дата: {0}',timeTemplate:'Час: {0} - {1}',
+      locationTemplate:'Місце: {0}',mins:'хв',
+      loadingTitle:'Завантаження…',loadingDesc:'Будь ласка, зачекайте.',
+      loadingBookingTitle:'Завантаження сторінки…',loadingBookingDesc:'Підготовка системи запису.',
+      loadingSlotsTitle:'Завантаження слотів…',loadingSlotsDesc:'Отримання доступних часів.',
+      confirmingTitle:'Підтвердження запису…',confirmingDesc:'Надсилання підтвердження.',
+      noSlots:'Немає доступних слотів.',noDates:'Немає доступних дат у наступні 7 днів.',
+      serviceSelected:'Послугу обрано',loadingSlots:'Завантаження…',slotsLoaded:'Слоти завантажено',
+      timeSelected:'Час обрано',missingFields:'Не всі поля заповнено',bookingStatus:'Запис…',
+      unavailable:'Недоступно',errorLoadingSlots:'Помилка завантаження',noDatesAvailable:'Немає доступних дат',
+      loadError:'Помилка завантаження',bookingFailed:'Помилка запису',bookingError:'Помилка запису',
+      confirmMsg:'Ваш запис підтверджено.\\n\\nПослуга: {0}\\nДата: {1}\\nЧас: {2} - {3}\\nМісце: {4}\\n\\nЛист підтвердження надіслано. Скасувати можна за посиланням у листі.',
+      couldNotBook:'Не вдалося записатися. Спробуйте ще раз.',errorLoadingApp:'Помилка завантаження: ',
+      noAvailability:'Немає доступного часу.',
+      valService:'Оберіть послугу.',valDate:'Оберіть дату.',valTime:'Оберіть час.',
+      valName:'Повне ім\\'я обов\\'язкове.',valPhone:'Телефон обов\\'язковий.',valEmail:'Ел. пошта обов\\'язкова.',
+      valEmailFormat:'Введіть дійсну ел. пошту.',timeDash:'—'
+    };
+
+    TR.fil = {
+      summary:'Buod',clinicHours:'Oras ng klinika',services:'Mga Serbisyo',selectDate:'Pumili ng petsa',
+      availableDates:'Mga available na petsa (susunod na 7 araw)',selectTime:'Pumili ng oras',yourDetails:'Iyong impormasyon',
+      fullNameLabel:'Buong pangalan *',phoneLabel:'Telepono *',emailLabel:'Email *',commentsLabel:'Mga komento',
+      confirmBtn:'Kumpirmahin',appointmentConfirmed:'Nakumpirma ang appointment',okBtn:'OK',
+      clinicMF:'Lun–Biy:',clinicSat:'Sab:',clinicSun:'Lin:',closed:'Sarado',
+      slotInfo:'Ang bawat slot ay 10 minuto.',ready:'Handa na',
+      fullNamePh:'Buong pangalan',emailPh:'you@example.com',commentsPh:'Opsyonal na tala…',searchCountryPh:'Maghanap ng bansa…',
+      serviceTemplate:'Serbisyo: {0} ({1} min)',dateTemplate:'Petsa: {0}',timeTemplate:'Oras: {0} - {1}',
+      locationTemplate:'Lokasyon: {0}',mins:'min',
+      loadingTitle:'Naglo-load…',loadingDesc:'Mangyaring maghintay.',
+      loadingBookingTitle:'Naglo-load ng pahina…',loadingBookingDesc:'Inihahanda ang sistema ng booking.',
+      loadingSlotsTitle:'Naglo-load ng mga oras…',loadingSlotsDesc:'Kinukuha ang availability.',
+      confirmingTitle:'Kinukumpirma ang appointment…',confirmingDesc:'Nagpapadala ng confirmation email.',
+      noSlots:'Walang available na slot.',noDates:'Walang available na petsa sa susunod na 7 araw.',
+      serviceSelected:'Napili ang serbisyo',loadingSlots:'Naglo-load…',slotsLoaded:'Na-load na ang mga oras',
+      timeSelected:'Napili ang oras',missingFields:'May kulang na impormasyon',bookingStatus:'Nagbu-book…',
+      unavailable:'Hindi available',errorLoadingSlots:'Error sa pag-load',noDatesAvailable:'Walang available na petsa',
+      loadError:'Error sa pag-load',bookingFailed:'Hindi na-book',bookingError:'Error sa booking',
+      confirmMsg:'Nakumpirma na ang iyong appointment.\\n\\nSerbisyo: {0}\\nPetsa: {1}\\nOras: {2} - {3}\\nLokasyon: {4}\\n\\nNaipadala na ang confirmation email. Maaari kang mag-cancel sa link sa email.',
+      couldNotBook:'Hindi na-book. Pakisubukan ulit.',errorLoadingApp:'Error sa pag-load: ',
+      noAvailability:'Walang availability.',
+      valService:'Pumili ng serbisyo.',valDate:'Pumili ng petsa.',valTime:'Pumili ng oras.',
+      valName:'Kailangan ang buong pangalan.',valPhone:'Kailangan ang telepono.',valEmail:'Kailangan ang email.',
+      valEmailFormat:'Maglagay ng tamang email.',timeDash:'—'
+    };
+
+    TR.bg = {
+      summary:'Обобщение',clinicHours:'Работно време на клиниката',services:'Услуги',selectDate:'Изберете дата',
+      availableDates:'Налични дати (следващите 7 дни)',selectTime:'Изберете час',yourDetails:'Вашите данни',
+      fullNameLabel:'Пълно име *',phoneLabel:'Телефон *',emailLabel:'Имейл *',commentsLabel:'Коментари',
+      confirmBtn:'Потвърди',appointmentConfirmed:'Часът е потвърден',okBtn:'OK',
+      clinicMF:'Пон–Пет:',clinicSat:'Съб:',clinicSun:'Нед:',closed:'Затворено',
+      slotInfo:'Всеки час е по 10 минути.',ready:'Готово',
+      fullNamePh:'Пълно име',emailPh:'you@example.com',commentsPh:'Незадължителни бележки…',searchCountryPh:'Търсене на държава…',
+      serviceTemplate:'Услуга: {0} ({1} мин)',dateTemplate:'Дата: {0}',timeTemplate:'Час: {0} - {1}',
+      locationTemplate:'Местоположение: {0}',mins:'мин',
+      loadingTitle:'Зареждане…',loadingDesc:'Моля, изчакайте.',
+      loadingBookingTitle:'Зареждане на страницата…',loadingBookingDesc:'Подготовка на системата за записване.',
+      loadingSlotsTitle:'Зареждане на часове…',loadingSlotsDesc:'Получаване на наличност.',
+      confirmingTitle:'Потвърждаване на час…',confirmingDesc:'Изпращане на имейл за потвърждение.',
+      noSlots:'Няма налични часове.',noDates:'Няма налични дати в следващите 7 дни.',
+      serviceSelected:'Услугата е избрана',loadingSlots:'Зареждане…',slotsLoaded:'Часовете са заредени',
+      timeSelected:'Часът е избран',missingFields:'Липсващи полета',bookingStatus:'Записване…',
+      unavailable:'Недостъпно',errorLoadingSlots:'Грешка при зареждане',noDatesAvailable:'Няма налични дати',
+      loadError:'Грешка при зареждане',bookingFailed:'Неуспешно записване',bookingError:'Грешка при записване',
+      confirmMsg:'Вашият час е потвърден.\\n\\nУслуга: {0}\\nДата: {1}\\nЧас: {2} - {3}\\nМестоположение: {4}\\n\\nИзпратен е имейл за потвърждение. Можете да отмените от линка в имейла.',
+      couldNotBook:'Не може да се запише. Опитайте отново.',errorLoadingApp:'Грешка при зареждане: ',
+      noAvailability:'Няма наличност.',
+      valService:'Моля, изберете услуга.',valDate:'Моля, изберете дата.',valTime:'Моля, изберете час.',
+      valName:'Пълното име е задължително.',valPhone:'Телефонът е задължителен.',valEmail:'Имейлът е задължителен.',
+      valEmailFormat:'Въведете валиден имейл.',timeDash:'—'
+    };
+
+    TR.ro = {
+      summary:'Rezumat',clinicHours:'Programul clinicii',services:'Servicii',selectDate:'Selectați o dată',
+      availableDates:'Date disponibile (următoarele 7 zile)',selectTime:'Selectați o oră',yourDetails:'Datele dumneavoastră',
+      fullNameLabel:'Nume complet *',phoneLabel:'Telefon *',emailLabel:'E-mail *',commentsLabel:'Comentarii',
+      confirmBtn:'Confirmă',appointmentConfirmed:'Programare confirmată',okBtn:'OK',
+      clinicMF:'Lun–Vin:',clinicSat:'Sâm:',clinicSun:'Dum:',closed:'Închis',
+      slotInfo:'Fiecare slot are 10 minute.',ready:'Pregătit',
+      fullNamePh:'Nume complet',emailPh:'dvs@exemplu.com',commentsPh:'Note opționale…',searchCountryPh:'Caută țara…',
+      serviceTemplate:'Serviciu: {0} ({1} min)',dateTemplate:'Data: {0}',timeTemplate:'Ora: {0} - {1}',
+      locationTemplate:'Locație: {0}',mins:'min',
+      loadingTitle:'Se încarcă…',loadingDesc:'Vă rugăm așteptați.',
+      loadingBookingTitle:'Se încarcă pagina…',loadingBookingDesc:'Pregătirea sistemului de programări.',
+      loadingSlotsTitle:'Se încarcă orele…',loadingSlotsDesc:'Se obține disponibilitatea.',
+      confirmingTitle:'Se confirmă programarea…',confirmingDesc:'Se trimite e-mailul de confirmare.',
+      noSlots:'Nu sunt ore disponibile.',noDates:'Nu sunt date disponibile în următoarele 7 zile.',
+      serviceSelected:'Serviciu selectat',loadingSlots:'Se încarcă…',slotsLoaded:'Orele au fost încărcate',
+      timeSelected:'Ora selectată',missingFields:'Câmpuri lipsă',bookingStatus:'Se programează…',
+      unavailable:'Indisponibil',errorLoadingSlots:'Eroare la încărcare',noDatesAvailable:'Fără date disponibile',
+      loadError:'Eroare la încărcare',bookingFailed:'Programare eșuată',bookingError:'Eroare la programare',
+      confirmMsg:'Programarea dumneavoastră a fost confirmată.\\n\\nServiciu: {0}\\nData: {1}\\nOra: {2} - {3}\\nLocație: {4}\\n\\nUn e-mail de confirmare a fost trimis. Puteți anula din linkul din e-mail.',
+      couldNotBook:'Nu s-a putut programa. Încercați din nou.',errorLoadingApp:'Eroare la încărcare: ',
+      noAvailability:'Fără disponibilitate.',
+      valService:'Selectați un serviciu.',valDate:'Selectați o dată.',valTime:'Selectați o oră.',
+      valName:'Numele complet este obligatoriu.',valPhone:'Telefonul este obligatoriu.',valEmail:'E-mailul este obligatoriu.',
+      valEmailFormat:'Introduceți un e-mail valid.',timeDash:'—'
+    };
+
+    TR.mt = {
+      summary:'Sommarju',clinicHours:'Sigħat tal-klinika',services:'Servizzi',selectDate:'Agħżel data',
+      availableDates:'Dati disponibbli (7 ijiem li ġejjin)',selectTime:'Agħżel ħin',yourDetails:'Id-dettalji tiegħek',
+      fullNameLabel:'Isem sħiħ *',phoneLabel:'Telefon *',emailLabel:'Email *',commentsLabel:'Kummenti',
+      confirmBtn:'Ikkonferma',appointmentConfirmed:'L-appuntament ġie kkonfermat',okBtn:'OK',
+      clinicMF:'Tne–Ġim:',clinicSat:'Sib:',clinicSun:'Ħad:',closed:'Magħluq',
+      slotInfo:'Kull slot huwa ta\\' 10 minuti.',ready:'Lest',
+      fullNamePh:'Isem sħiħ',emailPh:'int@eżempju.com',commentsPh:'Noti mhux obbligatorji…',searchCountryPh:'Fittex pajjiż…',
+      serviceTemplate:'Servizz: {0} ({1} min)',dateTemplate:'Data: {0}',timeTemplate:'Ħin: {0} - {1}',
+      locationTemplate:'Post: {0}',mins:'min',
+      loadingTitle:'Qed jitgħabba…',loadingDesc:'Jekk jogħġbok stenna.',
+      loadingBookingTitle:'Qed tgħabbi l-paġna…',loadingBookingDesc:'Qed tipprepara s-sistema tal-booking.',
+      loadingSlotsTitle:'Qed jitgħabbew il-ħinijiet…',loadingSlotsDesc:'Qed tikseb id-disponibbiltà.',
+      confirmingTitle:'Qed tikkonferma l-appuntament…',confirmingDesc:'Qed tintbagħat l-email ta\\' konferma.',
+      noSlots:'M\\'hemm l-ebda slot disponibbli.',noDates:'M\\'hemmx dati disponibbli fis-7 ijiem li ġejjin.',
+      serviceSelected:'Servizz magħżul',loadingSlots:'Qed jitgħabba…',slotsLoaded:'Ħinijiet imtella\\'',
+      timeSelected:'Ħin magħżul',missingFields:'Dettalji neqsin',bookingStatus:'Qed tiġi rreġistrata…',
+      unavailable:'Mhux disponibbli',errorLoadingSlots:'Żball fit-tagħbija',noDatesAvailable:'L-ebda data disponibbli',
+      loadError:'Żball fit-tagħbija',bookingFailed:'Ir-reġistrazzjoni falliet',bookingError:'Żball fir-reġistrazzjoni',
+      confirmMsg:'L-appuntament tiegħek ġie kkonfermat.\\n\\nServizz: {0}\\nData: {1}\\nĦin: {2} - {3}\\nPost: {4}\\n\\nIntbagħtet email ta\\' konferma. Tista\\' tikkanċella mill-link fl-email.',
+      couldNotBook:'Ma setgħetx tirreġistra. Erġa\\' pprova.',errorLoadingApp:'Żball fit-tagħbija: ',
+      noAvailability:'L-ebda disponibbiltà.',
+      valService:'Jekk jogħġbok agħżel servizz.',valDate:'Jekk jogħġbok agħżel data.',valTime:'Jekk jogħġbok agħżel ħin.',
+      valName:'L-isem sħiħ huwa meħtieġ.',valPhone:'In-numru tat-telefon huwa meħtieġ.',valEmail:'L-email huwa meħtieġ.',
+      valEmailFormat:'Daħħal email validu.',timeDash:'—'
+    };
+
+    // ─── Translation helpers ───
+    function t(key) {
+      var dict = TR[currentLang] || TR.en;
+      var str = (dict[key] !== undefined) ? dict[key] : (TR.en[key] || key);
+      if (arguments.length > 1) {
+        for (var i = 1; i < arguments.length; i++) {
+          str = str.replace('{' + (i - 1) + '}', arguments[i]);
+        }
+      }
+      return str;
+    }
+
+    function applyLanguage(lang) {
+      currentLang = lang;
+      // Update static data-i18n text
+      document.querySelectorAll('[data-i18n]').forEach(function(el) {
+        var key = el.getAttribute('data-i18n');
+        el.textContent = t(key);
+      });
+      // Update placeholders
+      document.querySelectorAll('[data-i18n-ph]').forEach(function(el) {
+        var key = el.getAttribute('data-i18n-ph');
+        el.placeholder = t(key);
+      });
+      // RTL for Arabic
+      document.documentElement.dir = (lang === 'ar') ? 'rtl' : 'ltr';
+      // Update lang button label
+      var langLabel = document.querySelector('.langLabel');
+      if (langLabel) langLabel.textContent = lang.toUpperCase();
+      // Mark active in dropdown
+      document.querySelectorAll('.langItem').forEach(function(el) {
+        el.classList.toggle('active', el.dataset.lang === lang);
+      });
+      // Re-apply dynamic summary text if state is loaded
+      if (state.selectedServiceName) {
+        els.sumService.textContent = t('serviceTemplate', state.selectedServiceName, state.selectedServiceMinutes);
+      }
+      if (state.selectedDateLabel) {
+        els.sumDate.textContent = t('dateTemplate', state.selectedDateLabel);
+      } else {
+        els.sumDate.textContent = t('dateTemplate', t('timeDash'));
+      }
+      if (state.selectedSlot) {
+        els.sumTime.textContent = t('timeTemplate', to12h(state.selectedSlot.start), to12h(state.selectedSlot.end));
+      } else {
+        els.sumTime.textContent = t('timeTemplate', t('timeDash'), '').replace(' - ', '');
+      }
+      if (state.config && state.config.pottersLocation) {
+        els.sumLoc.textContent = t('locationTemplate', state.config.pottersLocation);
+      }
+    }
+
+    // ─── Language picker logic ───
+    (function() {
+      var langDrop = document.getElementById('langDrop');
+      var langBtn = document.getElementById('langBtn');
+
+      LANGUAGES.forEach(function(lang) {
+        var d = document.createElement('div');
+        d.className = 'langItem';
+        d.dataset.lang = lang.code;
+        d.textContent = lang.name;
+        if (lang.code === 'en') d.classList.add('active');
+        d.addEventListener('click', function() {
+          applyLanguage(lang.code);
+          langDrop.classList.remove('open');
+        });
+        langDrop.appendChild(d);
+      });
+
+      langBtn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        langDrop.classList.toggle('open');
+      });
+
+      document.addEventListener('click', function(e) {
+        if (!document.getElementById('langPicker').contains(e.target)) {
+          langDrop.classList.remove('open');
+        }
+      });
+
+      document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') langDrop.classList.remove('open');
+      });
+    })();
 
     const els = {
       services: document.getElementById('services'),
@@ -1024,8 +1763,8 @@ var _HTML_TEMPLATES = {
     }
 
     function showLoading(title, desc){
-      els.loadingTitle.textContent = title || 'Loading…';
-      els.loadingDesc.textContent = desc || 'Please wait.';
+      els.loadingTitle.textContent = title || t('loadingTitle');
+      els.loadingDesc.textContent = desc || t('loadingDesc');
       els.loadingOverlay.style.display = 'flex';
     }
     function hideLoading(){
@@ -1042,6 +1781,7 @@ var _HTML_TEMPLATES = {
 
     els.confirmOk.addEventListener('click', () => {
       hideConfirmModal();
+      applyLanguage('en');
       goToExecAfterBooking_();
     });
 
@@ -1126,7 +1866,7 @@ var _HTML_TEMPLATES = {
             <div class="serviceIcon">\${icon}</div>
             <div class="serviceMeta">
               <div class="serviceName">\${svc.name.toUpperCase()}</div>
-              <div class="serviceDur">\${svc.minutes} mins</div>
+              <div class="serviceDur">\${svc.minutes} \${t('mins')}</div>
             </div>
           </div>
           <div class="chev">›</div>
@@ -1148,8 +1888,8 @@ var _HTML_TEMPLATES = {
         x.classList.toggle('selected', x.dataset.serviceId === svc.id);
       });
 
-      els.sumService.textContent = \`Service: \${svc.name} (\${svc.minutes} mins)\`;
-      if (!silent) setStatus('good', 'Service selected');
+      els.sumService.textContent = t('serviceTemplate', svc.name, svc.minutes);
+      if (!silent) setStatus('good', t('serviceSelected'));
 
       // Refresh slots when switching service (optional; safe)
       if (state.selectedDateKey) loadAvailability(true);
@@ -1171,11 +1911,11 @@ var _HTML_TEMPLATES = {
         els.dateSelect.value = firstEnabled.dateKey;
         state.selectedDateKey = firstEnabled.dateKey;
         state.selectedDateLabel = firstEnabled.label;
-        els.sumDate.textContent = \`Date: \${firstEnabled.label}\`;
+        els.sumDate.textContent = t('dateTemplate', firstEnabled.label);
         hideHint(els.dateHint);
       } else {
         state.selectedDateKey = null;
-        showHint(els.dateHint, 'bad', 'No available dates in the next 7 days.');
+        showHint(els.dateHint, 'bad', t('noDates'));
       }
     }
 
@@ -1187,12 +1927,12 @@ var _HTML_TEMPLATES = {
       state.selectedDateLabel = opt ? opt.label : dateKey;
 
       state.selectedSlot = null;
-      els.sumDate.textContent = \`Date: \${state.selectedDateLabel}\`;
-      els.sumTime.textContent = \`Time: —\`;
+      els.sumDate.textContent = t('dateTemplate', state.selectedDateLabel);
+      els.sumTime.textContent = t('timeTemplate', t('timeDash'), '').replace(' - ', '');
 
       hideHint(els.timeHint);
       hideMsg();
-      setStatus('good', 'Loading slots…');
+      setStatus('good', t('loadingSlots'));
       loadAvailability(false);
     });
 
@@ -1220,12 +1960,12 @@ var _HTML_TEMPLATES = {
         const stillThere = filtered.some(s => s.start === state.selectedSlot.start);
         if (!stillThere) {
           state.selectedSlot = null;
-          els.sumTime.textContent = 'Time: —';
+          els.sumTime.textContent = t('timeTemplate', t('timeDash'), '').replace(' - ', '');
         }
       }
 
       if (!filtered.length) {
-        showHint(els.timeHint, 'bad', 'No slots available.');
+        showHint(els.timeHint, 'bad', t('noSlots'));
         return;
       }
       hideHint(els.timeHint);
@@ -1249,26 +1989,26 @@ var _HTML_TEMPLATES = {
       buttonEl.classList.add('selected');
 
       state.selectedSlot = slot;
-      els.sumTime.textContent = \`Time: \${to12h(slot.start)} - \${to12h(slot.end)}\`;
-      els.sumLoc.textContent = \`Location: \${state.config.pottersLocation}\`;
+      els.sumTime.textContent = t('timeTemplate', to12h(slot.start), to12h(slot.end));
+      els.sumLoc.textContent = t('locationTemplate', state.config.pottersLocation);
 
       hideMsg();
-      setStatus('good', 'Time selected');
+      setStatus('good', t('timeSelected'));
     }
 
     function validateForm() {
-      if (!state.selectedServiceId) return 'Please select a service.';
-      if (!state.selectedDateKey) return 'Please select a date.';
-      if (!state.selectedSlot || !state.selectedSlot.start) return 'Please select a time slot.';
+      if (!state.selectedServiceId) return t('valService');
+      if (!state.selectedDateKey) return t('valDate');
+      if (!state.selectedSlot || !state.selectedSlot.start) return t('valTime');
 
       const fullName = els.fullName.value.trim();
       const email = els.email.value.trim();
       const phone = els.phone.value.trim();
 
-      if (!fullName) return 'Full name is required.';
-      if (!phone) return 'Phone number is required.';
-      if (!email) return 'Email is required.';
-      if (!email.includes('@')) return 'Please enter a valid email.';
+      if (!fullName) return t('valName');
+      if (!phone) return t('valPhone');
+      if (!email) return t('valEmail');
+      if (!email.includes('@')) return t('valEmailFormat');
 
       return null;
     }
@@ -1277,7 +2017,7 @@ var _HTML_TEMPLATES = {
       if (!state.selectedDateKey) return;
 
       if (!isSilentRefresh) {
-        showLoading('Loading time slots…', 'Please wait while we fetch availability.');
+        showLoading(t('loadingSlotsTitle'), t('loadingSlotsDesc'));
       }
 
       google.script.run
@@ -1286,19 +2026,19 @@ var _HTML_TEMPLATES = {
 
           if (!res || !res.ok) {
             renderSlots([]);
-            showHint(els.timeHint, 'bad', (res && res.reason) ? res.reason : 'No availability.');
-            setStatus('bad', 'Unavailable');
+            showHint(els.timeHint, 'bad', (res && res.reason) ? res.reason : t('noAvailability'));
+            setStatus('bad', t('unavailable'));
             return;
           }
 
           renderSlots(res.slots || []);
-          setStatus('good', 'Slots loaded');
+          setStatus('good', t('slotsLoaded'));
         })
         .withFailureHandler((err) => {
           if (!isSilentRefresh) hideLoading();
           renderSlots([]);
           showHint(els.timeHint, 'bad', String(err && err.message ? err.message : err));
-          setStatus('bad', 'Error loading slots');
+          setStatus('bad', t('errorLoadingSlots'));
         })
         .apiGetAvailability(state.selectedDateKey);
     }
@@ -1308,12 +2048,12 @@ var _HTML_TEMPLATES = {
       const err = validateForm();
       if (err) {
         showMsg('bad', err);
-        setStatus('bad', 'Missing fields');
+        setStatus('bad', t('missingFields'));
         return;
       }
 
-      showLoading('Confirming appointment…', 'Sending confirmation email and reserving your slot.');
-      setStatus('good', 'Booking…');
+      showLoading(t('confirmingTitle'), t('confirmingDesc'));
+      setStatus('good', t('bookingStatus'));
 
       const payload = {
         serviceId: state.selectedServiceId,
@@ -1330,27 +2070,20 @@ var _HTML_TEMPLATES = {
           hideLoading();
 
           if (res && res.ok) {
-            const text =
-              \`Your appointment has been confirmed.\\n\\n\` +
-              \`Service: \${res.serviceName}\\n\` +
-              \`Date: \${state.selectedDateLabel}\\n\` +
-              \`Time: \${to12h(res.startTime)} - \${to12h(res.endTime)}\\n\` +
-              \`Location: \${res.location}\\n\\n\` +
-              \`A confirmation email has been sent. You can cancel from the link in that email.\`;
-
+            const text = t('confirmMsg', res.serviceName, state.selectedDateLabel, to12h(res.startTime), to12h(res.endTime), res.location);
             showConfirmModal(text);
             return;
           }
 
-          showMsg('bad', 'Could not book. Please try again.');
-          setStatus('bad', 'Booking failed');
+          showMsg('bad', t('couldNotBook'));
+          setStatus('bad', t('bookingFailed'));
           loadAvailability(false);
         })
         .withFailureHandler((e) => {
           hideLoading();
           const msg = (e && e.message) ? e.message : String(e);
           showMsg('bad', msg);
-          setStatus('bad', 'Booking error');
+          setStatus('bad', t('bookingError'));
           loadAvailability(false);
         })
         .apiBook(payload);
@@ -1372,7 +2105,7 @@ var _HTML_TEMPLATES = {
     }
 
     function init() {
-      showLoading('Loading booking page…', 'Please wait while we prepare the booking system.');
+      showLoading(t('loadingBookingTitle'), t('loadingBookingDesc'));
 
       google.script.run
         .withSuccessHandler((data) => {
@@ -1385,24 +2118,24 @@ var _HTML_TEMPLATES = {
           els.docMeta.textContent = state.config.pottersLocation;
           els.tzMeta.textContent = 'Time zone: ' + state.config.timezone;
 
-          els.sumLoc.textContent = \`Location: \${state.config.pottersLocation}\`;
+          els.sumLoc.textContent = t('locationTemplate', state.config.pottersLocation);
 
           renderServices();
           renderDates();
 
           if (state.selectedDateKey) {
-            setStatus('good', 'Loading slots…');
+            setStatus('good', t('loadingSlots'));
             loadAvailability(false);
           } else {
-            setStatus('bad', 'No dates available');
+            setStatus('bad', t('noDatesAvailable'));
           }
 
           installAutoRefresh();
         })
         .withFailureHandler((e) => {
           hideLoading();
-          showMsg('bad', 'Error loading app: ' + (e && e.message ? e.message : e));
-          setStatus('bad', 'Load error');
+          showMsg('bad', t('errorLoadingApp') + (e && e.message ? e.message : e));
+          setStatus('bad', t('loadError'));
         })
         .apiInit();
     }
