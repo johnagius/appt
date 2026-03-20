@@ -147,6 +147,7 @@ function apiAdminAddExtraSlots(sig, payload) {
 
   payload = payload || {};
   var date = String(payload.date || '').trim();
+  var endDate = String(payload.endDate || '').trim();
   var startTime = String(payload.startTime || '').trim();
   var endTime = String(payload.endTime || '').trim();
   var reason = String(payload.reason || 'Extra hours').trim();
@@ -156,6 +157,7 @@ function apiAdminAddExtraSlots(sig, payload) {
   if (!endTime) return { ok: false, reason: 'Missing end time.' };
 
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { ok: false, reason: 'Invalid date format.' };
+  if (endDate && !/^\d{4}-\d{2}-\d{2}$/.test(endDate)) return { ok: false, reason: 'Invalid end date format.' };
   if (!/^\d{2}:\d{2}$/.test(startTime)) return { ok: false, reason: 'Invalid start time format.' };
   if (!/^\d{2}:\d{2}$/.test(endTime)) return { ok: false, reason: 'Invalid end time format.' };
 
@@ -163,14 +165,31 @@ function apiAdminAddExtraSlots(sig, payload) {
   var enMin = parseTimeToMinutes_(endTime);
   if (enMin <= stMin) return { ok: false, reason: 'End time must be after start time.' };
 
-  addDoctorExtraRow_(date, startTime, endTime, reason);
+  // Support date ranges: add a row for each date in the range
+  var startD = new Date(date + 'T00:00:00');
+  var endD = endDate ? new Date(endDate + 'T00:00:00') : startD;
+  if (endD < startD) { var tmp = startD; startD = endD; endD = tmp; }
 
-  var slotsAdded = Math.floor((enMin - stMin) / CFG().APPT_DURATION_MIN);
+  var daysAdded = 0;
+  var cur = new Date(startD);
+  while (cur <= endD) {
+    var key = Utilities.formatDate(cur, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+    addDoctorExtraRow_(key, startTime, endTime, reason);
+    daysAdded++;
+    cur.setDate(cur.getDate() + 1);
+  }
 
-  return {
-    ok: true,
-    message: 'Added extra time window: ' + startTime + ' - ' + endTime + ' on ' + date + ' (' + slotsAdded + ' slots).'
-  };
+  var slotsPerDay = Math.floor((enMin - stMin) / CFG().APPT_DURATION_MIN);
+  var totalSlots = slotsPerDay * daysAdded;
+
+  var msg = 'Added extra time: ' + startTime + ' - ' + endTime;
+  if (daysAdded === 1) {
+    msg += ' on ' + date + ' (' + totalSlots + ' slots).';
+  } else {
+    msg += ' for ' + daysAdded + ' days (' + totalSlots + ' total slots).';
+  }
+
+  return { ok: true, message: msg };
 }
 
 /**
