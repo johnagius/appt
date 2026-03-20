@@ -94,7 +94,7 @@ function uninstallEverything() {
 }
 
 /**
- * Uninstall but keep the calendar (useful if you reused an existing calendar and don’t want it removed).
+ * Uninstall but keep the calendar (useful if you reused an existing calendar and don't want it removed).
  * - Deletes triggers
  * - Trashes spreadsheets
  * - Keeps calendar

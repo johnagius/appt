@@ -4530,13 +4530,13 @@ function ensureDefaultConfigProperties_() {
     props.setProperty(CFG().PROP_DOCTOR_EMAIL, '');
   }
   if (!props.getProperty(CFG().PROP_POTTERS_LOCATION)) {
-    props.setProperty(CFG().PROP_POTTERS_LOCATION, "Potter’s Pharmacy Clinic");
+    props.setProperty(CFG().PROP_POTTERS_LOCATION, "Potter's Pharmacy Clinic");
   }
   if (!props.getProperty(CFG().PROP_SPINOLA_LOCATION)) {
-    props.setProperty(CFG().PROP_SPINOLA_LOCATION, ‘Spinola Clinic’);
+    props.setProperty(CFG().PROP_SPINOLA_LOCATION, 'Spinola Clinic');
   }
 
-  // Calendar double-check ON prevents stale “free slots”
+  // Calendar double-check ON prevents stale "free slots"
   if (!props.getProperty(CFG().PROP_DOUBLECHECK_CALENDAR)) {
     props.setProperty(CFG().PROP_DOUBLECHECK_CALENDAR, 'true');
   }
@@ -4833,7 +4833,7 @@ function uninstallEverything() {
 }
 
 /**
- * Uninstall but keep the calendar (useful if you reused an existing calendar and don’t want it removed).
+ * Uninstall but keep the calendar (useful if you reused an existing calendar and don't want it removed).
  * - Deletes triggers
  * - Trashes spreadsheets
  * - Keeps calendar
