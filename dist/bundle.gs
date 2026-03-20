@@ -2270,6 +2270,7 @@ var _HTML_TEMPLATES = {
         .withSuccessHandler((res) => {
           if (!isSilentRefresh) hideLoading();
 
+          if (res && res._debug) console.log('[APPT DEBUG]', JSON.stringify(res._debug));
           if (!res || !res.ok) {
             renderSlots([]);
             showHint(els.timeHint, 'bad', (res && res.reason) ? res.reason : t('noAvailability'));
