@@ -3666,7 +3666,11 @@ function sendNotification() {
 }
 
 // ========== Init ==========
-loadDashboard();
+if (document.readyState === 'complete' || document.readyState === 'interactive') {
+  setTimeout(loadDashboard, 0);
+} else {
+  document.addEventListener('DOMContentLoaded', loadDashboard);
+}
 </script>
 </body>
 </html>
@@ -4442,8 +4446,8 @@ function appointmentRowToObj_(r) {
   return {
     appointmentId: String(r[0] || ''),
     dateKey: String(r[1] || ''),
-    startTime: String(r[2] || ''),
-    endTime: String(r[3] || ''),
+    startTime: normalizeTimeCell_(r[2]),
+    endTime: normalizeTimeCell_(r[3]),
     serviceId: String(r[4] || ''),
     serviceName: String(r[5] || ''),
     fullName: String(r[6] || ''),

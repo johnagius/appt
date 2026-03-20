@@ -931,7 +931,11 @@ function sendNotification() {
 }
 
 // ========== Init ==========
-loadDashboard();
+if (document.readyState === 'complete' || document.readyState === 'interactive') {
+  setTimeout(loadDashboard, 0);
+} else {
+  document.addEventListener('DOMContentLoaded', loadDashboard);
+}
 </script>
 </body>
 </html>
