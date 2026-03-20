@@ -85,6 +85,32 @@
       .stat{flex:1 1 100%;}
     }
 
+    /* Availability tab */
+    .avail-toggle{display:flex;gap:0;margin-bottom:14px;}
+    .toggle-btn{flex:1;padding:12px;border:1px solid var(--line);cursor:pointer;font-weight:700;font-size:13px;text-align:center;transition:all 0.15s ease;background:#fff;color:var(--muted);}
+    .toggle-btn:first-child{border-radius:12px 0 0 12px;}
+    .toggle-btn:last-child{border-radius:0 12px 12px 0;border-left:none;}
+    .toggle-btn.active-block{background:rgba(239,68,68,0.08);color:var(--bad);border-color:var(--bad);}
+    .toggle-btn.active-block + .toggle-btn{border-left-color:var(--line);}
+    .toggle-btn.active-add{background:rgba(16,185,129,0.08);color:var(--good);border-color:var(--good);}
+    .presets{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;}
+    .preset-pill{padding:8px 14px;border-radius:999px;border:1px solid var(--line);background:#fff;cursor:pointer;font-size:12px;font-weight:600;transition:all 0.15s ease;user-select:none;}
+    .preset-pill:hover{border-color:#d1d5db;background:rgba(17,24,39,0.03);}
+    .preset-pill.active{background:#111827;color:#fff;border-color:#111827;}
+    .override-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--line);font-size:13px;}
+    .override-item:last-child{border-bottom:none;}
+    .override-item .ov-icon{font-size:16px;flex-shrink:0;}
+    .override-item .ov-info{flex:1;line-height:1.5;}
+    .override-item .ov-date{font-weight:700;}
+    .override-item .ov-detail{color:var(--muted);font-size:12px;}
+    .override-item .ov-reason{color:var(--muted);font-style:italic;font-size:12px;}
+    .override-item.past{opacity:0.4;}
+    .override-item .ov-remove{border:none;background:none;color:var(--muted);cursor:pointer;font-size:16px;padding:4px 8px;border-radius:8px;transition:all 0.15s ease;}
+    .override-item .ov-remove:hover{background:rgba(239,68,68,0.1);color:var(--bad);}
+    .allday-row{display:flex;align-items:center;gap:6px;margin-bottom:8px;}
+    .allday-row label{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;cursor:pointer;}
+    .allday-row input[type=checkbox]{width:auto;margin:0;}
+
     /* Overlay animation */
     .overlay{opacity:0;transition:opacity 0.2s ease;}
     .overlay.show{opacity:1;}
@@ -106,8 +132,7 @@
 
   <div class="tabs">
     <div class="tab active" data-tab="schedule" onclick="switchTab('schedule')">Schedule</div>
-    <div class="tab" data-tab="doctoroff" onclick="switchTab('doctoroff')">Doctor Off</div>
-    <div class="tab" data-tab="extraslots" onclick="switchTab('extraslots')">Extra Slots</div>
+    <div class="tab" data-tab="availability" onclick="switchTab('availability')">Availability</div>
     <div class="tab" data-tab="actions" onclick="switchTab('actions')">Quick Actions</div>
   </div>
 
@@ -125,51 +150,44 @@
     </div>
   </div>
 
-  <!-- DOCTOR OFF TAB -->
-  <div class="tab-content" id="tab-doctoroff" style="display:none;">
+  <!-- AVAILABILITY TAB -->
+  <div class="tab-content" id="tab-availability" style="display:none;">
     <div class="card">
-      <h3>Mark Doctor Unavailable</h3>
-      <div class="form-row">
-        <div class="form-group"><label>Start Date</label><input type="date" id="offStartDate"></div>
-        <div class="form-group"><label>End Date (optional)</label><input type="date" id="offEndDate"></div>
+      <div class="avail-toggle">
+        <div class="toggle-btn active-block" id="toggleBlock" onclick="setAvailMode('block')">Block Time</div>
+        <div class="toggle-btn" id="toggleAdd" onclick="setAvailMode('add')">Add Extra Time</div>
       </div>
-      <div class="form-row">
-        <div class="form-group"><label>Start Time (optional)</label><input type="time" id="offStartTime"></div>
-        <div class="form-group"><label>End Time (optional)</label><input type="time" id="offEndTime"></div>
+
+      <div class="presets" id="presets">
+        <div class="preset-pill" onclick="applyPreset('today')">Today</div>
+        <div class="preset-pill" onclick="applyPreset('tomorrow')">Tomorrow</div>
+        <div class="preset-pill" onclick="applyPreset('week')">This week</div>
+        <div class="preset-pill" onclick="applyPreset('custom')">Custom</div>
       </div>
-      <div class="form-row">
-        <div class="form-group"><label>Reason</label><input type="text" id="offReason" placeholder="e.g. Personal leave, Conference"></div>
+
+      <div id="availForm" style="display:none;">
+        <div class="form-row">
+          <div class="form-group"><label>Start date</label><input type="date" id="avStartDate"></div>
+          <div class="form-group"><label>End date</label><input type="date" id="avEndDate"></div>
+        </div>
+        <div class="allday-row">
+          <label><input type="checkbox" id="avAllDay" checked onchange="toggleAllDay()"> All day</label>
+        </div>
+        <div class="form-row" id="avTimeRow" style="display:none;">
+          <div class="form-group"><label>Start time</label><input type="time" id="avStartTime"></div>
+          <div class="form-group"><label>End time</label><input type="time" id="avEndTime"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Reason (optional)</label><input type="text" id="avReason" placeholder="e.g. Personal leave, Conference"></div>
+        </div>
+        <button class="btn btn-danger" id="avSubmitBtn" onclick="submitAvailability()">Block Time</button>
+        <div class="msg" id="availMsg"></div>
       </div>
-      <button class="btn btn-danger" onclick="markDoctorOff()">Mark Unavailable</button>
-      <div class="msg" id="offMsg"></div>
     </div>
 
     <div class="card">
-      <h3>Current Doctor-Off Entries</h3>
-      <div id="offEntriesTable"></div>
-    </div>
-  </div>
-
-  <!-- EXTRA SLOTS TAB -->
-  <div class="tab-content" id="tab-extraslots" style="display:none;">
-    <div class="card">
-      <h3>Add Extra Working Hours</h3>
-      <p class="subtitle">Doctor wants to work extra? Add additional time slots here.</p>
-      <div class="form-row">
-        <div class="form-group"><label>Date</label><input type="date" id="extraDate"></div>
-        <div class="form-group"><label>Start Time</label><input type="time" id="extraStartTime"></div>
-        <div class="form-group"><label>End Time</label><input type="time" id="extraEndTime"></div>
-      </div>
-      <div class="form-row">
-        <div class="form-group"><label>Reason (optional)</label><input type="text" id="extraReason" placeholder="e.g. Extra clinic hours"></div>
-      </div>
-      <button class="btn btn-good" onclick="addExtraSlots()">Add Extra Slots</button>
-      <div class="msg" id="extraMsg"></div>
-    </div>
-
-    <div class="card">
-      <h3>Current Extra Slot Entries</h3>
-      <div id="extraEntriesTable"></div>
+      <h3>Active Overrides</h3>
+      <div id="overridesList"><div class="empty">Loading...</div></div>
     </div>
   </div>
 
@@ -319,47 +337,59 @@ function renderApptTable(appts, containerId, withCheckboxes) {
   el.innerHTML = html;
 }
 
-function renderOffEntries(entries) {
-  var el = document.getElementById('offEntriesTable');
-  if (!entries || !entries.length) {
-    el.innerHTML = '<div class="empty">No doctor-off entries.</div>';
+function renderOverrides(offEntries, extraEntries) {
+  var el = document.getElementById('overridesList');
+  var items = [];
+  var todayStr = new Date().toISOString().slice(0, 10);
+
+  (offEntries || []).forEach(function(e) {
+    var dateLabel = formatDateNice(e.startDate);
+    if (e.endDate && e.endDate !== e.startDate) dateLabel += ' - ' + formatDateNice(e.endDate);
+    var timeLabel = (e.startTime && e.endTime) ? e.startTime + ' - ' + e.endTime : 'All day';
+    items.push({
+      type: 'block', sortDate: e.startDate, rowIndex: e.rowIndex,
+      dateLabel: dateLabel, timeLabel: timeLabel, reason: e.reason || '',
+      past: (e.endDate || e.startDate) < todayStr
+    });
+  });
+
+  (extraEntries || []).forEach(function(e) {
+    items.push({
+      type: 'extra', sortDate: e.date, rowIndex: e.rowIndex,
+      dateLabel: formatDateNice(e.date), timeLabel: e.startTime + ' - ' + e.endTime,
+      reason: e.reason || '', past: e.date < todayStr
+    });
+  });
+
+  items.sort(function(a, b) { return a.sortDate < b.sortDate ? -1 : a.sortDate > b.sortDate ? 1 : 0; });
+
+  if (!items.length) {
+    el.innerHTML = '<div class="empty">No overrides set.</div>';
     return;
   }
-  var html = '<div class="table-wrap"><table><thead><tr><th>Start Date</th><th>End Date</th><th>Start Time</th><th>End Time</th><th>Reason</th><th></th></tr></thead><tbody>';
-  for (var i = 0; i < entries.length; i++) {
-    var e = entries[i];
-    html += '<tr>';
-    html += '<td>' + esc(e.startDate) + '</td>';
-    html += '<td>' + esc(e.endDate) + '</td>';
-    html += '<td>' + (e.startTime || '<span style="color:#6b7280">All day</span>') + '</td>';
-    html += '<td>' + (e.endTime || '') + '</td>';
-    html += '<td>' + esc(e.reason) + '</td>';
-    html += '<td><button class="btn btn-sm btn-ghost" onclick="removeDoctorOff(' + e.rowIndex + ')">Remove</button></td>';
-    html += '</tr>';
+
+  var html = '';
+  for (var i = 0; i < items.length; i++) {
+    var it = items[i];
+    var icon = it.type === 'block' ? '<span style="color:var(--bad)">&#x1f6ab;</span>' : '<span style="color:var(--good)">&#x2795;</span>';
+    html += '<div class="override-item' + (it.past ? ' past' : '') + '">';
+    html += '<div class="ov-icon">' + icon + '</div>';
+    html += '<div class="ov-info">';
+    html += '<span class="ov-date">' + esc(it.dateLabel) + '</span>';
+    html += ' <span class="ov-detail">' + esc(it.timeLabel) + '</span>';
+    if (it.reason) html += ' <span class="ov-reason"> &middot; ' + esc(it.reason) + '</span>';
+    html += '</div>';
+    html += '<button class="ov-remove" onclick="removeOverride(\'' + it.type + '\',' + it.rowIndex + ')" title="Remove">&times;</button>';
+    html += '</div>';
   }
-  html += '</tbody></table></div>';
   el.innerHTML = html;
 }
 
-function renderExtraEntries(entries) {
-  var el = document.getElementById('extraEntriesTable');
-  if (!entries || !entries.length) {
-    el.innerHTML = '<div class="empty">No extra slot entries.</div>';
-    return;
-  }
-  var html = '<div class="table-wrap"><table><thead><tr><th>Date</th><th>Start Time</th><th>End Time</th><th>Reason</th><th></th></tr></thead><tbody>';
-  for (var i = 0; i < entries.length; i++) {
-    var e = entries[i];
-    html += '<tr>';
-    html += '<td>' + esc(e.date) + '</td>';
-    html += '<td>' + esc(e.startTime) + '</td>';
-    html += '<td>' + esc(e.endTime) + '</td>';
-    html += '<td>' + esc(e.reason) + '</td>';
-    html += '<td><button class="btn btn-sm btn-ghost" onclick="removeExtraSlots(' + e.rowIndex + ')">Remove</button></td>';
-    html += '</tr>';
-  }
-  html += '</tbody></table></div>';
-  el.innerHTML = html;
+function formatDateNice(dateStr) {
+  if (!dateStr) return '';
+  var parts = dateStr.split('-');
+  var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return months[parseInt(parts[1], 10) - 1] + ' ' + parseInt(parts[2], 10) + ', ' + parts[0];
 }
 
 function esc(s) {
@@ -398,12 +428,9 @@ function loadDashboard() {
 
       renderApptTable(res.todayAppointments, 'todayTable', false);
       renderApptTable(res.tomorrowAppointments, 'tomorrowTable', false);
-      renderOffEntries(res.doctorOffEntries);
-      renderExtraEntries(res.extraSlotEntries);
+      renderOverrides(res.doctorOffEntries, res.extraSlotEntries);
 
       // Set default dates
-      document.getElementById('offStartDate').value = res.todayKey;
-      document.getElementById('extraDate').value = res.todayKey;
       document.getElementById('actionDate').value = res.todayKey;
       loadActionAppts();
       document.getElementById('notifyDate').value = res.todayKey;
@@ -416,97 +443,172 @@ function loadDashboard() {
     .apiAdminGetDashboard(SIG);
 }
 
-// ========== Doctor Off ==========
+// ========== Availability (unified Block / Extra) ==========
 
-function markDoctorOff() {
-  var startDate = document.getElementById('offStartDate').value;
-  var endDate = document.getElementById('offEndDate').value;
-  var startTime = document.getElementById('offStartTime').value;
-  var endTime = document.getElementById('offEndTime').value;
-  var reason = document.getElementById('offReason').value;
+var _availMode = 'block'; // 'block' or 'add'
 
-  if (!startDate) { showMsg('offMsg', 'bad', 'Please select a start date.'); return; }
+function setAvailMode(mode) {
+  _availMode = mode;
+  var blockBtn = document.getElementById('toggleBlock');
+  var addBtn = document.getElementById('toggleAdd');
+  var submitBtn = document.getElementById('avSubmitBtn');
+  var allDayRow = document.querySelector('.allday-row');
 
-  showLoading('Marking unavailable...', 'Adding doctor-off entry.');
-  google.script.run
-    .withSuccessHandler(function(res) {
-      hideLoading();
-      if (!res || !res.ok) { showMsg('offMsg', 'bad', res.reason || 'Failed.'); return; }
+  blockBtn.className = 'toggle-btn' + (mode === 'block' ? ' active-block' : '');
+  addBtn.className = 'toggle-btn' + (mode === 'add' ? ' active-add' : '');
 
-      var msg = 'Doctor marked as unavailable.';
-      if (res.affectedAppointments && res.affectedAppointments.length > 0) {
-        msg += ' ' + res.affectedAppointments.length + ' appointment(s) affected. Go to Quick Actions to process them.';
-      }
-      showMsg('offMsg', 'good', msg);
-      loadDashboard();
-    })
-    .withFailureHandler(function(err) {
-      hideLoading();
-      showMsg('offMsg', 'bad', 'Error: ' + (err && err.message ? err.message : String(err)));
-    })
-    .apiAdminMarkDoctorOff(SIG, {
-      startDate: startDate,
-      endDate: endDate || startDate,
-      startTime: startTime,
-      endTime: endTime,
-      reason: reason || 'Doctor not available'
-    });
+  if (mode === 'block') {
+    submitBtn.className = 'btn btn-danger';
+    submitBtn.textContent = 'Block Time';
+    allDayRow.style.display = 'flex';
+  } else {
+    submitBtn.className = 'btn btn-good';
+    submitBtn.textContent = 'Add Extra Time';
+    // Extra time always needs time range
+    document.getElementById('avAllDay').checked = false;
+    toggleAllDay();
+    allDayRow.style.display = 'none';
+  }
 }
 
-function removeDoctorOff(rowIndex) {
-  styledConfirm('Remove Entry', 'Remove this doctor-off entry? This will re-open those slots for booking.', 'Remove', 'btn-danger').then(function(ok){
-    if (!ok) return;
-    showLoading('Removing...', 'Removing doctor-off entry.');
+function applyPreset(preset) {
+  var pills = document.querySelectorAll('.preset-pill');
+  pills.forEach(function(p) { p.classList.remove('active'); });
+  event.target.classList.add('active');
+
+  var today = new Date();
+  var todayStr = toDateStr(today);
+
+  var startDate = document.getElementById('avStartDate');
+  var endDate = document.getElementById('avEndDate');
+
+  if (preset === 'today') {
+    startDate.value = todayStr;
+    endDate.value = todayStr;
+  } else if (preset === 'tomorrow') {
+    var tom = new Date(today);
+    tom.setDate(tom.getDate() + 1);
+    var tomStr = toDateStr(tom);
+    startDate.value = tomStr;
+    endDate.value = tomStr;
+  } else if (preset === 'week') {
+    startDate.value = todayStr;
+    var sun = new Date(today);
+    sun.setDate(sun.getDate() + (7 - sun.getDay()));
+    endDate.value = toDateStr(sun);
+  } else {
+    startDate.value = '';
+    endDate.value = '';
+  }
+
+  document.getElementById('avAllDay').checked = true;
+  toggleAllDay();
+  document.getElementById('avReason').value = '';
+  document.getElementById('availForm').style.display = 'block';
+  document.getElementById('availMsg').className = 'msg';
+
+  // Re-apply mode in case extra was selected (needs time)
+  if (_availMode === 'add') setAvailMode('add');
+}
+
+function toDateStr(d) {
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+function toggleAllDay() {
+  var allDay = document.getElementById('avAllDay').checked;
+  document.getElementById('avTimeRow').style.display = allDay ? 'none' : 'flex';
+}
+
+function submitAvailability() {
+  var startDate = document.getElementById('avStartDate').value;
+  var endDate = document.getElementById('avEndDate').value;
+  var allDay = document.getElementById('avAllDay').checked;
+  var startTime = document.getElementById('avStartTime').value;
+  var endTime = document.getElementById('avEndTime').value;
+  var reason = document.getElementById('avReason').value;
+
+  if (!startDate) { showMsg('availMsg', 'bad', 'Please select a start date.'); return; }
+
+  if (_availMode === 'block') {
+    showLoading('Blocking time...', 'Adding block entry.');
     google.script.run
       .withSuccessHandler(function(res) {
         hideLoading();
-        if (!res || !res.ok) { showMsg('offMsg', 'bad', res.reason || 'Failed.'); return; }
+        if (!res || !res.ok) { showMsg('availMsg', 'bad', res.reason || 'Failed.'); return; }
+        var msg = 'Time blocked successfully.';
+        if (res.affectedAppointments && res.affectedAppointments.length > 0) {
+          msg += ' ' + res.affectedAppointments.length + ' appointment(s) affected. Go to Quick Actions to process them.';
+        }
+        showMsg('availMsg', 'good', msg);
+        document.getElementById('availForm').style.display = 'none';
+        document.querySelectorAll('.preset-pill').forEach(function(p) { p.classList.remove('active'); });
         loadDashboard();
       })
-      .withFailureHandler(function(err) { hideLoading(); showMsg('offMsg', 'bad', 'Error: ' + (err && err.message ? err.message : String(err))); })
-      .apiAdminRemoveDoctorOff(SIG, rowIndex);
-  });
-}
+      .withFailureHandler(function(err) {
+        hideLoading();
+        showMsg('availMsg', 'bad', 'Error: ' + (err && err.message ? err.message : String(err)));
+      })
+      .apiAdminMarkDoctorOff(SIG, {
+        startDate: startDate,
+        endDate: endDate || startDate,
+        startTime: allDay ? '' : startTime,
+        endTime: allDay ? '' : endTime,
+        reason: reason || 'Doctor not available'
+      });
+  } else {
+    if (!startTime) { showMsg('availMsg', 'bad', 'Please select a start time.'); return; }
+    if (!endTime) { showMsg('availMsg', 'bad', 'Please select an end time.'); return; }
 
-// ========== Extra Slots ==========
-
-function addExtraSlots() {
-  var date = document.getElementById('extraDate').value;
-  var startTime = document.getElementById('extraStartTime').value;
-  var endTime = document.getElementById('extraEndTime').value;
-  var reason = document.getElementById('extraReason').value;
-
-  if (!date) { showMsg('extraMsg', 'bad', 'Please select a date.'); return; }
-  if (!startTime) { showMsg('extraMsg', 'bad', 'Please select a start time.'); return; }
-  if (!endTime) { showMsg('extraMsg', 'bad', 'Please select an end time.'); return; }
-
-  showLoading('Adding extra slots...', 'Adding extra working hours.');
-  google.script.run
-    .withSuccessHandler(function(res) {
-      hideLoading();
-      if (!res || !res.ok) { showMsg('extraMsg', 'bad', res.reason || 'Failed.'); return; }
-      showMsg('extraMsg', 'good', res.message);
-      loadDashboard();
-    })
-    .withFailureHandler(function(err) {
-      hideLoading();
-      showMsg('extraMsg', 'bad', 'Error: ' + (err && err.message ? err.message : String(err)));
-    })
-    .apiAdminAddExtraSlots(SIG, { date: date, startTime: startTime, endTime: endTime, reason: reason });
-}
-
-function removeExtraSlots(rowIndex) {
-  styledConfirm('Remove Entry', 'Remove this extra slots entry?', 'Remove', 'btn-danger').then(function(ok){
-    if (!ok) return;
-    showLoading('Removing...', 'Removing extra slots entry.');
+    showLoading('Adding extra time...', 'Adding extra working hours.');
     google.script.run
       .withSuccessHandler(function(res) {
         hideLoading();
-        if (!res || !res.ok) { showMsg('extraMsg', 'bad', res.reason || 'Failed.'); return; }
+        if (!res || !res.ok) { showMsg('availMsg', 'bad', res.reason || 'Failed.'); return; }
+        showMsg('availMsg', 'good', res.message);
+        document.getElementById('availForm').style.display = 'none';
+        document.querySelectorAll('.preset-pill').forEach(function(p) { p.classList.remove('active'); });
         loadDashboard();
       })
-      .withFailureHandler(function(err) { hideLoading(); showMsg('extraMsg', 'bad', 'Error: ' + (err && err.message ? err.message : String(err))); })
-      .apiAdminRemoveExtraSlots(SIG, rowIndex);
+      .withFailureHandler(function(err) {
+        hideLoading();
+        showMsg('availMsg', 'bad', 'Error: ' + (err && err.message ? err.message : String(err)));
+      })
+      .apiAdminAddExtraSlots(SIG, {
+        date: startDate,
+        endDate: endDate || '',
+        startTime: startTime,
+        endTime: endTime,
+        reason: reason
+      });
+  }
+}
+
+function removeOverride(type, rowIndex) {
+  var title = type === 'block' ? 'Remove Block' : 'Remove Extra Time';
+  var body = type === 'block'
+    ? 'Remove this block? Slots will re-open for booking.'
+    : 'Remove this extra time entry?';
+
+  styledConfirm(title, body, 'Remove', 'btn-danger').then(function(ok) {
+    if (!ok) return;
+    showLoading('Removing...', 'Removing entry.');
+
+    var handler = function(res) {
+      hideLoading();
+      if (!res || !res.ok) { showMsg('availMsg', 'bad', res.reason || 'Failed.'); return; }
+      loadDashboard();
+    };
+    var errHandler = function(err) {
+      hideLoading();
+      showMsg('availMsg', 'bad', 'Error: ' + (err && err.message ? err.message : String(err)));
+    };
+
+    if (type === 'block') {
+      google.script.run.withSuccessHandler(handler).withFailureHandler(errHandler).apiAdminRemoveDoctorOff(SIG, rowIndex);
+    } else {
+      google.script.run.withSuccessHandler(handler).withFailureHandler(errHandler).apiAdminRemoveExtraSlots(SIG, rowIndex);
+    }
   });
 }
 
