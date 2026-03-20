@@ -156,6 +156,7 @@ function doGet(e)                            { return _getApp().doGet(e); }
 // ----- Booking API (called from Index.html via google.script.run) -----
 function apiInit()                           { return _getApp().apiInit(); }
 function apiGetDateOptions(m)                { return _getApp().apiGetDateOptions(m); }
+function apiRefreshDates()                   { return _getApp().apiRefreshDates(); }
 function apiGetAvailability(dk)              { return _getApp().apiGetAvailability(dk); }
 function apiBook(p)                          { return _getApp().apiBook(p); }
 
