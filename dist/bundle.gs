@@ -2148,6 +2148,7 @@ function loadDashboard() {
       document.getElementById('offStartDate').value = res.todayKey;
       document.getElementById('extraDate').value = res.todayKey;
       document.getElementById('actionDate').value = res.todayKey;
+      loadActionAppts();
       document.getElementById('notifyDate').value = res.todayKey;
     })
     .withFailureHandler(function(err) {
