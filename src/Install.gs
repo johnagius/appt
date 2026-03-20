@@ -242,6 +242,9 @@ function setMaxActiveAppointmentsPerPerson(n) {
  */
 function generateAdminLink() {
   var link = buildAdminLink_();
+  Logger.log('=== ADMIN LINK ===');
+  Logger.log(link);
+  Logger.log('==================');
   return { ok: true, adminLink: link };
 }
 
@@ -254,6 +257,7 @@ function setWebAppUrlAuto() {
     );
   }
   getScriptProps_().setProperty(CFG().PROP_WEBAPP_URL, auto);
+  Logger.log('Web App URL set to: ' + auto);
   return { ok: true, WEBAPP_URL: auto };
 }
 
