@@ -271,20 +271,43 @@ var _HTML_TEMPLATES = {
       border:1px solid var(--line);
       border-radius:10px;
       box-shadow:0 6px 20px rgba(0,0,0,.15);
-      width:260px;
-      max-height:280px;
+      width:280px;
+      max-height:340px;
       overflow:hidden;
       flex-direction:column;
     }
     .ccDrop.open{display:flex;}
-    .ccSearch{
-      border:none;
+    .ccSearchWrap{
+      position:sticky;
+      top:0;
+      background:#fff;
+      padding:8px;
       border-bottom:1px solid var(--line);
-      padding:10px 12px;
+      z-index:1;
+      display:flex;
+      align-items:center;
+      gap:6px;
+    }
+    .ccSearchWrap::before{
+      content:'🔍';
+      font-size:13px;
+      opacity:0.5;
+      flex-shrink:0;
+    }
+    .ccSearch{
+      border:1px solid var(--line);
+      border-radius:8px;
+      padding:8px 10px;
       font-size:14px;
       outline:none;
       width:100%;
       box-sizing:border-box;
+      background:#f9fafb;
+      transition: border-color 0.15s ease;
+    }
+    .ccSearch:focus{
+      border-color:var(--accent);
+      background:#fff;
     }
     .ccList{
       overflow-y:auto;
@@ -610,7 +633,7 @@ var _HTML_TEMPLATES = {
       </div>
 
       <div class="langPicker" id="langPicker">
-        <button type="button" class="langBtn" id="langBtn">🌐 <span class="langLabel">EN</span></button>
+        <button type="button" class="langBtn" id="langBtn">🌐 <span class="langLabel">English</span></button>
         <div class="langDrop" id="langDrop"></div>
       </div>
 
@@ -678,7 +701,9 @@ var _HTML_TEMPLATES = {
             <div class="ccPicker" id="ccPicker">
               <button type="button" class="ccBtn" id="ccBtn" aria-label="Country code">🇲🇹</button>
               <div class="ccDrop" id="ccDrop" role="listbox" aria-label="Country code">
-                <input type="text" class="ccSearch" id="ccSearch" placeholder="Search country\\u2026" autocomplete="off" data-i18n-ph="searchCountryPh">
+                <div class="ccSearchWrap">
+                  <input type="text" class="ccSearch" id="ccSearch" placeholder="Search country\\u2026" autocomplete="off" data-i18n-ph="searchCountryPh">
+                </div>
                 <div class="ccList" id="ccList"></div>
               </div>
             </div>
@@ -1445,7 +1470,8 @@ var _HTML_TEMPLATES = {
       document.documentElement.dir = (lang === 'ar') ? 'rtl' : 'ltr';
       // Update lang button label
       var langLabel = document.querySelector('.langLabel');
-      if (langLabel) langLabel.textContent = lang.toUpperCase();
+      var langObj = LANGUAGES.find(function(l) { return l.code === lang; });
+      if (langLabel) langLabel.textContent = langObj ? langObj.name : lang.toUpperCase();
       // Mark active in dropdown
       document.querySelectorAll('.langItem').forEach(function(el) {
         el.classList.toggle('active', el.dataset.lang === lang);
@@ -1747,11 +1773,16 @@ var _HTML_TEMPLATES = {
     var selectedCountry = COUNTRIES[0]; // Malta default
 
     (function initCountryPicker(){
+      var hlIndex = -1;
+      var visibleItems = [];
+
       function renderList(filter) {
         els.ccList.innerHTML = '';
+        visibleItems = [];
+        hlIndex = -1;
         var q = (filter || '').toLowerCase();
-        COUNTRIES.forEach(function(c, i) {
-          if (q && c.name.toLowerCase().indexOf(q) === -1 && c.code.indexOf(q) === -1) return;
+        COUNTRIES.forEach(function(c) {
+          if (q && c.name.toLowerCase().indexOf(q) === -1 && c.code.indexOf(q) === -1 && c.flag.indexOf(q) === -1) return;
           var d = document.createElement('div');
           d.className = 'ccItem';
           d.innerHTML = '<span class="ccFlag">' + c.flag + '</span>' +
@@ -1759,7 +1790,17 @@ var _HTML_TEMPLATES = {
             '<span class="ccCode">' + c.code + '</span>';
           d.addEventListener('click', function() { pickCountry(c); });
           els.ccList.appendChild(d);
+          visibleItems.push({el: d, country: c});
         });
+      }
+
+      function highlightItem(idx) {
+        visibleItems.forEach(function(item) { item.el.classList.remove('hl'); });
+        if (idx >= 0 && idx < visibleItems.length) {
+          hlIndex = idx;
+          visibleItems[idx].el.classList.add('hl');
+          visibleItems[idx].el.scrollIntoView({block: 'nearest'});
+        }
       }
 
       function pickCountry(c) {
@@ -1773,11 +1814,12 @@ var _HTML_TEMPLATES = {
         els.ccDrop.classList.add('open');
         els.ccSearch.value = '';
         renderList('');
-        els.ccSearch.focus();
+        setTimeout(function() { els.ccSearch.focus(); }, 10);
       }
 
       function closeDrop() {
         els.ccDrop.classList.remove('open');
+        hlIndex = -1;
       }
 
       els.ccBtn.addEventListener('click', function() {
@@ -1786,6 +1828,19 @@ var _HTML_TEMPLATES = {
 
       els.ccSearch.addEventListener('input', function() {
         renderList(this.value);
+      });
+
+      els.ccSearch.addEventListener('keydown', function(e) {
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          highlightItem(Math.min(hlIndex + 1, visibleItems.length - 1));
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          highlightItem(Math.max(hlIndex - 1, 0));
+        } else if (e.key === 'Enter' && hlIndex >= 0) {
+          e.preventDefault();
+          pickCountry(visibleItems[hlIndex].country);
+        }
       });
 
       document.addEventListener('click', function(e) {
