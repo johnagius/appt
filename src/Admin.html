@@ -113,6 +113,25 @@
     .time-pill.active{background:#111827;color:#fff;border-color:#111827;}
     .time-label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px;font-weight:600;}
 
+    /* Custom time spinner */
+    .time-spinner-row{display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin-bottom:10px;}
+    .time-spinner-group{display:flex;flex-direction:column;align-items:center;gap:2px;}
+    .time-spinner-group .time-label{margin-bottom:2px;}
+    .time-spinner{display:flex;align-items:center;gap:2px;background:#f9fafb;border:1px solid var(--line);border-radius:12px;padding:4px;user-select:none;}
+    .time-drum{display:flex;flex-direction:column;align-items:center;width:48px;}
+    .time-drum-btn{border:none;background:none;cursor:pointer;color:var(--muted);font-size:16px;line-height:1;padding:4px;border-radius:8px;transition:background 0.1s ease;width:100%;text-align:center;}
+    .time-drum-btn:hover{background:rgba(17,24,39,0.06);}
+    .time-drum-btn:active{background:rgba(17,24,39,0.12);}
+    .time-drum-val{font-size:24px;font-weight:800;width:100%;text-align:center;padding:4px 0;cursor:ns-resize;line-height:1.2;}
+    .time-drum-label{font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase;}
+    .time-sep{font-size:24px;font-weight:800;color:var(--muted);padding:0 2px;align-self:center;margin-top:-2px;}
+    .time-spinner-arrow{font-size:20px;color:var(--muted);padding:0 4px;align-self:center;}
+    @media(max-width:600px){
+      .time-spinner-row{gap:10px;}
+      .time-drum{width:42px;}
+      .time-drum-val{font-size:20px;}
+    }
+
     /* Overlay animation */
     .overlay{opacity:0;transition:opacity 0.2s ease;}
     .overlay.show{opacity:1;}
@@ -179,9 +198,42 @@
           <div class="time-pill" onclick="pickTime('afternoon')">Afternoon 17:00-19:00</div>
           <div class="time-pill" onclick="pickTime('custom')">Custom</div>
         </div>
-        <div class="form-row" id="avTimeRow" style="display:none;">
-          <div class="form-group"><label>Start time</label><input type="time" id="avStartTime" step="600"></div>
-          <div class="form-group"><label>End time</label><input type="time" id="avEndTime" step="600"></div>
+        <div id="avTimeRow" style="display:none;">
+          <div class="time-spinner-row">
+            <div class="time-spinner-group">
+              <div class="time-label">Start</div>
+              <div class="time-spinner" id="spinnerStart">
+                <div class="time-drum" data-unit="h" data-spinner="start">
+                  <button type="button" class="time-drum-btn" onclick="drumStep('start','h',1)">&#x25B2;</button>
+                  <div class="time-drum-val" id="startH">09</div>
+                  <button type="button" class="time-drum-btn" onclick="drumStep('start','h',-1)">&#x25BC;</button>
+                </div>
+                <div class="time-sep">:</div>
+                <div class="time-drum" data-unit="m" data-spinner="start">
+                  <button type="button" class="time-drum-btn" onclick="drumStep('start','m',1)">&#x25B2;</button>
+                  <div class="time-drum-val" id="startM">00</div>
+                  <button type="button" class="time-drum-btn" onclick="drumStep('start','m',-1)">&#x25BC;</button>
+                </div>
+              </div>
+            </div>
+            <div class="time-spinner-arrow">&#x2192;</div>
+            <div class="time-spinner-group">
+              <div class="time-label">End</div>
+              <div class="time-spinner" id="spinnerEnd">
+                <div class="time-drum" data-unit="h" data-spinner="end">
+                  <button type="button" class="time-drum-btn" onclick="drumStep('end','h',1)">&#x25B2;</button>
+                  <div class="time-drum-val" id="endH">12</div>
+                  <button type="button" class="time-drum-btn" onclick="drumStep('end','h',-1)">&#x25BC;</button>
+                </div>
+                <div class="time-sep">:</div>
+                <div class="time-drum" data-unit="m" data-spinner="end">
+                  <button type="button" class="time-drum-btn" onclick="drumStep('end','m',1)">&#x25B2;</button>
+                  <div class="time-drum-val" id="endM">00</div>
+                  <button type="button" class="time-drum-btn" onclick="drumStep('end','m',-1)">&#x25BC;</button>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
         <div class="form-row">
           <div class="form-group"><label>Reason (optional)</label><input type="text" id="avReason" placeholder="e.g. Personal leave, Conference"></div>
@@ -545,8 +597,81 @@ function getTimeRange() {
   if (_selectedTime === 'allday') return {start: '', end: ''};
   if (_selectedTime === 'morning') return {start: '09:00', end: '12:00'};
   if (_selectedTime === 'afternoon') return {start: '17:00', end: '19:00'};
-  return {start: document.getElementById('avStartTime').value, end: document.getElementById('avEndTime').value};
+  var sh = document.getElementById('startH').textContent;
+  var sm = document.getElementById('startM').textContent;
+  var eh = document.getElementById('endH').textContent;
+  var em = document.getElementById('endM').textContent;
+  return {start: sh + ':' + sm, end: eh + ':' + em};
 }
+
+// ─── Time spinner logic ───
+
+function drumStep(which, unit, dir) {
+  var hEl = document.getElementById(which === 'start' ? 'startH' : 'endH');
+  var mEl = document.getElementById(which === 'start' ? 'startM' : 'endM');
+  var h = parseInt(hEl.textContent, 10);
+  var m = parseInt(mEl.textContent, 10);
+
+  if (unit === 'h') {
+    h = (h + dir + 24) % 24;
+  } else {
+    m = m + dir * 10;
+    if (m >= 60) { m = 0; h = (h + 1) % 24; }
+    if (m < 0) { m = 50; h = (h - 1 + 24) % 24; }
+  }
+
+  hEl.textContent = String(h).padStart(2, '0');
+  mEl.textContent = String(m).padStart(2, '0');
+}
+
+// Mouse wheel on drum values
+document.addEventListener('wheel', function(e) {
+  var drum = e.target.closest('.time-drum');
+  if (!drum) return;
+  e.preventDefault();
+  var which = drum.dataset.spinner;
+  var unit = drum.dataset.unit;
+  var dir = e.deltaY < 0 ? 1 : -1;
+  drumStep(which, unit, dir);
+}, {passive: false});
+
+// Drag on drum values
+(function() {
+  var dragDrum = null, dragUnit = null, dragWhich = null, dragStartY = 0, dragAccum = 0;
+
+  function onPointerDown(e) {
+    var val = e.target.closest('.time-drum-val');
+    if (!val) return;
+    var drum = val.closest('.time-drum');
+    if (!drum) return;
+    dragDrum = drum;
+    dragUnit = drum.dataset.unit;
+    dragWhich = drum.dataset.spinner;
+    dragStartY = e.clientY;
+    dragAccum = 0;
+    e.preventDefault();
+    document.addEventListener('pointermove', onPointerMove);
+    document.addEventListener('pointerup', onPointerUp);
+  }
+
+  function onPointerMove(e) {
+    if (!dragDrum) return;
+    var dy = dragStartY - e.clientY;
+    dragAccum += dy;
+    dragStartY = e.clientY;
+    var threshold = 20;
+    while (dragAccum >= threshold) { drumStep(dragWhich, dragUnit, 1); dragAccum -= threshold; }
+    while (dragAccum <= -threshold) { drumStep(dragWhich, dragUnit, -1); dragAccum += threshold; }
+  }
+
+  function onPointerUp() {
+    dragDrum = null;
+    document.removeEventListener('pointermove', onPointerMove);
+    document.removeEventListener('pointerup', onPointerUp);
+  }
+
+  document.addEventListener('pointerdown', onPointerDown);
+})();
 
 function submitAvailability() {
   var startDate = document.getElementById('avStartDate').value;
