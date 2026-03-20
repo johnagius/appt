@@ -159,6 +159,9 @@ function apiGetDateOptions(extraMap) {
   return out;
 }
 
+function apiRefreshDates() {
+  return apiGetDateOptions(null);
+}
 
 function apiGetAvailability(dateKey) {
   dateKey = String(dateKey || '').trim();

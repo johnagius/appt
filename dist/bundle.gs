@@ -344,25 +344,44 @@ var _HTML_TEMPLATES = {
     .ccItem:hover .ccCode,.ccItem.hl .ccCode{color:rgba(255,255,255,.8);}
 
     /* Language picker */
-    .langPicker{position:relative;flex:0 0 auto;}
+    .langPicker{position:relative;flex:0 0 auto;display:flex;align-items:center;gap:4px;}
+    .langQuickFlags{
+      display:flex;
+      gap:2px;
+    }
+    .langFlag{
+      font-size:20px;
+      width:36px;
+      height:36px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      cursor:pointer;
+      border-radius:10px;
+      border:2px solid transparent;
+      transition: border-color 0.12s ease, transform 0.1s ease;
+      flex-shrink:0;
+    }
+    .langFlag:hover{background:rgba(17,24,39,0.06);transform:scale(1.12);}
+    .langFlag.active{border-color:var(--accent);}
     .langBtn{
       border:none;
       background:#fff;
       font-size:20px;
-      padding:8px 12px;
-      min-height:44px;
+      padding:6px 10px;
+      min-height:36px;
       cursor:pointer;
       line-height:1;
       border-radius:999px;
       border:1px solid var(--line);
       display:flex;
       align-items:center;
-      gap:6px;
+      gap:4px;
       transition: border-color 0.15s ease, box-shadow 0.15s ease;
     }
     .langBtn:hover{ border-color:#d1d5db; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
     .langBtn .langLabel{
-      font-size:12px;
+      font-size:11px;
       font-weight:800;
       color:var(--muted);
     }
@@ -376,42 +395,12 @@ var _HTML_TEMPLATES = {
       border:1px solid var(--line);
       border-radius:10px;
       box-shadow:0 6px 20px rgba(0,0,0,.15);
-      width:240px;
-      max-height:400px;
+      width:220px;
+      max-height:360px;
       overflow-y:auto;
       margin-top:4px;
     }
     .langDrop.open{display:block;}
-    .langQuickFlags{
-      display:flex;
-      flex-wrap:wrap;
-      gap:4px;
-      padding:10px 10px 6px;
-      border-bottom:1px solid var(--line);
-    }
-    .langFlag{
-      font-size:22px;
-      width:38px;
-      height:38px;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      cursor:pointer;
-      border-radius:10px;
-      transition: background 0.12s ease, transform 0.1s ease;
-    }
-    .langFlag:hover{background:rgba(17,24,39,0.06);transform:scale(1.15);}
-    .langFlag.active{background:var(--accent);transform:scale(1.1);}
-    .langDivider{
-      padding:6px 12px;
-      font-size:10px;
-      font-weight:700;
-      text-transform:uppercase;
-      color:var(--muted);
-      letter-spacing:0.5px;
-      border-bottom:1px solid var(--line);
-      background:#fafafa;
-    }
     .langItem{
       display:flex;
       align-items:center;
@@ -423,11 +412,17 @@ var _HTML_TEMPLATES = {
       white-space:nowrap;
       transition: background 0.12s ease;
     }
+    .langItem:first-child{border-radius:10px 10px 0 0;}
     .langItem:last-child{border-radius:0 0 10px 10px;}
     .langItem:hover,.langItem.active{background:var(--accent);color:#fff;}
     [dir="rtl"] .langDrop{right:auto;left:0;}
     [dir="rtl"] .headerBox{flex-direction:row-reverse;}
     [dir="rtl"] .headerLeft{flex-direction:row-reverse;}
+    [dir="rtl"] .langPicker{flex-direction:row-reverse;}
+    @media(max-width: 650px){
+      .langQuickFlags{display:none;}
+      .langBtn .langLabel{display:inline;}
+    }
 
     .serviceRow{
       display:flex;
@@ -676,7 +671,8 @@ var _HTML_TEMPLATES = {
       </div>
 
       <div class="langPicker" id="langPicker">
-        <button type="button" class="langBtn" id="langBtn">🌐 <span class="langLabel">English</span></button>
+        <div class="langQuickFlags" id="langQuickFlags"></div>
+        <button type="button" class="langBtn" id="langBtn">🌐 <span class="langLabel">More</span></button>
         <div class="langDrop" id="langDrop"></div>
       </div>
 
@@ -1543,10 +1539,9 @@ var _HTML_TEMPLATES = {
       });
       // RTL for Arabic
       document.documentElement.dir = (lang === 'ar') ? 'rtl' : 'ltr';
-      // Update lang button label
+      // Update lang button label (shows "More" on large screens with flags visible)
       var langLabel = document.querySelector('.langLabel');
-      var langObj = LANGUAGES.find(function(l) { return l.code === lang; });
-      if (langLabel) langLabel.textContent = langObj ? langObj.name : lang.toUpperCase();
+      if (langLabel) langLabel.textContent = 'More';
       // Mark active in dropdown
       document.querySelectorAll('.langItem').forEach(function(el) {
         el.classList.toggle('active', el.dataset.lang === lang);
@@ -1577,12 +1572,13 @@ var _HTML_TEMPLATES = {
     (function() {
       var langDrop = document.getElementById('langDrop');
       var langBtn = document.getElementById('langBtn');
+      var quickFlags = document.getElementById('langQuickFlags');
 
       function selectLang(code) {
         applyLanguage(code);
         langDrop.classList.remove('open');
         // Update flag highlights
-        langDrop.querySelectorAll('.langFlag').forEach(function(f) {
+        quickFlags.querySelectorAll('.langFlag').forEach(function(f) {
           f.classList.toggle('active', f.dataset.lang === code);
         });
         langDrop.querySelectorAll('.langItem').forEach(function(f) {
@@ -1590,9 +1586,7 @@ var _HTML_TEMPLATES = {
         });
       }
 
-      // Popular flags row
-      var flagRow = document.createElement('div');
-      flagRow.className = 'langQuickFlags';
+      // Popular flags in header (always visible)
       POPULAR_LANGS.forEach(function(code) {
         var lang = LANGUAGES.find(function(l) { return l.code === code; });
         if (!lang) return;
@@ -1603,17 +1597,10 @@ var _HTML_TEMPLATES = {
         f.textContent = lang.flag;
         f.title = lang.name;
         f.addEventListener('click', function() { selectLang(code); });
-        flagRow.appendChild(f);
+        quickFlags.appendChild(f);
       });
-      langDrop.appendChild(flagRow);
 
-      // Divider
-      var div = document.createElement('div');
-      div.className = 'langDivider';
-      div.textContent = 'All languages';
-      langDrop.appendChild(div);
-
-      // Full language list
+      // Full language list in dropdown (for all languages including less common ones)
       LANGUAGES.forEach(function(lang) {
         var d = document.createElement('div');
         d.className = 'langItem';
@@ -2359,18 +2346,44 @@ var _HTML_TEMPLATES = {
         .apiBook(payload);
     });
 
-    // Auto-refresh (keeps page accurate if someone else books online)
+    // Auto-refresh (keeps page accurate if someone else books online or doctor adds overrides)
+    function refreshDateOptions() {
+      google.script.run
+        .withSuccessHandler(function(dateOptions) {
+          if (!dateOptions) return;
+          var prevSelected = state.selectedDateKey;
+          state.dateOptions = dateOptions;
+          renderDates();
+          // Restore selection if the previously selected date is still available
+          if (prevSelected) {
+            var still = state.dateOptions.find(function(o) { return o.dateKey === prevSelected && !o.disabled; });
+            if (still) {
+              els.dateSelect.value = prevSelected;
+              state.selectedDateKey = prevSelected;
+              state.selectedDateLabel = still.label;
+            }
+          }
+          if (state.selectedDateKey) loadAvailability(true);
+        })
+        .withFailureHandler(function() { /* silent */ })
+        .apiRefreshDates();
+    }
+
     function installAutoRefresh() {
+      // Refresh slots every 20s
       setInterval(() => {
         if (state.selectedDateKey) loadAvailability(true);
       }, 20000);
 
+      // Refresh date options every 60s (picks up new overrides, closed days, etc.)
+      setInterval(refreshDateOptions, 60000);
+
       window.addEventListener('focus', () => {
-        if (state.selectedDateKey) loadAvailability(true);
+        refreshDateOptions();
       });
 
       document.addEventListener('visibilitychange', () => {
-        if (!document.hidden && state.selectedDateKey) loadAvailability(true);
+        if (!document.hidden) refreshDateOptions();
       });
     }
 
@@ -5356,6 +5369,9 @@ function apiGetDateOptions(extraMap) {
   return out;
 }
 
+function apiRefreshDates() {
+  return apiGetDateOptions(null);
+}
 
 function apiGetAvailability(dateKey) {
   dateKey = String(dateKey || '').trim();
