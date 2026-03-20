@@ -187,17 +187,25 @@ function apiGetAvailability(dateKey) {
 
   var appts = listAppointmentsForDate_(dateKey);
   var taken = {};
+  var cancelledSlots = {};
   for (var i = 0; i < appts.length; i++) {
     var st = String(appts[i].startTime || '').trim();
     if (apptIsActive_(appts[i])) {
       taken[st] = true;
+    } else {
+      cancelledSlots[st] = true;
     }
   }
 
   var dc = (getScriptProps_().getProperty(CFG().PROP_DOUBLECHECK_CALENDAR) || 'true') === 'true';
   if (dc) {
     var calTaken = listCalendarTakenSlots_(dateKey);
-    Object.keys(calTaken).forEach(function(k) { taken[k] = true; });
+    Object.keys(calTaken).forEach(function(k) {
+      // DB is source of truth: don't let stale calendar events block cancelled slots
+      if (!cancelledSlots[k]) {
+        taken[k] = true;
+      }
+    });
   }
 
   var nowMin = nowMinutesLocal_();
@@ -337,8 +345,14 @@ function apiBook(payload) {
       }
     }
 
+    var cancelledSlotsBook = {};
+    for (var c = 0; c < appts.length; c++) {
+      if (!apptIsActive_(appts[c])) {
+        cancelledSlotsBook[String(appts[c].startTime || '').trim()] = true;
+      }
+    }
     var calTaken = listCalendarTakenSlots_(dateKey);
-    if (calTaken[startTime]) {
+    if (calTaken[startTime] && !cancelledSlotsBook[startTime]) {
       throw new Error('That slot was just taken. Please pick another.');
     }
 
