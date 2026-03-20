@@ -215,7 +215,7 @@ function renderApptTable(appts, containerId, withCheckboxes) {
   }
   var html = '<table><thead><tr>';
   if (withCheckboxes) html += '<th><input type="checkbox" onchange="toggleAll(this, \'' + containerId + '\')"></th>';
-  html += '<th>Time</th><th>Patient</th><th>Phone</th><th>Service</th><th>Location</th><th>Status</th></tr></thead><tbody>';
+  html += '<th>Time</th><th>Patient</th><th>Phone</th><th>Service</th><th>Location</th><th>Status</th><th></th></tr></thead><tbody>';
   for (var i = 0; i < appts.length; i++) {
     var a = appts[i];
     var statusBadge = a.status === 'RELOCATED_SPINOLA'
@@ -229,6 +229,7 @@ function renderApptTable(appts, containerId, withCheckboxes) {
     html += '<td>' + esc(a.serviceName) + '</td>';
     html += '<td>' + esc(a.location) + '</td>';
     html += '<td>' + statusBadge + '</td>';
+    html += '<td><button class="btn btn-sm btn-danger" onclick="cancelSingleAppt(\'' + esc(a.appointmentId) + '\', \'' + containerId + '\')">Cancel</button></td>';
     html += '</tr>';
   }
   html += '</tbody></table>';
@@ -323,6 +324,7 @@ function loadDashboard() {
       document.getElementById('actionDate').value = res.todayKey;
       loadActionAppts();
       document.getElementById('notifyDate').value = res.todayKey;
+      loadNotifyAppts();
     })
     .withFailureHandler(function(err) {
       hideLoading();
@@ -490,6 +492,41 @@ function processAction(action) {
       action: action,
       appointmentIds: ids,
       customMessage: customMsg
+    });
+}
+
+function cancelSingleAppt(appointmentId, containerId) {
+  var dateKey = containerId === 'actionApptsList'
+    ? document.getElementById('actionDate').value
+    : document.getElementById('notifyDate').value;
+  if (!dateKey) return;
+  if (!confirm('Cancel this appointment?')) return;
+
+  showLoading('Cancelling...', 'Cancelling appointment.');
+  google.script.run
+    .withSuccessHandler(function(res) {
+      hideLoading();
+      if (!res || !res.ok) {
+        var msgId = containerId === 'actionApptsList' ? 'actionMsg' : 'notifyResultMsg';
+        showMsg(msgId, 'bad', res.reason || 'Failed.');
+        return;
+      }
+      var msgId = containerId === 'actionApptsList' ? 'actionMsg' : 'notifyResultMsg';
+      showMsg(msgId, 'good', 'Appointment cancelled.');
+      if (containerId === 'actionApptsList') loadActionAppts();
+      else loadNotifyAppts();
+      loadDashboard();
+    })
+    .withFailureHandler(function(err) {
+      hideLoading();
+      var msgId = containerId === 'actionApptsList' ? 'actionMsg' : 'notifyResultMsg';
+      showMsg(msgId, 'bad', 'Error: ' + (err && err.message ? err.message : String(err)));
+    })
+    .apiAdminProcessAppointments(SIG, {
+      dateKey: dateKey,
+      action: 'cancel',
+      appointmentIds: [appointmentId],
+      customMessage: ''
     });
 }
 
