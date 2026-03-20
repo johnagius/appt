@@ -333,13 +333,14 @@ function showMsg(id, type, text) {
 }
 
 var _confirmCb = null;
-function styledConfirm(title, body, btnLabel, btnClass) {
+function styledConfirm(title, body, btnLabel, btnClass, dismissLabel) {
   return new Promise(function(resolve) {
     document.getElementById('confirmTitle').textContent = title;
     document.getElementById('confirmBody').textContent = body;
     var okBtn = document.getElementById('confirmOk');
     okBtn.className = 'btn ' + (btnClass || 'btn-danger');
     okBtn.textContent = btnLabel || 'Confirm';
+    document.getElementById('confirmCancel').textContent = dismissLabel || 'Go Back';
     var overlay = document.getElementById('confirmOverlay');
     overlay.style.display = 'flex';
     requestAnimationFrame(function(){ requestAnimationFrame(function(){ overlay.classList.add('show'); }); });
@@ -843,7 +844,7 @@ function cancelSingleAppt(appointmentId, containerId) {
     ? document.getElementById('actionDate').value
     : document.getElementById('notifyDate').value;
   if (!dateKey) return;
-  styledConfirm('Cancel Appointment', 'Cancel this appointment?', 'Cancel', 'btn-danger').then(function(ok){
+  styledConfirm('Cancel Appointment', 'Are you sure you want to cancel this appointment?', 'Yes, Cancel', 'btn-danger', 'Go Back').then(function(ok){
   if (!ok) return;
 
   showLoading('Cancelling...', 'Cancelling appointment.');
