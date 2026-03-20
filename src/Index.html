@@ -1,0 +1,1054 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Booking</title>
+
+  <style>
+    :root{
+      --bg:#f6f7fb;
+      --card:#ffffff;
+      --muted:#6b7280;
+      --text:#111827;
+      --accent:#f5b301;
+      --line:#e5e7eb;
+      --good:#10b981;
+      --bad:#ef4444;
+      --shadow: 0 10px 30px rgba(17,24,39,0.08);
+      --radius: 16px;
+    }
+    *{box-sizing:border-box;}
+    html,body{height:100%;}
+    body{
+      margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Apple Color Emoji","Segoe UI Emoji";
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    /* Attempt hide Apps Script banner if it's inside same DOM */
+    #warning,
+    .warning-bar.warning-banner-bar,
+    .warning-banner-bar,
+    .warning-banner{
+      display:none !important;
+      height:0 !important;
+      margin:0 !important;
+      padding:0 !important;
+      border:0 !important;
+    }
+
+    .wrap{
+      width:100%;
+      max-width:none;
+      margin:0;
+      padding:12px 12px 18px 12px;
+    }
+
+    .card{
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      border: 1px solid rgba(229,231,235,0.95);
+    }
+
+    /* Header bar */
+    .headerBox{
+      border-radius: var(--radius);
+      border:1px solid var(--line);
+      background:#f3f4f6;
+      padding:10px 12px;
+      display:flex;
+      gap:10px;
+      align-items:center;
+      justify-content:space-between;
+      margin-bottom:10px;
+    }
+    .headerLeft{
+      display:flex;
+      gap:10px;
+      align-items:center;
+      min-width:0;
+    }
+    .headerLogo{
+      width:42px;
+      height:42px;
+      border-radius:14px;
+      background:#eff6ff;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      color:#1d4ed8;
+      font-weight:900;
+      font-size:14px;
+      border:1px solid rgba(29,78,216,0.15);
+      flex:0 0 auto;
+    }
+    .headerText{
+      display:flex;
+      flex-direction:column;
+      gap:1px;
+      min-width:0;
+    }
+    .headerName{
+      margin:0;
+      font-weight:900;
+      font-size:14.5px;
+      line-height:1.15;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+    .headerClinic,.headerTz{
+      margin:0;
+      color: var(--muted);
+      font-size:12px;
+      line-height:1.2;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding:4px 10px;
+      border-radius:999px;
+      border:1px solid var(--line);
+      background:#fff;
+      color: var(--muted);
+      font-size:12px;
+      white-space:nowrap;
+    }
+    .dot{
+      width:8px;
+      height:8px;
+      border-radius:999px;
+      background: var(--good);
+      display:inline-block;
+    }
+    .dot.bad{ background: var(--bad); }
+
+    /* === TOP: 3 columns: Summary | Clinic Hours | Services+Date === */
+    .topRow{
+      display:grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap:10px;
+      margin-bottom:10px;
+      align-items:stretch;
+    }
+    @media(max-width: 1100px){
+      .topRow{ grid-template-columns: 1fr 1fr; }
+      .topRow .topCard.pickCard{ grid-column: 1 / -1; }
+    }
+    @media(max-width: 780px){
+      .topRow{ grid-template-columns: 1fr; }
+      .topRow .topCard.pickCard{ grid-column: auto; }
+    }
+
+    .topCard{
+      padding:12px;
+    }
+    .topTitle{
+      margin:0 0 8px 0;
+      font-weight:900;
+      font-size:13.5px;
+    }
+    .topLine{
+      margin:0;
+      font-size:12.5px;
+      color: var(--muted);
+      line-height:1.4;
+    }
+    .topLine b{ color: var(--text); font-weight:800; }
+
+    /* Services + Date in third card */
+    .pickGrid{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap:10px;
+      align-items:start;
+    }
+    @media(max-width: 780px){
+      .pickGrid{ grid-template-columns: 1fr; }
+    }
+
+    .sectionTitle{
+      margin:0 0 6px 0;
+      font-size:12px;
+      color: var(--muted);
+      font-weight:800;
+      letter-spacing:0.02em;
+      text-transform:uppercase;
+    }
+    .label{
+      font-size:12px;
+      color: var(--muted);
+      font-weight:800;
+      margin-bottom:6px;
+    }
+
+    select, input, textarea{
+      width:100%;
+      padding:10px 10px;
+      border:1px solid var(--line);
+      border-radius:12px;
+      outline:none;
+      font-size:13px;
+      background:#fff;
+      color: var(--text);
+    }
+    textarea{ min-height:80px; resize:vertical; }
+
+    .serviceRow{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      padding:10px 12px;
+      border:1px solid var(--line);
+      border-radius:14px;
+      cursor:pointer;
+      transition: transform 0.06s ease, box-shadow 0.06s ease;
+      background:#fff;
+      margin-bottom:8px;
+    }
+    .serviceRow:last-child{ margin-bottom:0; }
+    .serviceRow:hover{
+      box-shadow: 0 10px 22px rgba(17,24,39,0.08);
+      transform: translateY(-1px);
+    }
+    .serviceRow.selected{
+      border-color:#111827;
+      box-shadow: 0 12px 26px rgba(17,24,39,0.12);
+    }
+    .serviceLeft{ display:flex; gap:10px; align-items:center; min-width:0; }
+    .serviceIcon{
+      width:40px;
+      height:40px;
+      border-radius:12px;
+      background:#eef2ff;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-weight:900;
+      color:#1d4ed8;
+      border:1px solid rgba(29,78,216,0.12);
+      flex:0 0 auto;
+    }
+    .serviceMeta{ display:flex; flex-direction:column; gap:2px; min-width:0; }
+    .serviceName{
+      font-weight:900;
+      font-size:13px;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+    .serviceDur{ font-size:12px; color: var(--muted); }
+    .chev{ font-size:18px; color: var(--muted); padding: 0 4px; flex:0 0 auto; }
+
+    /* MAIN booking area */
+    .main{
+      padding:12px;
+    }
+
+    /* 10 columns time grid on desktop */
+    .timeGrid{
+      display:grid;
+      grid-template-columns: repeat(10, minmax(0, 1fr));
+      gap:8px;
+    }
+    @media(max-width: 1100px){
+      .timeGrid{ grid-template-columns: repeat(8, minmax(0, 1fr)); }
+    }
+    @media(max-width: 860px){
+      .timeGrid{ grid-template-columns: repeat(6, minmax(0, 1fr)); }
+    }
+    @media(max-width: 650px){
+      .timeGrid{ grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    }
+    @media(max-width: 420px){
+      .timeGrid{ grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+
+    .timeBtn{
+      padding:10px 6px;
+      border-radius:12px;
+      border:1px solid var(--line);
+      background:#fff;
+      cursor:pointer;
+      font-weight:900;
+      font-size:12.5px;
+      text-align:center;
+      user-select:none;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+    .timeBtn.selected{
+      border-color:#111827;
+      box-shadow: 0 10px 20px rgba(17,24,39,0.10);
+      transform: translateY(-1px);
+    }
+
+    .row{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      align-items:center;
+    }
+
+    .btn{
+      border:none;
+      border-radius:999px;
+      padding:10px 16px;
+      font-weight:750;
+      cursor:pointer;
+      background:#111827;
+      color:#fff;
+      box-shadow: 0 8px 18px rgba(0,0,0,0.12);
+      white-space:nowrap;
+    }
+    .btn:active{ transform: translateY(1px); }
+    .btnAccent{
+      background: var(--accent);
+      color:#111827;
+      box-shadow: 0 10px 22px rgba(245,179,1,0.35);
+    }
+    .btnGhost{
+      background: transparent;
+      color: var(--text);
+      border: 1px solid var(--line);
+      box-shadow:none;
+    }
+
+    .msg{
+      margin-top:10px;
+      padding:10px;
+      border-radius:14px;
+      border:1px solid var(--line);
+      background:#fff;
+      color: var(--text);
+      font-size:13px;
+      line-height:1.4;
+      display:none;
+    }
+    .msg.good{ border-color: rgba(16,185,129,0.35); background: rgba(16,185,129,0.06); }
+    .msg.bad{ border-color: rgba(239,68,68,0.35); background: rgba(239,68,68,0.06); }
+
+    /* Modals */
+    .overlay{
+      position:fixed;
+      inset:0;
+      background: rgba(17,24,39,0.55);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      padding:14px;
+      z-index:2000;
+    }
+    .modal{
+      width: min(720px, 100%);
+      background:#fff;
+      border-radius:18px;
+      padding:16px;
+      border:1px solid var(--line);
+      box-shadow: var(--shadow);
+    }
+    .modal h3{
+      margin:0 0 8px 0;
+      font-size:16px;
+      font-weight:900;
+    }
+    .modal p{
+      margin:0 0 12px 0;
+      font-size:13px;
+      color: var(--muted);
+      line-height:1.45;
+      white-space:pre-line;
+    }
+    .modalActions{
+      display:flex;
+      justify-content:flex-end;
+      gap:10px;
+    }
+
+    .loadingBox{
+      width: min(560px, 100%);
+      background:#fff;
+      border-radius:18px;
+      padding:18px;
+      border:1px solid var(--line);
+      box-shadow: var(--shadow);
+      display:flex;
+      gap:14px;
+      align-items:center;
+    }
+    .spinner{
+      width:34px;
+      height:34px;
+      border-radius:999px;
+      border:4px solid #e5e7eb;
+      border-top-color:#111827;
+      animation: spin 0.9s linear infinite;
+      flex:0 0 auto;
+    }
+    @keyframes spin{ to { transform: rotate(360deg); } }
+    .loadingText h4{ margin:0 0 4px 0; font-size:14px; }
+    .loadingText div{ margin:0; color: var(--muted); font-size:12.5px; line-height:1.35; }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+
+    <!-- Header -->
+    <div class="headerBox card">
+      <div class="headerLeft">
+        <div class="headerLogo">MD</div>
+        <div class="headerText">
+          <p class="headerName" id="docName">Dr Kevin Navarro Gera</p>
+          <p class="headerClinic" id="docMeta">Potter’s Pharmacy Clinic</p>
+          <p class="headerTz" id="tzMeta">Time zone: Europe/Malta</p>
+        </div>
+      </div>
+
+      <span class="pill" id="statusPill" style="display:none;">
+        <span class="dot" id="statusDot"></span>
+        <span id="statusText">Ready</span>
+      </span>
+    </div>
+
+    <!-- TOP: 3 columns -->
+    <div class="topRow">
+      <!-- Summary -->
+      <div class="card topCard">
+        <p class="topTitle">Summary</p>
+        <p class="topLine" id="sumService">Service: Clinic Consultation (10 mins)</p>
+        <p class="topLine" id="sumDate">Date: —</p>
+        <p class="topLine" id="sumTime">Time: —</p>
+        <p class="topLine" id="sumLoc">Location: Potter’s Pharmacy Clinic</p>
+      </div>
+
+      <!-- Clinic hours -->
+      <div class="card topCard">
+        <p class="topTitle">Clinic hours</p>
+        <p class="topLine"><b>Mon–Fri:</b> 09:00–12:00 & 17:00–19:00</p>
+        <p class="topLine"><b>Sat:</b> 10:00–12:00</p>
+        <p class="topLine"><b>Sun:</b> Closed</p>
+        <p class="topLine">Slots are 10 minutes each.</p>
+      </div>
+
+      <!-- Services + Date moved into the empty third column -->
+      <div class="card topCard pickCard">
+        <div class="pickGrid">
+          <div>
+            <div class="sectionTitle">Services</div>
+            <div id="services"></div>
+          </div>
+
+          <div>
+            <div class="sectionTitle">Select a date</div>
+            <div class="label">Available dates (next 7 days)</div>
+            <select id="dateSelect"></select>
+            <div id="dateHint" class="msg"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main -->
+    <div class="card main">
+      <div class="sectionTitle">Select a time</div>
+      <div id="timeGrid" class="timeGrid"></div>
+      <div id="timeHint" class="msg"></div>
+
+      <div class="sectionTitle" style="margin-top:12px;">Your details</div>
+
+      <div class="row">
+        <div style="flex: 1 1 280px;">
+          <div class="label">Full name *</div>
+          <input id="fullName" type="text" autocomplete="name" placeholder="Full name">
+        </div>
+        <div style="flex: 1 1 200px;">
+          <div class="label">Phone *</div>
+          <input id="phone" type="tel" autocomplete="tel" placeholder="+356 …">
+        </div>
+        <div style="flex: 1 1 280px;">
+          <div class="label">Email *</div>
+          <input id="email" type="email" autocomplete="email" placeholder="you@example.com">
+        </div>
+      </div>
+
+      <div style="margin-top:10px;">
+        <div class="label">Comments</div>
+        <textarea id="comments" placeholder="Optional notes…"></textarea>
+      </div>
+
+      <div class="row" style="margin-top:10px; justify-content:flex-start;">
+        <button class="btn btnAccent" id="confirmBtn">Confirm</button>
+      </div>
+
+      <div id="resultMsg" class="msg"></div>
+    </div>
+
+  </div>
+
+  <!-- Confirmation modal -->
+  <div class="overlay" id="confirmOverlay">
+    <div class="modal">
+      <h3>Appointment Confirmed</h3>
+      <p id="confirmText"></p>
+      <div class="modalActions">
+        <button class="btn btnAccent" id="confirmOk">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading overlay -->
+  <div class="overlay" id="loadingOverlay">
+    <div class="loadingBox">
+      <div class="spinner"></div>
+      <div class="loadingText">
+        <h4 id="loadingTitle">Loading…</h4>
+        <div id="loadingDesc">Please wait.</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // --- Remove the "This application was created by a Google Apps Script user" banner (best effort) ---
+    (function () {
+      function findAndRemoveInDocument(doc) {
+        if (!doc) return false;
+
+        let el =
+          doc.getElementById('warning') ||
+          doc.querySelector('#warning') ||
+          doc.querySelector('.warning-bar.warning-banner-bar') ||
+          doc.querySelector('.warning-banner-bar') ||
+          doc.querySelector('.warning-banner') ||
+          doc.querySelector('[aria-labelledby="warning-text"]') ||
+          doc.querySelector('#warning-text');
+
+        if (!el) return false;
+
+        if (el && el.id === 'warning-text') {
+          el = el.closest('#warning') || el.closest('.warning-banner-bar') || el.closest('.warning-banner') || el;
+        }
+
+        const kill =
+          el.closest('tr') ||
+          el.closest('td') ||
+          el.closest('table') ||
+          el;
+
+        if (kill && kill.parentNode) {
+          kill.parentNode.removeChild(kill);
+          return true;
+        }
+
+        try {
+          el.style.display = 'none';
+          el.style.visibility = 'hidden';
+          el.style.height = '0';
+          el.style.margin = '0';
+          el.style.padding = '0';
+          return true;
+        } catch (e) {}
+
+        return false;
+      }
+
+      function stripGasBanner() {
+        let removed = false;
+        removed = findAndRemoveInDocument(document) || removed;
+        try { removed = findAndRemoveInDocument(window.parent && window.parent.document) || removed; } catch (e1) {}
+        try { removed = findAndRemoveInDocument(window.top && window.top.document) || removed; } catch (e2) {}
+        return removed;
+      }
+
+      function installWatchers() {
+        stripGasBanner();
+        setTimeout(stripGasBanner, 50);
+        setTimeout(stripGasBanner, 250);
+        setTimeout(stripGasBanner, 800);
+        setTimeout(stripGasBanner, 1500);
+
+        try {
+          const mo = new MutationObserver(() => { stripGasBanner(); });
+          mo.observe(document.documentElement || document.body, { childList: true, subtree: true });
+        } catch (e) {}
+
+        setInterval(stripGasBanner, 2000);
+      }
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', installWatchers);
+      } else {
+        installWatchers();
+      }
+
+      window.stripGasBanner = stripGasBanner;
+    })();
+  </script>
+
+  <script>
+    const state = {
+      config: null,
+      dateOptions: [],
+      selectedServiceId: null,
+      selectedServiceName: null,
+      selectedServiceMinutes: null,
+      selectedDateKey: null,
+      selectedDateLabel: null,
+      selectedSlot: null,
+      slots: []
+    };
+
+
+    const els = {
+      services: document.getElementById('services'),
+      dateSelect: document.getElementById('dateSelect'),
+      timeGrid: document.getElementById('timeGrid'),
+      confirmBtn: document.getElementById('confirmBtn'),
+      resultMsg: document.getElementById('resultMsg'),
+
+      docName: document.getElementById('docName'),
+      docMeta: document.getElementById('docMeta'),
+      tzMeta: document.getElementById('tzMeta'),
+
+      sumService: document.getElementById('sumService'),
+      sumDate: document.getElementById('sumDate'),
+      sumTime: document.getElementById('sumTime'),
+      sumLoc: document.getElementById('sumLoc'),
+
+      confirmOverlay: document.getElementById('confirmOverlay'),
+      confirmText: document.getElementById('confirmText'),
+      confirmOk: document.getElementById('confirmOk'),
+
+      loadingOverlay: document.getElementById('loadingOverlay'),
+      loadingTitle: document.getElementById('loadingTitle'),
+      loadingDesc: document.getElementById('loadingDesc'),
+
+      dateHint: document.getElementById('dateHint'),
+      timeHint: document.getElementById('timeHint'),
+
+      statusPill: document.getElementById('statusPill'),
+      statusDot: document.getElementById('statusDot'),
+      statusText: document.getElementById('statusText'),
+
+      fullName: document.getElementById('fullName'),
+      email: document.getElementById('email'),
+      phone: document.getElementById('phone'),
+      comments: document.getElementById('comments')
+    };
+
+    const EXEC_URL_AFTER_BOOKING = 'https://script.google.com/macros/s/AKfycbxQGnxKNEe9BpU8F7TSDHzc1kybq9TBi-RpUOwX4BsRcX2HUU2V5TfcuHsvQA6duZQ/exec';
+
+    function goToExecAfterBooking_(){
+      const target = EXEC_URL_AFTER_BOOKING;
+      try { window.top.location.href = target; return; } catch (e1) {}
+      try { window.parent.location.href = target; return; } catch (e2) {}
+      try { window.location.href = target; return; } catch (e3) {}
+      try {
+        const a = document.createElement('a');
+        a.href = target;
+        a.target = '_top';
+        a.rel = 'noopener';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      } catch (e4) {}
+    }
+
+    function showLoading(title, desc){
+      els.loadingTitle.textContent = title || 'Loading…';
+      els.loadingDesc.textContent = desc || 'Please wait.';
+      els.loadingOverlay.style.display = 'flex';
+    }
+    function hideLoading(){
+      els.loadingOverlay.style.display = 'none';
+    }
+
+    function showConfirmModal(text){
+      els.confirmText.textContent = text;
+      els.confirmOverlay.style.display = 'flex';
+    }
+    function hideConfirmModal(){
+      els.confirmOverlay.style.display = 'none';
+    }
+
+    els.confirmOk.addEventListener('click', () => {
+      hideConfirmModal();
+      goToExecAfterBooking_();
+    });
+
+    function setStatus(type, text) {
+      els.statusPill.style.display = 'inline-flex';
+      els.statusText.textContent = text;
+      if (type === 'bad') els.statusDot.classList.add('bad');
+      else els.statusDot.classList.remove('bad');
+    }
+
+    function showMsg(type, text) {
+      els.resultMsg.style.display = 'block';
+      els.resultMsg.classList.remove('good', 'bad');
+      if (type === 'good') els.resultMsg.classList.add('good');
+      if (type === 'bad') els.resultMsg.classList.add('bad');
+      els.resultMsg.textContent = text;
+    }
+    function hideMsg() {
+      els.resultMsg.style.display = 'none';
+      els.resultMsg.textContent = '';
+      els.resultMsg.classList.remove('good','bad');
+    }
+
+    function showHint(el, type, text) {
+      el.style.display = 'block';
+      el.classList.remove('good', 'bad');
+      if (type === 'good') el.classList.add('good');
+      if (type === 'bad') el.classList.add('bad');
+      el.textContent = text;
+    }
+    function hideHint(el) {
+      el.style.display = 'none';
+      el.textContent = '';
+      el.classList.remove('good','bad');
+    }
+
+    function to12h(hhmm){
+      const [hh, mm] = hhmm.split(':').map(x => parseInt(x,10));
+      const ampm = hh >= 12 ? 'PM' : 'AM';
+      const h = (hh % 12) === 0 ? 12 : (hh % 12);
+      return `${h}:${String(mm).padStart(2,'0')} ${ampm}`;
+    }
+
+    function parseHHMMToMinutes(hhmm){
+      const [hh, mm] = hhmm.split(':').map(x => parseInt(x,10));
+      return (hh * 60) + mm;
+    }
+
+    function getNowInTimeZoneParts(tz){
+      // Returns {dateKey: YYYY-MM-DD, minutes: minutesSinceMidnight} for a given IANA tz
+      const dtf = new Intl.DateTimeFormat('en-GB', {
+        timeZone: tz,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      });
+      const parts = dtf.formatToParts(new Date());
+      const map = {};
+      parts.forEach(p => { if (p.type !== 'literal') map[p.type] = p.value; });
+
+      const dateKey = `${map.year}-${map.month}-${map.day}`;
+      const minutes = (parseInt(map.hour,10) * 60) + parseInt(map.minute,10);
+      return { dateKey, minutes };
+    }
+
+    function renderServices() {
+      els.services.innerHTML = '';
+      const svcs = (state.config && state.config.services) ? state.config.services : [];
+
+      svcs.forEach((svc) => {
+        const div = document.createElement('div');
+        div.className = 'serviceRow';
+        div.dataset.serviceId = svc.id;
+
+        const icon = (svc.id === 'blood') ? '🧪' : '🩺';
+
+        div.innerHTML = `
+          <div class="serviceLeft">
+            <div class="serviceIcon">${icon}</div>
+            <div class="serviceMeta">
+              <div class="serviceName">${svc.name.toUpperCase()}</div>
+              <div class="serviceDur">${svc.minutes} mins</div>
+            </div>
+          </div>
+          <div class="chev">›</div>
+        `;
+
+        div.addEventListener('click', () => selectService(svc));
+        els.services.appendChild(div);
+      });
+
+      if (svcs.length) selectService(svcs[0], true);
+    }
+
+    function selectService(svc, silent) {
+      state.selectedServiceId = svc.id;
+      state.selectedServiceName = svc.name;
+      state.selectedServiceMinutes = svc.minutes;
+
+      [...els.services.querySelectorAll('.serviceRow')].forEach(x => {
+        x.classList.toggle('selected', x.dataset.serviceId === svc.id);
+      });
+
+      els.sumService.textContent = `Service: ${svc.name} (${svc.minutes} mins)`;
+      if (!silent) setStatus('good', 'Service selected');
+
+      // Refresh slots when switching service (optional; safe)
+      if (state.selectedDateKey) loadAvailability(true);
+    }
+
+    function renderDates() {
+      els.dateSelect.innerHTML = '';
+
+      state.dateOptions.forEach(opt => {
+        const o = document.createElement('option');
+        o.value = opt.dateKey;
+        o.textContent = opt.label + (opt.disabled ? ` — ${opt.reason}` : '');
+        o.disabled = !!opt.disabled;
+        els.dateSelect.appendChild(o);
+      });
+
+      const firstEnabled = state.dateOptions.find(x => !x.disabled);
+      if (firstEnabled) {
+        els.dateSelect.value = firstEnabled.dateKey;
+        state.selectedDateKey = firstEnabled.dateKey;
+        state.selectedDateLabel = firstEnabled.label;
+        els.sumDate.textContent = `Date: ${firstEnabled.label}`;
+        hideHint(els.dateHint);
+      } else {
+        state.selectedDateKey = null;
+        showHint(els.dateHint, 'bad', 'No available dates in the next 7 days.');
+      }
+    }
+
+    els.dateSelect.addEventListener('change', () => {
+      const dateKey = els.dateSelect.value;
+      state.selectedDateKey = dateKey;
+
+      const opt = state.dateOptions.find(x => x.dateKey === dateKey);
+      state.selectedDateLabel = opt ? opt.label : dateKey;
+
+      state.selectedSlot = null;
+      els.sumDate.textContent = `Date: ${state.selectedDateLabel}`;
+      els.sumTime.textContent = `Time: —`;
+
+      hideHint(els.timeHint);
+      hideMsg();
+      setStatus('good', 'Loading slots…');
+      loadAvailability(false);
+    });
+
+    function renderSlots(slots) {
+      els.timeGrid.innerHTML = '';
+      state.slots = slots || [];
+
+      // Only show available + not past (for today in Europe/Malta)
+      const tz = (state.config && state.config.timezone) ? state.config.timezone : 'Europe/Malta';
+      const now = getNowInTimeZoneParts(tz);
+
+      const filtered = (slots || []).filter(slot => {
+        if (!slot || !slot.start) return false;
+        if (slot.available !== true) return false;
+
+        if (state.selectedDateKey && state.selectedDateKey === now.dateKey) {
+          const startMin = parseHHMMToMinutes(slot.start);
+          if (startMin < now.minutes) return false;
+        }
+        return true;
+      });
+
+      // If previously selected slot is gone, clear
+      if (state.selectedSlot && state.selectedSlot.start) {
+        const stillThere = filtered.some(s => s.start === state.selectedSlot.start);
+        if (!stillThere) {
+          state.selectedSlot = null;
+          els.sumTime.textContent = 'Time: —';
+        }
+      }
+
+      if (!filtered.length) {
+        showHint(els.timeHint, 'bad', 'No slots available.');
+        return;
+      }
+      hideHint(els.timeHint);
+
+      filtered.forEach(slot => {
+        const b = document.createElement('div');
+        b.className = 'timeBtn';
+        b.textContent = to12h(slot.start);
+
+        if (state.selectedSlot && state.selectedSlot.start === slot.start) {
+          b.classList.add('selected');
+        }
+
+        b.addEventListener('click', () => selectSlot(slot, b));
+        els.timeGrid.appendChild(b);
+      });
+    }
+
+    function selectSlot(slot, buttonEl) {
+      [...els.timeGrid.querySelectorAll('.timeBtn')].forEach(x => x.classList.remove('selected'));
+      buttonEl.classList.add('selected');
+
+      state.selectedSlot = slot;
+      els.sumTime.textContent = `Time: ${to12h(slot.start)} - ${to12h(slot.end)}`;
+      els.sumLoc.textContent = `Location: ${state.config.pottersLocation}`;
+
+      hideMsg();
+      setStatus('good', 'Time selected');
+    }
+
+    function validateForm() {
+      if (!state.selectedServiceId) return 'Please select a service.';
+      if (!state.selectedDateKey) return 'Please select a date.';
+      if (!state.selectedSlot || !state.selectedSlot.start) return 'Please select a time slot.';
+
+      const fullName = els.fullName.value.trim();
+      const email = els.email.value.trim();
+      const phone = els.phone.value.trim();
+
+      if (!fullName) return 'Full name is required.';
+      if (!phone) return 'Phone is required.';
+      if (!email) return 'Email is required.';
+      if (!email.includes('@')) return 'Please enter a valid email.';
+
+      return null;
+    }
+
+    function loadAvailability(isSilentRefresh) {
+      if (!state.selectedDateKey) return;
+
+      if (!isSilentRefresh) {
+        showLoading('Loading time slots…', 'Please wait while we fetch availability.');
+      }
+
+      google.script.run
+        .withSuccessHandler((res) => {
+          if (!isSilentRefresh) hideLoading();
+
+          if (!res || !res.ok) {
+            renderSlots([]);
+            showHint(els.timeHint, 'bad', (res && res.reason) ? res.reason : 'No availability.');
+            setStatus('bad', 'Unavailable');
+            return;
+          }
+
+          renderSlots(res.slots || []);
+          setStatus('good', 'Slots loaded');
+        })
+        .withFailureHandler((err) => {
+          if (!isSilentRefresh) hideLoading();
+          renderSlots([]);
+          showHint(els.timeHint, 'bad', String(err && err.message ? err.message : err));
+          setStatus('bad', 'Error loading slots');
+        })
+        .apiGetAvailability(state.selectedDateKey);
+    }
+
+    els.confirmBtn.addEventListener('click', () => {
+      hideMsg();
+      const err = validateForm();
+      if (err) {
+        showMsg('bad', err);
+        setStatus('bad', 'Missing fields');
+        return;
+      }
+
+      showLoading('Confirming appointment…', 'Sending confirmation email and reserving your slot.');
+      setStatus('good', 'Booking…');
+
+      const payload = {
+        serviceId: state.selectedServiceId,
+        dateKey: state.selectedDateKey,
+        startTime: state.selectedSlot.start,
+        fullName: els.fullName.value.trim(),
+        email: els.email.value.trim(),
+        phone: els.phone.value.trim(),
+        comments: els.comments.value.trim()
+      };
+
+      google.script.run
+        .withSuccessHandler((res) => {
+          hideLoading();
+
+          if (res && res.ok) {
+            const text =
+              `Your appointment has been confirmed.\n\n` +
+              `Service: ${res.serviceName}\n` +
+              `Date: ${state.selectedDateLabel}\n` +
+              `Time: ${to12h(res.startTime)} - ${to12h(res.endTime)}\n` +
+              `Location: ${res.location}\n\n` +
+              `A confirmation email has been sent. You can cancel from the link in that email.`;
+
+            showConfirmModal(text);
+            return;
+          }
+
+          showMsg('bad', 'Could not book. Please try again.');
+          setStatus('bad', 'Booking failed');
+          loadAvailability(false);
+        })
+        .withFailureHandler((e) => {
+          hideLoading();
+          const msg = (e && e.message) ? e.message : String(e);
+          showMsg('bad', msg);
+          setStatus('bad', 'Booking error');
+          loadAvailability(false);
+        })
+        .apiBook(payload);
+    });
+
+    // Auto-refresh (keeps page accurate if someone else books online)
+    function installAutoRefresh() {
+      setInterval(() => {
+        if (state.selectedDateKey) loadAvailability(true);
+      }, 20000);
+
+      window.addEventListener('focus', () => {
+        if (state.selectedDateKey) loadAvailability(true);
+      });
+
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden && state.selectedDateKey) loadAvailability(true);
+      });
+    }
+
+    function init() {
+      showLoading('Loading booking page…', 'Please wait while we prepare the booking system.');
+
+      google.script.run
+        .withSuccessHandler((data) => {
+          hideLoading();
+
+          state.config = data.config;
+          state.dateOptions = data.dateOptions || [];
+
+          els.docName.textContent = state.config.doctorName;
+          els.docMeta.textContent = state.config.pottersLocation;
+          els.tzMeta.textContent = 'Time zone: ' + state.config.timezone;
+
+          els.sumLoc.textContent = `Location: ${state.config.pottersLocation}`;
+
+          renderServices();
+          renderDates();
+
+          if (state.selectedDateKey) {
+            setStatus('good', 'Loading slots…');
+            loadAvailability(false);
+          } else {
+            setStatus('bad', 'No dates available');
+          }
+
+          installAutoRefresh();
+        })
+        .withFailureHandler((e) => {
+          hideLoading();
+          showMsg('bad', 'Error loading app: ' + (e && e.message ? e.message : e));
+          setStatus('bad', 'Load error');
+        })
+        .apiInit();
+    }
+
+    init();
+  </script>
+</body>
+</html>
