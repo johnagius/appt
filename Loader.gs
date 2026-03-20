@@ -89,11 +89,12 @@ function _fetchBundle() {
     );
   }
 
-  var url = 'https://raw.githubusercontent.com/' + owner + '/' + repo + '/' + branch + '/' + BUNDLE_PATH;
+  // Use GitHub API (more reliable, no CDN caching issues like raw.githubusercontent.com)
+  var url = 'https://api.github.com/repos/' + owner + '/' + repo + '/contents/' + BUNDLE_PATH + '?ref=' + branch;
 
-  var options = { muteHttpExceptions: true };
+  var options = { muteHttpExceptions: true, headers: { 'Accept': 'application/vnd.github.v3.raw', 'User-Agent': 'GAS-Loader' } };
   if (token) {
-    options.headers = { 'Authorization': 'token ' + token };
+    options.headers['Authorization'] = 'token ' + token;
   }
 
   var response = UrlFetchApp.fetch(url, options);
@@ -142,6 +143,67 @@ function testGitHubConnection() {
   } catch (e) {
     return { ok: false, message: 'Failed: ' + e.message };
   }
+}
+
+/**
+ * Run this to diagnose issues. Check the Execution Log after running.
+ */
+function diagnoseBundleIssues() {
+  var results = [];
+
+  // 1. Check script properties
+  var props = PropertiesService.getScriptProperties();
+  var owner = props.getProperty('GITHUB_OWNER') || '(not set)';
+  var repo = props.getProperty('GITHUB_REPO') || '(not set)';
+  var branch = props.getProperty('GITHUB_BRANCH') || 'main (default)';
+  results.push('GITHUB_OWNER: ' + owner);
+  results.push('GITHUB_REPO: ' + repo);
+  results.push('GITHUB_BRANCH: ' + branch);
+
+  // 2. Check cache state
+  var cache = CacheService.getScriptCache();
+  var cachedChunks = 0;
+  var cachedSize = 0;
+  for (var i = 0; i < 20; i++) {
+    var chunk = cache.get('_B' + i);
+    if (chunk === null) break;
+    cachedChunks++;
+    cachedSize += chunk.length;
+  }
+  results.push('Cached chunks: ' + cachedChunks + ' (' + (cachedSize/1024).toFixed(1) + ' KB)');
+
+  // 3. Check if cached bundle has key features
+  if (cachedSize > 0) {
+    var cached = [];
+    for (var j = 0; j < cachedChunks; j++) cached.push(cache.get('_B' + j));
+    var cachedCode = cached.join('');
+    results.push('Cached bundle has ccBtn (country selector): ' + (cachedCode.indexOf('ccBtn') > -1));
+    results.push('Cached bundle has langQuickFlags (language flags): ' + (cachedCode.indexOf('langQuickFlags') > -1));
+    results.push('Cached bundle has POPULAR_LANGS: ' + (cachedCode.indexOf('POPULAR_LANGS') > -1));
+    results.push('Cached bundle has Lietuvių (Lithuanian): ' + (cachedCode.indexOf('Lietuvių') > -1));
+  }
+
+  // 4. Force fresh fetch from GitHub
+  results.push('--- Fetching fresh from GitHub ---');
+  try {
+    // Clear cache first
+    var keys = [];
+    for (var k = 0; k < 20; k++) keys.push('_B' + k);
+    cache.removeAll(keys);
+
+    var freshCode = _fetchBundle();
+    results.push('Fresh fetch size: ' + (freshCode.length/1024).toFixed(1) + ' KB');
+    results.push('Fresh bundle has ccBtn (country selector): ' + (freshCode.indexOf('ccBtn') > -1));
+    results.push('Fresh bundle has langQuickFlags (language flags): ' + (freshCode.indexOf('langQuickFlags') > -1));
+    results.push('Fresh bundle has POPULAR_LANGS: ' + (freshCode.indexOf('POPULAR_LANGS') > -1));
+    results.push('Fresh bundle has Lietuvių (Lithuanian): ' + (freshCode.indexOf('Lietuvių') > -1));
+  } catch(e) {
+    results.push('FETCH ERROR: ' + e.message);
+  }
+
+  var output = results.join('\n');
+  Logger.log(output);
+  return output;
 }
 
 
