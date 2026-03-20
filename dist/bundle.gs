@@ -192,11 +192,23 @@ var _HTML_TEMPLATES = {
       text-transform:uppercase;
     }
     .label{
+      display:block;
       font-size:12px;
       color: var(--muted);
       font-weight:800;
       margin-bottom:6px;
     }
+    .field-error{
+      font-size:11.5px;
+      color: var(--bad);
+      margin-top:4px;
+      min-height:0;
+      line-height:1.3;
+    }
+    .field-error:empty{ display:none; }
+    .has-error{ border-color: var(--bad) !important; }
+    .has-error:focus{ box-shadow: 0 0 0 3px rgba(239,68,68,0.15) !important; }
+    .phoneWrap.has-error{ border-color: var(--bad) !important; }
 
     select, input, textarea{
       width:100%;
@@ -207,6 +219,11 @@ var _HTML_TEMPLATES = {
       font-size:13px;
       background:#fff;
       color: var(--text);
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    select:focus, input:focus, textarea:focus{
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(245,179,1,0.18);
     }
     textarea{ min-height:80px; resize:vertical; }
 
@@ -239,7 +256,8 @@ var _HTML_TEMPLATES = {
       border:none;
       background:transparent;
       font-size:18px;
-      padding:8px 4px 8px 10px;
+      padding:10px 6px 10px 10px;
+      min-height:44px;
       cursor:pointer;
       line-height:1;
     }
@@ -276,10 +294,12 @@ var _HTML_TEMPLATES = {
       display:flex;
       align-items:center;
       gap:8px;
-      padding:8px 12px;
+      padding:10px 12px;
+      min-height:44px;
       cursor:pointer;
       font-size:13px;
       white-space:nowrap;
+      transition: background 0.12s ease;
     }
     .ccItem:hover,.ccItem.hl{background:var(--accent);color:#fff;}
     .ccItem .ccFlag{font-size:16px;}
@@ -292,7 +312,8 @@ var _HTML_TEMPLATES = {
       border:none;
       background:#fff;
       font-size:20px;
-      padding:6px 10px;
+      padding:8px 12px;
+      min-height:44px;
       cursor:pointer;
       line-height:1;
       border-radius:999px;
@@ -300,7 +321,9 @@ var _HTML_TEMPLATES = {
       display:flex;
       align-items:center;
       gap:6px;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
     }
+    .langBtn:hover{ border-color:#d1d5db; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
     .langBtn .langLabel{
       font-size:12px;
       font-weight:800;
@@ -326,10 +349,12 @@ var _HTML_TEMPLATES = {
       display:flex;
       align-items:center;
       gap:8px;
-      padding:9px 12px;
+      padding:10px 12px;
+      min-height:44px;
       cursor:pointer;
       font-size:13px;
       white-space:nowrap;
+      transition: background 0.12s ease;
     }
     .langItem:first-child{border-radius:10px 10px 0 0;}
     .langItem:last-child{border-radius:0 0 10px 10px;}
@@ -342,11 +367,12 @@ var _HTML_TEMPLATES = {
       display:flex;
       align-items:center;
       justify-content:space-between;
-      padding:10px 12px;
+      padding:12px 14px;
+      min-height:48px;
       border:1px solid var(--line);
       border-radius:14px;
       cursor:pointer;
-      transition: transform 0.06s ease, box-shadow 0.06s ease;
+      transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
       background:#fff;
       margin-bottom:8px;
     }
@@ -409,7 +435,8 @@ var _HTML_TEMPLATES = {
     }
 
     .timeBtn{
-      padding:10px 6px;
+      padding:12px 6px;
+      min-height:44px;
       border-radius:12px;
       border:1px solid var(--line);
       background:#fff;
@@ -421,6 +448,11 @@ var _HTML_TEMPLATES = {
       white-space:nowrap;
       overflow:hidden;
       text-overflow:ellipsis;
+      transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+    }
+    .timeBtn:hover{
+      border-color:#d1d5db;
+      box-shadow: 0 4px 12px rgba(17,24,39,0.06);
     }
     .timeBtn.selected{
       border-color:#111827;
@@ -438,15 +470,19 @@ var _HTML_TEMPLATES = {
     .btn{
       border:none;
       border-radius:999px;
-      padding:10px 16px;
+      padding:12px 20px;
+      min-height:44px;
       font-weight:750;
+      font-size:13px;
       cursor:pointer;
       background:#111827;
       color:#fff;
       box-shadow: 0 8px 18px rgba(0,0,0,0.12);
       white-space:nowrap;
+      transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
     }
-    .btn:active{ transform: translateY(1px); }
+    .btn:hover{ opacity:0.88; transform: translateY(-1px); }
+    .btn:active{ transform: translateY(1px); opacity:1; }
     .btnAccent{
       background: var(--accent);
       color:#111827;
@@ -458,6 +494,7 @@ var _HTML_TEMPLATES = {
       border: 1px solid var(--line);
       box-shadow:none;
     }
+    .btnGhost:hover{ background: rgba(17,24,39,0.04); opacity:1; }
 
     .msg{
       margin-top:10px;
@@ -473,6 +510,15 @@ var _HTML_TEMPLATES = {
     .msg.good{ border-color: rgba(16,185,129,0.35); background: rgba(16,185,129,0.06); }
     .msg.bad{ border-color: rgba(239,68,68,0.35); background: rgba(239,68,68,0.06); }
 
+    /* Global focus-visible ring */
+    :focus-visible{
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+    input:focus-visible, select:focus-visible, textarea:focus-visible{
+      outline: none; /* handled by border/shadow above */
+    }
+
     /* Modals */
     .overlay{
       position:fixed;
@@ -483,14 +529,22 @@ var _HTML_TEMPLATES = {
       justify-content:center;
       padding:14px;
       z-index:2000;
+      opacity:0;
+      transition: opacity 0.2s ease;
     }
+    .overlay.show{ opacity:1; }
     .modal{
       width: min(720px, 100%);
       background:#fff;
       border-radius:18px;
-      padding:16px;
+      padding:20px;
       border:1px solid var(--line);
       box-shadow: var(--shadow);
+      transform: translateY(10px) scale(0.98);
+      transition: transform 0.2s ease;
+    }
+    .overlay.show .modal{
+      transform: translateY(0) scale(1);
     }
     .modal h3{
       margin:0 0 8px 0;
@@ -520,6 +574,11 @@ var _HTML_TEMPLATES = {
       display:flex;
       gap:14px;
       align-items:center;
+      transform: translateY(10px) scale(0.98);
+      transition: transform 0.2s ease;
+    }
+    .overlay.show .loadingBox{
+      transform: translateY(0) scale(1);
     }
     .spinner{
       width:34px;
@@ -609,15 +668,16 @@ var _HTML_TEMPLATES = {
 
       <div class="row">
         <div style="flex: 1 1 280px;">
-          <div class="label" data-i18n="fullNameLabel">Full name *</div>
+          <label class="label" for="fullName" data-i18n="fullNameLabel">Full name *</label>
           <input id="fullName" type="text" autocomplete="name" placeholder="Full name" data-i18n-ph="fullNamePh">
+          <div class="field-error" id="fullNameError"></div>
         </div>
         <div style="flex: 1 1 220px;">
-          <div class="label" data-i18n="phoneLabel">Phone *</div>
-          <div class="phoneWrap">
+          <label class="label" data-i18n="phoneLabel">Phone *</label>
+          <div class="phoneWrap" id="phoneWrap">
             <div class="ccPicker" id="ccPicker">
               <button type="button" class="ccBtn" id="ccBtn" aria-label="Country code">🇲🇹</button>
-              <div class="ccDrop" id="ccDrop">
+              <div class="ccDrop" id="ccDrop" role="listbox" aria-label="Country code">
                 <input type="text" class="ccSearch" id="ccSearch" placeholder="Search country\\u2026" autocomplete="off" data-i18n-ph="searchCountryPh">
                 <div class="ccList" id="ccList"></div>
               </div>
@@ -625,15 +685,17 @@ var _HTML_TEMPLATES = {
             <span id="dialCode" class="dialCode">+356</span>
             <input id="phone" type="tel" autocomplete="tel-national" placeholder="7900 1234">
           </div>
+          <div class="field-error" id="phoneError"></div>
         </div>
         <div style="flex: 1 1 280px;">
-          <div class="label" data-i18n="emailLabel">Email *</div>
+          <label class="label" for="email" data-i18n="emailLabel">Email *</label>
           <input id="email" type="email" autocomplete="email" placeholder="you@example.com" data-i18n-ph="emailPh">
+          <div class="field-error" id="emailError"></div>
         </div>
       </div>
 
       <div style="margin-top:10px;">
-        <div class="label" data-i18n="commentsLabel">Comments</div>
+        <label class="label" for="comments" data-i18n="commentsLabel">Comments</label>
         <textarea id="comments" placeholder="Optional notes…" data-i18n-ph="commentsPh"></textarea>
       </div>
 
@@ -647,9 +709,9 @@ var _HTML_TEMPLATES = {
   </div>
 
   <!-- Confirmation modal -->
-  <div class="overlay" id="confirmOverlay">
+  <div class="overlay" id="confirmOverlay" role="dialog" aria-modal="true" aria-labelledby="confirmModalTitle">
     <div class="modal">
-      <h3 data-i18n="appointmentConfirmed">Appointment Confirmed</h3>
+      <h3 id="confirmModalTitle" data-i18n="appointmentConfirmed">Appointment Confirmed</h3>
       <p id="confirmText"></p>
       <div class="modalActions">
         <button class="btn btnAccent" id="confirmOk" data-i18n="okBtn">OK</button>
@@ -1762,21 +1824,30 @@ var _HTML_TEMPLATES = {
       } catch (e4) {}
     }
 
+    function showOverlay(el){
+      el.style.display = 'flex';
+      requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('show')));
+    }
+    function hideOverlay(el){
+      el.classList.remove('show');
+      setTimeout(() => { el.style.display = 'none'; }, 200);
+    }
+
     function showLoading(title, desc){
       els.loadingTitle.textContent = title || t('loadingTitle');
       els.loadingDesc.textContent = desc || t('loadingDesc');
-      els.loadingOverlay.style.display = 'flex';
+      showOverlay(els.loadingOverlay);
     }
     function hideLoading(){
-      els.loadingOverlay.style.display = 'none';
+      hideOverlay(els.loadingOverlay);
     }
 
     function showConfirmModal(text){
       els.confirmText.textContent = text;
-      els.confirmOverlay.style.display = 'flex';
+      showOverlay(els.confirmOverlay);
     }
     function hideConfirmModal(){
-      els.confirmOverlay.style.display = 'none';
+      hideOverlay(els.confirmOverlay);
     }
 
     els.confirmOk.addEventListener('click', () => {
@@ -1996,7 +2067,26 @@ var _HTML_TEMPLATES = {
       setStatus('good', t('timeSelected'));
     }
 
+    function clearFieldErrors() {
+      ['fullNameError','phoneError','emailError'].forEach(id => {
+        var el = document.getElementById(id);
+        if (el) el.textContent = '';
+      });
+      els.fullName.classList.remove('has-error');
+      els.phone.classList.remove('has-error');
+      document.getElementById('phoneWrap').classList.remove('has-error');
+      els.email.classList.remove('has-error');
+    }
+
+    function setFieldError(inputEl, errorId, msg) {
+      inputEl.classList.add('has-error');
+      var errEl = document.getElementById(errorId);
+      if (errEl) errEl.textContent = msg;
+    }
+
     function validateForm() {
+      clearFieldErrors();
+
       if (!state.selectedServiceId) return t('valService');
       if (!state.selectedDateKey) return t('valDate');
       if (!state.selectedSlot || !state.selectedSlot.start) return t('valTime');
@@ -2005,10 +2095,13 @@ var _HTML_TEMPLATES = {
       const email = els.email.value.trim();
       const phone = els.phone.value.trim();
 
-      if (!fullName) return t('valName');
-      if (!phone) return t('valPhone');
-      if (!email) return t('valEmail');
-      if (!email.includes('@')) return t('valEmailFormat');
+      let hasError = false;
+      if (!fullName) { setFieldError(els.fullName, 'fullNameError', t('valName')); hasError = true; }
+      if (!phone) { setFieldError(els.phone, 'phoneError', t('valPhone')); document.getElementById('phoneWrap').classList.add('has-error'); hasError = true; }
+      if (!email) { setFieldError(els.email, 'emailError', t('valEmail')); hasError = true; }
+      else if (!email.includes('@')) { setFieldError(els.email, 'emailError', t('valEmailFormat')); hasError = true; }
+
+      if (hasError) return t('missingFields') || 'Please fill in the required fields.';
 
       return null;
     }
@@ -2042,6 +2135,17 @@ var _HTML_TEMPLATES = {
         })
         .apiGetAvailability(state.selectedDateKey);
     }
+
+    // Clear inline errors on input
+    ['fullName','phone','email'].forEach(id => {
+      var inp = document.getElementById(id);
+      if (inp) inp.addEventListener('input', () => {
+        inp.classList.remove('has-error');
+        var errEl = document.getElementById(id + 'Error');
+        if (errEl) errEl.textContent = '';
+        if (id === 'phone') document.getElementById('phoneWrap').classList.remove('has-error');
+      });
+    });
 
     els.confirmBtn.addEventListener('click', () => {
       hideMsg();
@@ -2579,28 +2683,39 @@ var _HTML_TEMPLATES = {
     .stat{background:var(--card);border-radius:14px;border:1px solid var(--line);padding:12px 16px;flex:1;min-width:120px;text-align:center;}
     .stat .num{font-size:28px;font-weight:900;}
     .stat .label{font-size:12px;color:var(--muted);}
+    .table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:0 -4px;padding:0 4px;}
     table{border-collapse:collapse;width:100%;font-size:13px;}
-    th{text-align:left;padding:8px;border-bottom:2px solid var(--line);font-size:12px;color:var(--muted);font-weight:600;}
-    td{padding:8px;border-bottom:1px solid var(--line);}
-    .btn{border:none;border-radius:999px;padding:8px 14px;font-weight:700;cursor:pointer;font-size:12px;display:inline-flex;align-items:center;gap:4px;}
-    .btn-sm{padding:5px 10px;font-size:11px;}
+    th{text-align:left;padding:10px 10px;border-bottom:2px solid var(--line);font-size:12px;color:var(--muted);font-weight:600;}
+    td{padding:10px 10px;border-bottom:1px solid var(--line);}
+    tbody tr:nth-child(even){background:rgba(243,244,246,0.5);}
+    tbody tr{transition:background 0.12s ease;}
+    tbody tr:hover{background:rgba(243,244,246,0.9);}
+    .btn{border:none;border-radius:999px;padding:10px 16px;min-height:40px;font-weight:700;cursor:pointer;font-size:12px;display:inline-flex;align-items:center;gap:4px;transition:transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;}
+    .btn:hover{opacity:0.88;transform:translateY(-1px);}
+    .btn:active{transform:translateY(1px);opacity:1;}
+    .btn-sm{padding:6px 12px;min-height:34px;font-size:11px;}
     .btn-dark{background:#111827;color:#fff;}
     .btn-danger{background:var(--bad);color:#fff;}
     .btn-good{background:var(--good);color:#052e1a;}
     .btn-blue{background:var(--blue);color:#fff;}
     .btn-ghost{background:transparent;color:var(--text);border:1px solid var(--line);}
-    .btn:disabled{opacity:0.5;cursor:not-allowed;}
-    input,select,textarea{font-family:inherit;font-size:13px;padding:8px 12px;border:1px solid var(--line);border-radius:12px;outline:none;width:100%;}
-    input:focus,select:focus,textarea:focus{border-color:var(--blue);}
+    .btn-ghost:hover{background:rgba(17,24,39,0.04);opacity:1;}
+    .btn:disabled{opacity:0.5;cursor:not-allowed;transform:none !important;}
+    input,select,textarea{font-family:inherit;font-size:13px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;outline:none;width:100%;transition:border-color 0.15s ease, box-shadow 0.15s ease;}
+    input:focus,select:focus,textarea:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(37,99,235,0.12);}
+    :focus-visible{outline:2px solid var(--blue);outline-offset:2px;}
+    input:focus-visible,select:focus-visible,textarea:focus-visible{outline:none;}
     .form-row{display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;align-items:end;}
     .form-group{flex:1;min-width:120px;}
-    .form-group label{display:block;font-size:11px;color:var(--muted);margin-bottom:3px;font-weight:600;}
+    .form-group label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;font-weight:600;}
     .msg{margin-top:8px;padding:10px 12px;border-radius:12px;font-size:13px;line-height:1.4;display:none;}
     .msg.good{display:block;border:1px solid rgba(16,185,129,0.35);background:rgba(16,185,129,0.06);color:#065f46;}
     .msg.bad{display:block;border:1px solid rgba(239,68,68,0.35);background:rgba(239,68,68,0.06);color:#991b1b;}
     .tabs{display:flex;gap:4px;margin-bottom:14px;flex-wrap:wrap;}
-    .tab{padding:8px 14px;border-radius:999px;cursor:pointer;font-size:13px;font-weight:600;background:transparent;border:1px solid var(--line);color:var(--muted);}
+    .tab{padding:10px 16px;min-height:40px;border-radius:999px;cursor:pointer;font-size:13px;font-weight:600;background:transparent;border:1px solid var(--line);color:var(--muted);transition:background 0.15s ease, color 0.15s ease, border-color 0.15s ease;display:inline-flex;align-items:center;}
+    .tab:hover{border-color:#d1d5db;background:rgba(17,24,39,0.03);}
     .tab.active{background:#111827;color:#fff;border-color:#111827;}
+    .tab.active:hover{background:#1f2937;}
     .empty{padding:16px;text-align:center;color:var(--muted);font-size:13px;}
     .appt-row{display:flex;align-items:center;gap:8px;}
     .appt-row input[type=checkbox]{width:auto;margin:0;}
@@ -2611,9 +2726,34 @@ var _HTML_TEMPLATES = {
     @keyframes spin{to{transform:rotate(360deg);}}
     .loadingText h4{margin:0 0 4px;font-size:14px;}
     .loadingText div{margin:0;color:var(--muted);font-size:12.5px;line-height:1.35;}
-    .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700;}
+    .badge{display:inline-block;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:700;}
     .badge-red{background:rgba(239,68,68,0.1);color:#dc2626;}
     .badge-green{background:rgba(16,185,129,0.1);color:#059669;}
+
+    /* Responsive */
+    @media(max-width:600px){
+      .wrap{padding:10px 10px 30px;}
+      .stats{gap:8px;}
+      .stat{min-width:0;flex:1 1 calc(50% - 4px);padding:10px 12px;}
+      .stat .num{font-size:22px;}
+      .form-row{flex-direction:column;}
+      .form-group{min-width:0;width:100%;}
+      .action-bar{flex-direction:column;}
+      .action-bar .btn{width:100%;justify-content:center;}
+      .tabs{gap:6px;}
+      .tab{padding:8px 12px;font-size:12px;}
+      h1{font-size:18px;}
+      .card{padding:12px;}
+    }
+    @media(max-width:400px){
+      .stat{flex:1 1 100%;}
+    }
+
+    /* Overlay animation */
+    .overlay{opacity:0;transition:opacity 0.2s ease;}
+    .overlay.show{opacity:1;}
+    .loadingBox{transform:translateY(10px) scale(0.98);transition:transform 0.2s ease;}
+    .overlay.show .loadingBox{transform:translateY(0) scale(1);}
   </style>
 </head>
 <body>
@@ -2634,6 +2774,8 @@ var _HTML_TEMPLATES = {
     <div class="tab" data-tab="extraslots" onclick="switchTab('extraslots')">Extra Slots</div>
     <div class="tab" data-tab="actions" onclick="switchTab('actions')">Quick Actions</div>
   </div>
+
+  <div class="msg" id="globalMsg"></div>
 
   <!-- SCHEDULE TAB -->
   <div class="tab-content" id="tab-schedule">
@@ -2734,6 +2876,18 @@ var _HTML_TEMPLATES = {
   </div>
 </div>
 
+<!-- Confirm modal -->
+<div class="overlay" id="confirmOverlay" role="dialog" aria-modal="true">
+  <div class="loadingBox" style="flex-direction:column;align-items:stretch;gap:12px;max-width:420px;">
+    <h3 id="confirmTitle" style="margin:0;font-size:15px;font-weight:800;">Confirm</h3>
+    <p id="confirmBody" style="margin:0;font-size:13px;color:var(--muted);line-height:1.45;"></p>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:4px;">
+      <button class="btn btn-ghost" id="confirmCancel">Cancel</button>
+      <button class="btn btn-danger" id="confirmOk">Confirm</button>
+    </div>
+  </div>
+</div>
+
 <div class="overlay" id="loadingOverlay">
   <div class="loadingBox">
     <div class="spinner"></div>
@@ -2750,15 +2904,48 @@ const SIG = "<?= adminSig ?>";
 function showLoading(title, desc) {
   document.getElementById('loadingTitle').textContent = title || 'Loading...';
   document.getElementById('loadingDesc').textContent = desc || 'Please wait.';
-  document.getElementById('loadingOverlay').style.display = 'flex';
+  var el = document.getElementById('loadingOverlay');
+  el.style.display = 'flex';
+  requestAnimationFrame(function(){ requestAnimationFrame(function(){ el.classList.add('show'); }); });
 }
-function hideLoading() { document.getElementById('loadingOverlay').style.display = 'none'; }
+function hideLoading() {
+  var el = document.getElementById('loadingOverlay');
+  el.classList.remove('show');
+  setTimeout(function(){ el.style.display = 'none'; }, 200);
+}
 
 function showMsg(id, type, text) {
   var el = document.getElementById(id);
   el.className = 'msg ' + type;
   el.textContent = text;
 }
+
+var _confirmCb = null;
+function styledConfirm(title, body, btnLabel, btnClass) {
+  return new Promise(function(resolve) {
+    document.getElementById('confirmTitle').textContent = title;
+    document.getElementById('confirmBody').textContent = body;
+    var okBtn = document.getElementById('confirmOk');
+    okBtn.className = 'btn ' + (btnClass || 'btn-danger');
+    okBtn.textContent = btnLabel || 'Confirm';
+    var overlay = document.getElementById('confirmOverlay');
+    overlay.style.display = 'flex';
+    requestAnimationFrame(function(){ requestAnimationFrame(function(){ overlay.classList.add('show'); }); });
+    _confirmCb = resolve;
+  });
+}
+document.getElementById('confirmCancel').onclick = function(){
+  var overlay = document.getElementById('confirmOverlay');
+  overlay.classList.remove('show');
+  setTimeout(function(){ overlay.style.display = 'none'; }, 200);
+  if (_confirmCb) { _confirmCb(false); _confirmCb = null; }
+};
+document.getElementById('confirmOk').onclick = function(){
+  var overlay = document.getElementById('confirmOverlay');
+  overlay.classList.remove('show');
+  setTimeout(function(){ overlay.style.display = 'none'; }, 200);
+  if (_confirmCb) { _confirmCb(true); _confirmCb = null; }
+};
 
 function switchTab(name) {
   document.querySelectorAll('.tab-content').forEach(function(el) { el.style.display = 'none'; });
@@ -2773,7 +2960,7 @@ function renderApptTable(appts, containerId, withCheckboxes) {
     el.innerHTML = '<div class="empty">No appointments.</div>';
     return;
   }
-  var html = '<table><thead><tr>';
+  var html = '<div class="table-wrap"><table><thead><tr>';
   if (withCheckboxes) html += '<th><input type="checkbox" onchange="toggleAll(this, \\'' + containerId + '\\')"></th>';
   html += '<th>Time</th><th>Patient</th><th>Phone</th><th>Service</th><th>Location</th><th>Status</th><th></th></tr></thead><tbody>';
   for (var i = 0; i < appts.length; i++) {
@@ -2792,7 +2979,7 @@ function renderApptTable(appts, containerId, withCheckboxes) {
     html += '<td><button class="btn btn-sm btn-danger" onclick="cancelSingleAppt(\\'' + esc(a.appointmentId) + '\\', \\'' + containerId + '\\')">Cancel</button></td>';
     html += '</tr>';
   }
-  html += '</tbody></table>';
+  html += '</tbody></table></div>';
   el.innerHTML = html;
 }
 
@@ -2802,7 +2989,7 @@ function renderOffEntries(entries) {
     el.innerHTML = '<div class="empty">No doctor-off entries.</div>';
     return;
   }
-  var html = '<table><thead><tr><th>Start Date</th><th>End Date</th><th>Start Time</th><th>End Time</th><th>Reason</th><th></th></tr></thead><tbody>';
+  var html = '<div class="table-wrap"><table><thead><tr><th>Start Date</th><th>End Date</th><th>Start Time</th><th>End Time</th><th>Reason</th><th></th></tr></thead><tbody>';
   for (var i = 0; i < entries.length; i++) {
     var e = entries[i];
     html += '<tr>';
@@ -2814,7 +3001,7 @@ function renderOffEntries(entries) {
     html += '<td><button class="btn btn-sm btn-ghost" onclick="removeDoctorOff(' + e.rowIndex + ')">Remove</button></td>';
     html += '</tr>';
   }
-  html += '</tbody></table>';
+  html += '</tbody></table></div>';
   el.innerHTML = html;
 }
 
@@ -2824,7 +3011,7 @@ function renderExtraEntries(entries) {
     el.innerHTML = '<div class="empty">No extra slot entries.</div>';
     return;
   }
-  var html = '<table><thead><tr><th>Date</th><th>Start Time</th><th>End Time</th><th>Reason</th><th></th></tr></thead><tbody>';
+  var html = '<div class="table-wrap"><table><thead><tr><th>Date</th><th>Start Time</th><th>End Time</th><th>Reason</th><th></th></tr></thead><tbody>';
   for (var i = 0; i < entries.length; i++) {
     var e = entries[i];
     html += '<tr>';
@@ -2835,7 +3022,7 @@ function renderExtraEntries(entries) {
     html += '<td><button class="btn btn-sm btn-ghost" onclick="removeExtraSlots(' + e.rowIndex + ')">Remove</button></td>';
     html += '</tr>';
   }
-  html += '</tbody></table>';
+  html += '</tbody></table></div>';
   el.innerHTML = html;
 }
 
@@ -2863,7 +3050,7 @@ function loadDashboard() {
   google.script.run
     .withSuccessHandler(function(res) {
       hideLoading();
-      if (!res || !res.ok) { alert('Failed to load dashboard.'); return; }
+      if (!res || !res.ok) { showMsg('globalMsg', 'bad', 'Failed to load dashboard.'); return; }
 
       document.getElementById('statBooked').textContent = res.stats.weekBooked;
       document.getElementById('statCancelled').textContent = res.stats.weekCancelled;
@@ -2888,7 +3075,7 @@ function loadDashboard() {
     })
     .withFailureHandler(function(err) {
       hideLoading();
-      alert('Error: ' + (err && err.message ? err.message : String(err)));
+      showMsg('globalMsg', 'bad', 'Error: ' + (err && err.message ? err.message : String(err)));
     })
     .apiAdminGetDashboard(SIG);
 }
@@ -2931,16 +3118,18 @@ function markDoctorOff() {
 }
 
 function removeDoctorOff(rowIndex) {
-  if (!confirm('Remove this doctor-off entry? This will re-open those slots for booking.')) return;
-  showLoading('Removing...', 'Removing doctor-off entry.');
-  google.script.run
-    .withSuccessHandler(function(res) {
-      hideLoading();
-      if (!res || !res.ok) { alert(res.reason || 'Failed.'); return; }
-      loadDashboard();
-    })
-    .withFailureHandler(function(err) { hideLoading(); alert('Error: ' + (err && err.message ? err.message : String(err))); })
-    .apiAdminRemoveDoctorOff(SIG, rowIndex);
+  styledConfirm('Remove Entry', 'Remove this doctor-off entry? This will re-open those slots for booking.', 'Remove', 'btn-danger').then(function(ok){
+    if (!ok) return;
+    showLoading('Removing...', 'Removing doctor-off entry.');
+    google.script.run
+      .withSuccessHandler(function(res) {
+        hideLoading();
+        if (!res || !res.ok) { showMsg('offMsg', 'bad', res.reason || 'Failed.'); return; }
+        loadDashboard();
+      })
+      .withFailureHandler(function(err) { hideLoading(); showMsg('offMsg', 'bad', 'Error: ' + (err && err.message ? err.message : String(err))); })
+      .apiAdminRemoveDoctorOff(SIG, rowIndex);
+  });
 }
 
 // ========== Extra Slots ==========
@@ -2971,16 +3160,18 @@ function addExtraSlots() {
 }
 
 function removeExtraSlots(rowIndex) {
-  if (!confirm('Remove this extra slots entry?')) return;
-  showLoading('Removing...', 'Removing extra slots entry.');
-  google.script.run
-    .withSuccessHandler(function(res) {
-      hideLoading();
-      if (!res || !res.ok) { alert(res.reason || 'Failed.'); return; }
-      loadDashboard();
-    })
-    .withFailureHandler(function(err) { hideLoading(); alert('Error: ' + (err && err.message ? err.message : String(err))); })
-    .apiAdminRemoveExtraSlots(SIG, rowIndex);
+  styledConfirm('Remove Entry', 'Remove this extra slots entry?', 'Remove', 'btn-danger').then(function(ok){
+    if (!ok) return;
+    showLoading('Removing...', 'Removing extra slots entry.');
+    google.script.run
+      .withSuccessHandler(function(res) {
+        hideLoading();
+        if (!res || !res.ok) { showMsg('extraMsg', 'bad', res.reason || 'Failed.'); return; }
+        loadDashboard();
+      })
+      .withFailureHandler(function(err) { hideLoading(); showMsg('extraMsg', 'bad', 'Error: ' + (err && err.message ? err.message : String(err))); })
+      .apiAdminRemoveExtraSlots(SIG, rowIndex);
+  });
 }
 
 // ========== Quick Actions ==========
@@ -3020,7 +3211,9 @@ function processAction(action) {
 
   var actionLabel = action === 'cancel' ? 'CANCEL' : action === 'redirect_spinola' ? 'REDIRECT TO SPINOLA' : 'PUSH TO NEXT DAY';
   var target = ids.length > 0 ? ids.length + ' selected appointment(s)' : 'ALL appointments';
-  if (!confirm('Are you sure you want to ' + actionLabel + ' ' + target + ' on ' + dateKey + '?')) return;
+  var btnClass = action === 'cancel' ? 'btn-danger' : action === 'redirect_spinola' ? 'btn-blue' : 'btn-good';
+  styledConfirm('Confirm Action', actionLabel + ' ' + target + ' on ' + dateKey + '?', actionLabel, btnClass).then(function(ok){
+  if (!ok) return;
 
   showLoading('Processing...', 'Applying ' + actionLabel.toLowerCase() + ' to appointments.');
   google.script.run
@@ -3053,6 +3246,7 @@ function processAction(action) {
       appointmentIds: ids,
       customMessage: customMsg
     });
+  });
 }
 
 function cancelSingleAppt(appointmentId, containerId) {
@@ -3060,7 +3254,8 @@ function cancelSingleAppt(appointmentId, containerId) {
     ? document.getElementById('actionDate').value
     : document.getElementById('notifyDate').value;
   if (!dateKey) return;
-  if (!confirm('Cancel this appointment?')) return;
+  styledConfirm('Cancel Appointment', 'Cancel this appointment?', 'Cancel', 'btn-danger').then(function(ok){
+  if (!ok) return;
 
   showLoading('Cancelling...', 'Cancelling appointment.');
   google.script.run
@@ -3088,6 +3283,7 @@ function cancelSingleAppt(appointmentId, containerId) {
       appointmentIds: [appointmentId],
       customMessage: ''
     });
+  });
 }
 
 // ========== Notifications ==========
