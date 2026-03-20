@@ -6,20 +6,22 @@ function doGet(e) {
   var mode = (e && e.parameter && e.parameter.mode) ? String(e.parameter.mode) : 'book';
 
   if (mode === 'cancel') {
-    var t1 = HtmlService.createTemplateFromFile('Cancel');
-    t1.token = String((e.parameter && e.parameter.token) || '');
-    t1.sig = String((e.parameter && e.parameter.sig) || '');
-    return t1.evaluate()
+    var cancelHtml = _serveHtml('Cancel', {
+      token: String((e.parameter && e.parameter.token) || ''),
+      sig: String((e.parameter && e.parameter.sig) || '')
+    });
+    return cancelHtml
       .setTitle('Cancel Appointment')
       .addMetaTag('viewport', 'width=device-width, initial-scale=1, viewport-fit=cover');
   }
 
   if (mode === 'docaction') {
-    var t2 = HtmlService.createTemplateFromFile('DocAction');
-    t2.token = String((e.parameter && e.parameter.token) || '');
-    t2.act = String((e.parameter && e.parameter.act) || '');
-    t2.sig = String((e.parameter && e.parameter.sig) || '');
-    return t2.evaluate()
+    var docHtml = _serveHtml('DocAction', {
+      token: String((e.parameter && e.parameter.token) || ''),
+      act: String((e.parameter && e.parameter.act) || ''),
+      sig: String((e.parameter && e.parameter.sig) || '')
+    });
+    return docHtml
       .setTitle('Doctor Action')
       .addMetaTag('viewport', 'width=device-width, initial-scale=1, viewport-fit=cover');
   }
@@ -30,17 +32,33 @@ function doGet(e) {
       return HtmlService.createHtmlOutput('<h2>Access Denied</h2><p>Invalid or missing admin signature.</p>')
         .setTitle('Access Denied');
     }
-    var t3 = HtmlService.createTemplateFromFile('Admin');
-    t3.adminSig = adminSig;
-    return t3.evaluate()
+    var adminHtml = _serveHtml('Admin', { adminSig: adminSig });
+    return adminHtml
       .setTitle('Admin - Dr Kevin Navarro Gera')
       .addMetaTag('viewport', 'width=device-width, initial-scale=1, viewport-fit=cover');
   }
 
-  var t = HtmlService.createTemplateFromFile('Index');
-  return t.evaluate()
+  return _serveHtml('Index', {})
     .setTitle('Dr Kevin Navarro Gera - Booking')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1, viewport-fit=cover');
+}
+
+/**
+ * Serve an HTML page from the _HTML_TEMPLATES global (populated by the bundle).
+ * Replaces <?= varName ?> scriptlet placeholders with actual values.
+ */
+function _serveHtml(name, vars) {
+  var html = (_HTML_TEMPLATES && _HTML_TEMPLATES[name]) || '';
+  if (!html) throw new Error('HTML template not found: ' + name);
+
+  // Replace GAS-style scriptlet placeholders: <?= varName ?>
+  for (var key in vars) {
+    // Escape the value for safe HTML embedding inside a JS string
+    var safeVal = String(vars[key]).replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/'/g, "\\'");
+    html = html.replace(new RegExp('<\\?=\\s*' + key + '\\s*\\?>', 'g'), safeVal);
+  }
+
+  return HtmlService.createHtmlOutput(html);
 }
 
 function apiInit() {

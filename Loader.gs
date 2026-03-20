@@ -1,51 +1,95 @@
-/***************
- * Loader.gs - GitHub Code Sync for Google Apps Script
+/***********************************************************************
+ * Loader.gs — THE ONLY FILE IN YOUR GOOGLE APPS SCRIPT PROJECT
  *
- * Google Apps Script does not support true dynamic code loading at runtime
- * (eval'd functions don't register for google.script.run or triggers).
+ * Everything else is fetched live from GitHub at runtime.
+ * When you push changes to GitHub, they go live automatically
+ * (after the cache expires, default 1 hour).
  *
- * Instead, this loader syncs code FROM GitHub INTO your GAS project.
- * Run syncFromGitHub() to pull the latest code from your repo.
+ * SETUP (one-time):
+ *   1. Create a new Apps Script project
+ *   2. Paste this entire file as the only Code.gs (or Loader.gs)
+ *   3. Set Script Properties (Project Settings → Script properties):
+ *        GITHUB_OWNER   = johnagius
+ *        GITHUB_REPO    = appt
+ *        GITHUB_BRANCH  = main
+ *      (optional, if repo is private):
+ *        GITHUB_TOKEN   = ghp_your_personal_access_token
+ *   4. Also copy these Script Properties from your OLD project:
+ *        CONFIG_SPREADSHEET_ID
+ *        APPOINTMENTS_SPREADSHEET_ID
+ *        KEVINAPPTS_CALENDAR_ID
+ *        DOCTOR_EMAIL
+ *        SIGNING_SECRET
+ *        TIMEZONE
+ *        POTTERS_LOCATION
+ *        SPINOLA_LOCATION
+ *        DOUBLECHECK_CALENDAR
+ *   5. Deploy → New deployment → Web app
+ *   6. Run setWebAppUrlAuto() from the editor
+ *   7. Run repairSheets() to set up new sheets (DoctorExtra, etc.)
+ *   8. Run generateAdminLink() and check the execution log for your admin URL
  *
- * SETUP:
- * 1. Enable the Apps Script API: https://script.google.com/home/usersettings
- * 2. Enable "Google Apps Script API" in your GCP project
- * 3. Set Script Properties:
- *    - GITHUB_OWNER: your GitHub username or org (e.g. 'johnagius')
- *    - GITHUB_REPO: your repository name (e.g. 'appt')
- *    - GITHUB_BRANCH: branch to load from (e.g. 'main')
- *    - GITHUB_PATH: path prefix in repo (e.g. 'src')
- *    - SCRIPT_ID: your Apps Script project ID (from Project Settings)
+ * HOW IT WORKS:
+ *   - On first call per execution, fetches dist/bundle.gs from GitHub
+ *   - bundle.gs contains all .gs code + HTML templates in one file
+ *   - The bundle is cached in CacheService for 1 hour (saves GitHub calls)
+ *   - Each public function below is a thin proxy to the bundle
+ *   - To force-refresh: run clearBundleCache() from the editor
  *
- * 4. If your repo is private, also set:
- *    - GITHUB_TOKEN: a personal access token with repo read access
- *
- * USAGE:
- * - Run syncFromGitHub() manually or set up a time trigger
- * - After sync, create a new deployment to go live
- *
- * ALTERNATIVE (recommended for simplicity):
- * - Use the build.py script in the repo to generate KevAppts.json
- * - Push via clasp: `clasp push`
- * - This keeps your GAS project in sync with GitHub automatically
- ***************/
+ * TO UPDATE CODE:
+ *   - Edit files in src/ on GitHub
+ *   - Run build.py to regenerate dist/bundle.gs
+ *   - Push to GitHub
+ *   - Wait up to 1 hour (or run clearBundleCache() for immediate refresh)
+ *   - NO changes needed in this file or the GAS editor!
+ ***********************************************************************/
 
-/**
- * Fetch a raw file from GitHub.
- */
-function fetchGitHubFile_(fileName) {
+// ===== Configuration =====
+var BUNDLE_CACHE_TTL = 3600;  // seconds (1 hour). Max 21600 (6 hours).
+var BUNDLE_PATH = 'dist/bundle.gs';
+var CHUNK_SIZE = 90000;  // CacheService limit is 100KB per key; leave margin
+
+// ===== Bundle loading =====
+var _app = null;
+var _htmlTemplates = null;
+
+function _getApp() {
+  if (_app) return _app;
+  var code = _fetchBundle();
+  // eval the bundle - it sets global _BUNDLE and _HTML_TEMPLATES
+  eval(code);
+  _app = _BUNDLE;
+  _htmlTemplates = _HTML_TEMPLATES;
+  return _app;
+}
+
+function _fetchBundle() {
+  var cache = CacheService.getScriptCache();
+
+  // Try reading from chunked cache
+  var chunks = [];
+  for (var i = 0; i < 20; i++) {
+    var chunk = cache.get('_B' + i);
+    if (chunk === null) break;
+    chunks.push(chunk);
+  }
+  if (chunks.length > 0) return chunks.join('');
+
+  // Fetch from GitHub
   var props = PropertiesService.getScriptProperties();
   var owner = props.getProperty('GITHUB_OWNER') || '';
   var repo = props.getProperty('GITHUB_REPO') || '';
   var branch = props.getProperty('GITHUB_BRANCH') || 'main';
-  var path = props.getProperty('GITHUB_PATH') || 'src';
   var token = props.getProperty('GITHUB_TOKEN') || '';
 
   if (!owner || !repo) {
-    throw new Error('Set GITHUB_OWNER and GITHUB_REPO in Script Properties.');
+    throw new Error(
+      'Loader: Set GITHUB_OWNER and GITHUB_REPO in Script Properties. '
+      + 'See setup instructions in Loader.gs comments.'
+    );
   }
 
-  var url = 'https://raw.githubusercontent.com/' + owner + '/' + repo + '/' + branch + '/' + path + '/' + fileName;
+  var url = 'https://raw.githubusercontent.com/' + owner + '/' + repo + '/' + branch + '/' + BUNDLE_PATH;
 
   var options = { muteHttpExceptions: true };
   if (token) {
@@ -54,62 +98,103 @@ function fetchGitHubFile_(fileName) {
 
   var response = UrlFetchApp.fetch(url, options);
   if (response.getResponseCode() !== 200) {
-    throw new Error('Failed to fetch ' + fileName + ' (HTTP ' + response.getResponseCode() + ')');
+    throw new Error(
+      'Loader: Failed to fetch bundle from GitHub (HTTP ' + response.getResponseCode() + '). '
+      + 'URL: ' + url
+    );
   }
 
-  return response.getContentText();
+  var code = response.getContentText();
+
+  // Cache in chunks (CacheService has 100KB per-key limit)
+  var cacheObj = {};
+  for (var i = 0; i * CHUNK_SIZE < code.length; i++) {
+    cacheObj['_B' + i] = code.substr(i * CHUNK_SIZE, CHUNK_SIZE);
+  }
+  cache.putAll(cacheObj, BUNDLE_CACHE_TTL);
+
+  return code;
 }
 
 /**
- * Check which files have changed by comparing GitHub content with current project.
- * Returns a report without making changes.
+ * Run this to force-refresh the code from GitHub immediately.
  */
-function checkForUpdates() {
-  var files = [
-    { name: 'Config', type: 'server_js', src: 'Config.gs' },
-    { name: 'Utils', type: 'server_js', src: 'Utils.gs' },
-    { name: 'Data', type: 'server_js', src: 'Data.gs' },
-    { name: 'CalendarService', type: 'server_js', src: 'CalendarService.gs' },
-    { name: 'EmailService', type: 'server_js', src: 'EmailService.gs' },
-    { name: 'WebApp', type: 'server_js', src: 'WebApp.gs' },
-    { name: 'Install', type: 'server_js', src: 'Install.gs' },
-    { name: 'Uninstall', type: 'server_js', src: 'Uninstall.gs' },
-    { name: 'AdminApi', type: 'server_js', src: 'AdminApi.gs' },
-    { name: 'Index', type: 'html', src: 'Index.html' },
-    { name: 'Cancel', type: 'html', src: 'Cancel.html' },
-    { name: 'DocAction', type: 'html', src: 'DocAction.html' },
-    { name: 'Admin', type: 'html', src: 'Admin.html' }
-  ];
-
-  var report = { checked: 0, changed: [], errors: [] };
-
-  for (var i = 0; i < files.length; i++) {
-    try {
-      fetchGitHubFile_(files[i].src);
-      report.checked++;
-    } catch (e) {
-      report.errors.push(files[i].src + ': ' + e.message);
-    }
-  }
-
-  return report;
+function clearBundleCache() {
+  var cache = CacheService.getScriptCache();
+  var keys = [];
+  for (var i = 0; i < 20; i++) keys.push('_B' + i);
+  cache.removeAll(keys);
+  _app = null;
+  _htmlTemplates = null;
+  return { ok: true, message: 'Bundle cache cleared. Next call will fetch fresh code from GitHub.' };
 }
 
 /**
- * Convenience: show which files can be fetched from GitHub.
- * Use this to verify your GitHub settings are correct.
+ * Test that GitHub connection works. Run this after setting Script Properties.
  */
 function testGitHubConnection() {
   try {
-    var content = fetchGitHubFile_('Config.gs');
+    var code = _fetchBundle();
     return {
       ok: true,
-      message: 'Successfully connected to GitHub. Config.gs fetched (' + content.length + ' chars).'
+      message: 'Connected! Bundle fetched (' + (code.length / 1024).toFixed(1) + ' KB).'
     };
   } catch (e) {
-    return {
-      ok: false,
-      message: 'Failed to connect to GitHub: ' + e.message
-    };
+    return { ok: false, message: 'Failed: ' + e.message };
   }
 }
+
+
+// ==========================================================================
+// PROXY FUNCTIONS — these are the real GAS entry points.
+// Each one loads the bundle (cached) and delegates to the real implementation.
+// ==========================================================================
+
+// ----- Web App -----
+function doGet(e)                            { return _getApp().doGet(e); }
+
+// ----- Booking API (called from Index.html via google.script.run) -----
+function apiInit()                           { return _getApp().apiInit(); }
+function apiGetDateOptions(m)                { return _getApp().apiGetDateOptions(m); }
+function apiGetAvailability(dk)              { return _getApp().apiGetAvailability(dk); }
+function apiBook(p)                          { return _getApp().apiBook(p); }
+
+// ----- Cancel API (called from Cancel.html) -----
+function apiGetCancelInfo(t, s)              { return _getApp().apiGetCancelInfo(t, s); }
+function apiCancelAppointment(t, s)          { return _getApp().apiCancelAppointment(t, s); }
+
+// ----- Doctor Action API (called from DocAction.html) -----
+function apiDoctorAction(t, a, s)            { return _getApp().apiDoctorAction(t, a, s); }
+
+// ----- Admin API (called from Admin.html) -----
+function apiAdminGetDashboard(s)             { return _getApp().apiAdminGetDashboard(s); }
+function apiAdminGetDateAppointments(s, dk)  { return _getApp().apiAdminGetDateAppointments(s, dk); }
+function apiAdminMarkDoctorOff(s, p)         { return _getApp().apiAdminMarkDoctorOff(s, p); }
+function apiAdminAddExtraSlots(s, p)         { return _getApp().apiAdminAddExtraSlots(s, p); }
+function apiAdminProcessAppointments(s, p)   { return _getApp().apiAdminProcessAppointments(s, p); }
+function apiAdminRemoveDoctorOff(s, ri)      { return _getApp().apiAdminRemoveDoctorOff(s, ri); }
+function apiAdminRemoveExtraSlots(s, ri)     { return _getApp().apiAdminRemoveExtraSlots(s, ri); }
+function apiAdminNotifyPatients(s, p)        { return _getApp().apiAdminNotifyPatients(s, p); }
+
+// ----- Trigger (daily schedule email at 7am) -----
+function sendDailyDoctorSchedule_()          { return _getApp()['sendDailyDoctorSchedule_'](); }
+
+// ----- Install / Setup (run from GAS editor) -----
+function install()                           { return _getApp().install(); }
+function repairSheets()                      { return _getApp().repairSheets(); }
+function setWebAppUrl(u)                     { return _getApp().setWebAppUrl(u); }
+function setDoctorEmail(e)                   { return _getApp().setDoctorEmail(e); }
+function setPottersLocation(t)               { return _getApp().setPottersLocation(t); }
+function setSpinolaLocation(t)               { return _getApp().setSpinolaLocation(t); }
+function setDoubleCheckCalendar(v)           { return _getApp().setDoubleCheckCalendar(v); }
+function setMaxActiveAppointmentsPerPerson(n){ return _getApp().setMaxActiveAppointmentsPerPerson(n); }
+function generateAdminLink()                 { return _getApp().generateAdminLink(); }
+function setWebAppUrlAuto()                  { return _getApp().setWebAppUrlAuto(); }
+
+// ----- Uninstall (run from GAS editor) -----
+function armUninstall()                      { return _getApp().armUninstall(); }
+function armUninstallForce()                 { return _getApp().armUninstallForce(); }
+function disarmUninstall()                   { return _getApp().disarmUninstall(); }
+function uninstallDryRun()                   { return _getApp().uninstallDryRun(); }
+function uninstallEverything()               { return _getApp().uninstallEverything(); }
+function uninstallKeepCalendar()             { return _getApp().uninstallKeepCalendar(); }
