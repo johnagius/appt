@@ -70,6 +70,7 @@ PUBLIC_FUNCTIONS = [
     'doGet',
     'apiInit',
     'apiGetDateOptions',
+    'apiRefreshDates',
     'apiGetAvailability',
     'apiBook',
     'apiGetCancelInfo',

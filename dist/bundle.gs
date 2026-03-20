@@ -6917,6 +6917,7 @@ function wipeScriptProperties_(execute) {
     doGet: doGet,
     apiInit: apiInit,
     apiGetDateOptions: apiGetDateOptions,
+    apiRefreshDates: apiRefreshDates,
     apiGetAvailability: apiGetAvailability,
     apiBook: apiBook,
     apiGetCancelInfo: apiGetCancelInfo,
