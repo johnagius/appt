@@ -555,12 +555,14 @@ function apiAdminSearchAppointments(sig, query) {
 
   var today = todayLocal_();
   var results = [];
+  var seenDates = {};
 
-  // Search past 30 days + future 14 days
+  // Search live sheets: past 30 days + future 14 days
   for (var d = -30; d <= 14; d++) {
     if (results.length >= 50) break;
     var dt = addMinutes_(today, d * 24 * 60);
     var dk = toDateKey_(dt);
+    seenDates[dk] = true;
     var vals = getDayRows_(dk);
     if (!vals.length) continue;
     for (var r = 0; r < vals.length; r++) {
@@ -581,6 +583,37 @@ function apiAdminSearchAppointments(sig, query) {
           status: status,
           location: String(vals[r][11] || '')
         });
+      }
+    }
+  }
+
+  // Also search full archive for dates outside the live window
+  if (results.length < 50) {
+    var archive = loadArchiveData_();
+    var archiveDates = Object.keys(archive).sort().reverse();
+    for (var a = 0; a < archiveDates.length; a++) {
+      if (results.length >= 50) break;
+      var adk = archiveDates[a];
+      if (seenDates[adk]) continue;
+      var avals = archive[adk];
+      for (var ar = 0; ar < avals.length; ar++) {
+        if (results.length >= 50) break;
+        var aname = String(avals[ar][6] || '').toLowerCase();
+        var aphone = String(avals[ar][8] || '').toLowerCase();
+        if (aname.indexOf(query) >= 0 || aphone.indexOf(query) >= 0) {
+          results.push({
+            dateKey: adk,
+            appointmentId: String(avals[ar][0] || ''),
+            startTime: normalizeTimeCell_(avals[ar][2]),
+            endTime: normalizeTimeCell_(avals[ar][3]),
+            serviceName: String(avals[ar][5] || ''),
+            fullName: String(avals[ar][6] || ''),
+            email: String(avals[ar][7] || ''),
+            phone: String(avals[ar][8] || ''),
+            status: String(avals[ar][10] || ''),
+            location: String(avals[ar][11] || '')
+          });
+        }
       }
     }
   }
@@ -867,6 +900,30 @@ function apiAdminGetStatistics(sig) {
   var totalAll = totalBooked + totalCancelled;
   var cancelRate = totalAll > 0 ? Math.round(totalCancelled / totalAll * 1000) / 10 : 0;
 
+  // Enrich patient map with archive data (so repeat/unique counts are accurate)
+  var archive = loadArchiveData_();
+  var archiveDates = Object.keys(archive);
+  for (var ai = 0; ai < archiveDates.length; ai++) {
+    var adk = archiveDates[ai];
+    // Skip dates already covered by the live window
+    if (adk >= fromKey && adk <= toKey) continue;
+    var avals = archive[adk];
+    for (var ar = 0; ar < avals.length; ar++) {
+      var ast = String(avals[ar][10] || '');
+      if (ast === 'BOOKED' || ast === 'RELOCATED_SPINOLA' || ast === 'ATTENDED' || ast === 'NO_SHOW') {
+        var aemail = String(avals[ar][7] || '').trim().toLowerCase();
+        var aphone = String(avals[ar][8] || '').trim();
+        var apKey = aemail || aphone;
+        if (apKey) {
+          if (!patientMap[apKey]) {
+            patientMap[apKey] = { name: String(avals[ar][6] || ''), count: 0 };
+          }
+          patientMap[apKey].count++;
+        }
+      }
+    }
+  }
+
   // Patient insights
   var patientKeys = Object.keys(patientMap);
   var totalUniquePatients = patientKeys.length;
@@ -979,12 +1036,13 @@ function apiAdminGetPatientHistory(sig, email, phone) {
   var patientEmail = '';
   var patientPhone = '';
   var firstSeen = '';
+  var seenDates = {};
 
-  // Search 90 days back + 14 forward (checks archive for old dates)
+  // Search live sheets: 90 days back + 14 forward
   for (var d = -90; d <= 14; d++) {
-    if (results.length >= 100) break;
     var dt = addMinutes_(today, d * 1440);
     var dk = toDateKey_(dt);
+    seenDates[dk] = true;
     var vals = getDayRows_(dk);
     if (!vals.length) continue;
     for (var r = 0; r < vals.length; r++) {
@@ -1009,6 +1067,39 @@ function apiAdminGetPatientHistory(sig, email, phone) {
         location: String(vals[r][11] || ''),
         comments: String(vals[r][9] || ''),
         createdAt: String(vals[r][12] || '')
+      });
+    }
+  }
+
+  // Also search full archive for dates outside the live window
+  var archive = loadArchiveData_();
+  var archiveDates = Object.keys(archive);
+  for (var a = 0; a < archiveDates.length; a++) {
+    var adk = archiveDates[a];
+    if (seenDates[adk]) continue;
+    var avals = archive[adk];
+    for (var ar = 0; ar < avals.length; ar++) {
+      var ae = String(avals[ar][7] || '').trim().toLowerCase();
+      var ap = String(avals[ar][8] || '').trim();
+      var amatch = false;
+      if (email && ae === email) amatch = true;
+      if (phone && ap === phone) amatch = true;
+      if (!amatch) continue;
+
+      if (!patientName) patientName = String(avals[ar][6] || '');
+      if (!patientEmail && ae) patientEmail = ae;
+      if (!patientPhone && ap) patientPhone = ap;
+      if (!firstSeen || adk < firstSeen) firstSeen = adk;
+
+      results.push({
+        dateKey: adk,
+        startTime: normalizeTimeCell_(avals[ar][2]),
+        endTime: normalizeTimeCell_(avals[ar][3]),
+        serviceName: String(avals[ar][5] || ''),
+        status: String(avals[ar][10] || ''),
+        location: String(avals[ar][11] || ''),
+        comments: String(avals[ar][9] || ''),
+        createdAt: String(avals[ar][12] || '')
       });
     }
   }
