@@ -3155,19 +3155,21 @@ var _HTML_TEMPLATES = {
     .tl-date-nav button{border:none;background:none;cursor:pointer;font-size:18px;color:var(--muted);padding:4px 8px;border-radius:8px;}
     .tl-date-nav button:hover{background:rgba(17,24,39,0.06);}
     .tl-date-label{font-weight:700;font-size:14px;min-width:140px;text-align:center;}
+    .tl-outer{position:relative;margin-bottom:6px;}
     .tl-wrap{position:relative;height:48px;background:#f3f4f6;border-radius:10px;overflow:hidden;cursor:crosshair;border:1px solid var(--line);}
     .tl-seg{position:absolute;top:0;height:100%;transition:opacity 0.15s;}
     .tl-seg.regular{background:var(--good);opacity:0.55;}
     .tl-seg.extra{background:var(--good);opacity:0.85;background-image:repeating-linear-gradient(45deg,transparent,transparent 4px,rgba(255,255,255,0.2) 4px,rgba(255,255,255,0.2) 8px);}
     .tl-seg.blocked{background:var(--bad);opacity:0.7;}
     .tl-seg:hover{opacity:1;z-index:2;}
-    .tl-hours{position:absolute;top:0;left:0;right:0;bottom:0;pointer-events:none;display:flex;}
-    .tl-hour-mark{flex:1;border-right:1px solid rgba(0,0,0,0.08);position:relative;}
-    .tl-hour-mark:last-child{border-right:none;}
-    .tl-hour-label{position:absolute;bottom:-16px;left:50%;transform:translateX(-50%);font-size:9px;color:var(--muted);white-space:nowrap;}
-    .tl-legend{display:flex;gap:12px;margin-top:20px;font-size:11px;color:var(--muted);justify-content:center;}
+    .tl-ticks{position:relative;height:18px;display:flex;pointer-events:none;}
+    .tl-tick{flex:1;position:relative;border-left:1px solid var(--line);}
+    .tl-tick:last-child{border-right:1px solid var(--line);}
+    .tl-tick-label{position:absolute;top:2px;left:-1px;font-size:10px;color:var(--muted);font-weight:600;white-space:nowrap;transform:translateX(-50%);left:0;}
+    .tl-legend{display:flex;gap:12px;margin-top:10px;font-size:11px;color:var(--muted);justify-content:center;}
     .tl-legend-dot{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:middle;}
     .tl-tooltip{position:absolute;bottom:calc(100% + 6px);background:#111827;color:#fff;padding:4px 8px;border-radius:6px;font-size:11px;white-space:nowrap;pointer-events:none;z-index:10;transform:translateX(-50%);display:none;}
+    .tl-sel-label{position:absolute;top:-22px;left:50%;transform:translateX(-50%);background:var(--blue);color:#fff;padding:2px 8px;border-radius:4px;font-size:12px;font-weight:700;white-space:nowrap;pointer-events:none;z-index:11;}
     .tl-actions{display:flex;gap:6px;margin-top:8px;justify-content:center;}
     .tl-actions .btn{font-size:12px;padding:6px 14px;}
     .tl-sel{position:absolute;top:0;height:100%;background:rgba(37,99,235,0.25);border:2px solid var(--blue);border-radius:4px;pointer-events:none;z-index:5;display:none;}
@@ -3401,10 +3403,12 @@ var _HTML_TEMPLATES = {
         <div class="tl-date-label" id="tlDateLabel">Today</div>
         <button onclick="tlNavDate(1)" title="Next day">&#9654;</button>
       </div>
-      <div class="tl-wrap" id="tlBar">
-        <div class="tl-hours" id="tlHours"></div>
-        <div class="tl-sel" id="tlSel"></div>
-        <div class="tl-tooltip" id="tlTip"></div>
+      <div class="tl-outer">
+        <div class="tl-wrap" id="tlBar">
+          <div class="tl-sel" id="tlSel"><div class="tl-sel-label" id="tlSelLabel"></div></div>
+          <div class="tl-tooltip" id="tlTip"></div>
+        </div>
+        <div class="tl-ticks" id="tlTicks"></div>
       </div>
       <div class="tl-legend">
         <span><span class="tl-legend-dot" style="background:var(--good);opacity:0.55;"></span>Regular hours</span>
@@ -4138,7 +4142,7 @@ function renderTimeline() {
   if (!_tlDate || !_tlWorkingHours) return;
   var bar = document.getElementById('tlBar');
   var label = document.getElementById('tlDateLabel');
-  var hoursEl = document.getElementById('tlHours');
+  var ticksEl = document.getElementById('tlTicks');
 
   // Update date label
   var d = new Date(_tlDate + 'T12:00:00');
@@ -4146,7 +4150,7 @@ function renderTimeline() {
   var monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   label.textContent = dayNames[d.getDay()] + ' ' + d.getDate() + ' ' + monthNames[d.getMonth()] + ' ' + d.getFullYear();
 
-  // Clear old segments (keep hours, sel, tooltip)
+  // Clear old segments
   bar.querySelectorAll('.tl-seg').forEach(function(el) { el.remove(); });
   document.getElementById('tlSel').style.display = 'none';
   document.getElementById('tlActions').style.display = 'none';
@@ -4159,18 +4163,16 @@ function renderTimeline() {
     return ((m - _tlDayStart * 60) / totalMin * 100);
   }
 
-  // Render hour marks
-  hoursEl.innerHTML = '';
-  for (var h = _tlDayStart; h < _tlDayEnd; h++) {
-    var mark = document.createElement('div');
-    mark.className = 'tl-hour-mark';
-    if (h % 2 === 0 || (_tlDayEnd - _tlDayStart) <= 8) {
-      var lbl = document.createElement('div');
-      lbl.className = 'tl-hour-label';
-      lbl.textContent = String(h).padStart(2, '0') + ':00';
-      mark.appendChild(lbl);
-    }
-    hoursEl.appendChild(mark);
+  // Render tick marks below the bar
+  ticksEl.innerHTML = '';
+  for (var h = _tlDayStart; h <= _tlDayEnd; h++) {
+    var tick = document.createElement('div');
+    tick.className = 'tl-tick';
+    var lbl = document.createElement('div');
+    lbl.className = 'tl-tick-label';
+    lbl.textContent = String(h).padStart(2, '0') + ':00';
+    tick.appendChild(lbl);
+    ticksEl.appendChild(tick);
   }
 
   // Get day-of-week key
@@ -4199,7 +4201,6 @@ function renderTimeline() {
     var offEnd = off.endDate || off.startDate;
     if (_tlDate >= offStart && _tlDate <= offEnd) {
       if (!off.startTime || !off.endTime) {
-        // All day block
         addSegment(bar, String(_tlDayStart).padStart(2, '0') + ':00', String(_tlDayEnd).padStart(2, '0') + ':00', 'blocked', 'Blocked: All day' + (off.reason ? ' (' + off.reason + ')' : ''));
       } else {
         addSegment(bar, off.startTime, off.endTime, 'blocked', 'Blocked: ' + off.startTime + ' - ' + off.endTime + (off.reason ? ' (' + off.reason + ')' : ''));
@@ -4228,7 +4229,7 @@ function renderTimeline() {
     seg.addEventListener('mouseleave', function() {
       document.getElementById('tlTip').style.display = 'none';
     });
-    container.insertBefore(seg, container.querySelector('.tl-hours'));
+    container.insertBefore(seg, container.querySelector('.tl-sel'));
   }
 }
 
@@ -4255,7 +4256,7 @@ function parseHHMM(str) {
     if (_tlSelStart === null || _tlSelEnd === null) return;
     var s = Math.min(_tlSelStart, _tlSelEnd);
     var e = Math.max(_tlSelStart, _tlSelEnd);
-    if (e - s < 10) return;
+    if (e - s < 10) { document.getElementById('tlSel').style.display = 'none'; return; }
     var totalMin = (_tlDayEnd - _tlDayStart) * 60;
     var left = (s - _tlDayStart * 60) / totalMin * 100;
     var width = (e - s) / totalMin * 100;
@@ -4263,6 +4264,9 @@ function parseHHMM(str) {
     sel.style.left = left + '%';
     sel.style.width = width + '%';
     sel.style.display = 'block';
+    // Show live time label
+    var selLabel = document.getElementById('tlSelLabel');
+    selLabel.textContent = minToHHMM(s) + ' - ' + minToHHMM(e);
   }
 
   bar.addEventListener('mousedown', function(e) {
@@ -4274,29 +4278,48 @@ function parseHHMM(str) {
     updateSel();
   });
 
+  bar.addEventListener('touchstart', function(e) {
+    var touch = e.touches[0];
+    _tlDragging = true;
+    _tlSelStart = getMinFromX(touch);
+    _tlSelEnd = _tlSelStart;
+    document.getElementById('tlActions').style.display = 'none';
+    updateSel();
+  }, {passive: true});
+
   document.addEventListener('mousemove', function(e) {
     if (!_tlDragging) return;
     _tlSelEnd = getMinFromX(e);
     updateSel();
   });
 
-  document.addEventListener('mouseup', function(e) {
+  document.addEventListener('touchmove', function(e) {
+    if (!_tlDragging) return;
+    _tlSelEnd = getMinFromX(e.touches[0]);
+    updateSel();
+  }, {passive: true});
+
+  function finishDrag(e) {
     if (!_tlDragging) return;
     _tlDragging = false;
-    _tlSelEnd = getMinFromX(e);
+    var pos = e.changedTouches ? e.changedTouches[0] : e;
+    _tlSelEnd = getMinFromX(pos);
     var s = Math.min(_tlSelStart, _tlSelEnd);
     var en = Math.max(_tlSelStart, _tlSelEnd);
     if (en - s >= 10) {
-      // Show action buttons
       document.getElementById('tlActions').style.display = 'flex';
       _tlSelStart = s;
       _tlSelEnd = en;
+      updateSel();
     } else {
       document.getElementById('tlSel').style.display = 'none';
       _tlSelStart = null;
       _tlSelEnd = null;
     }
-  });
+  }
+
+  document.addEventListener('mouseup', finishDrag);
+  document.addEventListener('touchend', finishDrag);
 })();
 
 function minToHHMM(m) {
