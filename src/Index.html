@@ -645,9 +645,19 @@
     }
     @keyframes spin{ to { transform: rotate(360deg); } }
 
-    .idle-bar{position:fixed;bottom:0;left:0;right:0;background:rgba(17,24,39,0.92);color:#e5e7eb;font-size:12px;padding:6px 14px;display:flex;justify-content:space-between;align-items:center;z-index:1500;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);font-weight:500;}
-    .idle-bar .idle-dot{width:6px;height:6px;border-radius:50%;background:var(--good);display:inline-block;margin-right:4px;animation:idle-pulse 2s ease-in-out infinite;}
-    @keyframes idle-pulse{0%,100%{opacity:1;}50%{opacity:0.3;}}
+    /* Idle overlay */
+    .idle-overlay{position:fixed;inset:0;z-index:2000;display:none;align-items:center;justify-content:center;background:rgba(246,247,251,0.50);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);cursor:pointer;opacity:0;transition:opacity 0.5s ease;}
+    .idle-overlay.show{display:flex;opacity:1;}
+    .idle-card{text-align:center;padding:48px 36px;max-width:340px;animation:idle-float 3s ease-in-out infinite;}
+    .idle-icon{font-size:56px;margin-bottom:16px;animation:idle-pulse-icon 2.5s ease-in-out infinite;}
+    .idle-title{font-size:22px;font-weight:800;color:var(--text);margin:0 0 8px 0;letter-spacing:-0.3px;}
+    .idle-sub{font-size:14px;color:var(--muted);margin:0 0 24px 0;line-height:1.5;}
+    .idle-cta{display:inline-flex;align-items:center;gap:8px;padding:12px 28px;background:var(--accent);color:#fff;border-radius:40px;font-size:15px;font-weight:700;box-shadow:0 4px 20px rgba(245,179,1,0.35);transition:transform 0.2s,box-shadow 0.2s;}
+    .idle-cta:hover{transform:scale(1.05);box-shadow:0 6px 28px rgba(245,179,1,0.45);}
+    .idle-cta .idle-arrow{display:inline-block;transition:transform 0.3s;font-size:18px;}
+    .idle-overlay:hover .idle-arrow{transform:translateX(4px);}
+    @keyframes idle-float{0%,100%{transform:translateY(0);}50%{transform:translateY(-8px);}}
+    @keyframes idle-pulse-icon{0%,100%{opacity:1;transform:scale(1);}50%{opacity:0.7;transform:scale(0.95);}}
     .loadingText h4{ margin:0 0 4px 0; font-size:14px; }
     .loadingText div{ margin:0; color: var(--muted); font-size:12.5px; line-height:1.35; }
   </style>
@@ -769,8 +779,14 @@
 
   </div>
 
-  <div class="idle-bar" id="idleBar" style="display:none;">
-    <span><span class="idle-dot"></span> Page refreshes in: <span id="idleCountdown">5:00</span></span>
+  <!-- Idle overlay — shown after inactivity to pause all background fetches -->
+  <div class="idle-overlay" id="idleOverlay">
+    <div class="idle-card">
+      <div class="idle-icon">📋</div>
+      <div class="idle-title">Ready to Book?</div>
+      <div class="idle-sub">Tap anywhere to view the latest<br>available appointment slots</div>
+      <div class="idle-cta">Start Booking <span class="idle-arrow">→</span></div>
+    </div>
   </div>
 
   <!-- Confirmation modal -->
@@ -2433,46 +2449,59 @@
       if (_autoRefreshInstalled) return;
       _autoRefreshInstalled = true;
 
-      // Refresh slots every 30s — catches new bookings, cancellations, and
-      // time-based expiry (slots becoming "past"). 1 GAS call per interval.
-      setInterval(function() {
-        if (state.selectedDateKey && !document.hidden) loadAvailability(true);
+      var _idlePaused = false;
+      var IDLE_MS = 5 * 60 * 1000 + 10 * 1000; // 5 minutes 10 seconds
+      var _lastActivity = Date.now();
+      var _slotTimerId = null;
+      var _dateTimerId = null;
+      var _idleCheckId = null;
+      var _idleOverlay = document.getElementById('idleOverlay');
+
+      function isIdle() { return _idlePaused; }
+
+      // ── Slot refresh (30s) ──
+      _slotTimerId = setInterval(function() {
+        if (isIdle() || document.hidden || !state.selectedDateKey) return;
+        loadAvailability(true);
       }, 30000);
 
-      // Refresh date options every 90s — picks up doctor-off, extra slots, etc.
-      // These change rarely so a longer interval is fine.
-      setInterval(function() {
-        if (!document.hidden) refreshDateOptions();
+      // ── Date refresh (90s) ──
+      _dateTimerId = setInterval(function() {
+        if (isIdle() || document.hidden) return;
+        refreshDateOptions();
       }, 90000);
 
-      // On tab focus/visibility — refresh immediately (no waiting)
-      window.addEventListener('focus', function() { refreshDateOptions(); });
+      // ── Focus / visibility — skip if idle ──
+      window.addEventListener('focus', function() {
+        if (!isIdle()) refreshDateOptions();
+      });
       document.addEventListener('visibilitychange', function() {
-        if (!document.hidden) refreshDateOptions();
+        if (!document.hidden && !isIdle()) refreshDateOptions();
       });
 
-      // Full page reload after 5 minutes of idle (no interaction)
-      var lastActivity = Date.now();
-      var IDLE_RELOAD_MS = 5 * 60 * 1000;
-      var idleBarEl = document.getElementById('idleBar');
-      var idleCountdownEl = document.getElementById('idleCountdown');
-
+      // ── Activity tracking ──
       ['pointerdown', 'keydown', 'scroll', 'touchstart'].forEach(function(evt) {
-        document.addEventListener(evt, function() { lastActivity = Date.now(); }, { passive: true });
+        document.addEventListener(evt, function() { _lastActivity = Date.now(); }, { passive: true });
       });
 
-      setInterval(function() {
-        var remaining = Math.max(0, IDLE_RELOAD_MS - (Date.now() - lastActivity));
-        var secs = Math.ceil(remaining / 1000);
-        var m = Math.floor(secs / 60);
-        var s = secs % 60;
-        idleCountdownEl.textContent = m + ':' + (s < 10 ? '0' : '') + s;
-        idleBarEl.style.display = '';
-        if (remaining <= 0) {
-          lastActivity = Date.now();
-          goToExecAfterBooking_();
+      // ── Idle check (every 1s) ──
+      _idleCheckId = setInterval(function() {
+        if (_idlePaused) return;
+        var elapsed = Date.now() - _lastActivity;
+        if (elapsed >= IDLE_MS) {
+          _idlePaused = true;
+          _idleOverlay.classList.add('show');
         }
       }, 1000);
+
+      // ── Wake on click ──
+      _idleOverlay.addEventListener('click', function() {
+        _idlePaused = false;
+        _lastActivity = Date.now();
+        _idleOverlay.classList.remove('show');
+        // Full fresh reload of data
+        goToExecAfterBooking_();
+      });
     }
 
     function init() {
