@@ -194,6 +194,15 @@
     .tl-sel{position:absolute;top:28px;height:48px;background:rgba(37,99,235,0.25);border:2px solid var(--blue);border-radius:4px;pointer-events:none;z-index:5;display:none;}
     .tl-cursor{position:absolute;top:28px;width:2px;height:48px;background:var(--blue);pointer-events:none;z-index:8;display:none;opacity:0.7;}
     .tl-cursor-label{position:absolute;top:-20px;left:50%;transform:translateX(-50%);background:#111827;color:#fff;padding:1px 6px;border-radius:3px;font-size:11px;font-weight:600;white-space:nowrap;}
+    .tl-popover{position:absolute;bottom:calc(100% + 8px);background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,0.15);padding:8px 10px;z-index:20;transform:translateX(-50%);white-space:nowrap;display:none;font-size:12px;}
+    .tl-popover::after{content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);border:6px solid transparent;border-top-color:#fff;}
+    .tl-popover-type{font-weight:700;margin-bottom:2px;}
+    .tl-popover-type.pop-extra{color:var(--good);}
+    .tl-popover-type.pop-blocked{color:var(--bad);}
+    .tl-popover-time{color:var(--text);margin-bottom:4px;}
+    .tl-popover-reason{color:var(--muted);font-style:italic;margin-bottom:6px;}
+    .tl-popover-del{border:none;background:var(--bad);color:#fff;padding:4px 12px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;width:100%;}
+    .tl-popover-del:hover{opacity:0.85;}
 
     /* Search bar */
     .search-wrap{position:relative;margin-bottom:14px;}
@@ -431,6 +440,12 @@
         </div>
         <div class="tl-sel" id="tlSel"></div>
         <div class="tl-cursor" id="tlCursor"><div class="tl-cursor-label" id="tlCursorLabel"></div></div>
+        <div class="tl-popover" id="tlPopover">
+          <div class="tl-popover-type" id="tlPopType"></div>
+          <div class="tl-popover-time" id="tlPopTime"></div>
+          <div class="tl-popover-reason" id="tlPopReason"></div>
+          <button class="tl-popover-del" id="tlPopDel">Remove</button>
+        </div>
         <div class="tl-ticks" id="tlTicks"></div>
       </div>
       <div class="tl-legend">
@@ -1173,9 +1188,11 @@ function renderTimeline() {
   var monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   label.textContent = dayNames[d.getDay()] + ' ' + d.getDate() + ' ' + monthNames[d.getMonth()] + ' ' + d.getFullYear();
 
-  // Clear old segments
+  // Clear old segments and popover
   bar.querySelectorAll('.tl-seg').forEach(function(el) { el.remove(); });
   document.getElementById('tlSel').style.display = 'none';
+  document.getElementById('tlSelLabel').style.display = 'none';
+  document.getElementById('tlPopover').style.display = 'none';
   document.getElementById('tlActions').style.display = 'none';
   _tlSelStart = null;
   _tlSelEnd = null;
@@ -1213,7 +1230,9 @@ function renderTimeline() {
   for (var j = 0; j < _tlExtraEntries.length; j++) {
     var ex = _tlExtraEntries[j];
     if (ex.date === _tlDate && ex.startTime && ex.endTime) {
-      addSegment(bar, ex.startTime, ex.endTime, 'extra', 'Extra: ' + ex.startTime + ' - ' + ex.endTime + (ex.reason ? ' (' + ex.reason + ')' : ''));
+      addSegment(bar, ex.startTime, ex.endTime, 'extra', 'Extra: ' + ex.startTime + ' - ' + ex.endTime + (ex.reason ? ' (' + ex.reason + ')' : ''), {
+        type: 'extra', rowIndex: ex.rowIndex, time: ex.startTime + ' - ' + ex.endTime, reason: ex.reason || ''
+      });
     }
   }
 
@@ -1223,15 +1242,17 @@ function renderTimeline() {
     var offStart = off.startDate;
     var offEnd = off.endDate || off.startDate;
     if (_tlDate >= offStart && _tlDate <= offEnd) {
-      if (!off.startTime || !off.endTime) {
-        addSegment(bar, String(_tlDayStart).padStart(2, '0') + ':00', String(_tlDayEnd).padStart(2, '0') + ':00', 'blocked', 'Blocked: All day' + (off.reason ? ' (' + off.reason + ')' : ''));
-      } else {
-        addSegment(bar, off.startTime, off.endTime, 'blocked', 'Blocked: ' + off.startTime + ' - ' + off.endTime + (off.reason ? ' (' + off.reason + ')' : ''));
-      }
+      var isAllDay = !off.startTime || !off.endTime;
+      var bStart = isAllDay ? String(_tlDayStart).padStart(2, '0') + ':00' : off.startTime;
+      var bEnd = isAllDay ? String(_tlDayEnd).padStart(2, '0') + ':00' : off.endTime;
+      var bLabel = isAllDay ? 'All day' : off.startTime + ' - ' + off.endTime;
+      addSegment(bar, bStart, bEnd, 'blocked', 'Blocked: ' + bLabel + (off.reason ? ' (' + off.reason + ')' : ''), {
+        type: 'block', rowIndex: off.rowIndex, time: bLabel, reason: off.reason || ''
+      });
     }
   }
 
-  function addSegment(container, start, end, cls, tip) {
+  function addSegment(container, start, end, cls, tip, meta) {
     var sMin = parseHHMM(start);
     var eMin = parseHHMM(end);
     var left = Math.max(0, minToPercent(sMin));
@@ -1243,17 +1264,84 @@ function renderTimeline() {
     seg.style.left = left + '%';
     seg.style.width = (right - left) + '%';
     seg.title = tip;
-    seg.addEventListener('mouseenter', function(e) {
-      var tipEl = document.getElementById('tlTip');
-      tipEl.textContent = tip;
-      tipEl.style.left = (left + (right - left) / 2) + '%';
-      tipEl.style.display = 'block';
+    if (meta) {
+      seg.style.cursor = 'pointer';
+      seg.addEventListener('click', function(e) {
+        e.stopPropagation();
+        showSegPopover(left + (right - left) / 2, meta);
+      });
+    }
+    seg.addEventListener('mouseenter', function() {
+      if (!_tlDragging) {
+        var tipEl = document.getElementById('tlTip');
+        tipEl.textContent = tip;
+        tipEl.style.left = (left + (right - left) / 2) + '%';
+        tipEl.style.display = 'block';
+      }
     });
     seg.addEventListener('mouseleave', function() {
       document.getElementById('tlTip').style.display = 'none';
     });
-    container.insertBefore(seg, container.querySelector('.tl-sel'));
+    container.insertBefore(seg, container.querySelector('.tl-tooltip'));
   }
+}
+
+function showSegPopover(pct, meta) {
+  var pop = document.getElementById('tlPopover');
+  var typeEl = document.getElementById('tlPopType');
+  var timeEl = document.getElementById('tlPopTime');
+  var reasonEl = document.getElementById('tlPopReason');
+  var delBtn = document.getElementById('tlPopDel');
+
+  typeEl.textContent = meta.type === 'extra' ? 'Extra Hours' : 'Blocked Time';
+  typeEl.className = 'tl-popover-type ' + (meta.type === 'extra' ? 'pop-extra' : 'pop-blocked');
+  timeEl.textContent = meta.time;
+  if (meta.reason) {
+    reasonEl.textContent = meta.reason;
+    reasonEl.style.display = 'block';
+  } else {
+    reasonEl.style.display = 'none';
+  }
+
+  // Clamp popover position so it doesn't overflow
+  pop.style.left = Math.max(10, Math.min(90, pct)) + '%';
+  pop.style.display = 'block';
+
+  delBtn.onclick = function() {
+    pop.style.display = 'none';
+    if (meta.type === 'extra') {
+      showLoading('Removing...', 'Removing extra time slot.');
+      google.script.run
+        .withSuccessHandler(function(res) {
+          hideLoading();
+          if (!res || !res.ok) { showMsg('availMsg', 'bad', res.reason || 'Failed.'); return; }
+          showMsg('availMsg', 'good', res.message);
+          loadDashboard();
+        })
+        .withFailureHandler(function(err) { hideLoading(); showMsg('availMsg', 'bad', 'Error: ' + (err && err.message ? err.message : String(err))); })
+        .apiAdminRemoveExtraSlots(SIG, meta.rowIndex);
+    } else {
+      showLoading('Removing...', 'Removing blocked time.');
+      google.script.run
+        .withSuccessHandler(function(res) {
+          hideLoading();
+          if (!res || !res.ok) { showMsg('availMsg', 'bad', res.reason || 'Failed.'); return; }
+          showMsg('availMsg', 'good', res.message);
+          loadDashboard();
+        })
+        .withFailureHandler(function(err) { hideLoading(); showMsg('availMsg', 'bad', 'Error: ' + (err && err.message ? err.message : String(err))); })
+        .apiAdminRemoveDoctorOff(SIG, meta.rowIndex);
+    }
+  };
+
+  // Close popover when clicking elsewhere
+  function closePop(e) {
+    if (!pop.contains(e.target)) {
+      pop.style.display = 'none';
+      document.removeEventListener('click', closePop);
+    }
+  }
+  setTimeout(function() { document.addEventListener('click', closePop); }, 0);
 }
 
 function parseHHMM(str) {
