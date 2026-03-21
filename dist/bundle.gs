@@ -2465,10 +2465,18 @@ var _HTML_TEMPLATES = {
       if (_autoRefreshInstalled) return;
       _autoRefreshInstalled = true;
 
-      // Poll version every 10s — costs 1 PropertiesService read, no sheet access
+      // Version poll every 10s — detects bookings, cancellations, admin changes.
+      // Costs 1 PropertiesService read (no sheet access) when nothing changed.
       setInterval(pollForChanges, 10000);
 
-      // On tab focus/visibility — refresh immediately (catches changes while tab was hidden)
+      // Time-based slot refresh every 45s — catches slots expiring as time passes
+      // (e.g. morning slots becoming "past"). Version poll can't catch this because
+      // no data write happens — it's purely a function of the current time.
+      setInterval(function() {
+        if (state.selectedDateKey && !document.hidden) loadAvailability(true);
+      }, 45000);
+
+      // On tab focus/visibility — refresh immediately
       window.addEventListener('focus', function() { refreshDateOptions(); });
       document.addEventListener('visibilitychange', function() {
         if (!document.hidden) refreshDateOptions();
