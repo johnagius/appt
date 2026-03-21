@@ -67,6 +67,9 @@ function apiAdminGetDashboard(sig) {
     }
   }
 
+  // Build timeline data for today (used by visual availability bar)
+  var hoursConfig = CFG().HOURS;
+
   return {
     ok: true,
     todayKey: todayKey,
@@ -75,6 +78,7 @@ function apiAdminGetDashboard(sig) {
     tomorrowAppointments: tomorrowAppts,
     doctorOffEntries: futureOffRows,
     extraSlotEntries: futureExtraRows,
+    workingHours: hoursConfig,
     stats: {
       weekBooked: weekBooked,
       weekCancelled: weekCancelled,

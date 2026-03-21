@@ -3149,6 +3149,29 @@ var _HTML_TEMPLATES = {
       .time-drum-val{font-size:20px;}
     }
 
+    /* Timeline bar */
+    .timeline-card{margin-bottom:0;padding-bottom:10px;}
+    .tl-date-nav{display:flex;align-items:center;gap:8px;margin-bottom:10px;justify-content:center;}
+    .tl-date-nav button{border:none;background:none;cursor:pointer;font-size:18px;color:var(--muted);padding:4px 8px;border-radius:8px;}
+    .tl-date-nav button:hover{background:rgba(17,24,39,0.06);}
+    .tl-date-label{font-weight:700;font-size:14px;min-width:140px;text-align:center;}
+    .tl-wrap{position:relative;height:48px;background:#f3f4f6;border-radius:10px;overflow:hidden;cursor:crosshair;border:1px solid var(--line);}
+    .tl-seg{position:absolute;top:0;height:100%;transition:opacity 0.15s;}
+    .tl-seg.regular{background:var(--good);opacity:0.55;}
+    .tl-seg.extra{background:var(--good);opacity:0.85;background-image:repeating-linear-gradient(45deg,transparent,transparent 4px,rgba(255,255,255,0.2) 4px,rgba(255,255,255,0.2) 8px);}
+    .tl-seg.blocked{background:var(--bad);opacity:0.7;}
+    .tl-seg:hover{opacity:1;z-index:2;}
+    .tl-hours{position:absolute;top:0;left:0;right:0;bottom:0;pointer-events:none;display:flex;}
+    .tl-hour-mark{flex:1;border-right:1px solid rgba(0,0,0,0.08);position:relative;}
+    .tl-hour-mark:last-child{border-right:none;}
+    .tl-hour-label{position:absolute;bottom:-16px;left:50%;transform:translateX(-50%);font-size:9px;color:var(--muted);white-space:nowrap;}
+    .tl-legend{display:flex;gap:12px;margin-top:20px;font-size:11px;color:var(--muted);justify-content:center;}
+    .tl-legend-dot{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:middle;}
+    .tl-tooltip{position:absolute;bottom:calc(100% + 6px);background:#111827;color:#fff;padding:4px 8px;border-radius:6px;font-size:11px;white-space:nowrap;pointer-events:none;z-index:10;transform:translateX(-50%);display:none;}
+    .tl-actions{display:flex;gap:6px;margin-top:8px;justify-content:center;}
+    .tl-actions .btn{font-size:12px;padding:6px 14px;}
+    .tl-sel{position:absolute;top:0;height:100%;background:rgba(37,99,235,0.25);border:2px solid var(--blue);border-radius:4px;pointer-events:none;z-index:5;display:none;}
+
     /* Search bar */
     .search-wrap{position:relative;margin-bottom:14px;}
     .search-wrap input{padding-left:36px;padding-right:36px;}
@@ -3371,6 +3394,30 @@ var _HTML_TEMPLATES = {
 
   <!-- AVAILABILITY TAB -->
   <div class="tab-content" id="tab-availability" style="display:none;">
+    <div class="card timeline-card">
+      <h3>Daily Availability</h3>
+      <div class="tl-date-nav">
+        <button onclick="tlNavDate(-1)" title="Previous day">&#9664;</button>
+        <div class="tl-date-label" id="tlDateLabel">Today</div>
+        <button onclick="tlNavDate(1)" title="Next day">&#9654;</button>
+      </div>
+      <div class="tl-wrap" id="tlBar">
+        <div class="tl-hours" id="tlHours"></div>
+        <div class="tl-sel" id="tlSel"></div>
+        <div class="tl-tooltip" id="tlTip"></div>
+      </div>
+      <div class="tl-legend">
+        <span><span class="tl-legend-dot" style="background:var(--good);opacity:0.55;"></span>Regular hours</span>
+        <span><span class="tl-legend-dot" style="background:var(--good);opacity:0.85;background-image:repeating-linear-gradient(45deg,transparent,transparent 2px,rgba(255,255,255,0.3) 2px,rgba(255,255,255,0.3) 4px);"></span>Extra hours</span>
+        <span><span class="tl-legend-dot" style="background:var(--bad);opacity:0.7;"></span>Blocked</span>
+        <span><span class="tl-legend-dot" style="background:#f3f4f6;border:1px solid var(--line);"></span>Off</span>
+      </div>
+      <div class="tl-actions" id="tlActions" style="display:none;">
+        <button class="btn btn-good" id="tlAddBtn" onclick="tlAddExtra()">Add Extra Time</button>
+        <button class="btn btn-danger" id="tlBlockBtn" onclick="tlBlockTime()">Block Time</button>
+      </div>
+    </div>
+
     <div class="card">
       <div class="avail-toggle">
         <div class="toggle-btn active-block" id="toggleBlock" onclick="setAvailMode('block')">Block Time</div>
@@ -3861,6 +3908,14 @@ function loadDashboard() {
       updateFillRing(res.todayAppointments.length, res.stats.todayCapacity || 0);
 
       renderOverrides(res.doctorOffEntries, res.extraSlotEntries);
+
+      // Update timeline data
+      _tlWorkingHours = res.workingHours || null;
+      _tlOffEntries = res.doctorOffEntries || [];
+      _tlExtraEntries = res.extraSlotEntries || [];
+      if (!_tlDate) _tlDate = res.todayKey;
+      renderTimeline();
+
       _cachedDashboard = _dashboardHash(res);
       if (res._v !== undefined) _cachedVersion = res._v;
 
@@ -4057,6 +4112,241 @@ function clearSearch() {
   document.getElementById('searchClear').style.display = 'none';
   document.getElementById('searchResults').style.display = 'none';
   document.getElementById('scheduleView').style.display = 'block';
+}
+
+// ========== Timeline Bar ==========
+
+var _tlDate = null; // current timeline date string "YYYY-MM-DD"
+var _tlWorkingHours = null; // working hours config from dashboard
+var _tlOffEntries = []; // doctor off entries
+var _tlExtraEntries = []; // extra slot entries
+var _tlDayStart = 7; // timeline display range: 7am
+var _tlDayEnd = 21; // to 9pm
+var _tlSelStart = null; // drag selection start (minutes)
+var _tlSelEnd = null; // drag selection end (minutes)
+var _tlDragging = false;
+
+function tlNavDate(delta) {
+  if (!_tlDate) return;
+  var d = new Date(_tlDate + 'T12:00:00');
+  d.setDate(d.getDate() + delta);
+  _tlDate = d.toISOString().slice(0, 10);
+  renderTimeline();
+}
+
+function renderTimeline() {
+  if (!_tlDate || !_tlWorkingHours) return;
+  var bar = document.getElementById('tlBar');
+  var label = document.getElementById('tlDateLabel');
+  var hoursEl = document.getElementById('tlHours');
+
+  // Update date label
+  var d = new Date(_tlDate + 'T12:00:00');
+  var dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  var monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  label.textContent = dayNames[d.getDay()] + ' ' + d.getDate() + ' ' + monthNames[d.getMonth()] + ' ' + d.getFullYear();
+
+  // Clear old segments (keep hours, sel, tooltip)
+  bar.querySelectorAll('.tl-seg').forEach(function(el) { el.remove(); });
+  document.getElementById('tlSel').style.display = 'none';
+  document.getElementById('tlActions').style.display = 'none';
+  _tlSelStart = null;
+  _tlSelEnd = null;
+
+  var totalMin = (_tlDayEnd - _tlDayStart) * 60;
+
+  function minToPercent(m) {
+    return ((m - _tlDayStart * 60) / totalMin * 100);
+  }
+
+  // Render hour marks
+  hoursEl.innerHTML = '';
+  for (var h = _tlDayStart; h < _tlDayEnd; h++) {
+    var mark = document.createElement('div');
+    mark.className = 'tl-hour-mark';
+    if (h % 2 === 0 || (_tlDayEnd - _tlDayStart) <= 8) {
+      var lbl = document.createElement('div');
+      lbl.className = 'tl-hour-label';
+      lbl.textContent = String(h).padStart(2, '0') + ':00';
+      mark.appendChild(lbl);
+    }
+    hoursEl.appendChild(mark);
+  }
+
+  // Get day-of-week key
+  var dowKeys = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
+  var dow = dowKeys[d.getDay()];
+
+  // Regular working hours for this day
+  var regularWindows = _tlWorkingHours[dow] || [];
+  for (var i = 0; i < regularWindows.length; i++) {
+    var w = regularWindows[i];
+    addSegment(bar, w.start, w.end, 'regular', 'Regular: ' + w.start + ' - ' + w.end);
+  }
+
+  // Extra hours for this date
+  for (var j = 0; j < _tlExtraEntries.length; j++) {
+    var ex = _tlExtraEntries[j];
+    if (ex.date === _tlDate && ex.startTime && ex.endTime) {
+      addSegment(bar, ex.startTime, ex.endTime, 'extra', 'Extra: ' + ex.startTime + ' - ' + ex.endTime + (ex.reason ? ' (' + ex.reason + ')' : ''));
+    }
+  }
+
+  // Blocked hours for this date
+  for (var k = 0; k < _tlOffEntries.length; k++) {
+    var off = _tlOffEntries[k];
+    var offStart = off.startDate;
+    var offEnd = off.endDate || off.startDate;
+    if (_tlDate >= offStart && _tlDate <= offEnd) {
+      if (!off.startTime || !off.endTime) {
+        // All day block
+        addSegment(bar, String(_tlDayStart).padStart(2, '0') + ':00', String(_tlDayEnd).padStart(2, '0') + ':00', 'blocked', 'Blocked: All day' + (off.reason ? ' (' + off.reason + ')' : ''));
+      } else {
+        addSegment(bar, off.startTime, off.endTime, 'blocked', 'Blocked: ' + off.startTime + ' - ' + off.endTime + (off.reason ? ' (' + off.reason + ')' : ''));
+      }
+    }
+  }
+
+  function addSegment(container, start, end, cls, tip) {
+    var sMin = parseHHMM(start);
+    var eMin = parseHHMM(end);
+    var left = Math.max(0, minToPercent(sMin));
+    var right = Math.min(100, minToPercent(eMin));
+    if (right <= left) return;
+
+    var seg = document.createElement('div');
+    seg.className = 'tl-seg ' + cls;
+    seg.style.left = left + '%';
+    seg.style.width = (right - left) + '%';
+    seg.title = tip;
+    seg.addEventListener('mouseenter', function(e) {
+      var tipEl = document.getElementById('tlTip');
+      tipEl.textContent = tip;
+      tipEl.style.left = (left + (right - left) / 2) + '%';
+      tipEl.style.display = 'block';
+    });
+    seg.addEventListener('mouseleave', function() {
+      document.getElementById('tlTip').style.display = 'none';
+    });
+    container.insertBefore(seg, container.querySelector('.tl-hours'));
+  }
+}
+
+function parseHHMM(str) {
+  var parts = String(str).split(':');
+  return parseInt(parts[0], 10) * 60 + parseInt(parts[1] || '0', 10);
+}
+
+// Drag-to-select on timeline
+(function initTimelineDrag() {
+  var bar = document.getElementById('tlBar');
+  if (!bar) return;
+
+  function getMinFromX(e) {
+    var rect = bar.getBoundingClientRect();
+    var pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    var totalMin = (_tlDayEnd - _tlDayStart) * 60;
+    var rawMin = _tlDayStart * 60 + pct * totalMin;
+    // Snap to 10-minute intervals
+    return Math.round(rawMin / 10) * 10;
+  }
+
+  function updateSel() {
+    if (_tlSelStart === null || _tlSelEnd === null) return;
+    var s = Math.min(_tlSelStart, _tlSelEnd);
+    var e = Math.max(_tlSelStart, _tlSelEnd);
+    if (e - s < 10) return;
+    var totalMin = (_tlDayEnd - _tlDayStart) * 60;
+    var left = (s - _tlDayStart * 60) / totalMin * 100;
+    var width = (e - s) / totalMin * 100;
+    var sel = document.getElementById('tlSel');
+    sel.style.left = left + '%';
+    sel.style.width = width + '%';
+    sel.style.display = 'block';
+  }
+
+  bar.addEventListener('mousedown', function(e) {
+    if (e.button !== 0) return;
+    _tlDragging = true;
+    _tlSelStart = getMinFromX(e);
+    _tlSelEnd = _tlSelStart;
+    document.getElementById('tlActions').style.display = 'none';
+    updateSel();
+  });
+
+  document.addEventListener('mousemove', function(e) {
+    if (!_tlDragging) return;
+    _tlSelEnd = getMinFromX(e);
+    updateSel();
+  });
+
+  document.addEventListener('mouseup', function(e) {
+    if (!_tlDragging) return;
+    _tlDragging = false;
+    _tlSelEnd = getMinFromX(e);
+    var s = Math.min(_tlSelStart, _tlSelEnd);
+    var en = Math.max(_tlSelStart, _tlSelEnd);
+    if (en - s >= 10) {
+      // Show action buttons
+      document.getElementById('tlActions').style.display = 'flex';
+      _tlSelStart = s;
+      _tlSelEnd = en;
+    } else {
+      document.getElementById('tlSel').style.display = 'none';
+      _tlSelStart = null;
+      _tlSelEnd = null;
+    }
+  });
+})();
+
+function minToHHMM(m) {
+  var hh = String(Math.floor(m / 60)).padStart(2, '0');
+  var mm = String(m % 60).padStart(2, '0');
+  return hh + ':' + mm;
+}
+
+function tlAddExtra() {
+  if (_tlSelStart === null || _tlSelEnd === null || !_tlDate) return;
+  showLoading('Adding...', 'Adding extra time slot.');
+  google.script.run
+    .withSuccessHandler(function(res) {
+      hideLoading();
+      if (!res || !res.ok) { showMsg('availMsg', 'bad', res.reason || 'Failed.'); return; }
+      showMsg('availMsg', 'good', res.message);
+      loadDashboard();
+    })
+    .withFailureHandler(function(err) {
+      hideLoading();
+      showMsg('availMsg', 'bad', 'Error: ' + (err && err.message ? err.message : String(err)));
+    })
+    .apiAdminAddExtraSlots(SIG, {
+      date: _tlDate,
+      startTime: minToHHMM(_tlSelStart),
+      endTime: minToHHMM(_tlSelEnd),
+      reason: 'Added from timeline'
+    });
+}
+
+function tlBlockTime() {
+  if (_tlSelStart === null || _tlSelEnd === null || !_tlDate) return;
+  showLoading('Blocking...', 'Blocking time slot.');
+  google.script.run
+    .withSuccessHandler(function(res) {
+      hideLoading();
+      if (!res || !res.ok) { showMsg('availMsg', 'bad', res.reason || 'Failed.'); return; }
+      showMsg('availMsg', 'good', res.message);
+      loadDashboard();
+    })
+    .withFailureHandler(function(err) {
+      hideLoading();
+      showMsg('availMsg', 'bad', 'Error: ' + (err && err.message ? err.message : String(err)));
+    })
+    .apiAdminMarkDoctorOff(SIG, {
+      startDate: _tlDate,
+      startTime: minToHHMM(_tlSelStart),
+      endTime: minToHHMM(_tlSelEnd),
+      reason: 'Blocked from timeline'
+    });
 }
 
 // ========== Availability (unified Block / Extra) ==========
@@ -7530,6 +7820,9 @@ function apiAdminGetDashboard(sig) {
     }
   }
 
+  // Build timeline data for today (used by visual availability bar)
+  var hoursConfig = CFG().HOURS;
+
   return {
     ok: true,
     todayKey: todayKey,
@@ -7538,6 +7831,7 @@ function apiAdminGetDashboard(sig) {
     tomorrowAppointments: tomorrowAppts,
     doctorOffEntries: futureOffRows,
     extraSlotEntries: futureExtraRows,
+    workingHours: hoursConfig,
     stats: {
       weekBooked: weekBooked,
       weekCancelled: weekCancelled,
