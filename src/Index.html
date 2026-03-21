@@ -2458,13 +2458,13 @@
       if (_autoRefreshInstalled) return;
       _autoRefreshInstalled = true;
 
-      // Poll version every 15s — costs 1 PropertiesService read, no sheet access
-      setInterval(pollForChanges, 15000);
+      // Poll version every 10s — costs 1 PropertiesService read, no sheet access
+      setInterval(pollForChanges, 10000);
 
-      // On tab focus, poll immediately (catches changes while tab was hidden)
-      window.addEventListener('focus', function() { pollForChanges(); });
+      // On tab focus/visibility — refresh immediately (catches changes while tab was hidden)
+      window.addEventListener('focus', function() { refreshDateOptions(); });
       document.addEventListener('visibilitychange', function() {
-        if (!document.hidden) pollForChanges();
+        if (!document.hidden) refreshDateOptions();
       });
 
       // Full page reload after 5 minutes of idle (no interaction)

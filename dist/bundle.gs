@@ -2465,13 +2465,13 @@ var _HTML_TEMPLATES = {
       if (_autoRefreshInstalled) return;
       _autoRefreshInstalled = true;
 
-      // Poll version every 15s — costs 1 PropertiesService read, no sheet access
-      setInterval(pollForChanges, 15000);
+      // Poll version every 10s — costs 1 PropertiesService read, no sheet access
+      setInterval(pollForChanges, 10000);
 
-      // On tab focus, poll immediately (catches changes while tab was hidden)
-      window.addEventListener('focus', function() { pollForChanges(); });
+      // On tab focus/visibility — refresh immediately (catches changes while tab was hidden)
+      window.addEventListener('focus', function() { refreshDateOptions(); });
       document.addEventListener('visibilitychange', function() {
-        if (!document.hidden) pollForChanges();
+        if (!document.hidden) refreshDateOptions();
       });
 
       // Full page reload after 5 minutes of idle (no interaction)
@@ -4444,7 +4444,7 @@ if (document.readyState === 'complete' || document.readyState === 'interactive')
 // Instead of fetching the full dashboard every 60s (~11 sheet reads),
 // we poll a lightweight version counter (1 PropertiesService read).
 // Full dashboard is only fetched when the version actually changed.
-var POLL_INTERVAL_SEC = 15;
+var POLL_INTERVAL_SEC = 10;
 var _lastRefreshTime = Date.now();
 var _pollTimerId = null;
 var _isRefreshing = false;
@@ -4453,7 +4453,9 @@ var _cachedVersion = 0;
 var _cachedDashboard = null;
 
 function doPollAndRefresh() {
-  if (_isPolling || _isRefreshing || document.hidden) return;
+  if (_isPolling || _isRefreshing) return;
+  // Skip polling when tab is hidden — visibility handler will catch up
+  if (document.hidden) return;
   _isPolling = true;
 
   google.script.run
@@ -4462,11 +4464,9 @@ function doPollAndRefresh() {
       if (!res) return;
 
       if (res.v !== _cachedVersion) {
-        // Data changed — do a full dashboard refresh
         _cachedVersion = res.v;
         doFullRefresh();
       } else {
-        // No change — just update the display timer
         _lastRefreshTime = Date.now();
       }
     })
@@ -4538,12 +4538,14 @@ function updateRefreshDisplay() {
 _pollTimerId = setInterval(doPollAndRefresh, POLL_INTERVAL_SEC * 1000);
 setInterval(updateRefreshDisplay, 1000);
 
-// On tab visibility change — poll immediately if stale
+// On tab focus/visibility — always do a full refresh immediately.
+// While the tab was hidden, polls were paused, so we go straight to
+// a full dashboard fetch to catch any changes (e.g. patient bookings).
 document.addEventListener('visibilitychange', function() {
-  if (!document.hidden) {
-    var elapsed = (Date.now() - _lastRefreshTime) / 1000;
-    if (elapsed > 10) doPollAndRefresh();
-  }
+  if (!document.hidden) doFullRefresh();
+});
+window.addEventListener('focus', function() {
+  doFullRefresh();
 });
 
 // ========== Settings Tab ==========
