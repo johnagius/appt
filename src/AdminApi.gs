@@ -84,7 +84,8 @@ function apiAdminGetDashboard(sig) {
       weekBooked: weekBooked,
       weekCancelled: weekCancelled,
       todayCapacity: todayCapacity
-    }
+    },
+    _v: getDataVersion_()
   };
 }
 
@@ -124,6 +125,7 @@ function apiAdminMarkDoctorOff(sig, payload) {
   if (endTime && !/^\d{2}:\d{2}$/.test(endTime)) return { ok: false, reason: 'Invalid end time format. Use HH:mm.' };
 
   addDoctorOffRow_(startDate, endDate, startTime, endTime, reason);
+  bumpVersion_();
 
   // Find affected appointments
   var affected = [];
@@ -199,6 +201,8 @@ function apiAdminAddExtraSlots(sig, payload) {
     daysAdded++;
     cur.setDate(cur.getDate() + 1);
   }
+
+  bumpVersion_();
 
   var slotsPerDay = Math.floor((enMin - stMin) / CFG().APPT_DURATION_MIN);
   var totalSlots = slotsPerDay * daysAdded;
@@ -424,6 +428,8 @@ function apiAdminProcessAppointments(sig, payload) {
       }
     }
 
+    if (results.length > 0) bumpVersion_();
+
     return {
       ok: true,
       message: 'Processed ' + results.length + ' appointment(s).',
@@ -445,6 +451,7 @@ function apiAdminRemoveDoctorOff(sig, rowIndex) {
   rowIndex = Number(rowIndex);
   if (isNaN(rowIndex) || rowIndex < 2) return { ok: false, reason: 'Invalid row index.' };
   deleteDoctorOffRow_(rowIndex);
+  bumpVersion_();
   return { ok: true, message: 'Doctor-off entry removed. Slots are now available for booking.' };
 }
 
@@ -456,6 +463,7 @@ function apiAdminRemoveExtraSlots(sig, rowIndex) {
   rowIndex = Number(rowIndex);
   if (isNaN(rowIndex) || rowIndex < 2) return { ok: false, reason: 'Invalid row index.' };
   deleteDoctorExtraRow_(rowIndex);
+  bumpVersion_();
   return { ok: true, message: 'Extra slots entry removed.' };
 }
 
@@ -964,6 +972,7 @@ function apiAdminMarkAttendance(sig, appointmentId, dateKey, attended) {
     if (String(vals[r][0] || '') === appointmentId) {
       var newStatus = attended ? 'ATTENDED' : 'NO_SHOW';
       updateAppointmentStatus_(dateKey, r + 2, { status: newStatus });
+      bumpVersion_();
       return { ok: true, message: 'Marked as ' + (attended ? 'attended' : 'no-show') + '.' };
     }
   }

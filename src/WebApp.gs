@@ -61,6 +61,15 @@ function _serveHtml(name, vars) {
   return HtmlService.createHtmlOutput(html);
 }
 
+/**
+ * Lightweight poll endpoint — returns only the data version number.
+ * Clients compare against their cached version to decide if a full refetch is needed.
+ * Cost: 1 PropertiesService read (no sheet access).
+ */
+function apiPoll() {
+  return { v: getDataVersion_() };
+}
+
 function apiInit() {
   var extraMap = getDoctorExtraSlots_();
   return {
@@ -75,7 +84,8 @@ function apiInit() {
       spinolaLocation: (getScriptProps_().getProperty(CFG().PROP_SPINOLA_LOCATION) || 'Spinola Clinic'),
       workingHours: CFG().HOURS
     },
-    dateOptions: apiGetDateOptions(extraMap)
+    dateOptions: apiGetDateOptions(extraMap),
+    _v: getDataVersion_()
   };
 }
 
@@ -228,7 +238,7 @@ function apiGetAvailability(dateKey) {
     });
   }
 
-  return { ok: true, dateKey: dateKey, slots: outSlots, _debug: { extraKeys: extraKeys, extras: extras, slotCount: baseSlots.length } };
+  return { ok: true, dateKey: dateKey, slots: outSlots, _v: getDataVersion_(), _debug: { extraKeys: extraKeys, extras: extras, slotCount: baseSlots.length } };
 }
 
 function getDoctorOffEntryForDate_(offMap, dateKey) {
@@ -399,6 +409,7 @@ function apiBook(payload) {
     apptObj.calendarEventId = eventId;
 
     appendAppointment_(dateKey, apptObj);
+    bumpVersion_();
 
     sendClientConfirmationEmail_(apptObj);
     var dayList = listAppointmentsForDate_(dateKey);
@@ -483,6 +494,7 @@ function apiCancelAppointment(token, sig) {
       cancelReason: 'Cancelled by client via email link',
       calendarEventId: ''
     });
+    bumpVersion_();
 
     try { sendClientCancelledEmail_(appt, 'Your appointment has been cancelled.'); } catch (e1) {}
     try { sendDoctorCancellationEmail_(appt, 'Client cancelled via email link.'); } catch (e2) {}
@@ -539,6 +551,7 @@ function apiDoctorAction(token, act, sig) {
         cancelReason: 'Cancelled by doctor',
         calendarEventId: ''
       });
+      bumpVersion_();
 
       try { sendClientCancelledEmail_(appt, 'Your appointment has been cancelled by the clinic. Please rebook if needed.'); } catch (e1) {}
       try { sendDoctorCancellationEmail_(appt, 'You cancelled this appointment.'); } catch (e2) {}
@@ -553,6 +566,7 @@ function apiDoctorAction(token, act, sig) {
         status: 'RELOCATED_SPINOLA',
         location: spinolaLocation
       });
+      bumpVersion_();
 
       var calEventId = String(appt.calendarEventId || '').trim();
       if (calEventId) {

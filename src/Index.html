@@ -2331,6 +2331,7 @@
           if (!isSilentRefresh) hideLoading();
 
           if (res && res._debug) console.log('[APPT DEBUG]', JSON.stringify(res._debug));
+          if (res && res._v !== undefined) _cachedVersion = res._v;
           if (!res || !res.ok) {
             renderSlots([]);
             showHint(els.timeHint, 'bad', (res && res.reason) ? res.reason : t('noAvailability'));
@@ -2408,6 +2409,29 @@
     });
 
     // Auto-refresh (keeps page accurate if someone else books online or doctor adds overrides)
+    // ── Version-based polling ──
+    // Instead of re-reading sheets every 20s, we poll a lightweight version counter.
+    // Full data is only fetched when something actually changed.
+    var _cachedVersion = 0;
+    var _pollInFlight = false;
+
+    function pollForChanges() {
+      if (_pollInFlight || document.hidden) return;
+      _pollInFlight = true;
+      google.script.run
+        .withSuccessHandler(function(res) {
+          _pollInFlight = false;
+          if (!res) return;
+          if (res.v !== _cachedVersion) {
+            _cachedVersion = res.v;
+            // Data changed — refresh dates + availability
+            refreshDateOptions();
+          }
+        })
+        .withFailureHandler(function() { _pollInFlight = false; })
+        .apiPoll();
+    }
+
     function refreshDateOptions() {
       google.script.run
         .withSuccessHandler(function(dateOptions) {
@@ -2415,7 +2439,6 @@
           var prevSelected = state.selectedDateKey;
           state.dateOptions = dateOptions;
           renderDates();
-          // Restore selection if the previously selected date is still available
           if (prevSelected) {
             var still = state.dateOptions.find(function(o) { return o.dateKey === prevSelected && !o.disabled; });
             if (still) {
@@ -2434,20 +2457,14 @@
     function installAutoRefresh() {
       if (_autoRefreshInstalled) return;
       _autoRefreshInstalled = true;
-      // Refresh slots every 20s
-      setInterval(() => {
-        if (state.selectedDateKey) loadAvailability(true);
-      }, 20000);
 
-      // Refresh date options every 60s (picks up new overrides, closed days, etc.)
-      setInterval(refreshDateOptions, 60000);
+      // Poll version every 15s — costs 1 PropertiesService read, no sheet access
+      setInterval(pollForChanges, 15000);
 
-      window.addEventListener('focus', () => {
-        refreshDateOptions();
-      });
-
-      document.addEventListener('visibilitychange', () => {
-        if (!document.hidden) refreshDateOptions();
+      // On tab focus, poll immediately (catches changes while tab was hidden)
+      window.addEventListener('focus', function() { pollForChanges(); });
+      document.addEventListener('visibilitychange', function() {
+        if (!document.hidden) pollForChanges();
       });
 
       // Full page reload after 5 minutes of idle (no interaction)
@@ -2483,6 +2500,7 @@
 
           state.config = data.config;
           state.dateOptions = data.dateOptions || [];
+          if (data._v !== undefined) _cachedVersion = data._v;
 
           els.docName.textContent = state.config.doctorName;
           els.docMeta.textContent = state.config.pottersLocation;

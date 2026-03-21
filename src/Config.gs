@@ -88,6 +88,20 @@ function getTimeZone_() {
   return _tzCache;
 }
 
+/** Data version counter — stored in Script Properties for cheapest possible reads. */
+var _PROP_DATA_VERSION = 'DATA_VERSION';
+
+function getDataVersion_() {
+  return Number(getScriptProps_().getProperty(_PROP_DATA_VERSION) || '0');
+}
+
+function bumpVersion_() {
+  var props = getScriptProps_();
+  var v = Number(props.getProperty(_PROP_DATA_VERSION) || '0') + 1;
+  props.setProperty(_PROP_DATA_VERSION, String(v));
+  return v;
+}
+
 function getOrCreateSigningSecret_() {
   var props = getScriptProps_();
   var s = props.getProperty(CFG().PROP_SECRET);
