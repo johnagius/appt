@@ -1970,9 +1970,19 @@ var _HTML_TEMPLATES = {
     const EXEC_URL_AFTER_BOOKING = '<?= WEBAPP_URL ?>';
 
     function goToExecAfterBooking_(){
-      try { window.top.location.reload(); return; } catch (e1) {}
-      try { window.parent.location.reload(); return; } catch (e2) {}
-      try { window.location.reload(); return; } catch (e3) {}
+      // Reset form in-place (no redirect/reload — GAS sandboxed iframe doesn't support it)
+      state.selectedSlot = null;
+      state.selectedServiceId = '';
+      state.selectedServiceName = '';
+      els.fullName.value = '';
+      els.email.value = '';
+      els.phone.value = '';
+      els.comments.value = '';
+      els.sumTime.textContent = t('timeTemplate', t('timeDash'), '').replace(' - ', '');
+      els.timeGrid.innerHTML = '';
+      hideMsg();
+      // Re-fetch fresh data (dates, slots)
+      init();
     }
 
     function showOverlay(el){
@@ -2376,7 +2386,10 @@ var _HTML_TEMPLATES = {
         .apiRefreshDates();
     }
 
+    var _autoRefreshInstalled = false;
     function installAutoRefresh() {
+      if (_autoRefreshInstalled) return;
+      _autoRefreshInstalled = true;
       // Refresh slots every 20s
       setInterval(() => {
         if (state.selectedDateKey) loadAvailability(true);
