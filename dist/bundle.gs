@@ -3157,11 +3157,17 @@ var _HTML_TEMPLATES = {
     .tl-date-label{font-weight:700;font-size:14px;min-width:140px;text-align:center;}
     .tl-outer{position:relative;margin-bottom:6px;padding-top:28px;}
     .tl-wrap{position:relative;height:48px;background:#f3f4f6;border-radius:10px;overflow:hidden;cursor:crosshair;border:1px solid var(--line);}
-    .tl-seg{position:absolute;top:0;height:100%;transition:opacity 0.15s;}
-    .tl-seg.regular{background:var(--good);opacity:0.55;}
-    .tl-seg.extra{background:var(--good);opacity:0.85;background-image:repeating-linear-gradient(45deg,transparent,transparent 4px,rgba(255,255,255,0.2) 4px,rgba(255,255,255,0.2) 8px);}
-    .tl-seg.blocked{background:var(--bad);opacity:0.7;}
-    .tl-seg:hover{opacity:1;z-index:2;}
+    .tl-seg{position:absolute;top:0;height:100%;}
+    .tl-seg.regular{background:var(--good);opacity:0.55;z-index:1;}
+    .tl-seg.regular:hover{opacity:0.65;}
+    .tl-seg.extra{background:var(--good);opacity:0.85;z-index:3;cursor:pointer;background-image:repeating-linear-gradient(45deg,transparent,transparent 4px,rgba(255,255,255,0.2) 4px,rgba(255,255,255,0.2) 8px);}
+    .tl-seg.extra:hover{opacity:1;}
+    .tl-seg.blocked{background:var(--bad);opacity:0.7;z-index:3;cursor:pointer;}
+    .tl-seg.blocked:hover{opacity:1;}
+    .tl-seg-handle{position:absolute;top:0;width:10px;height:100%;cursor:ew-resize;z-index:4;}
+    .tl-seg-handle::after{content:'';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:3px;height:20px;border-radius:2px;background:rgba(255,255,255,0.7);}
+    .tl-seg-handle.handle-left{left:-2px;}
+    .tl-seg-handle.handle-right{right:-2px;}
     .tl-ticks{position:relative;height:18px;display:flex;pointer-events:none;}
     .tl-tick{flex:1;position:relative;border-left:1px solid var(--line);}
     .tl-tick:last-child{border-right:1px solid var(--line);}
@@ -4148,6 +4154,7 @@ var _tlDayEnd = 21; // to 9pm
 var _tlSelStart = null; // drag selection start (minutes)
 var _tlSelEnd = null; // drag selection end (minutes)
 var _tlDragging = false;
+var _tlResizing = false;
 
 function tlNavDate(delta) {
   if (!_tlDate) return;
@@ -4246,14 +4253,23 @@ function renderTimeline() {
     seg.style.width = (right - left) + '%';
     seg.title = tip;
     if (meta) {
-      seg.style.cursor = 'pointer';
       seg.addEventListener('click', function(e) {
         e.stopPropagation();
         showSegPopover(left + (right - left) / 2, meta);
       });
+      // Add resize handles
+      var handleL = document.createElement('div');
+      handleL.className = 'tl-seg-handle handle-left';
+      handleL.addEventListener('mousedown', function(e) { e.stopPropagation(); e.preventDefault(); startResize(meta, 'left', sMin, eMin, e); });
+      seg.appendChild(handleL);
+
+      var handleR = document.createElement('div');
+      handleR.className = 'tl-seg-handle handle-right';
+      handleR.addEventListener('mousedown', function(e) { e.stopPropagation(); e.preventDefault(); startResize(meta, 'right', sMin, eMin, e); });
+      seg.appendChild(handleR);
     }
     seg.addEventListener('mouseenter', function() {
-      if (!_tlDragging) {
+      if (!_tlDragging && !_tlResizing) {
         var tipEl = document.getElementById('tlTip');
         tipEl.textContent = tip;
         tipEl.style.left = (left + (right - left) / 2) + '%';
@@ -4323,6 +4339,87 @@ function showSegPopover(pct, meta) {
     }
   }
   setTimeout(function() { document.addEventListener('click', closePop); }, 0);
+}
+
+function startResize(meta, side, origStartMin, origEndMin, mouseEvt) {
+  _tlResizing = true;
+  var bar = document.getElementById('tlBar');
+  var totalMin = (_tlDayEnd - _tlDayStart) * 60;
+  document.getElementById('tlPopover').style.display = 'none';
+  document.getElementById('tlCursor').style.display = 'none';
+
+  // Show the selection overlay to visualize the resize
+  var sel = document.getElementById('tlSel');
+  var selLabel = document.getElementById('tlSelLabel');
+  var curStart = origStartMin;
+  var curEnd = origEndMin;
+
+  function getMin(e) {
+    var rect = bar.getBoundingClientRect();
+    var pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    return Math.round((_tlDayStart * 60 + pct * totalMin) / 10) * 10;
+  }
+
+  function updateResize(e) {
+    var m = getMin(e);
+    if (side === 'left') {
+      curStart = Math.min(m, curEnd - 10);
+    } else {
+      curEnd = Math.max(m, curStart + 10);
+    }
+    var left = (curStart - _tlDayStart * 60) / totalMin * 100;
+    var width = (curEnd - curStart) / totalMin * 100;
+    sel.style.left = left + '%';
+    sel.style.width = width + '%';
+    sel.style.display = 'block';
+    selLabel.textContent = minToHHMM(curStart) + ' \\u2192 ' + minToHHMM(curEnd);
+    selLabel.style.left = (left + width / 2) + '%';
+    selLabel.style.display = 'block';
+  }
+
+  updateResize(mouseEvt);
+
+  function onMove(e) { updateResize(e); }
+  function onUp() {
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+    _tlResizing = false;
+    sel.style.display = 'none';
+    selLabel.style.display = 'none';
+
+    // Only save if the time actually changed
+    if (curStart === origStartMin && curEnd === origEndMin) return;
+
+    var newStart = minToHHMM(curStart);
+    var newEnd = minToHHMM(curEnd);
+
+    // Delete old entry, then create new one with updated times
+    showLoading('Updating...', 'Resizing time range.');
+    var removeFunc = meta.type === 'extra' ? 'apiAdminRemoveExtraSlots' : 'apiAdminRemoveDoctorOff';
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (!res || !res.ok) { hideLoading(); showMsg('availMsg', 'bad', res.reason || 'Failed to remove old entry.'); return; }
+        // Now add the new resized entry
+        var addFunc = meta.type === 'extra' ? 'apiAdminAddExtraSlots' : 'apiAdminMarkDoctorOff';
+        var payload = meta.type === 'extra'
+          ? { date: _tlDate, startTime: newStart, endTime: newEnd, reason: meta.reason || 'Extra hours' }
+          : { startDate: _tlDate, startTime: newStart, endTime: newEnd, reason: meta.reason || 'Blocked' };
+        google.script.run
+          .withSuccessHandler(function(res2) {
+            hideLoading();
+            if (!res2 || !res2.ok) { showMsg('availMsg', 'bad', res2.reason || 'Failed.'); return; }
+            showMsg('availMsg', 'good', 'Updated to ' + newStart + ' - ' + newEnd);
+            loadDashboard();
+          })
+          .withFailureHandler(function(err) { hideLoading(); showMsg('availMsg', 'bad', 'Error: ' + (err && err.message ? err.message : String(err))); })
+          [addFunc](SIG, payload);
+      })
+      .withFailureHandler(function(err) { hideLoading(); showMsg('availMsg', 'bad', 'Error: ' + (err && err.message ? err.message : String(err))); })
+      [removeFunc](SIG, meta.rowIndex);
+  }
+
+  document.addEventListener('mousemove', onMove);
+  document.addEventListener('mouseup', onUp);
 }
 
 function parseHHMM(str) {
