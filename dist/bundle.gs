@@ -9188,6 +9188,7 @@ function wipeScriptProperties_(execute) {
     apiAdminGetStatistics: apiAdminGetStatistics,
     apiAdminMarkAttendance: apiAdminMarkAttendance,
     apiAdminGetPatientHistory: apiAdminGetPatientHistory,
+    apiAdminArchiveOldSheets: apiAdminArchiveOldSheets,
     sendDailyDoctorSchedule_: sendDailyDoctorSchedule_,
     install: install,
     repairSheets: repairSheets,

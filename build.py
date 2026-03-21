@@ -93,6 +93,7 @@ PUBLIC_FUNCTIONS = [
     'apiAdminGetStatistics',
     'apiAdminMarkAttendance',
     'apiAdminGetPatientHistory',
+    'apiAdminArchiveOldSheets',
     # EmailService.gs (trigger)
     'sendDailyDoctorSchedule_',
     # Install.gs
