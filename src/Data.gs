@@ -489,6 +489,31 @@ function apptIsActive_(appt) {
   return (st === 'BOOKED' || st === 'RELOCATED_SPINOLA');
 }
 
+/**
+ * List non-cancelled appointments for a date (includes ATTENDED and NO_SHOW).
+ */
+function listNonCancelledAppointmentsForDate_(dateKey) {
+  var all = listAppointmentsForDate_(dateKey);
+  var result = [];
+  for (var i = 0; i < all.length; i++) {
+    var st = String(all[i].status || '').trim();
+    if (st.indexOf('CANCELLED') < 0) result.push(all[i]);
+  }
+  result.sort(function(a, b) {
+    return parseTimeToMinutes_(a.startTime) - parseTimeToMinutes_(b.startTime);
+  });
+  return result;
+}
+
+/**
+ * Calculate days between two YYYY-MM-DD date strings.
+ */
+function daysBetween_(dateStr1, dateStr2) {
+  var d1 = parseDateKey_(dateStr1);
+  var d2 = parseDateKey_(dateStr2);
+  return Math.round((d2.getTime() - d1.getTime()) / 86400000);
+}
+
 function countActiveAppointmentsInWindow_(email, phone) {
   email = sanitizeEmail_(email);
   phone = sanitizePhone_(phone);

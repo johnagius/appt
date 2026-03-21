@@ -13,8 +13,8 @@ function apiAdminGetDashboard(sig) {
   var tomorrow = addMinutes_(today, 24 * 60);
   var tomorrowKey = toDateKey_(tomorrow);
 
-  var todayAppts = listActiveAppointmentsForDate_(todayKey);
-  var tomorrowAppts = listActiveAppointmentsForDate_(tomorrowKey);
+  var todayAppts = listNonCancelledAppointmentsForDate_(todayKey);
+  var tomorrowAppts = listNonCancelledAppointmentsForDate_(tomorrowKey);
 
   // Get doctor-off entries for upcoming days
   var offRows = getDoctorOffRows_();
@@ -47,8 +47,28 @@ function apiAdminGetDashboard(sig) {
     var vals = sh.getRange(2, 1, lr - 1, 18).getValues();
     for (var r = 0; r < vals.length; r++) {
       var status = String(vals[r][10] || '');
-      if (status === 'BOOKED' || status === 'RELOCATED_SPINOLA') weekBooked++;
+      if (status === 'BOOKED' || status === 'RELOCATED_SPINOLA' || status === 'ATTENDED') weekBooked++;
       if (status.indexOf('CANCELLED') >= 0) weekCancelled++;
+    }
+  }
+
+  // Today's capacity
+  var offMap = getDoctorOffDates_();
+  var extraMap = getDoctorExtraSlots_();
+  var todaySlots = buildSlotsForDate_(today, extraMap[todayKey] || null);
+  var todayCapacity = todaySlots.length;
+  var offEntry = offMap[todayKey];
+  if (offEntry) {
+    if (offEntry.allDay) { todayCapacity = 0; }
+    else if (offEntry.blocks) {
+      for (var s = 0; s < todaySlots.length; s++) {
+        var slotMin = parseTimeToMinutes_(todaySlots[s].start);
+        for (var bl = 0; bl < offEntry.blocks.length; bl++) {
+          if (slotMin >= offEntry.blocks[bl].startMin && slotMin < offEntry.blocks[bl].endMin) {
+            todayCapacity--; break;
+          }
+        }
+      }
     }
   }
 
@@ -62,7 +82,8 @@ function apiAdminGetDashboard(sig) {
     extraSlotEntries: futureExtraRows,
     stats: {
       weekBooked: weekBooked,
-      weekCancelled: weekCancelled
+      weekCancelled: weekCancelled,
+      todayCapacity: todayCapacity
     }
   };
 }
@@ -75,7 +96,7 @@ function apiAdminGetDateAppointments(sig, dateKey) {
   dateKey = String(dateKey || '').trim();
   if (!dateKey) return { ok: false, reason: 'Missing date.' };
 
-  var appts = listActiveAppointmentsForDate_(dateKey);
+  var appts = listNonCancelledAppointmentsForDate_(dateKey);
   return { ok: true, dateKey: dateKey, appointments: appts };
 }
 
@@ -498,7 +519,7 @@ function apiAdminGetWeekOverview(sig, weekStartDate) {
       var vals = sh.getRange(2, 1, sh.getLastRow() - 1, 18).getValues();
       for (var r = 0; r < vals.length; r++) {
         var st = String(vals[r][10] || '');
-        if (st === 'BOOKED' || st === 'RELOCATED_SPINOLA') count++;
+        if (st === 'BOOKED' || st === 'RELOCATED_SPINOLA' || st === 'ATTENDED') count++;
       }
     }
 
@@ -683,6 +704,9 @@ function apiAdminGetStatistics(sig) {
   var totalBooked = 0, totalCancelled = 0;
   var cancelByDoctor = 0, cancelByPatient = 0;
   var locationPotters = 0, locationSpinola = 0;
+  var totalNoShow = 0, totalAttended = 0, sameDayCancels = 0;
+  var leadTimes = [];
+  var recentBooked = 0, prevBooked = 0; // for period comparison
   var hourCounts = []; for (var h = 0; h < 24; h++) hourCounts.push(0);
   var dowBooked = { MON:0, TUE:0, WED:0, THU:0, FRI:0, SAT:0, SUN:0 };
   var dowSlots = { MON:0, TUE:0, WED:0, THU:0, FRI:0, SAT:0, SUN:0 };
@@ -744,7 +768,7 @@ function apiAdminGetStatistics(sig) {
           var status = String(vals[r][10] || '');
           var startTime = normalizeTimeCell_(vals[r][2]);
 
-          if (status === 'BOOKED' || status === 'RELOCATED_SPINOLA') {
+          if (status === 'BOOKED' || status === 'RELOCATED_SPINOLA' || status === 'ATTENDED') {
             totalBooked++;
             dayBooked++;
 
@@ -772,15 +796,41 @@ function apiAdminGetStatistics(sig) {
               }
               patientMap[pKey].count++;
             }
+
+            // Lead time (days between booking creation and appointment date)
+            var createdAt = String(vals[r][12] || '');
+            if (createdAt && createdAt.length >= 10) {
+              var createdDate = createdAt.substring(0, 10);
+              var leadDays = daysBetween_(createdDate, dk);
+              if (leadDays >= 0) leadTimes.push(leadDays);
+            }
+
+            // Attendance tracking
+            if (status === 'ATTENDED') totalAttended++;
+          } else if (status === 'NO_SHOW') {
+            totalNoShow++;
+            dayBooked++; // Count in booked totals for capacity purposes
+            totalBooked++;
+            dowBooked[dow]++;
           } else if (status.indexOf('CANCELLED') >= 0) {
             totalCancelled++;
             dayCancelled++;
             if (status === 'CANCELLED_DOCTOR') cancelByDoctor++;
             else cancelByPatient++;
+
+            // Same-day cancellation check
+            var cancelledAt = String(vals[r][16] || '');
+            if (cancelledAt && cancelledAt.length >= 10 && cancelledAt.substring(0, 10) === dk) {
+              sameDayCancels++;
+            }
           }
         }
       }
     }
+
+    // Period comparison (recent 14 days vs previous 14 days)
+    if (i >= -PAST_DAYS && i < -PAST_DAYS / 2) prevBooked += dayBooked;
+    else if (i >= -PAST_DAYS / 2 && i <= 0) recentBooked += dayBooked;
 
     // Busiest day
     if (dayBooked > busiestDay.count) {
@@ -848,6 +898,22 @@ function apiAdminGetStatistics(sig) {
   // Take last 4 weeks
   if (weeklyTrend.length > 4) weeklyTrend = weeklyTrend.slice(weeklyTrend.length - 4);
 
+  // Lead time average
+  var avgLeadTimeDays = 0;
+  if (leadTimes.length > 0) {
+    var sum = 0;
+    for (var li = 0; li < leadTimes.length; li++) sum += leadTimes[li];
+    avgLeadTimeDays = Math.round(sum / leadTimes.length * 10) / 10;
+  }
+
+  // No-show rate
+  var attendanceTotal = totalAttended + totalNoShow;
+  var noShowRate = attendanceTotal > 0 ? Math.round(totalNoShow / attendanceTotal * 1000) / 10 : 0;
+
+  // Trend direction
+  var trendDirection = recentBooked > prevBooked ? 'up' : recentBooked < prevBooked ? 'down' : 'flat';
+  var trendPct = prevBooked > 0 ? Math.round(Math.abs(recentBooked - prevBooked) / prevBooked * 100) : 0;
+
   return {
     ok: true,
     generated: Utilities.formatDate(new Date(), getTimeZone_(), "yyyy-MM-dd HH:mm"),
@@ -865,6 +931,118 @@ function apiAdminGetStatistics(sig) {
     totalUniquePatients: totalUniquePatients,
     repeatPatients: repeatPatients,
     topPatients: topPatients,
-    upcomingLoad: upcomingLoad
+    upcomingLoad: upcomingLoad,
+    avgLeadTimeDays: avgLeadTimeDays,
+    totalNoShow: totalNoShow,
+    totalAttended: totalAttended,
+    noShowRate: noShowRate,
+    sameDayCancels: sameDayCancels,
+    trendDirection: trendDirection,
+    trendPct: trendPct
+  };
+}
+
+/**
+ * Mark appointment as attended or no-show.
+ */
+function apiAdminMarkAttendance(sig, appointmentId, dateKey, attended) {
+  if (!verifyAdminSig_(sig)) return { ok: false, reason: 'Access denied.' };
+
+  appointmentId = String(appointmentId || '').trim();
+  dateKey = String(dateKey || '').trim();
+  if (!appointmentId || !dateKey) return { ok: false, reason: 'Missing appointment ID or date.' };
+
+  var ss = getAppointmentsSpreadsheet_();
+  var sh = ss.getSheetByName(dateKey);
+  if (!sh) return { ok: false, reason: 'Date sheet not found.' };
+
+  var lr = sh.getLastRow();
+  if (lr < 2) return { ok: false, reason: 'No appointments on this date.' };
+
+  var vals = sh.getRange(2, 1, lr - 1, 18).getValues();
+  for (var r = 0; r < vals.length; r++) {
+    if (String(vals[r][0] || '') === appointmentId) {
+      var newStatus = attended ? 'ATTENDED' : 'NO_SHOW';
+      updateAppointmentStatus_(dateKey, r + 2, { status: newStatus });
+      return { ok: true, message: 'Marked as ' + (attended ? 'attended' : 'no-show') + '.' };
+    }
+  }
+
+  return { ok: false, reason: 'Appointment not found.' };
+}
+
+/**
+ * Get patient history by email or phone.
+ */
+function apiAdminGetPatientHistory(sig, email, phone) {
+  if (!verifyAdminSig_(sig)) return { ok: false, reason: 'Access denied.' };
+
+  email = String(email || '').trim().toLowerCase();
+  phone = String(phone || '').trim();
+  if (!email && !phone) return { ok: false, reason: 'Missing email or phone.' };
+
+  var today = todayLocal_();
+  var ss = getAppointmentsSpreadsheet_();
+  var results = [];
+  var patientName = '';
+  var patientEmail = '';
+  var patientPhone = '';
+  var firstSeen = '';
+
+  // Search 90 days back + 14 forward
+  for (var d = -90; d <= 14; d++) {
+    if (results.length >= 100) break;
+    var dt = addMinutes_(today, d * 1440);
+    var dk = toDateKey_(dt);
+    var sh = ss.getSheetByName(dk);
+    if (!sh || sh.getLastRow() < 2) continue;
+
+    var vals = sh.getRange(2, 1, sh.getLastRow() - 1, 18).getValues();
+    for (var r = 0; r < vals.length; r++) {
+      var e = String(vals[r][7] || '').trim().toLowerCase();
+      var p = String(vals[r][8] || '').trim();
+      var match = false;
+      if (email && e === email) match = true;
+      if (phone && p === phone) match = true;
+      if (!match) continue;
+
+      if (!patientName) patientName = String(vals[r][6] || '');
+      if (!patientEmail && e) patientEmail = e;
+      if (!patientPhone && p) patientPhone = p;
+      if (!firstSeen || dk < firstSeen) firstSeen = dk;
+
+      results.push({
+        dateKey: dk,
+        startTime: normalizeTimeCell_(vals[r][2]),
+        endTime: normalizeTimeCell_(vals[r][3]),
+        serviceName: String(vals[r][5] || ''),
+        status: String(vals[r][10] || ''),
+        location: String(vals[r][11] || ''),
+        comments: String(vals[r][9] || ''),
+        createdAt: String(vals[r][12] || '')
+      });
+    }
+  }
+
+  // Sort by date descending
+  results.sort(function(a, b) { return a.dateKey > b.dateKey ? -1 : a.dateKey < b.dateKey ? 1 : 0; });
+
+  // Compute stats
+  var totalVisits = 0, cancelCount = 0, noShowCount = 0;
+  for (var i = 0; i < results.length; i++) {
+    var st = results[i].status;
+    if (st === 'BOOKED' || st === 'RELOCATED_SPINOLA' || st === 'ATTENDED') totalVisits++;
+    else if (st.indexOf('CANCELLED') >= 0) cancelCount++;
+    else if (st === 'NO_SHOW') noShowCount++;
+  }
+
+  return {
+    ok: true,
+    patient: { name: patientName, email: patientEmail, phone: patientPhone },
+    totalVisits: totalVisits,
+    cancelCount: cancelCount,
+    noShowCount: noShowCount,
+    firstSeen: firstSeen,
+    appointments: results
   };
 }
