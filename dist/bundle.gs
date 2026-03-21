@@ -3008,7 +3008,7 @@ var _HTML_TEMPLATES = {
     .btn-dark{background:#111827;color:#fff;}
     .btn-danger{background:var(--bad);color:#fff;}
     .btn-good{background:var(--good);color:#052e1a;}
-    .btn-blue{background:var(--blue);color:#fff;}
+    .btn-blue{background:var(--blue);color:#fff;}.btn-small{padding:4px 10px;font-size:12px;border-radius:4px;background:var(--muted);color:var(--text);}
     .btn-ghost{background:transparent;color:var(--text);border:1px solid var(--line);}
     .btn-ghost:hover{background:rgba(17,24,39,0.04);opacity:1;}
     .btn:disabled{opacity:0.5;cursor:not-allowed;transform:none !important;}
@@ -3474,6 +3474,9 @@ var _HTML_TEMPLATES = {
       <div class="form-row" id="notifyMsgRow" style="display:none;">
         <div class="form-group"><label>Message</label><textarea id="notifyMsg" rows="3" placeholder="Type your message to patients..."></textarea></div>
       </div>
+      <div id="notifyPresets" style="display:none;margin-bottom:8px;">
+        <button class="btn btn-small" onclick="prefillNotifyMsg('reminder')">Appointment Reminder</button>
+      </div>
       <button class="btn btn-blue" id="notifyBtn" style="display:none;" onclick="sendNotification()">Send Notification</button>
       <div class="msg" id="notifyResultMsg"></div>
     </div>
@@ -3689,7 +3692,7 @@ function switchTab(name) {
   document.querySelector('[data-tab="' + name + '"]').classList.add('active');
   if (name === 'settings') loadSettings();
   if (name === 'statistics') loadStatistics();
-  if (name === 'actions') loadActionAppts();
+  if (name === 'actions') { loadActionAppts(); if (document.getElementById('notifyDate').value) loadNotifyAppts(); }
 }
 
 function getStatusBadge(status) {
@@ -4437,6 +4440,7 @@ function loadNotifyAppts() {
 
   document.getElementById('notifyApptsList').innerHTML = '<div class="empty">Loading...</div>';
   document.getElementById('notifyMsgRow').style.display = 'none';
+  document.getElementById('notifyPresets').style.display = 'none';
   document.getElementById('notifyBtn').style.display = 'none';
 
   google.script.run
@@ -4448,6 +4452,7 @@ function loadNotifyAppts() {
       renderApptTable(res.appointments, 'notifyApptsList', true);
       if (res.appointments && res.appointments.length > 0) {
         document.getElementById('notifyMsgRow').style.display = 'flex';
+        document.getElementById('notifyPresets').style.display = 'block';
         document.getElementById('notifyBtn').style.display = 'inline-flex';
       }
     })
@@ -4455,6 +4460,13 @@ function loadNotifyAppts() {
       document.getElementById('notifyApptsList').innerHTML = '<div class="empty">Error loading.</div>';
     })
     .apiAdminGetDateAppointments(SIG, dateKey);
+}
+
+function prefillNotifyMsg(type) {
+  var dateKey = document.getElementById('notifyDate').value || 'your appointment date';
+  if (type === 'reminder') {
+    document.getElementById('notifyMsg').value = 'This is a friendly reminder that your appointment is coming up soon on ' + dateKey + '. Please make sure to arrive on time. Thank you!';
+  }
 }
 
 function sendNotification() {
@@ -4557,6 +4569,7 @@ function doFullRefresh() {
         // Refresh quick actions if that tab is active
         if (document.getElementById('tab-actions').style.display !== 'none') {
           loadActionAppts();
+          if (document.getElementById('notifyDate').value) loadNotifyAppts();
         }
       }
     })
