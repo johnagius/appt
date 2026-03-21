@@ -272,8 +272,8 @@
     .loadingBox{transform:translateY(10px) scale(0.98);transition:transform 0.2s ease;}
     .overlay.show .loadingBox{transform:translateY(0) scale(1);}
     /* Idle overlay */
-    .idle-overlay{position:fixed;inset:0;z-index:2000;display:none;align-items:center;justify-content:center;background:rgba(246,247,251,0.50);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);cursor:pointer;opacity:0;transition:opacity 0.5s ease;}
-    .idle-overlay.show{display:flex;opacity:1;}
+    .idle-overlay{position:fixed;inset:0;z-index:2000;display:flex;align-items:center;justify-content:center;background:rgba(246,247,251,0.50);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);cursor:pointer;opacity:0;visibility:hidden;pointer-events:none;transition:opacity 0.5s ease,visibility 0.5s ease;}
+    .idle-overlay.show{opacity:1;visibility:visible;pointer-events:auto;}
     .idle-card{text-align:center;padding:48px 36px;max-width:340px;animation:idle-float 3s ease-in-out infinite;}
     .idle-icon{font-size:56px;margin-bottom:16px;animation:idle-pulse-icon 2.5s ease-in-out infinite;}
     .idle-title{font-size:22px;font-weight:800;color:var(--text);margin:0 0 8px 0;letter-spacing:-0.3px;}
