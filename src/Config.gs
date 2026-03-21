@@ -6,8 +6,37 @@ var _cfgCache = null;
 var _propsCache = null;
 var _tzCache = null;
 
+var DEFAULT_HOURS = {
+  MON: [{ start: '09:00', end: '12:00' }, { start: '17:00', end: '19:00' }],
+  TUE: [{ start: '09:00', end: '12:00' }, { start: '17:00', end: '19:00' }],
+  WED: [{ start: '09:00', end: '12:00' }, { start: '17:00', end: '19:00' }],
+  THU: [{ start: '09:00', end: '12:00' }, { start: '17:00', end: '19:00' }],
+  FRI: [{ start: '09:00', end: '12:00' }, { start: '17:00', end: '19:00' }],
+  SAT: [{ start: '10:00', end: '12:00' }],
+  SUN: []
+};
+
 function CFG() {
   if (_cfgCache) return _cfgCache;
+
+  var props = getScriptProps_();
+
+  // Read working hours from script property, fallback to defaults
+  var hours = DEFAULT_HOURS;
+  var hoursJson = props.getProperty('WORKING_HOURS');
+  if (hoursJson) {
+    try { hours = JSON.parse(hoursJson); } catch (e) { hours = DEFAULT_HOURS; }
+  }
+
+  // Read numeric settings from script properties with defaults
+  var durationStr = props.getProperty('APPT_DURATION_MIN');
+  var duration = durationStr ? parseInt(durationStr, 10) : 10;
+  if (isNaN(duration) || duration < 1) duration = 10;
+
+  var advStr = props.getProperty('ADVANCE_DAYS');
+  var advDays = advStr ? parseInt(advStr, 10) : 7;
+  if (isNaN(advDays) || advDays < 1) advDays = 7;
+
   _cfgCache = {
     // Script Properties keys
     PROP_CONFIG_SSID: 'CONFIG_SPREADSHEET_ID',
@@ -31,25 +60,17 @@ function CFG() {
     // Appointment day sheet format
     APPT_SHEET_DATE_FORMAT: 'yyyy-MM-dd',
 
-    // Appointment settings
-    APPT_DURATION_MIN: 10,
-    ADVANCE_DAYS: 7,
+    // Appointment settings (now configurable via admin)
+    APPT_DURATION_MIN: duration,
+    ADVANCE_DAYS: advDays,
 
     // Services
     SERVICES: [
-      { id: 'clinic', name: 'Clinic Consultation', minutes: 10 }
+      { id: 'clinic', name: 'Clinic Consultation', minutes: duration }
     ],
 
-    // Working hours
-    HOURS: {
-      MON: [{ start: '09:00', end: '12:00' }, { start: '17:00', end: '19:00' }],
-      TUE: [{ start: '09:00', end: '12:00' }, { start: '17:00', end: '19:00' }],
-      WED: [{ start: '09:00', end: '12:00' }, { start: '17:00', end: '19:00' }],
-      THU: [{ start: '09:00', end: '12:00' }, { start: '17:00', end: '19:00' }],
-      FRI: [{ start: '09:00', end: '12:00' }, { start: '17:00', end: '19:00' }],
-      SAT: [{ start: '10:00', end: '12:00' }],
-      SUN: []
-    }
+    // Working hours (now configurable via admin)
+    HOURS: hours
   };
   return _cfgCache;
 }
