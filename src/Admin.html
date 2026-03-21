@@ -659,7 +659,7 @@ function loadDashboard() {
 
       // Load schedule for current date and week
       loadSchedAppts();
-      loadWeekOverview();
+      try { loadWeekOverview(); } catch(e) { console.error('Week overview error:', e); }
 
       // Set default dates for Quick Actions
       document.getElementById('actionDate').value = res.todayKey;
