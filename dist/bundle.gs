@@ -4365,6 +4365,8 @@ function processAction(action) {
       }
       showMsg('actionMsg', 'good', msg);
       loadActionAppts();
+      // Also refresh the notify table if it has the same date loaded
+      if (document.getElementById('notifyDate').value) loadNotifyAppts();
       _scheduleStatsRefresh(); // Deferred dashboard refresh instead of full reload
     })
     .withFailureHandler(function(err) {
@@ -4400,10 +4402,10 @@ function cancelSingleAppt(appointmentId, containerId) {
       }
       var msgId = containerId === 'actionApptsList' ? 'actionMsg' : containerId === 'notifyApptsList' ? 'notifyResultMsg' : 'globalMsg';
       showMsg(msgId, 'good', 'Appointment cancelled.');
-      // Only reload the specific view that needs it (not entire dashboard)
-      if (containerId === 'actionApptsList') loadActionAppts();
-      else if (containerId === 'notifyApptsList') loadNotifyAppts();
-      else loadSchedAppts();
+      // Reload both action tables so they stay in sync
+      if (document.getElementById('actionDate').value) loadActionAppts();
+      if (document.getElementById('notifyDate').value) loadNotifyAppts();
+      if (containerId !== 'actionApptsList' && containerId !== 'notifyApptsList') loadSchedAppts();
       _scheduleStatsRefresh(); // Deferred dashboard refresh instead of immediate
     })
     .withFailureHandler(function(err) {
@@ -4809,16 +4811,19 @@ function markAttendance(appointmentId, dateKey, attended, containerId) {
   // Optimistic UI: update the row immediately without refetching
   var newStatus = attended ? 'ATTENDED' : 'NO_SHOW';
   var badge = getStatusBadge(newStatus);
-  var container = document.getElementById(containerId);
-  if (container) {
+  // Update the row in ALL visible tables (action, notify, schedule)
+  var containerIds = [containerId];
+  if (containerId !== 'actionApptsList') containerIds.push('actionApptsList');
+  if (containerId !== 'notifyApptsList') containerIds.push('notifyApptsList');
+  for (var ci = 0; ci < containerIds.length; ci++) {
+    var container = document.getElementById(containerIds[ci]);
+    if (!container) continue;
     var rows = container.querySelectorAll('tr');
     for (var i = 0; i < rows.length; i++) {
       var cb = rows[i].querySelector('.appt-cb');
       if (cb && cb.value === appointmentId) {
-        // Update badge
         var badgeEl = rows[i].querySelector('.badge');
         if (badgeEl) { badgeEl.className = 'badge ' + badge.cls; badgeEl.textContent = badge.text; }
-        // Remove action buttons (cancel + attendance)
         var lastTd = rows[i].querySelector('td:last-child');
         if (lastTd) lastTd.innerHTML = '';
         break;
