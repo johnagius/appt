@@ -637,6 +637,16 @@
   <span class="refresh-countdown" id="refreshCountdown">Refreshes in: 30s</span>
 </div>
 
+<!-- Idle overlay — shown after inactivity to pause all background fetches -->
+<div class="idle-overlay" id="idleOverlay">
+  <div class="idle-card">
+    <div class="idle-icon">⚙️</div>
+    <div class="idle-title">Admin Dashboard Paused</div>
+    <div class="idle-sub">Background updates are paused to<br>save resources. Tap to resume.</div>
+    <div class="idle-cta">Resume Dashboard <span class="idle-arrow">→</span></div>
+  </div>
+</div>
+
 <script>
 const SIG = "<?= adminSig ?>";
 var _schedDate = ''; // currently viewed date in schedule tab
@@ -2222,16 +2232,6 @@ function renderBusiestDay(day) {
 }
 
 </script>
-
-<!-- Idle overlay — shown after inactivity to pause all background fetches -->
-<div class="idle-overlay" id="idleOverlay">
-  <div class="idle-card">
-    <div class="idle-icon">⚙️</div>
-    <div class="idle-title">Admin Dashboard Paused</div>
-    <div class="idle-sub">Background updates are paused to<br>save resources. Tap to resume.</div>
-    <div class="idle-cta">Resume Dashboard <span class="idle-arrow">→</span></div>
-  </div>
-</div>
 
 </body>
 </html>
