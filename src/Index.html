@@ -2331,7 +2331,6 @@
           if (!isSilentRefresh) hideLoading();
 
           if (res && res._debug) console.log('[APPT DEBUG]', JSON.stringify(res._debug));
-          if (res && res._v !== undefined) _cachedVersion = res._v;
           if (!res || !res.ok) {
             renderSlots([]);
             showHint(els.timeHint, 'bad', (res && res.reason) ? res.reason : t('noAvailability'));
@@ -2408,30 +2407,6 @@
         .apiBook(payload);
     });
 
-    // Auto-refresh (keeps page accurate if someone else books online or doctor adds overrides)
-    // ── Version-based polling ──
-    // Instead of re-reading sheets every 20s, we poll a lightweight version counter.
-    // Full data is only fetched when something actually changed.
-    var _cachedVersion = 0;
-    var _pollInFlight = false;
-
-    function pollForChanges() {
-      if (_pollInFlight || document.hidden) return;
-      _pollInFlight = true;
-      google.script.run
-        .withSuccessHandler(function(res) {
-          _pollInFlight = false;
-          if (!res) return;
-          if (res.v !== _cachedVersion) {
-            _cachedVersion = res.v;
-            // Data changed — refresh dates + availability
-            refreshDateOptions();
-          }
-        })
-        .withFailureHandler(function() { _pollInFlight = false; })
-        .apiPoll();
-    }
-
     function refreshDateOptions() {
       google.script.run
         .withSuccessHandler(function(dateOptions) {
@@ -2458,18 +2433,19 @@
       if (_autoRefreshInstalled) return;
       _autoRefreshInstalled = true;
 
-      // Version poll every 10s — detects bookings, cancellations, admin changes.
-      // Costs 1 PropertiesService read (no sheet access) when nothing changed.
-      setInterval(pollForChanges, 10000);
-
-      // Time-based slot refresh every 45s — catches slots expiring as time passes
-      // (e.g. morning slots becoming "past"). Version poll can't catch this because
-      // no data write happens — it's purely a function of the current time.
+      // Refresh slots every 30s — catches new bookings, cancellations, and
+      // time-based expiry (slots becoming "past"). 1 GAS call per interval.
       setInterval(function() {
         if (state.selectedDateKey && !document.hidden) loadAvailability(true);
-      }, 45000);
+      }, 30000);
 
-      // On tab focus/visibility — refresh immediately
+      // Refresh date options every 90s — picks up doctor-off, extra slots, etc.
+      // These change rarely so a longer interval is fine.
+      setInterval(function() {
+        if (!document.hidden) refreshDateOptions();
+      }, 90000);
+
+      // On tab focus/visibility — refresh immediately (no waiting)
       window.addEventListener('focus', function() { refreshDateOptions(); });
       document.addEventListener('visibilitychange', function() {
         if (!document.hidden) refreshDateOptions();
@@ -2508,7 +2484,6 @@
 
           state.config = data.config;
           state.dateOptions = data.dateOptions || [];
-          if (data._v !== undefined) _cachedVersion = data._v;
 
           els.docName.textContent = state.config.doctorName;
           els.docMeta.textContent = state.config.pottersLocation;
