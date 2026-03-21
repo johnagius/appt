@@ -700,10 +700,8 @@ var _HTML_TEMPLATES = {
       <!-- Clinic hours -->
       <div class="card topCard">
         <p class="topTitle" data-i18n="clinicHours">Clinic hours</p>
-        <p class="topLine"><b data-i18n="clinicMF">Mon–Fri:</b> 09:00–12:00 & 17:00–19:00</p>
-        <p class="topLine"><b data-i18n="clinicSat">Sat:</b> 10:00–12:00</p>
-        <p class="topLine"><b data-i18n="clinicSun">Sun:</b> <span data-i18n="closed">Closed</span></p>
-        <p class="topLine" data-i18n="slotInfo">Slots are 10 minutes each.</p>
+        <div id="clinicHoursInfo"></div>
+        <p class="topLine" id="slotInfoLine" data-i18n="slotInfo">Slots are {duration} minutes each.</p>
       </div>
 
       <!-- Services + Date moved into the empty third column -->
@@ -932,7 +930,7 @@ var _HTML_TEMPLATES = {
       fullNameLabel:'Full name *',phoneLabel:'Phone *',emailLabel:'Email *',commentsLabel:'Comments',
       confirmBtn:'Confirm',appointmentConfirmed:'Appointment Confirmed',okBtn:'OK',
       clinicMF:'Mon–Fri:',clinicSat:'Sat:',clinicSun:'Sun:',closed:'Closed',
-      slotInfo:'Slots are 10 minutes each.',ready:'Ready',
+      slotInfo:'Slots are {duration} minutes each.',ready:'Ready',
       fullNamePh:'Full name',emailPh:'you@example.com',commentsPh:'Optional notes…',searchCountryPh:'Search country…',
       serviceTemplate:'Service: {0} ({1} mins)',dateTemplate:'Date: {0}',timeTemplate:'Time: {0} - {1}',
       locationTemplate:'Location: {0}',mins:'mins',
@@ -959,7 +957,7 @@ var _HTML_TEMPLATES = {
       fullNameLabel:'Nom complet *',phoneLabel:'Téléphone *',emailLabel:'E-mail *',commentsLabel:'Commentaires',
       confirmBtn:'Confirmer',appointmentConfirmed:'Rendez-vous confirmé',okBtn:'OK',
       clinicMF:'Lun–Ven :',clinicSat:'Sam :',clinicSun:'Dim :',closed:'Fermé',
-      slotInfo:'Les créneaux sont de 10 minutes chacun.',ready:'Prêt',
+      slotInfo:'Les créneaux sont de {duration} minutes chacun.',ready:'Prêt',
       fullNamePh:'Nom complet',emailPh:'vous@exemple.com',commentsPh:'Notes facultatives…',searchCountryPh:'Rechercher un pays…',
       serviceTemplate:'Service : {0} ({1} min)',dateTemplate:'Date : {0}',timeTemplate:'Heure : {0} - {1}',
       locationTemplate:'Lieu : {0}',mins:'min',
@@ -986,7 +984,7 @@ var _HTML_TEMPLATES = {
       fullNameLabel:'Nombre completo *',phoneLabel:'Teléfono *',emailLabel:'Correo electrónico *',commentsLabel:'Comentarios',
       confirmBtn:'Confirmar',appointmentConfirmed:'Cita confirmada',okBtn:'OK',
       clinicMF:'Lun–Vie:',clinicSat:'Sáb:',clinicSun:'Dom:',closed:'Cerrado',
-      slotInfo:'Los turnos son de 10 minutos cada uno.',ready:'Listo',
+      slotInfo:'Los turnos son de {duration} minutos cada uno.',ready:'Listo',
       fullNamePh:'Nombre completo',emailPh:'tu@ejemplo.com',commentsPh:'Notas opcionales…',searchCountryPh:'Buscar país…',
       serviceTemplate:'Servicio: {0} ({1} min)',dateTemplate:'Fecha: {0}',timeTemplate:'Hora: {0} - {1}',
       locationTemplate:'Ubicación: {0}',mins:'min',
@@ -1013,7 +1011,7 @@ var _HTML_TEMPLATES = {
       fullNameLabel:'Nome completo *',phoneLabel:'Telefono *',emailLabel:'Email *',commentsLabel:'Commenti',
       confirmBtn:'Conferma',appointmentConfirmed:'Appuntamento confermato',okBtn:'OK',
       clinicMF:'Lun–Ven:',clinicSat:'Sab:',clinicSun:'Dom:',closed:'Chiuso',
-      slotInfo:'Gli slot sono di 10 minuti ciascuno.',ready:'Pronto',
+      slotInfo:'Gli slot sono di {duration} minuti ciascuno.',ready:'Pronto',
       fullNamePh:'Nome completo',emailPh:'tu@esempio.com',commentsPh:'Note facoltative…',searchCountryPh:'Cerca paese…',
       serviceTemplate:'Servizio: {0} ({1} min)',dateTemplate:'Data: {0}',timeTemplate:'Orario: {0} - {1}',
       locationTemplate:'Luogo: {0}',mins:'min',
@@ -1040,7 +1038,7 @@ var _HTML_TEMPLATES = {
       fullNameLabel:'全名 *',phoneLabel:'电话 *',emailLabel:'邮箱 *',commentsLabel:'备注',
       confirmBtn:'确认',appointmentConfirmed:'预约已确认',okBtn:'确定',
       clinicMF:'周一至周五：',clinicSat:'周六：',clinicSun:'周日：',closed:'休息',
-      slotInfo:'每个时段为10分钟。',ready:'就绪',
+      slotInfo:'每个时段为{duration}分钟。',ready:'就绪',
       fullNamePh:'全名',emailPh:'you@example.com',commentsPh:'可选备注…',searchCountryPh:'搜索国家…',
       serviceTemplate:'服务：{0}（{1}分钟）',dateTemplate:'日期：{0}',timeTemplate:'时间：{0} - {1}',
       locationTemplate:'地点：{0}',mins:'分钟',
@@ -1067,7 +1065,7 @@ var _HTML_TEMPLATES = {
       fullNameLabel:'पूरा नाम *',phoneLabel:'फ़ोन *',emailLabel:'ईमेल *',commentsLabel:'टिप्पणियाँ',
       confirmBtn:'पुष्टि करें',appointmentConfirmed:'अपॉइंटमेंट की पुष्टि हो गई',okBtn:'ठीक है',
       clinicMF:'सोम–शुक्र:',clinicSat:'शनि:',clinicSun:'रवि:',closed:'बंद',
-      slotInfo:'प्रत्येक स्लॉट 10 मिनट का है।',ready:'तैयार',
+      slotInfo:'प्रत्येक स्लॉट {duration} मिनट का है।',ready:'तैयार',
       fullNamePh:'पूरा नाम',emailPh:'you@example.com',commentsPh:'वैकल्पिक नोट्स…',searchCountryPh:'देश खोजें…',
       serviceTemplate:'सेवा: {0} ({1} मिनट)',dateTemplate:'तारीख: {0}',timeTemplate:'समय: {0} - {1}',
       locationTemplate:'स्थान: {0}',mins:'मिनट',
@@ -1094,7 +1092,7 @@ var _HTML_TEMPLATES = {
       fullNameLabel:'Nome completo *',phoneLabel:'Telefone *',emailLabel:'E-mail *',commentsLabel:'Comentários',
       confirmBtn:'Confirmar',appointmentConfirmed:'Consulta confirmada',okBtn:'OK',
       clinicMF:'Seg–Sex:',clinicSat:'Sáb:',clinicSun:'Dom:',closed:'Fechado',
-      slotInfo:'Os horários são de 10 minutos cada.',ready:'Pronto',
+      slotInfo:'Os horários são de {duration} minutos cada.',ready:'Pronto',
       fullNamePh:'Nome completo',emailPh:'voce@exemplo.com',commentsPh:'Notas opcionais…',searchCountryPh:'Pesquisar país…',
       serviceTemplate:'Serviço: {0} ({1} min)',dateTemplate:'Data: {0}',timeTemplate:'Horário: {0} - {1}',
       locationTemplate:'Local: {0}',mins:'min',
@@ -1121,7 +1119,7 @@ var _HTML_TEMPLATES = {
       fullNameLabel:'ФИО *',phoneLabel:'Телефон *',emailLabel:'Эл. почта *',commentsLabel:'Комментарии',
       confirmBtn:'Подтвердить',appointmentConfirmed:'Запись подтверждена',okBtn:'ОК',
       clinicMF:'Пн–Пт:',clinicSat:'Сб:',clinicSun:'Вс:',closed:'Закрыто',
-      slotInfo:'Каждый слот — 10 минут.',ready:'Готово',
+      slotInfo:'Каждый слот — {duration} минут.',ready:'Готово',
       fullNamePh:'ФИО',emailPh:'you@example.com',commentsPh:'Необязательные заметки…',searchCountryPh:'Поиск страны…',
       serviceTemplate:'Услуга: {0} ({1} мин)',dateTemplate:'Дата: {0}',timeTemplate:'Время: {0} - {1}',
       locationTemplate:'Место: {0}',mins:'мин',
@@ -1149,7 +1147,7 @@ var _HTML_TEMPLATES = {
       fullNameLabel:'氏名 *',phoneLabel:'電話番号 *',emailLabel:'メール *',commentsLabel:'コメント',
       confirmBtn:'確認',appointmentConfirmed:'予約が確定しました',okBtn:'OK',
       clinicMF:'月〜金：',clinicSat:'土：',clinicSun:'日：',closed:'休診',
-      slotInfo:'各スロットは10分間です。',ready:'準備完了',
+      slotInfo:'各スロットは{duration}分間です。',ready:'準備完了',
       fullNamePh:'氏名',emailPh:'you@example.com',commentsPh:'メモ（任意）…',searchCountryPh:'国を検索…',
       serviceTemplate:'サービス：{0}（{1}分）',dateTemplate:'日付：{0}',timeTemplate:'時間：{0} - {1}',
       locationTemplate:'場所：{0}',mins:'分',
@@ -1176,7 +1174,7 @@ var _HTML_TEMPLATES = {
       fullNameLabel:'ਪੂਰਾ ਨਾਮ *',phoneLabel:'ਫ਼ੋਨ *',emailLabel:'ਈਮੇਲ *',commentsLabel:'ਟਿੱਪਣੀਆਂ',
       confirmBtn:'ਪੁਸ਼ਟੀ ਕਰੋ',appointmentConfirmed:'ਅਪੌਇੰਟਮੈਂਟ ਦੀ ਪੁਸ਼ਟੀ ਹੋ ਗਈ',okBtn:'ਠੀਕ ਹੈ',
       clinicMF:'ਸੋਮ–ਸ਼ੁੱਕਰ:',clinicSat:'ਸ਼ਨੀ:',clinicSun:'ਐਤ:',closed:'ਬੰਦ',
-      slotInfo:'ਹਰ ਸਲਾਟ 10 ਮਿੰਟ ਦਾ ਹੈ।',ready:'ਤਿਆਰ',
+      slotInfo:'ਹਰ ਸਲਾਟ {duration} ਮਿੰਟ ਦਾ ਹੈ।',ready:'ਤਿਆਰ',
       fullNamePh:'ਪੂਰਾ ਨਾਮ',emailPh:'you@example.com',commentsPh:'ਵਿਕਲਪਿਕ ਨੋਟਸ…',searchCountryPh:'ਦੇਸ਼ ਖੋਜੋ…',
       serviceTemplate:'ਸੇਵਾ: {0} ({1} ਮਿੰਟ)',dateTemplate:'ਤਾਰੀਖ: {0}',timeTemplate:'ਸਮਾਂ: {0} - {1}',
       locationTemplate:'ਸਥਾਨ: {0}',mins:'ਮਿੰਟ',
@@ -1203,7 +1201,7 @@ var _HTML_TEMPLATES = {
       fullNameLabel:'Ad Soyad *',phoneLabel:'Telefon *',emailLabel:'E-posta *',commentsLabel:'Yorumlar',
       confirmBtn:'Onayla',appointmentConfirmed:'Randevu onaylandı',okBtn:'Tamam',
       clinicMF:'Pzt–Cum:',clinicSat:'Cmt:',clinicSun:'Paz:',closed:'Kapalı',
-      slotInfo:'Her slot 10 dakikadır.',ready:'Hazır',
+      slotInfo:'Her slot {duration} dakikadır.',ready:'Hazır',
       fullNamePh:'Ad Soyad',emailPh:'siz@ornek.com',commentsPh:'İsteğe bağlı notlar…',searchCountryPh:'Ülke ara…',
       serviceTemplate:'Hizmet: {0} ({1} dk)',dateTemplate:'Tarih: {0}',timeTemplate:'Saat: {0} - {1}',
       locationTemplate:'Konum: {0}',mins:'dk',
@@ -1230,7 +1228,7 @@ var _HTML_TEMPLATES = {
       fullNameLabel:'الاسم الكامل *',phoneLabel:'الهاتف *',emailLabel:'البريد الإلكتروني *',commentsLabel:'ملاحظات',
       confirmBtn:'تأكيد',appointmentConfirmed:'تم تأكيد الموعد',okBtn:'موافق',
       clinicMF:'الإثنين–الجمعة:',clinicSat:'السبت:',clinicSun:'الأحد:',closed:'مغلق',
-      slotInfo:'كل فترة 10 دقائق.',ready:'جاهز',
+      slotInfo:'كل فترة {duration} دقائق.',ready:'جاهز',
       fullNamePh:'الاسم الكامل',emailPh:'you@example.com',commentsPh:'ملاحظات اختيارية…',searchCountryPh:'البحث عن بلد…',
       serviceTemplate:'الخدمة: {0} ({1} دقيقة)',dateTemplate:'التاريخ: {0}',timeTemplate:'الوقت: {0} - {1}',
       locationTemplate:'الموقع: {0}',mins:'دقيقة',
@@ -1257,7 +1255,7 @@ var _HTML_TEMPLATES = {
       fullNameLabel:'Imię i nazwisko *',phoneLabel:'Telefon *',emailLabel:'E-mail *',commentsLabel:'Komentarze',
       confirmBtn:'Potwierdź',appointmentConfirmed:'Wizyta potwierdzona',okBtn:'OK',
       clinicMF:'Pon–Pt:',clinicSat:'Sob:',clinicSun:'Niedz:',closed:'Zamknięte',
-      slotInfo:'Każdy slot trwa 10 minut.',ready:'Gotowe',
+      slotInfo:'Każdy slot trwa {duration} minut.',ready:'Gotowe',
       fullNamePh:'Imię i nazwisko',emailPh:'ty@przyklad.pl',commentsPh:'Opcjonalne notatki…',searchCountryPh:'Szukaj kraju…',
       serviceTemplate:'Usługa: {0} ({1} min)',dateTemplate:'Data: {0}',timeTemplate:'Godzina: {0} - {1}',
       locationTemplate:'Lokalizacja: {0}',mins:'min',
@@ -1284,7 +1282,7 @@ var _HTML_TEMPLATES = {
       fullNameLabel:'Ime i prezime *',phoneLabel:'Telefon *',emailLabel:'E-mail *',commentsLabel:'Komentari',
       confirmBtn:'Potvrdi',appointmentConfirmed:'Termin je potvrđen',okBtn:'OK',
       clinicMF:'Pon–Pet:',clinicSat:'Sub:',clinicSun:'Ned:',closed:'Zatvoreno',
-      slotInfo:'Svaki termin traje 10 minuta.',ready:'Spremno',
+      slotInfo:'Svaki termin traje {duration} minuta.',ready:'Spremno',
       fullNamePh:'Ime i prezime',emailPh:'vi@primer.com',commentsPh:'Opcione napomene…',searchCountryPh:'Pretraži državu…',
       serviceTemplate:'Usluga: {0} ({1} min)',dateTemplate:'Datum: {0}',timeTemplate:'Vreme: {0} - {1}',
       locationTemplate:'Lokacija: {0}',mins:'min',
@@ -1311,7 +1309,7 @@ var _HTML_TEMPLATES = {
       fullNameLabel:'Ime i prezime *',phoneLabel:'Telefon *',emailLabel:'E-mail *',commentsLabel:'Komentari',
       confirmBtn:'Potvrdi',appointmentConfirmed:'Termin je potvrđen',okBtn:'OK',
       clinicMF:'Pon–Pet:',clinicSat:'Sub:',clinicSun:'Ned:',closed:'Zatvoreno',
-      slotInfo:'Svaki termin traje 10 minuta.',ready:'Spremno',
+      slotInfo:'Svaki termin traje {duration} minuta.',ready:'Spremno',
       fullNamePh:'Ime i prezime',emailPh:'vi@primjer.com',commentsPh:'Neobavezne napomene…',searchCountryPh:'Pretraži državu…',
       serviceTemplate:'Usluga: {0} ({1} min)',dateTemplate:'Datum: {0}',timeTemplate:'Vrijeme: {0} - {1}',
       locationTemplate:'Lokacija: {0}',mins:'min',
@@ -1338,7 +1336,7 @@ var _HTML_TEMPLATES = {
       fullNameLabel:'Ime i prezime *',phoneLabel:'Telefon *',emailLabel:'E-mail *',commentsLabel:'Komentari',
       confirmBtn:'Potvrdi',appointmentConfirmed:'Termin je potvrđen',okBtn:'OK',
       clinicMF:'Pon–Pet:',clinicSat:'Sub:',clinicSun:'Ned:',closed:'Zatvoreno',
-      slotInfo:'Svaki termin traje 10 minuta.',ready:'Spremno',
+      slotInfo:'Svaki termin traje {duration} minuta.',ready:'Spremno',
       fullNamePh:'Ime i prezime',emailPh:'vi@primjer.com',commentsPh:'Neobavezne napomene…',searchCountryPh:'Pretraži državu…',
       serviceTemplate:'Usluga: {0} ({1} min)',dateTemplate:'Datum: {0}',timeTemplate:'Vrijeme: {0} - {1}',
       locationTemplate:'Lokacija: {0}',mins:'min',
@@ -1365,7 +1363,7 @@ var _HTML_TEMPLATES = {
       fullNameLabel:'Повне ім\\'я *',phoneLabel:'Телефон *',emailLabel:'Ел. пошта *',commentsLabel:'Коментарі',
       confirmBtn:'Підтвердити',appointmentConfirmed:'Запис підтверджено',okBtn:'OK',
       clinicMF:'Пн–Пт:',clinicSat:'Сб:',clinicSun:'Нд:',closed:'Зачинено',
-      slotInfo:'Кожен слот — 10 хвилин.',ready:'Готово',
+      slotInfo:'Кожен слот — {duration} хвилин.',ready:'Готово',
       fullNamePh:'Повне ім\\'я',emailPh:'you@example.com',commentsPh:'Необов\\'язкові нотатки…',searchCountryPh:'Пошук країни…',
       serviceTemplate:'Послуга: {0} ({1} хв)',dateTemplate:'Дата: {0}',timeTemplate:'Час: {0} - {1}',
       locationTemplate:'Місце: {0}',mins:'хв',
@@ -1392,7 +1390,7 @@ var _HTML_TEMPLATES = {
       fullNameLabel:'Buong pangalan *',phoneLabel:'Telepono *',emailLabel:'Email *',commentsLabel:'Mga komento',
       confirmBtn:'Kumpirmahin',appointmentConfirmed:'Nakumpirma ang appointment',okBtn:'OK',
       clinicMF:'Lun–Biy:',clinicSat:'Sab:',clinicSun:'Lin:',closed:'Sarado',
-      slotInfo:'Ang bawat slot ay 10 minuto.',ready:'Handa na',
+      slotInfo:'Ang bawat slot ay {duration} minuto.',ready:'Handa na',
       fullNamePh:'Buong pangalan',emailPh:'you@example.com',commentsPh:'Opsyonal na tala…',searchCountryPh:'Maghanap ng bansa…',
       serviceTemplate:'Serbisyo: {0} ({1} min)',dateTemplate:'Petsa: {0}',timeTemplate:'Oras: {0} - {1}',
       locationTemplate:'Lokasyon: {0}',mins:'min',
@@ -1419,7 +1417,7 @@ var _HTML_TEMPLATES = {
       fullNameLabel:'Пълно име *',phoneLabel:'Телефон *',emailLabel:'Имейл *',commentsLabel:'Коментари',
       confirmBtn:'Потвърди',appointmentConfirmed:'Часът е потвърден',okBtn:'OK',
       clinicMF:'Пон–Пет:',clinicSat:'Съб:',clinicSun:'Нед:',closed:'Затворено',
-      slotInfo:'Всеки час е по 10 минути.',ready:'Готово',
+      slotInfo:'Всеки час е по {duration} минути.',ready:'Готово',
       fullNamePh:'Пълно име',emailPh:'you@example.com',commentsPh:'Незадължителни бележки…',searchCountryPh:'Търсене на държава…',
       serviceTemplate:'Услуга: {0} ({1} мин)',dateTemplate:'Дата: {0}',timeTemplate:'Час: {0} - {1}',
       locationTemplate:'Местоположение: {0}',mins:'мин',
@@ -1446,7 +1444,7 @@ var _HTML_TEMPLATES = {
       fullNameLabel:'Nume complet *',phoneLabel:'Telefon *',emailLabel:'E-mail *',commentsLabel:'Comentarii',
       confirmBtn:'Confirmă',appointmentConfirmed:'Programare confirmată',okBtn:'OK',
       clinicMF:'Lun–Vin:',clinicSat:'Sâm:',clinicSun:'Dum:',closed:'Închis',
-      slotInfo:'Fiecare slot are 10 minute.',ready:'Pregătit',
+      slotInfo:'Fiecare slot are {duration} minute.',ready:'Pregătit',
       fullNamePh:'Nume complet',emailPh:'dvs@exemplu.com',commentsPh:'Note opționale…',searchCountryPh:'Caută țara…',
       serviceTemplate:'Serviciu: {0} ({1} min)',dateTemplate:'Data: {0}',timeTemplate:'Ora: {0} - {1}',
       locationTemplate:'Locație: {0}',mins:'min',
@@ -1473,7 +1471,7 @@ var _HTML_TEMPLATES = {
       fullNameLabel:'Vardas ir pavardė *',phoneLabel:'Telefonas *',emailLabel:'El. paštas *',commentsLabel:'Komentarai',
       confirmBtn:'Patvirtinti',appointmentConfirmed:'Vizitas patvirtintas',okBtn:'Gerai',
       clinicMF:'Pr–Pn:',clinicSat:'Šešt:',clinicSun:'Sekm:',closed:'Uždaryta',
-      slotInfo:'Kiekvienas vizitas trunka 10 minučių.',ready:'Paruošta',
+      slotInfo:'Kiekvienas vizitas trunka {duration} minučių.',ready:'Paruošta',
       fullNamePh:'Vardas ir pavardė',emailPh:'jusu@pastas.lt',commentsPh:'Papildomos pastabos…',searchCountryPh:'Ieškoti šalies…',
       serviceTemplate:'Paslauga: {0} ({1} min)',dateTemplate:'Data: {0}',timeTemplate:'Laikas: {0} - {1}',
       locationTemplate:'Vieta: {0}',mins:'min',
@@ -1500,7 +1498,7 @@ var _HTML_TEMPLATES = {
       fullNameLabel:'Isem sħiħ *',phoneLabel:'Telefon *',emailLabel:'Email *',commentsLabel:'Kummenti',
       confirmBtn:'Ikkonferma',appointmentConfirmed:'L-appuntament ġie kkonfermat',okBtn:'OK',
       clinicMF:'Tne–Ġim:',clinicSat:'Sib:',clinicSun:'Ħad:',closed:'Magħluq',
-      slotInfo:'Kull slot huwa ta\\' 10 minuti.',ready:'Lest',
+      slotInfo:'Kull slot huwa ta\\' {duration} minuti.',ready:'Lest',
       fullNamePh:'Isem sħiħ',emailPh:'int@eżempju.com',commentsPh:'Noti mhux obbligatorji…',searchCountryPh:'Fittex pajjiż…',
       serviceTemplate:'Servizz: {0} ({1} min)',dateTemplate:'Data: {0}',timeTemplate:'Ħin: {0} - {1}',
       locationTemplate:'Post: {0}',mins:'min',
@@ -2090,6 +2088,59 @@ var _HTML_TEMPLATES = {
       return { dateKey, minutes };
     }
 
+    function renderClinicHours() {
+      var wh = state.config && state.config.workingHours;
+      var mins = (state.config && state.config.apptMinutes) || 10;
+      var container = document.getElementById('clinicHoursInfo');
+      var slotLine = document.getElementById('slotInfoLine');
+
+      // Update slot duration text
+      if (slotLine) {
+        var tmpl = t('slotInfo');
+        slotLine.textContent = tmpl.replace('{duration}', mins);
+      }
+
+      if (!wh || !container) return;
+
+      // Build schedule string for each day for grouping
+      var dayOrder = ['MON','TUE','WED','THU','FRI','SAT','SUN'];
+      var dayLabels = {MON:'Mon',TUE:'Tue',WED:'Wed',THU:'Thu',FRI:'Fri',SAT:'Sat',SUN:'Sun'};
+
+      function blocksToStr(blocks) {
+        if (!blocks || blocks.length === 0) return '';
+        return blocks.map(function(b) { return b.start + '–' + b.end; }).join(' & ');
+      }
+
+      // Group consecutive days with same schedule
+      var groups = [];
+      var i = 0;
+      while (i < dayOrder.length) {
+        var key = dayOrder[i];
+        var sched = blocksToStr(wh[key] || []);
+        var start = i;
+        while (i + 1 < dayOrder.length && blocksToStr(wh[dayOrder[i + 1]] || []) === sched) {
+          i++;
+        }
+        var end = i;
+        var label;
+        if (start === end) {
+          label = dayLabels[dayOrder[start]];
+        } else {
+          label = dayLabels[dayOrder[start]] + '–' + dayLabels[dayOrder[end]];
+        }
+        groups.push({ label: label, schedule: sched });
+        i++;
+      }
+
+      var html = '';
+      for (var g = 0; g < groups.length; g++) {
+        var grp = groups[g];
+        html += '<p class="topLine"><b>' + grp.label + ':</b> ' +
+          (grp.schedule || t('closed')) + '</p>';
+      }
+      container.innerHTML = html;
+    }
+
     function renderServices() {
       els.services.innerHTML = '';
       const svcs = (state.config && state.config.services) ? state.config.services : [];
@@ -2446,6 +2497,7 @@ var _HTML_TEMPLATES = {
 
           els.sumLoc.textContent = t('locationTemplate', state.config.pottersLocation);
 
+          renderClinicHours();
           renderServices();
           renderDates();
 
@@ -5902,7 +5954,8 @@ function apiInit() {
       timezone: getTimeZone_(),
       bookingPolicy: 'Choose a service and then select your time slot. You will receive confirmation by email. You can CANCEL your appointment from the email.',
       pottersLocation: (getScriptProps_().getProperty(CFG().PROP_POTTERS_LOCATION) || "Potter's Pharmacy Clinic"),
-      spinolaLocation: (getScriptProps_().getProperty(CFG().PROP_SPINOLA_LOCATION) || 'Spinola Clinic')
+      spinolaLocation: (getScriptProps_().getProperty(CFG().PROP_SPINOLA_LOCATION) || 'Spinola Clinic'),
+      workingHours: CFG().HOURS
     },
     dateOptions: apiGetDateOptions(extraMap)
   };
