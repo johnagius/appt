@@ -248,6 +248,7 @@ function apiAdminSaveSettings(s, p)          { return _getApp().apiAdminSaveSett
 function apiAdminGetStatistics(s)            { return _getApp().apiAdminGetStatistics(s); }
 function apiAdminMarkAttendance(s, a, d, t)  { return _getApp().apiAdminMarkAttendance(s, a, d, t); }
 function apiAdminGetPatientHistory(s, e, p)  { return _getApp().apiAdminGetPatientHistory(s, e, p); }
+function apiAdminArchiveOldSheets(s)         { return _getApp().apiAdminArchiveOldSheets(s); }
 
 // ----- Trigger (daily schedule email at 7am) -----
 function sendDailyDoctorSchedule_()          { return _getApp()['sendDailyDoctorSchedule_'](); }
