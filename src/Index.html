@@ -1963,19 +1963,9 @@
     const EXEC_URL_AFTER_BOOKING = '<?= WEBAPP_URL ?>';
 
     function goToExecAfterBooking_(){
-      const target = EXEC_URL_AFTER_BOOKING;
-      try { window.top.location.href = target; return; } catch (e1) {}
-      try { window.parent.location.href = target; return; } catch (e2) {}
-      try { window.location.href = target; return; } catch (e3) {}
-      try {
-        const a = document.createElement('a');
-        a.href = target;
-        a.target = '_top';
-        a.rel = 'noopener';
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-      } catch (e4) {}
+      try { window.top.location.reload(); return; } catch (e1) {}
+      try { window.parent.location.reload(); return; } catch (e2) {}
+      try { window.location.reload(); return; } catch (e3) {}
     }
 
     function showOverlay(el){
