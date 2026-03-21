@@ -3133,6 +3133,48 @@ var _HTML_TEMPLATES = {
     .add-block-btn{margin-left:50px;margin-top:4px;border:none;background:none;color:var(--blue);cursor:pointer;font-size:12px;font-weight:600;padding:4px 8px;border-radius:6px;}
     .add-block-btn:hover{background:rgba(37,99,235,0.06);}
 
+    /* Statistics tab */
+    .hero-stats{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;}
+    .hero-card{background:var(--card);border-radius:14px;border:1px solid var(--line);padding:16px;flex:1;min-width:140px;text-align:center;}
+    .hero-card .hero-value{font-size:28px;font-weight:900;line-height:1.1;}
+    .hero-card .hero-label{font-size:12px;color:var(--muted);margin-top:4px;}
+    .hero-card .hero-sub{font-size:11px;color:var(--muted);margin-top:2px;}
+    .progress-ring{display:block;margin:0 auto 4px;}
+    .progress-ring .ring-bg{fill:none;stroke:var(--line);stroke-width:6;}
+    .progress-ring .ring-fg{fill:none;stroke:#2563eb;stroke-width:6;stroke-linecap:round;transition:stroke-dashoffset 0.8s ease;}
+    .stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+    @media(max-width:600px){.stats-grid{grid-template-columns:1fr;}.hero-stats{flex-direction:column;}}
+    .bar-chart{display:flex;align-items:flex-end;gap:6px;height:120px;padding:0 4px;}
+    .bar-col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;}
+    .bar-stack{width:100%;display:flex;flex-direction:column;justify-content:flex-end;height:100%;}
+    .bar{width:100%;border-radius:4px 4px 0 0;transition:height 0.5s ease;min-height:0;}
+    .bar.booked{background:#2563eb;}
+    .bar.cancelled{background:#ef4444;border-radius:0 0 0 0;}
+    .bar-val{font-size:11px;font-weight:700;margin-bottom:2px;color:var(--fg);}
+    .bar-label{font-size:10px;color:var(--muted);margin-top:4px;text-align:center;}
+    .heatmap{display:flex;gap:4px;flex-wrap:wrap;}
+    .heat-cell{min-width:40px;flex:1;height:44px;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:11px;font-weight:700;transition:background 0.3s ease;}
+    .heat-cell .heat-hour{font-size:9px;font-weight:600;opacity:0.7;margin-bottom:1px;}
+    .h-bar-row{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
+    .h-bar-label{width:36px;font-size:12px;font-weight:700;flex-shrink:0;}
+    .h-bar-track{flex:1;height:22px;background:var(--line);border-radius:11px;overflow:hidden;}
+    .h-bar-fill{height:100%;border-radius:11px;transition:width 0.5s ease;background:#2563eb;}
+    .h-bar-pct{width:40px;font-size:12px;font-weight:600;text-align:right;flex-shrink:0;}
+    .patient-row{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line);}
+    .patient-row:last-child{border-bottom:none;}
+    .patient-rank{width:20px;height:20px;border-radius:50%;background:#2563eb;color:#fff;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+    .patient-name{flex:1;font-size:13px;font-weight:600;}
+    .patient-count{font-size:13px;font-weight:700;color:var(--muted);}
+    .capacity-row{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
+    .capacity-label{width:56px;font-size:12px;font-weight:700;flex-shrink:0;}
+    .capacity-track{flex:1;height:22px;background:var(--line);border-radius:11px;overflow:hidden;position:relative;}
+    .capacity-fill{height:100%;border-radius:11px;transition:width 0.5s ease;}
+    .capacity-text{position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:11px;font-weight:700;color:var(--fg);}
+    .stats-refresh{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+    .stats-period{font-size:12px;color:var(--muted);}
+    .legend{display:flex;gap:12px;margin-top:8px;font-size:11px;color:var(--muted);}
+    .legend-dot{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:middle;}
+
     /* Overlay animation */
     .overlay{opacity:0;transition:opacity 0.2s ease;}
     .overlay.show{opacity:1;}
@@ -3156,6 +3198,7 @@ var _HTML_TEMPLATES = {
     <div class="tab active" data-tab="schedule" onclick="switchTab('schedule')">Schedule</div>
     <div class="tab" data-tab="availability" onclick="switchTab('availability')">Availability</div>
     <div class="tab" data-tab="actions" onclick="switchTab('actions')">Quick Actions</div>
+    <div class="tab" data-tab="statistics" onclick="switchTab('statistics')">Statistics</div>
     <div class="tab" data-tab="settings" onclick="switchTab('settings')">Settings</div>
   </div>
 
@@ -3345,6 +3388,93 @@ var _HTML_TEMPLATES = {
   </div>
 </div>
 
+<!-- STATISTICS TAB -->
+<div class="tab-content" id="tab-statistics" style="display:none;">
+  <div class="stats-refresh">
+    <span class="stats-period" id="statsPeriod">Last 28 days</span>
+    <button class="btn btn-sm btn-ghost" onclick="_statsLoaded=false;loadStatistics()">Refresh</button>
+  </div>
+
+  <!-- Hero metrics -->
+  <div class="hero-stats" id="heroStats">
+    <div class="hero-card">
+      <svg class="progress-ring" width="72" height="72" viewBox="0 0 72 72" id="utilRing">
+        <circle class="ring-bg" cx="36" cy="36" r="30"/>
+        <circle class="ring-fg" cx="36" cy="36" r="30" stroke-dasharray="188.5" stroke-dashoffset="188.5" transform="rotate(-90 36 36)"/>
+      </svg>
+      <div class="hero-value" id="heroUtil">-</div>
+      <div class="hero-label">Utilization</div>
+    </div>
+    <div class="hero-card">
+      <div class="hero-value" id="heroBooked">-</div>
+      <div class="hero-label">Appointments</div>
+      <div class="hero-sub" id="heroBookedSub">last 28 days</div>
+    </div>
+    <div class="hero-card">
+      <div class="hero-value" id="heroCancelRate">-</div>
+      <div class="hero-label">Cancel Rate</div>
+      <div class="hero-sub" id="heroCancelSub">lower is better</div>
+    </div>
+    <div class="hero-card">
+      <div class="hero-value" id="heroPatients">-</div>
+      <div class="hero-label">Unique Patients</div>
+      <div class="hero-sub" id="heroRepeat">- returning</div>
+    </div>
+  </div>
+
+  <!-- Charts row -->
+  <div class="stats-grid">
+    <div class="card">
+      <h3>Weekly Trend</h3>
+      <div class="bar-chart" id="weeklyTrendChart"></div>
+      <div class="legend">
+        <span><span class="legend-dot" style="background:#2563eb;"></span>Booked</span>
+        <span><span class="legend-dot" style="background:#ef4444;"></span>Cancelled</span>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Peak Hours</h3>
+      <div class="heatmap" id="peakHoursMap"></div>
+    </div>
+  </div>
+
+  <!-- Insights row -->
+  <div class="stats-grid" style="margin-top:12px;">
+    <div class="card">
+      <h3>Utilization by Day</h3>
+      <div id="utilByDay"></div>
+    </div>
+    <div class="card">
+      <h3>Upcoming 7-Day Load</h3>
+      <div id="upcomingLoadChart"></div>
+    </div>
+  </div>
+
+  <div class="stats-grid" style="margin-top:12px;">
+    <div class="card">
+      <h3>Location Split</h3>
+      <div id="locationSplitChart"></div>
+    </div>
+    <div class="card">
+      <h3>Top Patients</h3>
+      <div id="topPatientsChart"></div>
+    </div>
+  </div>
+
+  <div class="stats-grid" style="margin-top:12px;">
+    <div class="card">
+      <h3>Cancellations</h3>
+      <div id="cancelBreakdownChart"></div>
+    </div>
+    <div class="card">
+      <h3>Busiest Day</h3>
+      <div id="busiestDayChart"></div>
+    </div>
+  </div>
+
+  <div class="msg" id="statsMsg"></div>
+</div>
+
 <!-- Confirm modal -->
 <div class="overlay" id="confirmOverlay" role="dialog" aria-modal="true">
   <div class="loadingBox" style="flex-direction:column;align-items:stretch;gap:12px;max-width:420px;">
@@ -3434,6 +3564,7 @@ function switchTab(name) {
   document.getElementById('tab-' + name).style.display = 'block';
   document.querySelector('[data-tab="' + name + '"]').classList.add('active');
   if (name === 'settings') loadSettings();
+  if (name === 'statistics') loadStatistics();
 }
 
 function renderApptTable(appts, containerId, withCheckboxes, showDate) {
@@ -4422,6 +4553,230 @@ function saveSettings() {
       .apiAdminSaveSettings(SIG, settings);
   });
 }
+
+// ========== Statistics Tab ==========
+
+var _statsLoaded = false;
+
+function loadStatistics() {
+  if (_statsLoaded) return;
+  showMsg('statsMsg', '', 'Loading statistics...');
+
+  google.script.run
+    .withSuccessHandler(function(res) {
+      if (!res || !res.ok) { showMsg('statsMsg', 'bad', res.reason || 'Failed.'); return; }
+      showMsg('statsMsg', '', '');
+      _statsLoaded = true;
+      renderAllStats(res);
+    })
+    .withFailureHandler(function(err) {
+      showMsg('statsMsg', 'bad', 'Error: ' + (err && err.message ? err.message : String(err)));
+    })
+    .apiAdminGetStatistics(SIG);
+}
+
+function renderAllStats(s) {
+  // Period label
+  document.getElementById('statsPeriod').textContent = s.period.from + ' to ' + s.period.to + ' (generated ' + s.generated + ')';
+
+  // Hero metrics
+  renderProgressRing(s.utilization);
+  document.getElementById('heroUtil').textContent = s.utilization + '%';
+  document.getElementById('heroBooked').textContent = s.totalBooked;
+  document.getElementById('heroCancelRate').textContent = s.cancelRate + '%';
+  var crEl = document.getElementById('heroCancelRate');
+  crEl.style.color = s.cancelRate < 10 ? 'var(--good)' : s.cancelRate < 20 ? '#f59e0b' : 'var(--bad)';
+  document.getElementById('heroPatients').textContent = s.totalUniquePatients;
+  document.getElementById('heroRepeat').textContent = s.repeatPatients + ' returning';
+
+  renderWeeklyTrend(s.weeklyTrend);
+  renderPeakHours(s.hourlyDistribution);
+  renderUtilByDay(s.utilizationByDay);
+  renderUpcomingLoad(s.upcomingLoad);
+  renderLocationSplit(s.locationSplit);
+  renderTopPatients(s.topPatients);
+  renderCancelBreakdown(s);
+  renderBusiestDay(s.busiestDay);
+}
+
+function renderProgressRing(pct) {
+  var circumference = 2 * Math.PI * 30; // r=30
+  var offset = circumference - (pct / 100) * circumference;
+  var fg = document.querySelector('#utilRing .ring-fg');
+  if (fg) {
+    fg.style.strokeDasharray = circumference;
+    // Trigger animation by setting initially then updating
+    setTimeout(function() { fg.style.strokeDashoffset = offset; }, 50);
+  }
+}
+
+function renderWeeklyTrend(weeks) {
+  var el = document.getElementById('weeklyTrendChart');
+  if (!weeks || !weeks.length) { el.innerHTML = '<div class="empty">No data yet.</div>'; return; }
+
+  var maxVal = 1;
+  for (var i = 0; i < weeks.length; i++) {
+    var total = weeks[i].booked + weeks[i].cancelled;
+    if (total > maxVal) maxVal = total;
+  }
+
+  var html = '';
+  for (var i = 0; i < weeks.length; i++) {
+    var w = weeks[i];
+    var bH = Math.round((w.booked / maxVal) * 100);
+    var cH = Math.round((w.cancelled / maxVal) * 100);
+    html += '<div class="bar-col">';
+    html += '<div class="bar-val">' + w.booked + '</div>';
+    html += '<div class="bar-stack" style="height:100%;">';
+    html += '<div style="flex:1;"></div>'; // spacer
+    if (w.cancelled > 0) html += '<div class="bar cancelled" style="height:' + cH + '%;"></div>';
+    html += '<div class="bar booked" style="height:' + bH + '%;"></div>';
+    html += '</div>';
+    html += '<div class="bar-label">' + esc(w.label) + '</div>';
+    html += '</div>';
+  }
+  el.innerHTML = html;
+}
+
+function renderPeakHours(dist) {
+  var el = document.getElementById('peakHoursMap');
+  if (!dist) { el.innerHTML = '<div class="empty">No data.</div>'; return; }
+
+  // Only show hours that have data or are in working range (7-21)
+  var maxCount = 1;
+  for (var h = 0; h < 24; h++) { if (dist[h] > maxCount) maxCount = dist[h]; }
+
+  var html = '';
+  for (var h = 7; h <= 20; h++) {
+    var count = dist[h] || 0;
+    var intensity = maxCount > 0 ? count / maxCount : 0;
+    var r = Math.round(219 - intensity * 182);
+    var g = Math.round(234 - intensity * 135);
+    var b = Math.round(254 - intensity * 15);
+    var textColor = intensity > 0.6 ? '#fff' : 'var(--fg)';
+    if (count === 0) { r = 249; g = 250; b = 251; textColor = 'var(--muted)'; }
+    var label = h < 12 ? h + 'am' : (h === 12 ? '12pm' : (h - 12) + 'pm');
+    html += '<div class="heat-cell" style="background:rgb(' + r + ',' + g + ',' + b + ');color:' + textColor + ';">';
+    html += '<span class="heat-hour">' + label + '</span>';
+    html += count;
+    html += '</div>';
+  }
+  el.innerHTML = html;
+}
+
+function renderUtilByDay(utilByDay) {
+  var el = document.getElementById('utilByDay');
+  if (!utilByDay) { el.innerHTML = '<div class="empty">No data.</div>'; return; }
+
+  var days = ['MON','TUE','WED','THU','FRI','SAT','SUN'];
+  var labels = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  var html = '';
+  for (var i = 0; i < days.length; i++) {
+    var pct = utilByDay[days[i]] || 0;
+    var color = pct >= 90 ? 'var(--bad)' : pct >= 70 ? '#f59e0b' : '#2563eb';
+    html += '<div class="h-bar-row">';
+    html += '<div class="h-bar-label">' + labels[i] + '</div>';
+    html += '<div class="h-bar-track"><div class="h-bar-fill" style="width:' + pct + '%;background:' + color + ';"></div></div>';
+    html += '<div class="h-bar-pct">' + pct + '%</div>';
+    html += '</div>';
+  }
+  el.innerHTML = html;
+}
+
+function renderUpcomingLoad(load) {
+  var el = document.getElementById('upcomingLoadChart');
+  if (!load || !load.length) { el.innerHTML = '<div class="empty">No upcoming data.</div>'; return; }
+
+  var html = '';
+  for (var i = 0; i < load.length; i++) {
+    var d = load[i];
+    if (d.capacity === 0) continue; // Skip closed days
+    var pct = d.capacity > 0 ? Math.round(d.booked / d.capacity * 100) : 0;
+    if (pct > 100) pct = 100;
+    var color = pct >= 90 ? 'var(--bad)' : pct >= 75 ? '#f59e0b' : 'var(--good)';
+    var dateNum = d.dateKey.substring(8);
+    html += '<div class="capacity-row">';
+    html += '<div class="capacity-label">' + d.dayLabel + ' ' + parseInt(dateNum, 10) + '</div>';
+    html += '<div class="capacity-track"><div class="capacity-fill" style="width:' + pct + '%;background:' + color + ';"></div>';
+    html += '<div class="capacity-text">' + d.booked + '/' + d.capacity + '</div></div>';
+    html += '</div>';
+  }
+  el.innerHTML = html || '<div class="empty">No working days ahead.</div>';
+}
+
+function renderLocationSplit(split) {
+  var el = document.getElementById('locationSplitChart');
+  if (!split) { el.innerHTML = '<div class="empty">No data.</div>'; return; }
+
+  var total = split.potters + split.spinola;
+  if (total === 0) { el.innerHTML = '<div class="empty">No appointments yet.</div>'; return; }
+
+  var pctP = Math.round(split.potters / total * 100);
+  var pctS = 100 - pctP;
+
+  var html = '';
+  html += '<div class="h-bar-row"><div class="h-bar-label" style="width:60px;">Potter\\'s</div>';
+  html += '<div class="h-bar-track"><div class="h-bar-fill" style="width:' + pctP + '%;background:#2563eb;"></div></div>';
+  html += '<div class="h-bar-pct">' + split.potters + '</div></div>';
+  html += '<div class="h-bar-row"><div class="h-bar-label" style="width:60px;">Spinola</div>';
+  html += '<div class="h-bar-track"><div class="h-bar-fill" style="width:' + pctS + '%;background:#8b5cf6;"></div></div>';
+  html += '<div class="h-bar-pct">' + split.spinola + '</div></div>';
+  el.innerHTML = html;
+}
+
+function renderTopPatients(patients) {
+  var el = document.getElementById('topPatientsChart');
+  if (!patients || !patients.length) { el.innerHTML = '<div class="empty">No patient data yet.</div>'; return; }
+
+  var html = '';
+  for (var i = 0; i < patients.length; i++) {
+    var p = patients[i];
+    html += '<div class="patient-row">';
+    html += '<div class="patient-rank">' + (i + 1) + '</div>';
+    html += '<div class="patient-name">' + esc(p.name) + '</div>';
+    html += '<div class="patient-count">' + p.count + ' visits</div>';
+    html += '</div>';
+  }
+  el.innerHTML = html;
+}
+
+function renderCancelBreakdown(s) {
+  var el = document.getElementById('cancelBreakdownChart');
+  var cb = s.cancelBreakdown;
+  var total = cb.byDoctor + cb.byPatient;
+
+  var html = '<div style="margin-bottom:12px;">';
+  html += '<div style="font-size:36px;font-weight:900;color:' + (s.cancelRate < 10 ? 'var(--good)' : s.cancelRate < 20 ? '#f59e0b' : 'var(--bad)') + ';">' + s.cancelRate + '%</div>';
+  html += '<div style="font-size:12px;color:var(--muted);">Overall cancel rate</div>';
+  html += '</div>';
+
+  if (total > 0) {
+    var pctD = Math.round(cb.byDoctor / total * 100);
+    var pctP = 100 - pctD;
+    html += '<div class="h-bar-row"><div class="h-bar-label" style="width:70px;">By Doctor</div>';
+    html += '<div class="h-bar-track"><div class="h-bar-fill" style="width:' + pctD + '%;background:#f59e0b;"></div></div>';
+    html += '<div class="h-bar-pct">' + cb.byDoctor + '</div></div>';
+    html += '<div class="h-bar-row"><div class="h-bar-label" style="width:70px;">By Patient</div>';
+    html += '<div class="h-bar-track"><div class="h-bar-fill" style="width:' + pctP + '%;background:#ef4444;"></div></div>';
+    html += '<div class="h-bar-pct">' + cb.byPatient + '</div></div>';
+  } else {
+    html += '<div class="empty">No cancellations!</div>';
+  }
+  html += '<div style="margin-top:10px;font-size:12px;color:var(--muted);">Total cancelled: ' + s.totalCancelled + ' of ' + (s.totalBooked + s.totalCancelled) + '</div>';
+  el.innerHTML = html;
+}
+
+function renderBusiestDay(day) {
+  var el = document.getElementById('busiestDayChart');
+  if (!day || !day.dateKey) { el.innerHTML = '<div class="empty">No data yet.</div>'; return; }
+
+  el.innerHTML = '<div style="text-align:center;padding:12px 0;">'
+    + '<div style="font-size:42px;font-weight:900;color:#2563eb;">' + day.count + '</div>'
+    + '<div style="font-size:14px;font-weight:700;margin-top:4px;">' + day.dayName + ', ' + day.dateKey + '</div>'
+    + '<div style="font-size:12px;color:var(--muted);margin-top:2px;">Most appointments in a single day</div>'
+    + '</div>';
+}
+
 </script>
 </body>
 </html>
@@ -7121,6 +7476,214 @@ function apiAdminSaveSettings(sig, settings) {
   return { ok: true, message: 'Settings saved successfully.' };
 }
 
+/**
+ * Statistics data for admin analytics dashboard.
+ * Scans 28 days back + 7 days forward.
+ */
+function apiAdminGetStatistics(sig) {
+  if (!verifyAdminSig_(sig)) return { ok: false, reason: 'Access denied.' };
+
+  var today = todayLocal_();
+  var todayKey = toDateKey_(today);
+  var ss = getAppointmentsSpreadsheet_();
+  var offMap = getDoctorOffDates_();
+  var extraMap = getDoctorExtraSlots_();
+
+  var PAST_DAYS = 28;
+  var FUTURE_DAYS = 7;
+  var dayLabels = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  var dowKeys = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
+
+  // Accumulators
+  var totalBooked = 0, totalCancelled = 0;
+  var cancelByDoctor = 0, cancelByPatient = 0;
+  var locationPotters = 0, locationSpinola = 0;
+  var hourCounts = []; for (var h = 0; h < 24; h++) hourCounts.push(0);
+  var dowBooked = { MON:0, TUE:0, WED:0, THU:0, FRI:0, SAT:0, SUN:0 };
+  var dowSlots = { MON:0, TUE:0, WED:0, THU:0, FRI:0, SAT:0, SUN:0 };
+  var patientMap = {}; // email/phone -> { name, count }
+  var busiestDay = { dateKey: '', count: 0, dayName: '' };
+
+  // Weekly trend: bucket by week (Mon-Sun)
+  var weekBuckets = {}; // mondayKey -> { booked, cancelled, label }
+
+  // Upcoming load (future days only)
+  var upcomingLoad = [];
+
+  var fromKey = toDateKey_(addMinutes_(today, -PAST_DAYS * 1440));
+  var toKey = toDateKey_(addMinutes_(today, FUTURE_DAYS * 1440));
+
+  for (var i = -PAST_DAYS; i <= FUTURE_DAYS; i++) {
+    var d = addMinutes_(today, i * 1440);
+    var dk = toDateKey_(d);
+    var dow = dayOfWeekKey_(d);
+
+    // Compute available slots for this day
+    var holiday = isHolidayOrClosed_(d);
+    var daySlotCount = 0;
+    if (!holiday.closed) {
+      var offEntry = offMap[dk];
+      if (!offEntry || !offEntry.allDay) {
+        var extraSlots = extraMap[dk] || [];
+        var slots = buildSlotsForDate_(d, extraSlots);
+        // Subtract blocked time slots
+        if (offEntry && offEntry.blocks) {
+          var unblockedSlots = [];
+          for (var s = 0; s < slots.length; s++) {
+            var slotMin = parseTimeToMinutes_(slots[s].start);
+            var blocked = false;
+            for (var b = 0; b < offEntry.blocks.length; b++) {
+              if (slotMin >= offEntry.blocks[b].startMin && slotMin < offEntry.blocks[b].endMin) {
+                blocked = true; break;
+              }
+            }
+            if (!blocked) unblockedSlots.push(slots[s]);
+          }
+          daySlotCount = unblockedSlots.length;
+        } else {
+          daySlotCount = slots.length;
+        }
+      }
+    }
+    dowSlots[dow] += daySlotCount;
+
+    // Read appointments for this day
+    var sh = ss.getSheetByName(dk);
+    var dayBooked = 0;
+    var dayCancelled = 0;
+    if (sh) {
+      var lr = sh.getLastRow();
+      if (lr >= 2) {
+        var vals = sh.getRange(2, 1, lr - 1, 18).getValues();
+        for (var r = 0; r < vals.length; r++) {
+          var status = String(vals[r][10] || '');
+          var startTime = normalizeTimeCell_(vals[r][2]);
+
+          if (status === 'BOOKED' || status === 'RELOCATED_SPINOLA') {
+            totalBooked++;
+            dayBooked++;
+
+            // Hour distribution
+            if (startTime) {
+              var hr = Math.floor(parseTimeToMinutes_(startTime) / 60);
+              if (hr >= 0 && hr < 24) hourCounts[hr]++;
+            }
+
+            // Location
+            var loc = String(vals[r][11] || '').toLowerCase();
+            if (loc.indexOf('spinola') >= 0) locationSpinola++;
+            else locationPotters++;
+
+            // DOW booked count
+            dowBooked[dow]++;
+
+            // Patient tracking
+            var email = String(vals[r][7] || '').trim().toLowerCase();
+            var phone = String(vals[r][8] || '').trim();
+            var pKey = email || phone;
+            if (pKey) {
+              if (!patientMap[pKey]) {
+                patientMap[pKey] = { name: String(vals[r][6] || ''), count: 0 };
+              }
+              patientMap[pKey].count++;
+            }
+          } else if (status.indexOf('CANCELLED') >= 0) {
+            totalCancelled++;
+            dayCancelled++;
+            if (status === 'CANCELLED_DOCTOR') cancelByDoctor++;
+            else cancelByPatient++;
+          }
+        }
+      }
+    }
+
+    // Busiest day
+    if (dayBooked > busiestDay.count) {
+      busiestDay = { dateKey: dk, count: dayBooked, dayName: dayLabels[d.getDay()] };
+    }
+
+    // Weekly trend bucketing (find Monday of this day's week)
+    var dayOfWeek = d.getDay(); // 0=Sun
+    var mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+    var monday = addMinutes_(d, mondayOffset * 1440);
+    var mondayKey = toDateKey_(monday);
+    if (!weekBuckets[mondayKey]) {
+      var monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      weekBuckets[mondayKey] = { booked: 0, cancelled: 0, label: monthNames[monday.getMonth()] + ' ' + monday.getDate() };
+    }
+    weekBuckets[mondayKey].booked += dayBooked;
+    weekBuckets[mondayKey].cancelled += dayCancelled;
+
+    // Upcoming load (future days including today)
+    if (i >= 0 && i <= FUTURE_DAYS) {
+      upcomingLoad.push({
+        dateKey: dk,
+        dayLabel: dayLabels[d.getDay()],
+        booked: dayBooked,
+        capacity: daySlotCount
+      });
+    }
+  }
+
+  // Compute utilization
+  var totalSlots = 0, totalUsed = 0;
+  var utilizationByDay = {};
+  var dayOrder = ['MON','TUE','WED','THU','FRI','SAT','SUN'];
+  for (var di = 0; di < dayOrder.length; di++) {
+    var dayK = dayOrder[di];
+    totalSlots += dowSlots[dayK];
+    totalUsed += dowBooked[dayK];
+    utilizationByDay[dayK] = dowSlots[dayK] > 0 ? Math.round(dowBooked[dayK] / dowSlots[dayK] * 100) : 0;
+  }
+  var utilization = totalSlots > 0 ? Math.round(totalUsed / totalSlots * 1000) / 10 : 0;
+
+  // Cancel rate
+  var totalAll = totalBooked + totalCancelled;
+  var cancelRate = totalAll > 0 ? Math.round(totalCancelled / totalAll * 1000) / 10 : 0;
+
+  // Patient insights
+  var patientKeys = Object.keys(patientMap);
+  var totalUniquePatients = patientKeys.length;
+  var repeatPatients = 0;
+  var patientList = [];
+  for (var pi = 0; pi < patientKeys.length; pi++) {
+    var p = patientMap[patientKeys[pi]];
+    if (p.count >= 2) repeatPatients++;
+    patientList.push(p);
+  }
+  patientList.sort(function(a, b) { return b.count - a.count; });
+  var topPatients = patientList.slice(0, 5).map(function(p) { return { name: p.name, count: p.count }; });
+
+  // Weekly trend: sort by date and take last 4 weeks
+  var weekKeys = Object.keys(weekBuckets).sort();
+  var weeklyTrend = [];
+  for (var wi = 0; wi < weekKeys.length; wi++) {
+    weeklyTrend.push(weekBuckets[weekKeys[wi]]);
+  }
+  // Take last 4 weeks
+  if (weeklyTrend.length > 4) weeklyTrend = weeklyTrend.slice(weeklyTrend.length - 4);
+
+  return {
+    ok: true,
+    generated: Utilities.formatDate(new Date(), getTimeZone_(), "yyyy-MM-dd HH:mm"),
+    period: { from: fromKey, to: toKey },
+    totalBooked: totalBooked,
+    totalCancelled: totalCancelled,
+    cancelRate: cancelRate,
+    utilization: utilization,
+    utilizationByDay: utilizationByDay,
+    weeklyTrend: weeklyTrend,
+    hourlyDistribution: hourCounts,
+    busiestDay: busiestDay,
+    locationSplit: { potters: locationPotters, spinola: locationSpinola },
+    cancelBreakdown: { byDoctor: cancelByDoctor, byPatient: cancelByPatient },
+    totalUniquePatients: totalUniquePatients,
+    repeatPatients: repeatPatients,
+    topPatients: topPatients,
+    upcomingLoad: upcomingLoad
+  };
+}
+
 // ===== Install.gs =====
 /***************
  * Install.gs
@@ -7803,6 +8366,7 @@ function wipeScriptProperties_(execute) {
     apiAdminSearchAppointments: apiAdminSearchAppointments,
     apiAdminGetSettings: apiAdminGetSettings,
     apiAdminSaveSettings: apiAdminSaveSettings,
+    apiAdminGetStatistics: apiAdminGetStatistics,
     sendDailyDoctorSchedule_: sendDailyDoctorSchedule_,
     install: install,
     repairSheets: repairSheets,

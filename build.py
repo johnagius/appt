@@ -89,6 +89,7 @@ PUBLIC_FUNCTIONS = [
     'apiAdminSearchAppointments',
     'apiAdminGetSettings',
     'apiAdminSaveSettings',
+    'apiAdminGetStatistics',
     # EmailService.gs (trigger)
     'sendDailyDoctorSchedule_',
     # Install.gs
