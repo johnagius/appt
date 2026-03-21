@@ -3025,6 +3025,62 @@ var _HTML_TEMPLATES = {
       .time-drum-val{font-size:20px;}
     }
 
+    /* Search bar */
+    .search-wrap{position:relative;margin-bottom:14px;}
+    .search-wrap input{padding-left:36px;padding-right:36px;}
+    .search-wrap .search-icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:14px;pointer-events:none;}
+    .search-wrap .search-clear{position:absolute;right:8px;top:50%;transform:translateY(-50%);border:none;background:none;color:var(--muted);cursor:pointer;font-size:16px;padding:4px 8px;border-radius:8px;}
+    .search-wrap .search-clear:hover{background:rgba(17,24,39,0.06);color:var(--text);}
+
+    /* Week grid */
+    .week-nav{display:flex;align-items:center;gap:8px;margin-bottom:10px;justify-content:space-between;}
+    .week-nav .week-label{font-size:14px;font-weight:700;text-align:center;flex:1;}
+    .week-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:14px;}
+    .week-cell{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px 4px;text-align:center;cursor:pointer;transition:all 0.15s ease;position:relative;}
+    .week-cell:hover{border-color:#d1d5db;background:rgba(17,24,39,0.02);transform:translateY(-1px);}
+    .week-cell.today{border-color:var(--blue);box-shadow:0 0 0 2px rgba(37,99,235,0.15);}
+    .week-cell.selected{background:#111827;color:#fff;border-color:#111827;}
+    .week-cell.selected:hover{background:#1f2937;}
+    .week-cell .wc-day{font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;}
+    .week-cell.selected .wc-day{color:rgba(255,255,255,0.7);}
+    .week-cell .wc-num{font-size:18px;font-weight:800;margin:2px 0;}
+    .week-cell .wc-count{font-size:11px;color:var(--muted);font-weight:600;}
+    .week-cell.selected .wc-count{color:rgba(255,255,255,0.7);}
+    .week-cell .wc-dot{width:6px;height:6px;border-radius:50%;display:inline-block;margin:0 1px;vertical-align:middle;}
+    .week-cell.blocked{background:rgba(239,68,68,0.04);}
+    .week-cell.no-hours{opacity:0.4;}
+    @media(max-width:600px){
+      .week-cell{padding:6px 2px;border-radius:8px;}
+      .week-cell .wc-num{font-size:14px;}
+      .week-cell .wc-day{font-size:10px;}
+    }
+
+    /* Date navigator */
+    .date-nav{display:flex;align-items:center;gap:6px;margin-bottom:14px;flex-wrap:wrap;}
+    .date-nav input[type=date]{width:auto;flex:0 0 auto;max-width:160px;}
+    .date-header{font-size:15px;font-weight:800;margin:0 0 4px;}
+
+    /* Settings tab */
+    .settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+    @media(max-width:600px){.settings-grid{grid-template-columns:1fr;}}
+    .day-row{padding:10px 0;border-bottom:1px solid var(--line);}
+    .day-row:last-child{border-bottom:none;}
+    .day-row-header{display:flex;align-items:center;gap:10px;margin-bottom:6px;}
+    .day-row-header .day-name{font-weight:700;font-size:14px;min-width:40px;}
+    .day-toggle{position:relative;width:38px;height:22px;cursor:pointer;}
+    .day-toggle input{display:none;}
+    .day-toggle .slider{position:absolute;inset:0;background:#d1d5db;border-radius:999px;transition:background 0.15s ease;}
+    .day-toggle .slider::before{content:'';position:absolute;width:16px;height:16px;left:3px;top:3px;background:#fff;border-radius:50%;transition:transform 0.15s ease;}
+    .day-toggle input:checked + .slider{background:var(--good);}
+    .day-toggle input:checked + .slider::before{transform:translateX(16px);}
+    .time-block-row{display:flex;align-items:center;gap:6px;margin:4px 0 4px 50px;flex-wrap:wrap;}
+    .time-block-row input[type=time]{width:auto;max-width:120px;padding:6px 8px;font-size:12px;}
+    .time-block-row .block-sep{color:var(--muted);font-weight:600;font-size:13px;}
+    .time-block-row .remove-block{border:none;background:none;color:var(--muted);cursor:pointer;font-size:14px;padding:2px 6px;border-radius:6px;}
+    .time-block-row .remove-block:hover{background:rgba(239,68,68,0.1);color:var(--bad);}
+    .add-block-btn{margin-left:50px;margin-top:4px;border:none;background:none;color:var(--blue);cursor:pointer;font-size:12px;font-weight:600;padding:4px 8px;border-radius:6px;}
+    .add-block-btn:hover{background:rgba(37,99,235,0.06);}
+
     /* Overlay animation */
     .overlay{opacity:0;transition:opacity 0.2s ease;}
     .overlay.show{opacity:1;}
@@ -3048,20 +3104,76 @@ var _HTML_TEMPLATES = {
     <div class="tab active" data-tab="schedule" onclick="switchTab('schedule')">Schedule</div>
     <div class="tab" data-tab="availability" onclick="switchTab('availability')">Availability</div>
     <div class="tab" data-tab="actions" onclick="switchTab('actions')">Quick Actions</div>
+    <div class="tab" data-tab="settings" onclick="switchTab('settings')">Settings</div>
   </div>
 
   <div class="msg" id="globalMsg"></div>
 
   <!-- SCHEDULE TAB -->
   <div class="tab-content" id="tab-schedule">
-    <div class="card">
-      <h3 id="todayHeader">Today's Appointments</h3>
-      <div id="todayTable"></div>
+    <!-- Search -->
+    <div class="search-wrap">
+      <span class="search-icon">&#x1F50D;</span>
+      <input type="text" id="searchInput" placeholder="Search patients by name or phone..." oninput="onSearchInput()">
+      <button class="search-clear" id="searchClear" style="display:none;" onclick="clearSearch()">&times;</button>
     </div>
-    <div class="card">
-      <h3 id="tomorrowHeader">Tomorrow's Appointments</h3>
-      <div id="tomorrowTable"></div>
+
+    <!-- Search results (hidden by default) -->
+    <div id="searchResults" style="display:none;"></div>
+
+    <!-- Normal schedule view -->
+    <div id="scheduleView">
+      <!-- Week overview -->
+      <div class="card" id="weekCard">
+        <div class="week-nav">
+          <button class="btn btn-ghost btn-sm" onclick="changeWeek(-1)">&larr; Prev</button>
+          <span class="week-label" id="weekLabel"></span>
+          <button class="btn btn-ghost btn-sm" onclick="changeWeek(1)">Next &rarr;</button>
+        </div>
+        <div class="week-grid" id="weekGrid"></div>
+      </div>
+
+      <!-- Date navigator -->
+      <div class="date-nav">
+        <button class="btn btn-ghost btn-sm" onclick="changeDay(-1)">&larr;</button>
+        <button class="btn btn-sm btn-dark" onclick="goToToday()">Today</button>
+        <button class="btn btn-sm btn-ghost" onclick="goToTomorrow()">Tomorrow</button>
+        <input type="date" id="schedDate" onchange="onSchedDateChange()">
+        <button class="btn btn-ghost btn-sm" onclick="changeDay(1)">&rarr;</button>
+      </div>
+
+      <!-- Day appointments -->
+      <div class="card">
+        <h3 id="schedHeader" class="date-header">Appointments</h3>
+        <div id="schedTable"></div>
+      </div>
     </div>
+  </div>
+
+  <!-- SETTINGS TAB -->
+  <div class="tab-content" id="tab-settings" style="display:none;">
+    <div class="card">
+      <h3>General Settings</h3>
+      <div class="settings-grid">
+        <div class="form-group"><label>Doctor Email</label><input type="email" id="setDoctorEmail"></div>
+        <div class="form-group"><label>Timezone</label><input type="text" id="setTimezone" placeholder="e.g. Europe/Malta"></div>
+        <div class="form-group"><label>Potter's Location</label><input type="text" id="setPottersLoc"></div>
+        <div class="form-group"><label>Spinola Location</label><input type="text" id="setSpinolaLoc"></div>
+        <div class="form-group"><label>Appointment Duration (minutes)</label><input type="number" id="setDuration" min="1" max="120"></div>
+        <div class="form-group"><label>Advance Booking Days</label><input type="number" id="setAdvanceDays" min="1" max="90"></div>
+        <div class="form-group"><label>Max Appointments Per Person (0 = unlimited)</label><input type="number" id="setMaxAppts" min="0"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Working Hours</h3>
+      <div id="hoursEditor"></div>
+    </div>
+
+    <div style="margin-top:10px;">
+      <button class="btn btn-dark" onclick="saveSettings()">Save Settings</button>
+    </div>
+    <div class="msg" id="settingsMsg"></div>
   </div>
 
   <!-- AVAILABILITY TAB -->
@@ -3213,6 +3325,9 @@ var _HTML_TEMPLATES = {
 
 <script>
 const SIG = "<?= adminSig ?>";
+var _schedDate = ''; // currently viewed date in schedule tab
+var _weekStart = ''; // Monday of currently viewed week
+var _searchTimer = null;
 
 function showLoading(title, desc) {
   document.getElementById('loadingTitle').textContent = title || 'Loading...';
@@ -3266,9 +3381,10 @@ function switchTab(name) {
   document.querySelectorAll('.tab').forEach(function(el) { el.classList.remove('active'); });
   document.getElementById('tab-' + name).style.display = 'block';
   document.querySelector('[data-tab="' + name + '"]').classList.add('active');
+  if (name === 'settings') loadSettings();
 }
 
-function renderApptTable(appts, containerId, withCheckboxes) {
+function renderApptTable(appts, containerId, withCheckboxes, showDate) {
   var el = document.getElementById(containerId);
   if (!appts || !appts.length) {
     el.innerHTML = '<div class="empty">No appointments.</div>';
@@ -3276,21 +3392,28 @@ function renderApptTable(appts, containerId, withCheckboxes) {
   }
   var html = '<div class="table-wrap"><table><thead><tr>';
   if (withCheckboxes) html += '<th><input type="checkbox" onchange="toggleAll(this, \\'' + containerId + '\\')"></th>';
+  if (showDate) html += '<th>Date</th>';
   html += '<th>Time</th><th>Patient</th><th>Phone</th><th>Service</th><th>Location</th><th>Status</th><th></th></tr></thead><tbody>';
   for (var i = 0; i < appts.length; i++) {
     var a = appts[i];
-    var statusBadge = a.status === 'RELOCATED_SPINOLA'
-      ? '<span class="badge badge-green">Spinola</span>'
-      : '<span class="badge badge-green">Booked</span>';
-    html += '<tr>';
+    var statusClass = 'badge-green';
+    var statusText = 'Booked';
+    if (a.status === 'RELOCATED_SPINOLA') statusText = 'Spinola';
+    else if (a.status && a.status.indexOf('CANCELLED') >= 0) { statusClass = 'badge-red'; statusText = 'Cancelled'; }
+    html += '<tr' + (showDate ? ' style="cursor:pointer" onclick="goToDate(\\'' + esc(a.dateKey) + '\\')"' : '') + '>';
     if (withCheckboxes) html += '<td><input type="checkbox" class="appt-cb" value="' + esc(a.appointmentId) + '"></td>';
+    if (showDate) html += '<td><b>' + esc(a.dateKey) + '</b></td>';
     html += '<td><b>' + esc(a.startTime) + ' - ' + esc(a.endTime) + '</b></td>';
     html += '<td>' + esc(a.fullName) + '</td>';
     html += '<td>' + esc(a.phone) + '</td>';
     html += '<td>' + esc(a.serviceName) + '</td>';
     html += '<td>' + esc(a.location) + '</td>';
-    html += '<td>' + statusBadge + '</td>';
-    html += '<td><button class="btn btn-sm btn-danger" onclick="cancelSingleAppt(\\'' + esc(a.appointmentId) + '\\', \\'' + containerId + '\\')">Cancel</button></td>';
+    html += '<td><span class="badge ' + statusClass + '">' + statusText + '</span></td>';
+    if (a.status && a.status.indexOf('CANCELLED') < 0) {
+      html += '<td><button class="btn btn-sm btn-danger" onclick="event.stopPropagation();cancelSingleAppt(\\'' + esc(a.appointmentId) + '\\', \\'' + containerId + '\\')">Cancel</button></td>';
+    } else {
+      html += '<td></td>';
+    }
     html += '</tr>';
   }
   html += '</tbody></table></div>';
@@ -3352,6 +3475,13 @@ function formatDateNice(dateStr) {
   return months[parseInt(parts[1], 10) - 1] + ' ' + parseInt(parts[2], 10) + ', ' + parts[0];
 }
 
+function formatDateFull(dateStr) {
+  if (!dateStr) return '';
+  var d = new Date(dateStr + 'T00:00:00');
+  var days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  return days[d.getDay()] + ', ' + formatDateNice(dateStr);
+}
+
 function esc(s) {
   if (s === null || s === undefined) return '';
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -3369,6 +3499,27 @@ function getSelectedIds(containerId) {
   return ids;
 }
 
+// ========== Date helpers ==========
+
+function todayStr() {
+  var d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
+function addDaysStr(dateStr, n) {
+  var d = new Date(dateStr + 'T00:00:00');
+  d.setDate(d.getDate() + n);
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
+function getMondayOf(dateStr) {
+  var d = new Date(dateStr + 'T00:00:00');
+  var dow = d.getDay();
+  var diff = dow === 0 ? -6 : 1 - dow; // Monday = 1
+  d.setDate(d.getDate() + diff);
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
 // ========== Load Dashboard ==========
 
 function loadDashboard() {
@@ -3383,14 +3534,20 @@ function loadDashboard() {
       document.getElementById('statToday').textContent = res.todayAppointments.length;
       document.getElementById('statTomorrow').textContent = res.tomorrowAppointments.length;
 
-      document.getElementById('todayHeader').textContent = "Today's Appointments (" + res.todayKey + ')';
-      document.getElementById('tomorrowHeader').textContent = "Tomorrow's Appointments (" + res.tomorrowKey + ')';
-
-      renderApptTable(res.todayAppointments, 'todayTable', false);
-      renderApptTable(res.tomorrowAppointments, 'tomorrowTable', false);
       renderOverrides(res.doctorOffEntries, res.extraSlotEntries);
 
-      // Set default dates
+      // Initialize schedule to today if not set
+      if (!_schedDate) {
+        _schedDate = res.todayKey;
+        _weekStart = getMondayOf(_schedDate);
+        document.getElementById('schedDate').value = _schedDate;
+      }
+
+      // Load schedule for current date and week
+      loadSchedAppts();
+      loadWeekOverview();
+
+      // Set default dates for Quick Actions
       document.getElementById('actionDate').value = res.todayKey;
       loadActionAppts();
       document.getElementById('notifyDate').value = res.todayKey;
@@ -3406,6 +3563,175 @@ function loadDashboard() {
       showMsg('globalMsg', 'bad', 'Error: ' + (err && err.message ? err.message : String(err)));
     })
     .apiAdminGetDashboard(SIG);
+}
+
+// ========== Schedule Tab: Date Navigation ==========
+
+function goToDate(dateStr) {
+  _schedDate = dateStr;
+  document.getElementById('schedDate').value = dateStr;
+  clearSearch();
+  var newWeek = getMondayOf(dateStr);
+  if (newWeek !== _weekStart) {
+    _weekStart = newWeek;
+    loadWeekOverview();
+  } else {
+    highlightWeekCell();
+  }
+  loadSchedAppts();
+}
+
+function goToToday() { goToDate(todayStr()); }
+function goToTomorrow() { goToDate(addDaysStr(todayStr(), 1)); }
+function changeDay(dir) { goToDate(addDaysStr(_schedDate, dir)); }
+function onSchedDateChange() { goToDate(document.getElementById('schedDate').value); }
+
+function loadSchedAppts() {
+  if (!_schedDate) return;
+  document.getElementById('schedHeader').textContent = formatDateFull(_schedDate);
+  document.getElementById('schedTable').innerHTML = '<div class="empty">Loading...</div>';
+
+  google.script.run
+    .withSuccessHandler(function(res) {
+      if (!res || !res.ok) {
+        document.getElementById('schedTable').innerHTML = '<div class="empty">' + esc(res.reason || 'Failed.') + '</div>';
+        return;
+      }
+      renderApptTable(res.appointments, 'schedTable', false);
+    })
+    .withFailureHandler(function() {
+      document.getElementById('schedTable').innerHTML = '<div class="empty">Error loading.</div>';
+    })
+    .apiAdminGetDateAppointments(SIG, _schedDate);
+}
+
+// ========== Week Overview ==========
+
+function changeWeek(dir) {
+  _weekStart = addDaysStr(_weekStart, dir * 7);
+  loadWeekOverview();
+}
+
+function loadWeekOverview() {
+  var grid = document.getElementById('weekGrid');
+  var label = document.getElementById('weekLabel');
+  var endStr = addDaysStr(_weekStart, 6);
+  label.textContent = formatDateNice(_weekStart) + ' - ' + formatDateNice(endStr);
+
+  // Show placeholder cells
+  var days = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  var html = '';
+  for (var i = 0; i < 7; i++) {
+    var dk = addDaysStr(_weekStart, i);
+    var num = parseInt(dk.split('-')[2], 10);
+    html += '<div class="week-cell' + (dk === todayStr() ? ' today' : '') + (dk === _schedDate ? ' selected' : '') + '" onclick="goToDate(\\'' + dk + '\\')">';
+    html += '<div class="wc-day">' + days[i] + '</div>';
+    html += '<div class="wc-num">' + num + '</div>';
+    html += '<div class="wc-count" id="wc-' + dk + '">...</div>';
+    html += '</div>';
+  }
+  grid.innerHTML = html;
+
+  google.script.run
+    .withSuccessHandler(function(res) {
+      if (!res || !res.ok) return;
+      for (var i = 0; i < res.days.length; i++) {
+        var d = res.days[i];
+        var countEl = document.getElementById('wc-' + d.dateKey);
+        if (!countEl) continue;
+        var cell = countEl.closest('.week-cell');
+
+        if (!d.hasHours && d.count === 0) {
+          countEl.textContent = '--';
+          cell.classList.add('no-hours');
+        } else {
+          var dots = '';
+          if (d.hasBlock) dots += '<span class="wc-dot" style="background:var(--bad)"></span>';
+          if (d.hasExtra) dots += '<span class="wc-dot" style="background:var(--good)"></span>';
+          countEl.innerHTML = d.count + (dots ? ' ' + dots : '');
+          if (d.hasBlock) cell.classList.add('blocked');
+        }
+      }
+    })
+    .withFailureHandler(function() {})
+    .apiAdminGetWeekOverview(SIG, _weekStart);
+}
+
+function highlightWeekCell() {
+  var cells = document.querySelectorAll('.week-cell');
+  cells.forEach(function(c) { c.classList.remove('selected'); });
+  // Find the cell for _schedDate by looking at onclick
+  cells.forEach(function(c) {
+    if (c.getAttribute('onclick') && c.getAttribute('onclick').indexOf(_schedDate) >= 0) {
+      c.classList.add('selected');
+    }
+  });
+}
+
+// ========== Search ==========
+
+function onSearchInput() {
+  var q = document.getElementById('searchInput').value.trim();
+  document.getElementById('searchClear').style.display = q ? 'block' : 'none';
+
+  if (_searchTimer) clearTimeout(_searchTimer);
+
+  if (q.length < 2) {
+    document.getElementById('searchResults').style.display = 'none';
+    document.getElementById('scheduleView').style.display = 'block';
+    return;
+  }
+
+  _searchTimer = setTimeout(function() { doSearch(q); }, 400);
+}
+
+function doSearch(query) {
+  document.getElementById('searchResults').style.display = 'block';
+  document.getElementById('scheduleView').style.display = 'none';
+  document.getElementById('searchResults').innerHTML = '<div class="card"><div class="empty">Searching...</div></div>';
+
+  google.script.run
+    .withSuccessHandler(function(res) {
+      if (!res || !res.ok) {
+        document.getElementById('searchResults').innerHTML = '<div class="card"><div class="empty">' + esc(res.reason || 'Search failed.') + '</div></div>';
+        return;
+      }
+      if (!res.results.length) {
+        document.getElementById('searchResults').innerHTML = '<div class="card"><div class="empty">No results found for "' + esc(query) + '".</div></div>';
+        return;
+      }
+      var html = '<div class="card"><h3>Search Results (' + res.total + ')</h3>';
+      html += '<div class="table-wrap"><table><thead><tr><th>Date</th><th>Time</th><th>Patient</th><th>Phone</th><th>Service</th><th>Location</th><th>Status</th></tr></thead><tbody>';
+      for (var i = 0; i < res.results.length; i++) {
+        var r = res.results[i];
+        var statusClass = 'badge-green';
+        var statusText = 'Booked';
+        if (r.status === 'RELOCATED_SPINOLA') statusText = 'Spinola';
+        else if (r.status && r.status.indexOf('CANCELLED') >= 0) { statusClass = 'badge-red'; statusText = 'Cancelled'; }
+        html += '<tr style="cursor:pointer" onclick="goToDate(\\'' + esc(r.dateKey) + '\\')">';
+        html += '<td><b>' + esc(r.dateKey) + '</b></td>';
+        html += '<td>' + esc(r.startTime) + ' - ' + esc(r.endTime) + '</td>';
+        html += '<td>' + esc(r.fullName) + '</td>';
+        html += '<td>' + esc(r.phone) + '</td>';
+        html += '<td>' + esc(r.serviceName) + '</td>';
+        html += '<td>' + esc(r.location) + '</td>';
+        html += '<td><span class="badge ' + statusClass + '">' + statusText + '</span></td>';
+        html += '</tr>';
+      }
+      html += '</tbody></table></div></div>';
+      document.getElementById('searchResults').innerHTML = html;
+    })
+    .withFailureHandler(function() {
+      document.getElementById('searchResults').innerHTML = '<div class="card"><div class="empty">Search error.</div></div>';
+    })
+    .apiAdminSearchAppointments(SIG, query);
+}
+
+function clearSearch() {
+  document.getElementById('searchInput').value = '';
+  document.getElementById('searchClear').style.display = 'none';
+  document.getElementById('searchResults').style.display = 'none';
+  document.getElementById('scheduleView').style.display = 'block';
 }
 
 // ========== Availability (unified Block / Extra) ==========
@@ -3746,9 +4072,10 @@ function processAction(action) {
 }
 
 function cancelSingleAppt(appointmentId, containerId) {
-  var dateKey = containerId === 'actionApptsList'
-    ? document.getElementById('actionDate').value
-    : document.getElementById('notifyDate').value;
+  var dateKey;
+  if (containerId === 'actionApptsList') dateKey = document.getElementById('actionDate').value;
+  else if (containerId === 'notifyApptsList') dateKey = document.getElementById('notifyDate').value;
+  else dateKey = _schedDate;
   if (!dateKey) return;
   styledConfirm('Cancel Appointment', 'Are you sure you want to cancel this appointment?', 'Yes, Cancel', 'btn-danger', 'Go Back').then(function(ok){
   if (!ok) return;
@@ -3762,10 +4089,11 @@ function cancelSingleAppt(appointmentId, containerId) {
         showMsg(msgId, 'bad', res.reason || 'Failed.');
         return;
       }
-      var msgId = containerId === 'actionApptsList' ? 'actionMsg' : 'notifyResultMsg';
+      var msgId = containerId === 'actionApptsList' ? 'actionMsg' : containerId === 'notifyApptsList' ? 'notifyResultMsg' : 'globalMsg';
       showMsg(msgId, 'good', 'Appointment cancelled.');
       if (containerId === 'actionApptsList') loadActionAppts();
-      else loadNotifyAppts();
+      else if (containerId === 'notifyApptsList') loadNotifyAppts();
+      else loadSchedAppts();
       loadDashboard();
     })
     .withFailureHandler(function(err) {
@@ -3865,12 +4193,11 @@ function doAutoRefresh() {
       document.getElementById('statToday').textContent = res.todayAppointments.length;
       document.getElementById('statTomorrow').textContent = res.tomorrowAppointments.length;
 
-      document.getElementById('todayHeader').textContent = "Today's Appointments (" + res.todayKey + ')';
-      document.getElementById('tomorrowHeader').textContent = "Tomorrow's Appointments (" + res.tomorrowKey + ')';
-
-      renderApptTable(res.todayAppointments, 'todayTable', false);
-      renderApptTable(res.tomorrowAppointments, 'tomorrowTable', false);
       renderOverrides(res.doctorOffEntries, res.extraSlotEntries);
+
+      // Refresh current schedule view and week overview
+      loadSchedAppts();
+      loadWeekOverview();
     })
     .withFailureHandler(function() {
       _isRefreshing = false;
@@ -3896,6 +4223,153 @@ function updateRefreshDisplay() {
 
 _refreshTimerId = setInterval(doAutoRefresh, REFRESH_INTERVAL_SEC * 1000);
 setInterval(updateRefreshDisplay, 1000);
+
+// ========== Settings Tab ==========
+
+var _settingsLoaded = false;
+var _settingsData = null;
+
+function loadSettings() {
+  if (_settingsLoaded) return;
+  showLoading('Loading settings...', 'Fetching configuration.');
+  google.script.run
+    .withSuccessHandler(function(res) {
+      hideLoading();
+      if (!res || !res.ok) { showMsg('settingsMsg', 'bad', 'Failed to load settings.'); return; }
+      _settingsLoaded = true;
+      _settingsData = res.settings;
+      populateSettings(res.settings);
+    })
+    .withFailureHandler(function(err) {
+      hideLoading();
+      showMsg('settingsMsg', 'bad', 'Error: ' + (err && err.message ? err.message : String(err)));
+    })
+    .apiAdminGetSettings(SIG);
+}
+
+function populateSettings(s) {
+  document.getElementById('setDoctorEmail').value = s.doctorEmail || '';
+  document.getElementById('setTimezone').value = s.timezone || '';
+  document.getElementById('setPottersLoc').value = s.pottersLocation || '';
+  document.getElementById('setSpinolaLoc').value = s.spinolaLocation || '';
+  document.getElementById('setDuration').value = s.apptDurationMin || 10;
+  document.getElementById('setAdvanceDays').value = s.advanceDays || 7;
+  document.getElementById('setMaxAppts').value = s.maxActiveApptsPerPerson || 0;
+  renderHoursEditor(s.workingHours);
+}
+
+function renderHoursEditor(hours) {
+  var dayNames = {MON:'Monday',TUE:'Tuesday',WED:'Wednesday',THU:'Thursday',FRI:'Friday',SAT:'Saturday',SUN:'Sunday'};
+  var dayOrder = ['MON','TUE','WED','THU','FRI','SAT','SUN'];
+  var el = document.getElementById('hoursEditor');
+  var html = '';
+
+  for (var di = 0; di < dayOrder.length; di++) {
+    var day = dayOrder[di];
+    var blocks = hours[day] || [];
+    var enabled = blocks.length > 0;
+
+    html += '<div class="day-row" data-day="' + day + '">';
+    html += '<div class="day-row-header">';
+    html += '<span class="day-name">' + dayNames[day] + '</span>';
+    html += '<label class="day-toggle"><input type="checkbox" ' + (enabled ? 'checked' : '') + ' onchange="toggleDay(\\'' + day + '\\', this.checked)"><span class="slider"></span></label>';
+    html += '</div>';
+    html += '<div class="day-blocks" id="blocks-' + day + '">';
+
+    if (enabled) {
+      for (var bi = 0; bi < blocks.length; bi++) {
+        html += timeBlockRow(day, bi, blocks[bi].start, blocks[bi].end);
+      }
+    }
+
+    html += '</div>';
+    html += '<button type="button" class="add-block-btn" onclick="addTimeBlock(\\'' + day + '\\')" ' + (enabled ? '' : 'style="display:none"') + ' id="addBtn-' + day + '">+ Add time block</button>';
+    html += '</div>';
+  }
+
+  el.innerHTML = html;
+}
+
+function timeBlockRow(day, idx, start, end) {
+  return '<div class="time-block-row">' +
+    '<input type="time" value="' + (start || '09:00') + '" step="600">' +
+    '<span class="block-sep">to</span>' +
+    '<input type="time" value="' + (end || '12:00') + '" step="600">' +
+    '<button type="button" class="remove-block" onclick="this.parentElement.remove()" title="Remove">&times;</button>' +
+    '</div>';
+}
+
+function toggleDay(day, enabled) {
+  var blocksEl = document.getElementById('blocks-' + day);
+  var addBtn = document.getElementById('addBtn-' + day);
+  if (enabled) {
+    if (blocksEl.children.length === 0) {
+      blocksEl.innerHTML = timeBlockRow(day, 0, '09:00', '12:00');
+    }
+    addBtn.style.display = '';
+  } else {
+    blocksEl.innerHTML = '';
+    addBtn.style.display = 'none';
+  }
+}
+
+function addTimeBlock(day) {
+  var blocksEl = document.getElementById('blocks-' + day);
+  var div = document.createElement('div');
+  div.innerHTML = timeBlockRow(day, blocksEl.children.length, '09:00', '12:00');
+  blocksEl.appendChild(div.firstChild);
+}
+
+function collectSettings() {
+  var settings = {
+    doctorEmail: document.getElementById('setDoctorEmail').value,
+    timezone: document.getElementById('setTimezone').value,
+    pottersLocation: document.getElementById('setPottersLoc').value,
+    spinolaLocation: document.getElementById('setSpinolaLoc').value,
+    apptDurationMin: parseInt(document.getElementById('setDuration').value, 10),
+    advanceDays: parseInt(document.getElementById('setAdvanceDays').value, 10),
+    maxActiveApptsPerPerson: parseInt(document.getElementById('setMaxAppts').value, 10)
+  };
+
+  // Collect working hours
+  var dayOrder = ['MON','TUE','WED','THU','FRI','SAT','SUN'];
+  var wh = {};
+  for (var di = 0; di < dayOrder.length; di++) {
+    var day = dayOrder[di];
+    var blocksEl = document.getElementById('blocks-' + day);
+    var rows = blocksEl.querySelectorAll('.time-block-row');
+    wh[day] = [];
+    for (var ri = 0; ri < rows.length; ri++) {
+      var inputs = rows[ri].querySelectorAll('input[type=time]');
+      if (inputs.length >= 2 && inputs[0].value && inputs[1].value) {
+        wh[day].push({ start: inputs[0].value.substring(0, 5), end: inputs[1].value.substring(0, 5) });
+      }
+    }
+  }
+  settings.workingHours = wh;
+  return settings;
+}
+
+function saveSettings() {
+  var settings = collectSettings();
+
+  styledConfirm('Save Settings', 'Save all settings? This will affect the booking page immediately.', 'Save', 'btn-dark', 'Cancel').then(function(ok) {
+    if (!ok) return;
+    showLoading('Saving settings...', 'Applying configuration changes.');
+    google.script.run
+      .withSuccessHandler(function(res) {
+        hideLoading();
+        if (!res || !res.ok) { showMsg('settingsMsg', 'bad', res.reason || 'Failed to save.'); return; }
+        showMsg('settingsMsg', 'good', res.message);
+        _settingsLoaded = false; // Force reload on next tab switch
+      })
+      .withFailureHandler(function(err) {
+        hideLoading();
+        showMsg('settingsMsg', 'bad', 'Error: ' + (err && err.message ? err.message : String(err)));
+      })
+      .apiAdminSaveSettings(SIG, settings);
+  });
+}
 </script>
 </body>
 </html>
@@ -3913,8 +4387,37 @@ var _cfgCache = null;
 var _propsCache = null;
 var _tzCache = null;
 
+var DEFAULT_HOURS = {
+  MON: [{ start: '09:00', end: '12:00' }, { start: '17:00', end: '19:00' }],
+  TUE: [{ start: '09:00', end: '12:00' }, { start: '17:00', end: '19:00' }],
+  WED: [{ start: '09:00', end: '12:00' }, { start: '17:00', end: '19:00' }],
+  THU: [{ start: '09:00', end: '12:00' }, { start: '17:00', end: '19:00' }],
+  FRI: [{ start: '09:00', end: '12:00' }, { start: '17:00', end: '19:00' }],
+  SAT: [{ start: '10:00', end: '12:00' }],
+  SUN: []
+};
+
 function CFG() {
   if (_cfgCache) return _cfgCache;
+
+  var props = getScriptProps_();
+
+  // Read working hours from script property, fallback to defaults
+  var hours = DEFAULT_HOURS;
+  var hoursJson = props.getProperty('WORKING_HOURS');
+  if (hoursJson) {
+    try { hours = JSON.parse(hoursJson); } catch (e) { hours = DEFAULT_HOURS; }
+  }
+
+  // Read numeric settings from script properties with defaults
+  var durationStr = props.getProperty('APPT_DURATION_MIN');
+  var duration = durationStr ? parseInt(durationStr, 10) : 10;
+  if (isNaN(duration) || duration < 1) duration = 10;
+
+  var advStr = props.getProperty('ADVANCE_DAYS');
+  var advDays = advStr ? parseInt(advStr, 10) : 7;
+  if (isNaN(advDays) || advDays < 1) advDays = 7;
+
   _cfgCache = {
     // Script Properties keys
     PROP_CONFIG_SSID: 'CONFIG_SPREADSHEET_ID',
@@ -3938,25 +4441,17 @@ function CFG() {
     // Appointment day sheet format
     APPT_SHEET_DATE_FORMAT: 'yyyy-MM-dd',
 
-    // Appointment settings
-    APPT_DURATION_MIN: 10,
-    ADVANCE_DAYS: 7,
+    // Appointment settings (now configurable via admin)
+    APPT_DURATION_MIN: duration,
+    ADVANCE_DAYS: advDays,
 
     // Services
     SERVICES: [
-      { id: 'clinic', name: 'Clinic Consultation', minutes: 10 }
+      { id: 'clinic', name: 'Clinic Consultation', minutes: duration }
     ],
 
-    // Working hours
-    HOURS: {
-      MON: [{ start: '09:00', end: '12:00' }, { start: '17:00', end: '19:00' }],
-      TUE: [{ start: '09:00', end: '12:00' }, { start: '17:00', end: '19:00' }],
-      WED: [{ start: '09:00', end: '12:00' }, { start: '17:00', end: '19:00' }],
-      THU: [{ start: '09:00', end: '12:00' }, { start: '17:00', end: '19:00' }],
-      FRI: [{ start: '09:00', end: '12:00' }, { start: '17:00', end: '19:00' }],
-      SAT: [{ start: '10:00', end: '12:00' }],
-      SUN: []
-    }
+    // Working hours (now configurable via admin)
+    HOURS: hours
   };
   return _cfgCache;
 }
@@ -6381,6 +6876,196 @@ function apiAdminNotifyPatients(sig, payload) {
   }
 
   return { ok: true, message: 'Notification sent to ' + sent + ' patient(s).', sent: sent };
+}
+
+/**
+ * Get week overview: appointment counts per day for a given week.
+ */
+function apiAdminGetWeekOverview(sig, weekStartDate) {
+  if (!verifyAdminSig_(sig)) return { ok: false, reason: 'Access denied.' };
+
+  weekStartDate = String(weekStartDate || '').trim();
+  if (!weekStartDate || !/^\d{4}-\d{2}-\d{2}$/.test(weekStartDate)) {
+    return { ok: false, reason: 'Invalid week start date.' };
+  }
+
+  var offRows = getDoctorOffRows_();
+  var extraRows = getDoctorExtraRows_();
+  var ss = getAppointmentsSpreadsheet_();
+  var days = [];
+
+  for (var d = 0; d < 7; d++) {
+    var dt = new Date(weekStartDate + 'T00:00:00');
+    dt.setDate(dt.getDate() + d);
+    var dk = toDateKey_(dt);
+
+    var count = 0;
+    var sh = ss.getSheetByName(dk);
+    if (sh && sh.getLastRow() >= 2) {
+      var vals = sh.getRange(2, 1, sh.getLastRow() - 1, 18).getValues();
+      for (var r = 0; r < vals.length; r++) {
+        var st = String(vals[r][10] || '');
+        if (st === 'BOOKED' || st === 'RELOCATED_SPINOLA') count++;
+      }
+    }
+
+    // Check for blocks on this date
+    var hasBlock = false;
+    for (var b = 0; b < offRows.length; b++) {
+      if (offRows[b].startDate <= dk && offRows[b].endDate >= dk) { hasBlock = true; break; }
+    }
+
+    // Check for extras on this date
+    var hasExtra = false;
+    for (var e = 0; e < extraRows.length; e++) {
+      if (extraRows[e].date === dk) { hasExtra = true; break; }
+    }
+
+    // Check if this day has working hours
+    var dowKey = dayOfWeekKey_(dt);
+    var hasHours = (CFG().HOURS[dowKey] || []).length > 0;
+
+    days.push({ dateKey: dk, count: count, hasBlock: hasBlock, hasExtra: hasExtra, hasHours: hasHours });
+  }
+
+  return { ok: true, days: days };
+}
+
+/**
+ * Search appointments by patient name or phone.
+ */
+function apiAdminSearchAppointments(sig, query) {
+  if (!verifyAdminSig_(sig)) return { ok: false, reason: 'Access denied.' };
+
+  query = String(query || '').trim().toLowerCase();
+  if (!query || query.length < 2) return { ok: false, reason: 'Query too short.' };
+
+  var today = todayLocal_();
+  var ss = getAppointmentsSpreadsheet_();
+  var results = [];
+
+  // Search past 30 days + future 14 days
+  for (var d = -30; d <= 14; d++) {
+    if (results.length >= 50) break;
+    var dt = addMinutes_(today, d * 24 * 60);
+    var dk = toDateKey_(dt);
+    var sh = ss.getSheetByName(dk);
+    if (!sh || sh.getLastRow() < 2) continue;
+
+    var vals = sh.getRange(2, 1, sh.getLastRow() - 1, 18).getValues();
+    for (var r = 0; r < vals.length; r++) {
+      if (results.length >= 50) break;
+      var name = String(vals[r][6] || '').toLowerCase();
+      var phone = String(vals[r][8] || '').toLowerCase();
+      var status = String(vals[r][10] || '');
+      if (name.indexOf(query) >= 0 || phone.indexOf(query) >= 0) {
+        results.push({
+          dateKey: dk,
+          appointmentId: String(vals[r][0] || ''),
+          startTime: normalizeTimeCell_(vals[r][2]),
+          endTime: normalizeTimeCell_(vals[r][3]),
+          serviceName: String(vals[r][5] || ''),
+          fullName: String(vals[r][6] || ''),
+          email: String(vals[r][7] || ''),
+          phone: String(vals[r][8] || ''),
+          status: status,
+          location: String(vals[r][11] || '')
+        });
+      }
+    }
+  }
+
+  // Sort by date descending (most recent first)
+  results.sort(function(a, b) { return a.dateKey > b.dateKey ? -1 : a.dateKey < b.dateKey ? 1 : 0; });
+
+  return { ok: true, results: results, total: results.length };
+}
+
+/**
+ * Get admin settings.
+ */
+function apiAdminGetSettings(sig) {
+  if (!verifyAdminSig_(sig)) return { ok: false, reason: 'Access denied.' };
+
+  var props = getScriptProps_();
+  var hoursJson = props.getProperty('WORKING_HOURS');
+  var hours = null;
+  if (hoursJson) { try { hours = JSON.parse(hoursJson); } catch (e) {} }
+  if (!hours) hours = DEFAULT_HOURS;
+
+  return {
+    ok: true,
+    settings: {
+      doctorEmail: props.getProperty(CFG().PROP_DOCTOR_EMAIL) || '',
+      timezone: props.getProperty(CFG().PROP_TIMEZONE) || 'Europe/Malta',
+      pottersLocation: props.getProperty(CFG().PROP_POTTERS_LOCATION) || "Potter's Pharmacy Clinic",
+      spinolaLocation: props.getProperty(CFG().PROP_SPINOLA_LOCATION) || 'Spinola Clinic',
+      apptDurationMin: CFG().APPT_DURATION_MIN,
+      advanceDays: CFG().ADVANCE_DAYS,
+      maxActiveApptsPerPerson: parseInt(props.getProperty(CFG().PROP_MAX_ACTIVE_APPTS_PER_PERSON) || '0', 10),
+      workingHours: hours
+    }
+  };
+}
+
+/**
+ * Save admin settings.
+ */
+function apiAdminSaveSettings(sig, settings) {
+  if (!verifyAdminSig_(sig)) return { ok: false, reason: 'Access denied.' };
+
+  settings = settings || {};
+  var props = getScriptProps_();
+
+  // Save simple string properties
+  if (settings.doctorEmail !== undefined) props.setProperty(CFG().PROP_DOCTOR_EMAIL, String(settings.doctorEmail).trim());
+  if (settings.timezone !== undefined) props.setProperty(CFG().PROP_TIMEZONE, String(settings.timezone).trim());
+  if (settings.pottersLocation !== undefined) props.setProperty(CFG().PROP_POTTERS_LOCATION, String(settings.pottersLocation).trim());
+  if (settings.spinolaLocation !== undefined) props.setProperty(CFG().PROP_SPINOLA_LOCATION, String(settings.spinolaLocation).trim());
+
+  // Save numeric properties
+  if (settings.apptDurationMin !== undefined) {
+    var dur = parseInt(settings.apptDurationMin, 10);
+    if (isNaN(dur) || dur < 1) return { ok: false, reason: 'Appointment duration must be at least 1 minute.' };
+    props.setProperty('APPT_DURATION_MIN', String(dur));
+  }
+  if (settings.advanceDays !== undefined) {
+    var adv = parseInt(settings.advanceDays, 10);
+    if (isNaN(adv) || adv < 1) return { ok: false, reason: 'Advance days must be at least 1.' };
+    props.setProperty('ADVANCE_DAYS', String(adv));
+  }
+  if (settings.maxActiveApptsPerPerson !== undefined) {
+    var max = parseInt(settings.maxActiveApptsPerPerson, 10);
+    if (isNaN(max) || max < 0) max = 0;
+    props.setProperty(CFG().PROP_MAX_ACTIVE_APPTS_PER_PERSON, String(max));
+  }
+
+  // Save working hours
+  if (settings.workingHours !== undefined) {
+    var wh = settings.workingHours;
+    // Validate structure
+    var validDays = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+    for (var i = 0; i < validDays.length; i++) {
+      var dayKey = validDays[i];
+      if (!wh[dayKey]) wh[dayKey] = [];
+      if (!Array.isArray(wh[dayKey])) return { ok: false, reason: 'Working hours for ' + dayKey + ' must be an array.' };
+      for (var j = 0; j < wh[dayKey].length; j++) {
+        var block = wh[dayKey][j];
+        if (!block.start || !block.end) return { ok: false, reason: 'Each time block must have start and end times.' };
+        if (!/^\d{2}:\d{2}$/.test(block.start) || !/^\d{2}:\d{2}$/.test(block.end)) {
+          return { ok: false, reason: 'Time format must be HH:mm.' };
+        }
+      }
+    }
+    props.setProperty('WORKING_HOURS', JSON.stringify(wh));
+  }
+
+  // Clear config cache so changes take effect
+  _cfgCache = null;
+  _propsCache = null;
+  _tzCache = null;
+
+  return { ok: true, message: 'Settings saved successfully.' };
 }
 
 // ===== Install.gs =====

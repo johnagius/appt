@@ -470,3 +470,193 @@ function apiAdminNotifyPatients(sig, payload) {
 
   return { ok: true, message: 'Notification sent to ' + sent + ' patient(s).', sent: sent };
 }
+
+/**
+ * Get week overview: appointment counts per day for a given week.
+ */
+function apiAdminGetWeekOverview(sig, weekStartDate) {
+  if (!verifyAdminSig_(sig)) return { ok: false, reason: 'Access denied.' };
+
+  weekStartDate = String(weekStartDate || '').trim();
+  if (!weekStartDate || !/^\d{4}-\d{2}-\d{2}$/.test(weekStartDate)) {
+    return { ok: false, reason: 'Invalid week start date.' };
+  }
+
+  var offRows = getDoctorOffRows_();
+  var extraRows = getDoctorExtraRows_();
+  var ss = getAppointmentsSpreadsheet_();
+  var days = [];
+
+  for (var d = 0; d < 7; d++) {
+    var dt = new Date(weekStartDate + 'T00:00:00');
+    dt.setDate(dt.getDate() + d);
+    var dk = toDateKey_(dt);
+
+    var count = 0;
+    var sh = ss.getSheetByName(dk);
+    if (sh && sh.getLastRow() >= 2) {
+      var vals = sh.getRange(2, 1, sh.getLastRow() - 1, 18).getValues();
+      for (var r = 0; r < vals.length; r++) {
+        var st = String(vals[r][10] || '');
+        if (st === 'BOOKED' || st === 'RELOCATED_SPINOLA') count++;
+      }
+    }
+
+    // Check for blocks on this date
+    var hasBlock = false;
+    for (var b = 0; b < offRows.length; b++) {
+      if (offRows[b].startDate <= dk && offRows[b].endDate >= dk) { hasBlock = true; break; }
+    }
+
+    // Check for extras on this date
+    var hasExtra = false;
+    for (var e = 0; e < extraRows.length; e++) {
+      if (extraRows[e].date === dk) { hasExtra = true; break; }
+    }
+
+    // Check if this day has working hours
+    var dowKey = dayOfWeekKey_(dt);
+    var hasHours = (CFG().HOURS[dowKey] || []).length > 0;
+
+    days.push({ dateKey: dk, count: count, hasBlock: hasBlock, hasExtra: hasExtra, hasHours: hasHours });
+  }
+
+  return { ok: true, days: days };
+}
+
+/**
+ * Search appointments by patient name or phone.
+ */
+function apiAdminSearchAppointments(sig, query) {
+  if (!verifyAdminSig_(sig)) return { ok: false, reason: 'Access denied.' };
+
+  query = String(query || '').trim().toLowerCase();
+  if (!query || query.length < 2) return { ok: false, reason: 'Query too short.' };
+
+  var today = todayLocal_();
+  var ss = getAppointmentsSpreadsheet_();
+  var results = [];
+
+  // Search past 30 days + future 14 days
+  for (var d = -30; d <= 14; d++) {
+    if (results.length >= 50) break;
+    var dt = addMinutes_(today, d * 24 * 60);
+    var dk = toDateKey_(dt);
+    var sh = ss.getSheetByName(dk);
+    if (!sh || sh.getLastRow() < 2) continue;
+
+    var vals = sh.getRange(2, 1, sh.getLastRow() - 1, 18).getValues();
+    for (var r = 0; r < vals.length; r++) {
+      if (results.length >= 50) break;
+      var name = String(vals[r][6] || '').toLowerCase();
+      var phone = String(vals[r][8] || '').toLowerCase();
+      var status = String(vals[r][10] || '');
+      if (name.indexOf(query) >= 0 || phone.indexOf(query) >= 0) {
+        results.push({
+          dateKey: dk,
+          appointmentId: String(vals[r][0] || ''),
+          startTime: normalizeTimeCell_(vals[r][2]),
+          endTime: normalizeTimeCell_(vals[r][3]),
+          serviceName: String(vals[r][5] || ''),
+          fullName: String(vals[r][6] || ''),
+          email: String(vals[r][7] || ''),
+          phone: String(vals[r][8] || ''),
+          status: status,
+          location: String(vals[r][11] || '')
+        });
+      }
+    }
+  }
+
+  // Sort by date descending (most recent first)
+  results.sort(function(a, b) { return a.dateKey > b.dateKey ? -1 : a.dateKey < b.dateKey ? 1 : 0; });
+
+  return { ok: true, results: results, total: results.length };
+}
+
+/**
+ * Get admin settings.
+ */
+function apiAdminGetSettings(sig) {
+  if (!verifyAdminSig_(sig)) return { ok: false, reason: 'Access denied.' };
+
+  var props = getScriptProps_();
+  var hoursJson = props.getProperty('WORKING_HOURS');
+  var hours = null;
+  if (hoursJson) { try { hours = JSON.parse(hoursJson); } catch (e) {} }
+  if (!hours) hours = DEFAULT_HOURS;
+
+  return {
+    ok: true,
+    settings: {
+      doctorEmail: props.getProperty(CFG().PROP_DOCTOR_EMAIL) || '',
+      timezone: props.getProperty(CFG().PROP_TIMEZONE) || 'Europe/Malta',
+      pottersLocation: props.getProperty(CFG().PROP_POTTERS_LOCATION) || "Potter's Pharmacy Clinic",
+      spinolaLocation: props.getProperty(CFG().PROP_SPINOLA_LOCATION) || 'Spinola Clinic',
+      apptDurationMin: CFG().APPT_DURATION_MIN,
+      advanceDays: CFG().ADVANCE_DAYS,
+      maxActiveApptsPerPerson: parseInt(props.getProperty(CFG().PROP_MAX_ACTIVE_APPTS_PER_PERSON) || '0', 10),
+      workingHours: hours
+    }
+  };
+}
+
+/**
+ * Save admin settings.
+ */
+function apiAdminSaveSettings(sig, settings) {
+  if (!verifyAdminSig_(sig)) return { ok: false, reason: 'Access denied.' };
+
+  settings = settings || {};
+  var props = getScriptProps_();
+
+  // Save simple string properties
+  if (settings.doctorEmail !== undefined) props.setProperty(CFG().PROP_DOCTOR_EMAIL, String(settings.doctorEmail).trim());
+  if (settings.timezone !== undefined) props.setProperty(CFG().PROP_TIMEZONE, String(settings.timezone).trim());
+  if (settings.pottersLocation !== undefined) props.setProperty(CFG().PROP_POTTERS_LOCATION, String(settings.pottersLocation).trim());
+  if (settings.spinolaLocation !== undefined) props.setProperty(CFG().PROP_SPINOLA_LOCATION, String(settings.spinolaLocation).trim());
+
+  // Save numeric properties
+  if (settings.apptDurationMin !== undefined) {
+    var dur = parseInt(settings.apptDurationMin, 10);
+    if (isNaN(dur) || dur < 1) return { ok: false, reason: 'Appointment duration must be at least 1 minute.' };
+    props.setProperty('APPT_DURATION_MIN', String(dur));
+  }
+  if (settings.advanceDays !== undefined) {
+    var adv = parseInt(settings.advanceDays, 10);
+    if (isNaN(adv) || adv < 1) return { ok: false, reason: 'Advance days must be at least 1.' };
+    props.setProperty('ADVANCE_DAYS', String(adv));
+  }
+  if (settings.maxActiveApptsPerPerson !== undefined) {
+    var max = parseInt(settings.maxActiveApptsPerPerson, 10);
+    if (isNaN(max) || max < 0) max = 0;
+    props.setProperty(CFG().PROP_MAX_ACTIVE_APPTS_PER_PERSON, String(max));
+  }
+
+  // Save working hours
+  if (settings.workingHours !== undefined) {
+    var wh = settings.workingHours;
+    // Validate structure
+    var validDays = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+    for (var i = 0; i < validDays.length; i++) {
+      var dayKey = validDays[i];
+      if (!wh[dayKey]) wh[dayKey] = [];
+      if (!Array.isArray(wh[dayKey])) return { ok: false, reason: 'Working hours for ' + dayKey + ' must be an array.' };
+      for (var j = 0; j < wh[dayKey].length; j++) {
+        var block = wh[dayKey][j];
+        if (!block.start || !block.end) return { ok: false, reason: 'Each time block must have start and end times.' };
+        if (!/^\d{2}:\d{2}$/.test(block.start) || !/^\d{2}:\d{2}$/.test(block.end)) {
+          return { ok: false, reason: 'Time format must be HH:mm.' };
+        }
+      }
+    }
+    props.setProperty('WORKING_HOURS', JSON.stringify(wh));
+  }
+
+  // Clear config cache so changes take effect
+  _cfgCache = null;
+  _propsCache = null;
+  _tzCache = null;
+
+  return { ok: true, message: 'Settings saved successfully.' };
+}
