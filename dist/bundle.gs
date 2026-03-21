@@ -3658,8 +3658,8 @@ function renderApptTable(appts, containerId, withCheckboxes, showDate) {
     if (a.status === 'BOOKED' || a.status === 'RELOCATED_SPINOLA') {
       html += '<button class="btn btn-sm btn-danger" onclick="event.stopPropagation();cancelSingleAppt(\\'' + esc(a.appointmentId) + '\\', \\'' + containerId + '\\')">Cancel</button>';
       html += '<span class="att-btns">';
-      html += '<button class="btn btn-sm btn-good" onclick="event.stopPropagation();markAttendance(\\'' + esc(a.appointmentId) + '\\',\\'' + esc(a.dateKey) + '\\',true,\\'' + containerId + '\\')" title="Attended">&#x2713;</button>';
-      html += '<button class="btn btn-sm btn-warn" onclick="event.stopPropagation();markAttendance(\\'' + esc(a.appointmentId) + '\\',\\'' + esc(a.dateKey) + '\\',false,\\'' + containerId + '\\')" title="No-Show">&#x2717;</button>';
+      html += '<button class="btn btn-sm btn-good" onclick="event.stopPropagation();markAttendance(\\'' + esc(a.appointmentId) + '\\',\\'' + esc(a.dateKey) + '\\',true,\\'' + containerId + '\\')">Attended</button>';
+      html += '<button class="btn btn-sm btn-warn" onclick="event.stopPropagation();markAttendance(\\'' + esc(a.appointmentId) + '\\',\\'' + esc(a.dateKey) + '\\',false,\\'' + containerId + '\\')">No-Show</button>';
       html += '</span>';
     }
     html += '</td>';
@@ -3784,6 +3784,7 @@ function loadDashboard() {
       updateFillRing(res.todayAppointments.length, res.stats.todayCapacity || 0);
 
       renderOverrides(res.doctorOffEntries, res.extraSlotEntries);
+      _cachedDashboard = _dashboardHash(res);
 
       // Initialize schedule to today if not set
       if (!_schedDate) {
@@ -4302,7 +4303,7 @@ function processAction(action) {
       }
       showMsg('actionMsg', 'good', msg);
       loadActionAppts();
-      loadDashboard();
+      _scheduleStatsRefresh(); // Deferred dashboard refresh instead of full reload
     })
     .withFailureHandler(function(err) {
       hideLoading();
@@ -4337,10 +4338,11 @@ function cancelSingleAppt(appointmentId, containerId) {
       }
       var msgId = containerId === 'actionApptsList' ? 'actionMsg' : containerId === 'notifyApptsList' ? 'notifyResultMsg' : 'globalMsg';
       showMsg(msgId, 'good', 'Appointment cancelled.');
+      // Only reload the specific view that needs it (not entire dashboard)
       if (containerId === 'actionApptsList') loadActionAppts();
       else if (containerId === 'notifyApptsList') loadNotifyAppts();
       else loadSchedAppts();
-      loadDashboard();
+      _scheduleStatsRefresh(); // Deferred dashboard refresh instead of immediate
     })
     .withFailureHandler(function(err) {
       hideLoading();
@@ -4419,13 +4421,16 @@ if (document.readyState === 'complete' || document.readyState === 'interactive')
 }
 
 // ========== Auto-Refresh ==========
-var REFRESH_INTERVAL_SEC = 30;
+var REFRESH_INTERVAL_SEC = 60; // 60s instead of 30s to save quota
 var _lastRefreshTime = Date.now();
 var _refreshTimerId = null;
 var _isRefreshing = false;
+var _cachedDashboard = null; // Cache to detect actual changes
 
 function doAutoRefresh() {
   if (_isRefreshing) return;
+  // Skip refresh when tab is hidden (saves quota)
+  if (document.hidden) return;
   _isRefreshing = true;
 
   google.script.run
@@ -4434,6 +4439,7 @@ function doAutoRefresh() {
       _lastRefreshTime = Date.now();
       if (!res || !res.ok) return;
 
+      // Always update stats bar (cheap DOM ops)
       document.getElementById('statBooked').textContent = res.stats.weekBooked;
       document.getElementById('statCancelled').textContent = res.stats.weekCancelled;
       document.getElementById('statTomorrow').textContent = res.tomorrowAppointments.length;
@@ -4441,15 +4447,26 @@ function doAutoRefresh() {
 
       renderOverrides(res.doctorOffEntries, res.extraSlotEntries);
 
-      // Refresh current schedule view and week overview
-      loadSchedAppts();
-      loadWeekOverview();
+      // Only reload schedule/week if data actually changed (avoid 2 extra API calls)
+      var newHash = _dashboardHash(res);
+      if (!_cachedDashboard || _cachedDashboard !== newHash) {
+        _cachedDashboard = newHash;
+        loadSchedAppts();
+        loadWeekOverview();
+      }
     })
     .withFailureHandler(function() {
       _isRefreshing = false;
       _lastRefreshTime = Date.now();
     })
     .apiAdminGetDashboard(SIG);
+}
+
+// Quick hash of dashboard data to detect changes
+function _dashboardHash(res) {
+  return res.stats.weekBooked + '|' + res.stats.weekCancelled + '|' +
+    res.todayAppointments.length + '|' + res.tomorrowAppointments.length + '|' +
+    (res.doctorOffEntries || []).length + '|' + (res.extraSlotEntries || []).length;
 }
 
 function updateRefreshDisplay() {
@@ -4469,6 +4486,15 @@ function updateRefreshDisplay() {
 
 _refreshTimerId = setInterval(doAutoRefresh, REFRESH_INTERVAL_SEC * 1000);
 setInterval(updateRefreshDisplay, 1000);
+
+// Pause auto-refresh when tab is not visible (saves quota)
+document.addEventListener('visibilitychange', function() {
+  if (!document.hidden) {
+    // Tab became visible — do a refresh if stale (>30s since last)
+    var elapsed = (Date.now() - _lastRefreshTime) / 1000;
+    if (elapsed > 30) doAutoRefresh();
+  }
+});
 
 // ========== Settings Tab ==========
 
@@ -4634,24 +4660,61 @@ function updateFillRing(booked, capacity) {
 // ========== Attendance Tracking ==========
 
 function markAttendance(appointmentId, dateKey, attended, containerId) {
-  var label = attended ? 'attended' : 'no-show';
-  showLoading('Updating...', 'Marking as ' + label + '.');
+  // Optimistic UI: update the row immediately without refetching
+  var newStatus = attended ? 'ATTENDED' : 'NO_SHOW';
+  var badge = getStatusBadge(newStatus);
+  var container = document.getElementById(containerId);
+  if (container) {
+    var rows = container.querySelectorAll('tr');
+    for (var i = 0; i < rows.length; i++) {
+      var cb = rows[i].querySelector('.appt-cb');
+      if (cb && cb.value === appointmentId) {
+        // Update badge
+        var badgeEl = rows[i].querySelector('.badge');
+        if (badgeEl) { badgeEl.className = 'badge ' + badge.cls; badgeEl.textContent = badge.text; }
+        // Remove action buttons (cancel + attendance)
+        var lastTd = rows[i].querySelector('td:last-child');
+        if (lastTd) lastTd.innerHTML = '';
+        break;
+      }
+      // Also handle schedule table (no checkboxes)
+      if (!cb) {
+        var btns = rows[i].querySelectorAll('.att-btns button');
+        for (var j = 0; j < btns.length; j++) {
+          if (btns[j].getAttribute('onclick') && btns[j].getAttribute('onclick').indexOf(appointmentId) >= 0) {
+            var badgeEl2 = rows[i].querySelector('.badge');
+            if (badgeEl2) { badgeEl2.className = 'badge ' + badge.cls; badgeEl2.textContent = badge.text; }
+            var lastTd2 = rows[i].querySelector('td:last-child');
+            if (lastTd2) lastTd2.innerHTML = '';
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  // Fire-and-forget API call (no loading spinner, no refetch)
   google.script.run
     .withSuccessHandler(function(res) {
-      hideLoading();
-      if (!res || !res.ok) { showMsg('globalMsg', 'bad', res.reason || 'Failed.'); return; }
-      // Reload the view that contains this appointment
-      if (containerId === 'actionApptsList') loadActionAppts();
-      else if (containerId === 'notifyApptsList') loadNotifyAppts();
-      else loadSchedAppts();
-      // Also refresh dashboard stats
-      doAutoRefresh();
+      if (!res || !res.ok) { showMsg('globalMsg', 'bad', res.reason || 'Failed. Refresh to see current state.'); }
+      // Schedule a deferred stats bar refresh (debounced)
+      _scheduleStatsRefresh();
     })
     .withFailureHandler(function(err) {
-      hideLoading();
-      showMsg('globalMsg', 'bad', 'Error: ' + (err && err.message ? err.message : String(err)));
+      showMsg('globalMsg', 'bad', 'Error saving: ' + (err && err.message ? err.message : String(err)));
     })
     .apiAdminMarkAttendance(SIG, appointmentId, dateKey, attended);
+}
+
+// Debounced stats refresh — batches multiple rapid actions into one refresh
+var _statsRefreshTimer = null;
+function _scheduleStatsRefresh() {
+  if (_statsRefreshTimer) clearTimeout(_statsRefreshTimer);
+  _statsRefreshTimer = setTimeout(function() {
+    _statsRefreshTimer = null;
+    _lastRefreshTime = Date.now(); // Reset auto-refresh countdown
+    doAutoRefresh();
+  }, 3000); // Wait 3s for rapid clicks to settle before refreshing
 }
 
 // ========== Patient History ==========
