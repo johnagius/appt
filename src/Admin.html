@@ -684,6 +684,7 @@ function switchTab(name) {
   document.querySelector('[data-tab="' + name + '"]').classList.add('active');
   if (name === 'settings') loadSettings();
   if (name === 'statistics') loadStatistics();
+  if (name === 'actions') loadActionAppts();
 }
 
 function getStatusBadge(status) {
@@ -1546,6 +1547,10 @@ function doFullRefresh() {
         _cachedDashboard = newHash;
         loadSchedAppts();
         loadWeekOverview();
+        // Refresh quick actions if that tab is active
+        if (document.getElementById('tab-actions').style.display !== 'none') {
+          loadActionAppts();
+        }
       }
     })
     .withFailureHandler(function() {
