@@ -652,9 +652,19 @@ var _HTML_TEMPLATES = {
     }
     @keyframes spin{ to { transform: rotate(360deg); } }
 
-    .idle-bar{position:fixed;bottom:0;left:0;right:0;background:rgba(17,24,39,0.92);color:#e5e7eb;font-size:12px;padding:6px 14px;display:flex;justify-content:space-between;align-items:center;z-index:1500;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);font-weight:500;}
-    .idle-bar .idle-dot{width:6px;height:6px;border-radius:50%;background:var(--good);display:inline-block;margin-right:4px;animation:idle-pulse 2s ease-in-out infinite;}
-    @keyframes idle-pulse{0%,100%{opacity:1;}50%{opacity:0.3;}}
+    /* Idle overlay */
+    .idle-overlay{position:fixed;inset:0;z-index:2000;display:flex;align-items:center;justify-content:center;background:rgba(246,247,251,0.50);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);cursor:pointer;opacity:0;visibility:hidden;pointer-events:none;transition:opacity 0.5s ease,visibility 0.5s ease;}
+    .idle-overlay.show{opacity:1;visibility:visible;pointer-events:auto;}
+    .idle-card{text-align:center;padding:48px 36px;max-width:340px;animation:idle-float 3s ease-in-out infinite;}
+    .idle-icon{font-size:56px;margin-bottom:16px;animation:idle-pulse-icon 2.5s ease-in-out infinite;}
+    .idle-title{font-size:22px;font-weight:800;color:var(--text);margin:0 0 8px 0;letter-spacing:-0.3px;}
+    .idle-sub{font-size:14px;color:var(--muted);margin:0 0 24px 0;line-height:1.5;}
+    .idle-cta{display:inline-flex;align-items:center;gap:8px;padding:12px 28px;background:var(--accent);color:#fff;border-radius:40px;font-size:15px;font-weight:700;box-shadow:0 4px 20px rgba(245,179,1,0.35);transition:transform 0.2s,box-shadow 0.2s;}
+    .idle-cta:hover{transform:scale(1.05);box-shadow:0 6px 28px rgba(245,179,1,0.45);}
+    .idle-cta .idle-arrow{display:inline-block;transition:transform 0.3s;font-size:18px;}
+    .idle-overlay:hover .idle-arrow{transform:translateX(4px);}
+    @keyframes idle-float{0%,100%{transform:translateY(0);}50%{transform:translateY(-8px);}}
+    @keyframes idle-pulse-icon{0%,100%{opacity:1;transform:scale(1);}50%{opacity:0.7;transform:scale(0.95);}}
     .loadingText h4{ margin:0 0 4px 0; font-size:14px; }
     .loadingText div{ margin:0; color: var(--muted); font-size:12.5px; line-height:1.35; }
   </style>
@@ -776,8 +786,14 @@ var _HTML_TEMPLATES = {
 
   </div>
 
-  <div class="idle-bar" id="idleBar" style="display:none;">
-    <span><span class="idle-dot"></span> Page refreshes in: <span id="idleCountdown">5:00</span></span>
+  <!-- Idle overlay — shown after inactivity to pause all background fetches -->
+  <div class="idle-overlay" id="idleOverlay">
+    <div class="idle-card">
+      <div class="idle-icon">📋</div>
+      <div class="idle-title">Ready to Book?</div>
+      <div class="idle-sub">Tap anywhere to view the latest<br>available appointment slots</div>
+      <div class="idle-cta">Start Booking <span class="idle-arrow">→</span></div>
+    </div>
   </div>
 
   <!-- Confirmation modal -->
@@ -2338,7 +2354,6 @@ var _HTML_TEMPLATES = {
           if (!isSilentRefresh) hideLoading();
 
           if (res && res._debug) console.log('[APPT DEBUG]', JSON.stringify(res._debug));
-          if (res && res._v !== undefined) _cachedVersion = res._v;
           if (!res || !res.ok) {
             renderSlots([]);
             showHint(els.timeHint, 'bad', (res && res.reason) ? res.reason : t('noAvailability'));
@@ -2415,30 +2430,6 @@ var _HTML_TEMPLATES = {
         .apiBook(payload);
     });
 
-    // Auto-refresh (keeps page accurate if someone else books online or doctor adds overrides)
-    // ── Version-based polling ──
-    // Instead of re-reading sheets every 20s, we poll a lightweight version counter.
-    // Full data is only fetched when something actually changed.
-    var _cachedVersion = 0;
-    var _pollInFlight = false;
-
-    function pollForChanges() {
-      if (_pollInFlight || document.hidden) return;
-      _pollInFlight = true;
-      google.script.run
-        .withSuccessHandler(function(res) {
-          _pollInFlight = false;
-          if (!res) return;
-          if (res.v !== _cachedVersion) {
-            _cachedVersion = res.v;
-            // Data changed — refresh dates + availability
-            refreshDateOptions();
-          }
-        })
-        .withFailureHandler(function() { _pollInFlight = false; })
-        .apiPoll();
-    }
-
     function refreshDateOptions() {
       google.script.run
         .withSuccessHandler(function(dateOptions) {
@@ -2465,45 +2456,59 @@ var _HTML_TEMPLATES = {
       if (_autoRefreshInstalled) return;
       _autoRefreshInstalled = true;
 
-      // Version poll every 10s — detects bookings, cancellations, admin changes.
-      // Costs 1 PropertiesService read (no sheet access) when nothing changed.
-      setInterval(pollForChanges, 10000);
+      var _idlePaused = false;
+      var IDLE_MS = 5 * 60 * 1000 + 10 * 1000; // 5 minutes 10 seconds
+      var _lastActivity = Date.now();
+      var _slotTimerId = null;
+      var _dateTimerId = null;
+      var _idleCheckId = null;
+      var _idleOverlay = document.getElementById('idleOverlay');
 
-      // Time-based slot refresh every 45s — catches slots expiring as time passes
-      // (e.g. morning slots becoming "past"). Version poll can't catch this because
-      // no data write happens — it's purely a function of the current time.
-      setInterval(function() {
-        if (state.selectedDateKey && !document.hidden) loadAvailability(true);
-      }, 45000);
+      function isIdle() { return _idlePaused; }
 
-      // On tab focus/visibility — refresh immediately
-      window.addEventListener('focus', function() { refreshDateOptions(); });
+      // ── Slot refresh (30s) ──
+      _slotTimerId = setInterval(function() {
+        if (isIdle() || document.hidden || !state.selectedDateKey) return;
+        loadAvailability(true);
+      }, 30000);
+
+      // ── Date refresh (90s) ──
+      _dateTimerId = setInterval(function() {
+        if (isIdle() || document.hidden) return;
+        refreshDateOptions();
+      }, 90000);
+
+      // ── Focus / visibility — skip if idle ──
+      window.addEventListener('focus', function() {
+        if (!isIdle()) refreshDateOptions();
+      });
       document.addEventListener('visibilitychange', function() {
-        if (!document.hidden) refreshDateOptions();
+        if (!document.hidden && !isIdle()) refreshDateOptions();
       });
 
-      // Full page reload after 5 minutes of idle (no interaction)
-      var lastActivity = Date.now();
-      var IDLE_RELOAD_MS = 5 * 60 * 1000;
-      var idleBarEl = document.getElementById('idleBar');
-      var idleCountdownEl = document.getElementById('idleCountdown');
-
+      // ── Activity tracking ──
       ['pointerdown', 'keydown', 'scroll', 'touchstart'].forEach(function(evt) {
-        document.addEventListener(evt, function() { lastActivity = Date.now(); }, { passive: true });
+        document.addEventListener(evt, function() { _lastActivity = Date.now(); }, { passive: true });
       });
 
-      setInterval(function() {
-        var remaining = Math.max(0, IDLE_RELOAD_MS - (Date.now() - lastActivity));
-        var secs = Math.ceil(remaining / 1000);
-        var m = Math.floor(secs / 60);
-        var s = secs % 60;
-        idleCountdownEl.textContent = m + ':' + (s < 10 ? '0' : '') + s;
-        idleBarEl.style.display = '';
-        if (remaining <= 0) {
-          lastActivity = Date.now();
-          goToExecAfterBooking_();
+      // ── Idle check (every 1s) ──
+      _idleCheckId = setInterval(function() {
+        if (_idlePaused) return;
+        var elapsed = Date.now() - _lastActivity;
+        if (elapsed >= IDLE_MS) {
+          _idlePaused = true;
+          _idleOverlay.classList.add('show');
         }
       }, 1000);
+
+      // ── Wake on click ──
+      _idleOverlay.addEventListener('click', function() {
+        _idlePaused = false;
+        _lastActivity = Date.now();
+        _idleOverlay.classList.remove('show');
+        // Full fresh reload of data
+        goToExecAfterBooking_();
+      });
     }
 
     function init() {
@@ -2515,7 +2520,6 @@ var _HTML_TEMPLATES = {
 
           state.config = data.config;
           state.dateOptions = data.dateOptions || [];
-          if (data._v !== undefined) _cachedVersion = data._v;
 
           els.docName.textContent = state.config.doctorName;
           els.docMeta.textContent = state.config.pottersLocation;
@@ -3235,6 +3239,19 @@ var _HTML_TEMPLATES = {
     .overlay.show{opacity:1;}
     .loadingBox{transform:translateY(10px) scale(0.98);transition:transform 0.2s ease;}
     .overlay.show .loadingBox{transform:translateY(0) scale(1);}
+    /* Idle overlay */
+    .idle-overlay{position:fixed;inset:0;z-index:2000;display:flex;align-items:center;justify-content:center;background:rgba(246,247,251,0.50);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);cursor:pointer;opacity:0;visibility:hidden;pointer-events:none;transition:opacity 0.5s ease,visibility 0.5s ease;}
+    .idle-overlay.show{opacity:1;visibility:visible;pointer-events:auto;}
+    .idle-card{text-align:center;padding:48px 36px;max-width:340px;animation:idle-float 3s ease-in-out infinite;}
+    .idle-icon{font-size:56px;margin-bottom:16px;animation:idle-pulse-icon 2.5s ease-in-out infinite;}
+    .idle-title{font-size:22px;font-weight:800;color:var(--text);margin:0 0 8px 0;letter-spacing:-0.3px;}
+    .idle-sub{font-size:14px;color:var(--muted);margin:0 0 24px 0;line-height:1.5;}
+    .idle-cta{display:inline-flex;align-items:center;gap:8px;padding:12px 28px;background:var(--blue);color:#fff;border-radius:40px;font-size:15px;font-weight:700;box-shadow:0 4px 20px rgba(37,99,235,0.35);transition:transform 0.2s,box-shadow 0.2s;}
+    .idle-cta:hover{transform:scale(1.05);box-shadow:0 6px 28px rgba(37,99,235,0.45);}
+    .idle-cta .idle-arrow{display:inline-block;transition:transform 0.3s;font-size:18px;}
+    .idle-overlay:hover .idle-arrow{transform:translateX(4px);}
+    @keyframes idle-float{0%,100%{transform:translateY(0);}50%{transform:translateY(-8px);}}
+    @keyframes idle-pulse-icon{0%,100%{opacity:1;transform:scale(1);}50%{opacity:0.7;transform:scale(0.95);}}
   </style>
 </head>
 <body>
@@ -3648,6 +3665,7 @@ function switchTab(name) {
   document.querySelector('[data-tab="' + name + '"]').classList.add('active');
   if (name === 'settings') loadSettings();
   if (name === 'statistics') loadStatistics();
+  if (name === 'actions') loadActionAppts();
 }
 
 function getStatusBadge(status) {
@@ -4510,6 +4528,10 @@ function doFullRefresh() {
         _cachedDashboard = newHash;
         loadSchedAppts();
         loadWeekOverview();
+        // Refresh quick actions if that tab is active
+        if (document.getElementById('tab-actions').style.display !== 'none') {
+          loadActionAppts();
+        }
       }
     })
     .withFailureHandler(function() {
@@ -4543,16 +4565,57 @@ function updateRefreshDisplay() {
   if (countEl) countEl.textContent = 'Next check: ' + remaining + 's';
 }
 
-_pollTimerId = setInterval(doPollAndRefresh, POLL_INTERVAL_SEC * 1000);
-setInterval(updateRefreshDisplay, 1000);
+// ── Idle overlay ──
+var _idlePaused = false;
+var _IDLE_MS = 5 * 60 * 1000 + 10 * 1000; // 5 minutes 10 seconds
+var _lastAdminActivity = Date.now();
+var _idleOverlay = document.getElementById('idleOverlay');
+var _displayTimerId = null;
 
-// On tab focus/visibility — always do a full refresh immediately.
-// While the tab was hidden, polls were paused, so we go straight to
-// a full dashboard fetch to catch any changes (e.g. patient bookings).
+function _isAdminIdle() { return _idlePaused; }
+
+_pollTimerId = setInterval(function() {
+  if (!_isAdminIdle()) doPollAndRefresh();
+}, POLL_INTERVAL_SEC * 1000);
+
+_displayTimerId = setInterval(function() {
+  if (!_isAdminIdle()) updateRefreshDisplay();
+}, 1000);
+
+// On tab focus/visibility — skip if idle
 document.addEventListener('visibilitychange', function() {
-  if (!document.hidden) doFullRefresh();
+  if (!document.hidden && !_isAdminIdle()) doFullRefresh();
 });
 window.addEventListener('focus', function() {
+  if (!_isAdminIdle()) doFullRefresh();
+});
+
+// Activity tracking
+['pointerdown', 'keydown', 'scroll', 'touchstart'].forEach(function(evt) {
+  document.addEventListener(evt, function() { _lastAdminActivity = Date.now(); }, { passive: true });
+});
+
+// Idle check (every 1s)
+setInterval(function() {
+  if (_idlePaused) return;
+  if (Date.now() - _lastAdminActivity >= _IDLE_MS) {
+    _idlePaused = true;
+    // Stop polling timer entirely to save cycles
+    if (_pollTimerId) { clearInterval(_pollTimerId); _pollTimerId = null; }
+    _idleOverlay.classList.add('show');
+  }
+}, 1000);
+
+// Wake on click
+_idleOverlay.addEventListener('click', function() {
+  _idlePaused = false;
+  _lastAdminActivity = Date.now();
+  _idleOverlay.classList.remove('show');
+  // Restart polling
+  _pollTimerId = setInterval(function() {
+    if (!_isAdminIdle()) doPollAndRefresh();
+  }, POLL_INTERVAL_SEC * 1000);
+  // Immediate full refresh
   doFullRefresh();
 });
 
@@ -5121,6 +5184,17 @@ function renderBusiestDay(day) {
 }
 
 </script>
+
+<!-- Idle overlay — shown after inactivity to pause all background fetches -->
+<div class="idle-overlay" id="idleOverlay">
+  <div class="idle-card">
+    <div class="idle-icon">⚙️</div>
+    <div class="idle-title">Admin Dashboard Paused</div>
+    <div class="idle-sub">Background updates are paused to<br>save resources. Tap to resume.</div>
+    <div class="idle-cta">Resume Dashboard <span class="idle-arrow">→</span></div>
+  </div>
+</div>
+
 </body>
 </html>
 `
@@ -8929,6 +9003,7 @@ function wipeScriptProperties_(execute) {
 
   return {
     doGet: doGet,
+    apiPoll: apiPoll,
     apiInit: apiInit,
     apiGetDateOptions: apiGetDateOptions,
     apiRefreshDates: apiRefreshDates,

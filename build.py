@@ -68,6 +68,7 @@ BUNDLE_HTML = [
 PUBLIC_FUNCTIONS = [
     # WebApp.gs
     'doGet',
+    'apiPoll',
     'apiInit',
     'apiGetDateOptions',
     'apiRefreshDates',
