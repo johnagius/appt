@@ -7476,12 +7476,7 @@ function apiAdminGetDashboard(sig) {
   var weekCancelled = 0;
   for (var d = 0; d <= 6; d++) {
     var dk = toDateKey_(addMinutes_(today, d * 24 * 60));
-    var ss = getAppointmentsSpreadsheet_();
-    var sh = ss.getSheetByName(dk);
-    if (!sh) continue;
-    var lr = sh.getLastRow();
-    if (lr < 2) continue;
-    var vals = sh.getRange(2, 1, lr - 1, 18).getValues();
+    var vals = getDayRows_(dk);
     for (var r = 0; r < vals.length; r++) {
       var status = String(vals[r][10] || '');
       if (status === 'BOOKED' || status === 'RELOCATED_SPINOLA' || status === 'ATTENDED') weekBooked++;
