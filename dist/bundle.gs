@@ -2478,12 +2478,19 @@ var _HTML_TEMPLATES = {
         refreshDateOptions();
       }, 90000);
 
-      // ── Focus / visibility — skip if idle ──
-      window.addEventListener('focus', function() {
-        if (!isIdle()) refreshDateOptions();
-      });
+      // ── Focus / visibility ──
+      // Tab hidden → immediately go idle (zero API calls while backgrounded)
+      // Tab visible again → user must click overlay to resume
       document.addEventListener('visibilitychange', function() {
-        if (!document.hidden && !isIdle()) refreshDateOptions();
+        if (document.hidden) {
+          // Immediately pause everything
+          _idlePaused = true;
+          _idleOverlay.classList.add('show');
+        }
+        // When visible again: do nothing — overlay is showing, user clicks to resume
+      });
+      window.addEventListener('focus', function() {
+        // Do nothing if idle — user must click overlay
       });
 
       // ── Activity tracking ──
@@ -4582,12 +4589,18 @@ _displayTimerId = setInterval(function() {
   if (!_isAdminIdle()) updateRefreshDisplay();
 }, 1000);
 
-// On tab focus/visibility — skip if idle
+// Tab hidden → immediately go idle (zero API calls while backgrounded)
+// Tab visible again → user must click overlay to resume
 document.addEventListener('visibilitychange', function() {
-  if (!document.hidden && !_isAdminIdle()) doFullRefresh();
+  if (document.hidden) {
+    _idlePaused = true;
+    if (_pollTimerId) { clearInterval(_pollTimerId); _pollTimerId = null; }
+    _idleOverlay.classList.add('show');
+  }
+  // When visible again: do nothing — overlay is showing, user clicks to resume
 });
 window.addEventListener('focus', function() {
-  if (!_isAdminIdle()) doFullRefresh();
+  // Do nothing if idle — user must click overlay
 });
 
 // Activity tracking
