@@ -749,7 +749,7 @@ var _HTML_TEMPLATES = {
           <label class="label" data-i18n="phoneLabel">Phone *</label>
           <div class="phoneRow">
             <div class="ccPicker" id="ccPicker">
-              <button type="button" class="ccBtn" id="ccBtn" aria-label="Country code"><img src="https://flagcdn.com/w20/mt.png" width="20" height="15" alt="" style="vertical-align:middle;border-radius:2px;"></button>
+              <button type="button" class="ccBtn" id="ccBtn" aria-label="Country code"><img src="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/1f1f2-1f1f9.svg" width="20" height="20" alt="" style="vertical-align:middle;"></button>
               <div class="ccDrop" id="ccDrop" role="listbox" aria-label="Country code">
                 <div class="ccSearchWrap">
                   <input type="text" class="ccSearch" id="ccSearch" placeholder="Search country&#8230;" autocomplete="off" data-i18n-ph="searchCountryPh">
@@ -937,7 +937,9 @@ var _HTML_TEMPLATES = {
 
     function flagImg(cc, size) {
       size = size || 20;
-      return '<img src="https://flagcdn.com/w' + size + '/' + cc + '.png" width="' + size + '" height="' + Math.round(size * 0.75) + '" alt="" style="vertical-align:middle;border-radius:2px;" loading="lazy">';
+      var a = (0x1f1e6 + cc.charCodeAt(0) - 97).toString(16);
+      var b = (0x1f1e6 + cc.charCodeAt(1) - 97).toString(16);
+      return '<img src="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/' + a + '-' + b + '.svg" width="' + size + '" height="' + size + '" alt="" style="vertical-align:middle;" loading="lazy">';
     }
 
     const POPULAR_LANGS = ['en','es','pt','fr','it','ru','zh','ja'];
