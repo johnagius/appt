@@ -379,6 +379,13 @@
       <button class="btn btn-dark" onclick="saveSettings()">Save Settings</button>
     </div>
     <div class="msg" id="settingsMsg"></div>
+
+    <div class="card" style="margin-top:16px;">
+      <h3>Data Maintenance</h3>
+      <p style="font-size:13px;color:#666;margin:0 0 10px;">Archive appointment sheets older than 30 days into a single Archive sheet. This reduces the number of sheets in the spreadsheet and improves performance. Patient history, search, and reports will still access archived data normally.</p>
+      <button class="btn" style="background:#6c757d;color:#fff;" onclick="archiveOldSheets()">Archive Old Sheets</button>
+      <div class="msg" id="archiveMsg"></div>
+    </div>
   </div>
 
   <!-- AVAILABILITY TAB -->
@@ -1390,6 +1397,8 @@ function processAction(action) {
       }
       showMsg('actionMsg', 'good', msg);
       loadActionAppts();
+      // Also refresh the notify table if it has the same date loaded
+      if (document.getElementById('notifyDate').value) loadNotifyAppts();
       _scheduleStatsRefresh(); // Deferred dashboard refresh instead of full reload
     })
     .withFailureHandler(function(err) {
@@ -1425,10 +1434,10 @@ function cancelSingleAppt(appointmentId, containerId) {
       }
       var msgId = containerId === 'actionApptsList' ? 'actionMsg' : containerId === 'notifyApptsList' ? 'notifyResultMsg' : 'globalMsg';
       showMsg(msgId, 'good', 'Appointment cancelled.');
-      // Only reload the specific view that needs it (not entire dashboard)
-      if (containerId === 'actionApptsList') loadActionAppts();
-      else if (containerId === 'notifyApptsList') loadNotifyAppts();
-      else loadSchedAppts();
+      // Reload both action tables so they stay in sync
+      if (document.getElementById('actionDate').value) loadActionAppts();
+      if (document.getElementById('notifyDate').value) loadNotifyAppts();
+      if (containerId !== 'actionApptsList' && containerId !== 'notifyApptsList') loadSchedAppts();
       _scheduleStatsRefresh(); // Deferred dashboard refresh instead of immediate
     })
     .withFailureHandler(function(err) {
@@ -1814,6 +1823,26 @@ function saveSettings() {
   });
 }
 
+// ========== Data Maintenance ==========
+
+function archiveOldSheets() {
+  styledConfirm('Archive Old Sheets', 'This will move appointment data older than 30 days into a single Archive sheet and delete the individual day sheets. All data remains accessible. Continue?', 'Archive', 'btn-dark', 'Cancel').then(function(ok) {
+    if (!ok) return;
+    showLoading('Archiving...', 'Moving old sheets to archive.');
+    google.script.run
+      .withSuccessHandler(function(res) {
+        hideLoading();
+        if (!res || !res.ok) { showMsg('archiveMsg', 'bad', res.reason || 'Archive failed.'); return; }
+        showMsg('archiveMsg', 'good', res.message);
+      })
+      .withFailureHandler(function(err) {
+        hideLoading();
+        showMsg('archiveMsg', 'bad', 'Error: ' + (err && err.message ? err.message : String(err)));
+      })
+      .apiAdminArchiveOldSheets(SIG);
+  });
+}
+
 // ========== Fill Ring ==========
 
 function updateFillRing(booked, capacity) {
@@ -1834,16 +1863,19 @@ function markAttendance(appointmentId, dateKey, attended, containerId) {
   // Optimistic UI: update the row immediately without refetching
   var newStatus = attended ? 'ATTENDED' : 'NO_SHOW';
   var badge = getStatusBadge(newStatus);
-  var container = document.getElementById(containerId);
-  if (container) {
+  // Update the row in ALL visible tables (action, notify, schedule)
+  var containerIds = [containerId];
+  if (containerId !== 'actionApptsList') containerIds.push('actionApptsList');
+  if (containerId !== 'notifyApptsList') containerIds.push('notifyApptsList');
+  for (var ci = 0; ci < containerIds.length; ci++) {
+    var container = document.getElementById(containerIds[ci]);
+    if (!container) continue;
     var rows = container.querySelectorAll('tr');
     for (var i = 0; i < rows.length; i++) {
       var cb = rows[i].querySelector('.appt-cb');
       if (cb && cb.value === appointmentId) {
-        // Update badge
         var badgeEl = rows[i].querySelector('.badge');
         if (badgeEl) { badgeEl.className = 'badge ' + badge.cls; badgeEl.textContent = badge.text; }
-        // Remove action buttons (cancel + attendance)
         var lastTd = rows[i].querySelector('td:last-child');
         if (lastTd) lastTd.innerHTML = '';
         break;
