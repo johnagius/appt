@@ -713,10 +713,11 @@ function archiveOldDaySheets_(daysToKeep) {
   var sheets = ss.getSheets();
   var archiveSh = ensureArchiveSheet_();
 
-  var archivedSheets = 0;
-  var archivedRows = 0;
   var datePattern = /^\d{4}-\d{2}-\d{2}$/;
+  var allRows = [];
+  var toDelete = [];
 
+  // Collect all data first, then write once (avoid per-sheet API calls)
   for (var i = 0; i < sheets.length; i++) {
     var name = sheets[i].getName();
     if (!datePattern.test(name)) continue;
@@ -725,17 +726,23 @@ function archiveOldDaySheets_(daysToKeep) {
     var lr = sheets[i].getLastRow();
     if (lr >= 2) {
       var vals = sheets[i].getRange(2, 1, lr - 1, 18).getValues();
-      if (vals.length > 0) {
-        archiveSh.getRange(archiveSh.getLastRow() + 1, 1, vals.length, 18).setValues(vals);
-        archivedRows += vals.length;
-      }
+      for (var r = 0; r < vals.length; r++) allRows.push(vals[r]);
     }
-    ss.deleteSheet(sheets[i]);
-    archivedSheets++;
+    toDelete.push(sheets[i]);
+  }
+
+  // Single batch write
+  if (allRows.length > 0) {
+    archiveSh.getRange(archiveSh.getLastRow() + 1, 1, allRows.length, 18).setValues(allRows);
+  }
+
+  // Delete old sheets
+  for (var d = 0; d < toDelete.length; d++) {
+    ss.deleteSheet(toDelete[d]);
   }
 
   // Invalidate cache since we just changed archive
   _archiveDataCache = null;
 
-  return { archivedSheets: archivedSheets, archivedRows: archivedRows };
+  return { archivedSheets: toDelete.length, archivedRows: allRows.length };
 }
