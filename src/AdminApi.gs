@@ -513,7 +513,6 @@ function apiAdminGetWeekOverview(sig, weekStartDate) {
 
   var offRows = getDoctorOffRows_();
   var extraRows = getDoctorExtraRows_();
-  var ss = getAppointmentsSpreadsheet_();
   var days = [];
 
   for (var d = 0; d < 7; d++) {
@@ -522,13 +521,10 @@ function apiAdminGetWeekOverview(sig, weekStartDate) {
     var dk = toDateKey_(dt);
 
     var count = 0;
-    var sh = ss.getSheetByName(dk);
-    if (sh && sh.getLastRow() >= 2) {
-      var vals = sh.getRange(2, 1, sh.getLastRow() - 1, 18).getValues();
-      for (var r = 0; r < vals.length; r++) {
-        var st = String(vals[r][10] || '');
-        if (st === 'BOOKED' || st === 'RELOCATED_SPINOLA' || st === 'ATTENDED') count++;
-      }
+    var vals = getDayRows_(dk);
+    for (var r = 0; r < vals.length; r++) {
+      var st = String(vals[r][10] || '');
+      if (st === 'BOOKED' || st === 'RELOCATED_SPINOLA' || st === 'ATTENDED') count++;
     }
 
     // Check for blocks on this date
@@ -563,7 +559,6 @@ function apiAdminSearchAppointments(sig, query) {
   if (!query || query.length < 2) return { ok: false, reason: 'Query too short.' };
 
   var today = todayLocal_();
-  var ss = getAppointmentsSpreadsheet_();
   var results = [];
 
   // Search past 30 days + future 14 days
@@ -571,10 +566,8 @@ function apiAdminSearchAppointments(sig, query) {
     if (results.length >= 50) break;
     var dt = addMinutes_(today, d * 24 * 60);
     var dk = toDateKey_(dt);
-    var sh = ss.getSheetByName(dk);
-    if (!sh || sh.getLastRow() < 2) continue;
-
-    var vals = sh.getRange(2, 1, sh.getLastRow() - 1, 18).getValues();
+    var vals = getDayRows_(dk);
+    if (!vals.length) continue;
     for (var r = 0; r < vals.length; r++) {
       if (results.length >= 50) break;
       var name = String(vals[r][6] || '').toLowerCase();
@@ -699,7 +692,6 @@ function apiAdminGetStatistics(sig) {
 
   var today = todayLocal_();
   var todayKey = toDateKey_(today);
-  var ss = getAppointmentsSpreadsheet_();
   var offMap = getDoctorOffDates_();
   var extraMap = getDoctorExtraSlots_();
 
@@ -764,14 +756,11 @@ function apiAdminGetStatistics(sig) {
     }
     dowSlots[dow] += daySlotCount;
 
-    // Read appointments for this day
-    var sh = ss.getSheetByName(dk);
+    // Read appointments for this day (live sheet or archive)
+    var vals = getDayRows_(dk);
     var dayBooked = 0;
     var dayCancelled = 0;
-    if (sh) {
-      var lr = sh.getLastRow();
-      if (lr >= 2) {
-        var vals = sh.getRange(2, 1, lr - 1, 18).getValues();
+    if (vals.length) {
         for (var r = 0; r < vals.length; r++) {
           var status = String(vals[r][10] || '');
           var startTime = normalizeTimeCell_(vals[r][2]);
@@ -833,7 +822,6 @@ function apiAdminGetStatistics(sig) {
             }
           }
         }
-      }
     }
 
     // Period comparison (recent 14 days vs previous 14 days)
@@ -991,22 +979,19 @@ function apiAdminGetPatientHistory(sig, email, phone) {
   if (!email && !phone) return { ok: false, reason: 'Missing email or phone.' };
 
   var today = todayLocal_();
-  var ss = getAppointmentsSpreadsheet_();
   var results = [];
   var patientName = '';
   var patientEmail = '';
   var patientPhone = '';
   var firstSeen = '';
 
-  // Search 90 days back + 14 forward
+  // Search 90 days back + 14 forward (checks archive for old dates)
   for (var d = -90; d <= 14; d++) {
     if (results.length >= 100) break;
     var dt = addMinutes_(today, d * 1440);
     var dk = toDateKey_(dt);
-    var sh = ss.getSheetByName(dk);
-    if (!sh || sh.getLastRow() < 2) continue;
-
-    var vals = sh.getRange(2, 1, sh.getLastRow() - 1, 18).getValues();
+    var vals = getDayRows_(dk);
+    if (!vals.length) continue;
     for (var r = 0; r < vals.length; r++) {
       var e = String(vals[r][7] || '').trim().toLowerCase();
       var p = String(vals[r][8] || '').trim();
@@ -1054,4 +1039,26 @@ function apiAdminGetPatientHistory(sig, email, phone) {
     firstSeen: firstSeen,
     appointments: results
   };
+}
+
+/**
+ * Archive old day sheets (older than 30 days) into a single Archive sheet.
+ * Reduces spreadsheet sheet count for better performance.
+ */
+function apiAdminArchiveOldSheets(sig) {
+  if (!verifyAdminSig_(sig)) return { ok: false, reason: 'Access denied.' };
+
+  try {
+    var result = archiveOldDaySheets_(30);
+    if (result.archivedSheets === 0) {
+      return { ok: true, message: 'Nothing to archive. All sheets are within the last 30 days.' };
+    }
+    return {
+      ok: true,
+      message: 'Archived ' + result.archivedSheets + ' day sheet' + (result.archivedSheets !== 1 ? 's' : '') +
+               ' (' + result.archivedRows + ' appointment' + (result.archivedRows !== 1 ? 's' : '') + ') into the Archive sheet.'
+    };
+  } catch (e) {
+    return { ok: false, reason: 'Archive failed: ' + (e.message || String(e)) };
+  }
 }

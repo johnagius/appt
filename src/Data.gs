@@ -5,6 +5,7 @@
 var _configSsCache = null;
 var _apptsSsCache = null;
 var _daySheetFormatted = {};
+var _archiveDataCache = null;
 
 function getConfigSpreadsheet_() {
   if (_configSsCache) return _configSsCache;
@@ -414,20 +415,24 @@ function findAppointmentByToken_(token) {
     var d = addMinutes_(today, i * 24 * 60);
     var dk = toDateKey_(d);
 
+    // Check live sheet first (need rowIndex for writes), then archive
     var sh = ss.getSheetByName(dk);
-    if (!sh) continue;
-
-    var lastRow = sh.getLastRow();
-    if (lastRow < 2) continue;
-
-    var vals = sh.getRange(2, 1, lastRow - 1, 18).getValues();
-    for (var r = 0; r < vals.length; r++) {
-      if (String(vals[r][14] || '') === token) {
-        return {
-          sheetName: dk,
-          rowIndex: r + 2,
-          appointment: appointmentRowToObj_(vals[r])
-        };
+    if (sh) {
+      var lastRow = sh.getLastRow();
+      if (lastRow >= 2) {
+        var vals = sh.getRange(2, 1, lastRow - 1, 18).getValues();
+        for (var r = 0; r < vals.length; r++) {
+          if (String(vals[r][14] || '') === token) {
+            return { sheetName: dk, rowIndex: r + 2, appointment: appointmentRowToObj_(vals[r]) };
+          }
+        }
+      }
+    } else {
+      var archiveRows = getDayRows_(dk);
+      for (var r = 0; r < archiveRows.length; r++) {
+        if (String(archiveRows[r][14] || '') === token) {
+          return { sheetName: dk, rowIndex: -1, appointment: appointmentRowToObj_(archiveRows[r]), archived: true };
+        }
       }
     }
   }
@@ -631,4 +636,106 @@ function findNextAvailableDay_(afterDateKey, offMap) {
     if (slots.length > 0) return dk;
   }
   return null;
+}
+
+// ========== Archive helpers ==========
+
+var ARCHIVE_SHEET_NAME = 'Archive';
+
+/**
+ * Get or create the Archive sheet (same 18-column structure as day sheets).
+ */
+function ensureArchiveSheet_() {
+  var ss = getAppointmentsSpreadsheet_();
+  var sh = ss.getSheetByName(ARCHIVE_SHEET_NAME);
+  if (!sh) {
+    sh = ss.insertSheet(ARCHIVE_SHEET_NAME);
+    sh.getRange(1, 1, 1, 18).setValues([[
+      'AppointmentId', 'Date(yyyy-MM-dd)', 'StartTime', 'EndTime',
+      'ServiceId', 'ServiceName', 'FullName', 'Email', 'Phone',
+      'Comments', 'Status', 'Location', 'CreatedAt', 'UpdatedAt',
+      'Token', 'CalendarEventId', 'CancelledAt', 'CancelReason'
+    ]]);
+    sh.setFrozenRows(1);
+    sh.getRange(1, 1, sh.getMaxRows(), 18).setNumberFormat('@');
+  }
+  return sh;
+}
+
+/**
+ * Load all archive data, indexed by dateKey. Cached per execution.
+ */
+function loadArchiveData_() {
+  if (_archiveDataCache) return _archiveDataCache;
+  var ss = getAppointmentsSpreadsheet_();
+  var sh = ss.getSheetByName(ARCHIVE_SHEET_NAME);
+  if (!sh) { _archiveDataCache = {}; return _archiveDataCache; }
+  var lr = sh.getLastRow();
+  if (lr < 2) { _archiveDataCache = {}; return _archiveDataCache; }
+
+  var vals = sh.getRange(2, 1, lr - 1, 18).getValues();
+  var byDate = {};
+  for (var i = 0; i < vals.length; i++) {
+    var dk = String(vals[i][1] || '');
+    if (!byDate[dk]) byDate[dk] = [];
+    byDate[dk].push(vals[i]);
+  }
+  _archiveDataCache = byDate;
+  return _archiveDataCache;
+}
+
+/**
+ * Get raw 18-column rows for a dateKey.
+ * Checks the live day sheet first; falls back to archive.
+ */
+function getDayRows_(dateKey) {
+  var ss = getAppointmentsSpreadsheet_();
+  var sh = ss.getSheetByName(dateKey);
+  if (sh) {
+    var lr = sh.getLastRow();
+    if (lr >= 2) return sh.getRange(2, 1, lr - 1, 18).getValues();
+    return [];
+  }
+  // Fall back to archive
+  var archive = loadArchiveData_();
+  return archive[dateKey] || [];
+}
+
+/**
+ * Archive day sheets older than daysToKeep and delete them.
+ * Returns { archivedSheets, archivedRows }.
+ */
+function archiveOldDaySheets_(daysToKeep) {
+  daysToKeep = daysToKeep || 30;
+  var today = todayLocal_();
+  var cutoff = toDateKey_(addMinutes_(today, -daysToKeep * 1440));
+  var ss = getAppointmentsSpreadsheet_();
+  var sheets = ss.getSheets();
+  var archiveSh = ensureArchiveSheet_();
+
+  var archivedSheets = 0;
+  var archivedRows = 0;
+  var datePattern = /^\d{4}-\d{2}-\d{2}$/;
+
+  for (var i = 0; i < sheets.length; i++) {
+    var name = sheets[i].getName();
+    if (!datePattern.test(name)) continue;
+    if (name >= cutoff) continue; // Keep recent sheets
+
+    var lr = sheets[i].getLastRow();
+    if (lr >= 2) {
+      var vals = sheets[i].getRange(2, 1, lr - 1, 18).getValues();
+      if (vals.length > 0) {
+        archiveSh.getRange(archiveSh.getLastRow() + 1, 1, vals.length, 18).setValues(vals);
+        archivedRows += vals.length;
+      }
+    }
+    ss.deleteSheet(sheets[i]);
+    archivedSheets++;
+  }
+
+  // Invalidate cache since we just changed archive
+  _archiveDataCache = null;
+
+  return { archivedSheets: archivedSheets, archivedRows: archivedRows };
 }

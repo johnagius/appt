@@ -379,6 +379,13 @@
       <button class="btn btn-dark" onclick="saveSettings()">Save Settings</button>
     </div>
     <div class="msg" id="settingsMsg"></div>
+
+    <div class="card" style="margin-top:16px;">
+      <h3>Data Maintenance</h3>
+      <p style="font-size:13px;color:#666;margin:0 0 10px;">Archive appointment sheets older than 30 days into a single Archive sheet. This reduces the number of sheets in the spreadsheet and improves performance. Patient history, search, and reports will still access archived data normally.</p>
+      <button class="btn" style="background:#6c757d;color:#fff;" onclick="archiveOldSheets()">Archive Old Sheets</button>
+      <div class="msg" id="archiveMsg"></div>
+    </div>
   </div>
 
   <!-- AVAILABILITY TAB -->
@@ -1813,6 +1820,26 @@ function saveSettings() {
         showMsg('settingsMsg', 'bad', 'Error: ' + (err && err.message ? err.message : String(err)));
       })
       .apiAdminSaveSettings(SIG, settings);
+  });
+}
+
+// ========== Data Maintenance ==========
+
+function archiveOldSheets() {
+  styledConfirm('Archive Old Sheets', 'This will move appointment data older than 30 days into a single Archive sheet and delete the individual day sheets. All data remains accessible. Continue?', 'Archive', 'btn-dark', 'Cancel').then(function(ok) {
+    if (!ok) return;
+    showLoading('Archiving...', 'Moving old sheets to archive.');
+    google.script.run
+      .withSuccessHandler(function(res) {
+        hideLoading();
+        if (!res || !res.ok) { showMsg('archiveMsg', 'bad', res.reason || 'Archive failed.'); return; }
+        showMsg('archiveMsg', 'good', res.message);
+      })
+      .withFailureHandler(function(err) {
+        hideLoading();
+        showMsg('archiveMsg', 'bad', 'Error: ' + (err && err.message ? err.message : String(err)));
+      })
+      .apiAdminArchiveOldSheets(SIG);
   });
 }
 
