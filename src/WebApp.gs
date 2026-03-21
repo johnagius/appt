@@ -72,7 +72,8 @@ function apiInit() {
       timezone: getTimeZone_(),
       bookingPolicy: 'Choose a service and then select your time slot. You will receive confirmation by email. You can CANCEL your appointment from the email.',
       pottersLocation: (getScriptProps_().getProperty(CFG().PROP_POTTERS_LOCATION) || "Potter's Pharmacy Clinic"),
-      spinolaLocation: (getScriptProps_().getProperty(CFG().PROP_SPINOLA_LOCATION) || 'Spinola Clinic')
+      spinolaLocation: (getScriptProps_().getProperty(CFG().PROP_SPINOLA_LOCATION) || 'Spinola Clinic'),
+      workingHours: CFG().HOURS
     },
     dateOptions: apiGetDateOptions(extraMap)
   };
