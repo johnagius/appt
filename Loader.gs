@@ -222,6 +222,9 @@ function apiRefreshDates()                   { return _getApp().apiRefreshDates(
 function apiGetAvailability(dk)              { return _getApp().apiGetAvailability(dk); }
 function apiBook(p)                          { return _getApp().apiBook(p); }
 
+// ----- Polling (called from Admin.html via google.script.run) -----
+function apiPoll()                           { return _getApp().apiPoll(); }
+
 // ----- Cancel API (called from Cancel.html) -----
 function apiGetCancelInfo(t, s)              { return _getApp().apiGetCancelInfo(t, s); }
 function apiCancelAppointment(t, s)          { return _getApp().apiCancelAppointment(t, s); }
