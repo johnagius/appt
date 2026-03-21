@@ -65,6 +65,35 @@
     .badge{display:inline-block;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:700;}
     .badge-red{background:rgba(239,68,68,0.1);color:#dc2626;}
     .badge-green{background:rgba(16,185,129,0.1);color:#059669;}
+    .badge-dark{background:rgba(17,24,39,0.1);color:#111827;}
+    .badge-amber{background:rgba(245,158,11,0.1);color:#b45309;}
+
+    /* Fill ring in stats bar */
+    .stat-fill{display:flex;align-items:center;gap:10px;justify-content:center;}
+    .fill-ring{flex-shrink:0;}
+    .fill-bg{fill:none;stroke:var(--line);stroke-width:4;}
+    .fill-fg{fill:none;stroke:var(--good);stroke-width:4;stroke-linecap:round;transition:stroke-dashoffset 0.6s ease;}
+
+    /* Patient history modal */
+    .patient-modal{width:min(640px,100%);background:#fff;border-radius:18px;padding:18px;border:1px solid var(--line);box-shadow:var(--shadow);max-height:80vh;overflow-y:auto;display:flex;flex-direction:column;gap:12px;}
+    .patient-modal-header{display:flex;justify-content:space-between;align-items:center;}
+    .patient-summary{display:flex;gap:12px;flex-wrap:wrap;}
+    .patient-summary-item{background:var(--bg);border-radius:12px;padding:10px 14px;flex:1;min-width:80px;text-align:center;}
+    .patient-summary-item .psv{font-size:22px;font-weight:900;}
+    .patient-summary-item .psl{font-size:11px;color:var(--muted);}
+    .patient-link{color:var(--blue);cursor:pointer;text-decoration:none;font-weight:inherit;}
+    .patient-link:hover{text-decoration:underline;}
+
+    /* Attendance buttons */
+    .att-btns{display:inline-flex;gap:4px;margin-left:4px;}
+    .att-btns .btn{min-height:28px;padding:4px 10px;font-size:12px;font-weight:800;}
+    .btn-warn{background:#f59e0b;color:#78350f;}
+
+    /* Trend arrow */
+    .trend-arrow{font-size:13px;font-weight:700;margin-left:4px;}
+    .trend-up{color:var(--good);}
+    .trend-down{color:var(--bad);}
+    .trend-flat{color:var(--muted);}
 
     /* Auto-refresh bar */
     .refresh-bar{position:fixed;bottom:0;left:0;right:0;background:rgba(17,24,39,0.92);color:#e5e7eb;font-size:12px;padding:6px 14px;display:flex;justify-content:space-between;align-items:center;z-index:1500;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);font-weight:500;}
@@ -252,7 +281,13 @@
   <div class="stats" id="statsBar">
     <div class="stat"><div class="num" id="statBooked">-</div><div class="label">Booked this week</div></div>
     <div class="stat"><div class="num" id="statCancelled">-</div><div class="label">Cancelled this week</div></div>
-    <div class="stat"><div class="num" id="statToday">-</div><div class="label">Today</div></div>
+    <div class="stat stat-fill">
+      <svg class="fill-ring" width="52" height="52" viewBox="0 0 52 52">
+        <circle class="fill-bg" cx="26" cy="26" r="22"/>
+        <circle class="fill-fg" cx="26" cy="26" r="22" id="fillRingFg" stroke-dasharray="138.2" stroke-dashoffset="138.2" transform="rotate(-90 26 26)"/>
+      </svg>
+      <div><div class="num" id="statToday">-</div><div class="label" id="statTodayLabel">Today</div></div>
+    </div>
     <div class="stat"><div class="num" id="statTomorrow">-</div><div class="label">Tomorrow</div></div>
   </div>
 
@@ -534,7 +569,29 @@
     </div>
   </div>
 
+  <div class="stats-grid" style="margin-top:12px;">
+    <div class="card">
+      <h3>Booking Lead Time</h3>
+      <div id="leadTimeChart"></div>
+    </div>
+    <div class="card">
+      <h3>Attendance</h3>
+      <div id="attendanceChart"></div>
+    </div>
+  </div>
+
   <div class="msg" id="statsMsg"></div>
+</div>
+
+<!-- Patient History modal -->
+<div class="overlay" id="patientOverlay">
+  <div class="patient-modal">
+    <div class="patient-modal-header">
+      <h3 id="patientTitle" style="margin:0;">Patient History</h3>
+      <button class="btn btn-ghost btn-sm" onclick="hidePatientHistory()">&#x2715;</button>
+    </div>
+    <div id="patientContent"><div class="empty">Loading...</div></div>
+  </div>
 </div>
 
 <!-- Confirm modal -->
@@ -629,6 +686,14 @@ function switchTab(name) {
   if (name === 'statistics') loadStatistics();
 }
 
+function getStatusBadge(status) {
+  if (status === 'ATTENDED') return { cls: 'badge-dark', text: 'Attended' };
+  if (status === 'NO_SHOW') return { cls: 'badge-amber', text: 'No-Show' };
+  if (status === 'RELOCATED_SPINOLA') return { cls: 'badge-green', text: 'Spinola' };
+  if (status && status.indexOf('CANCELLED') >= 0) return { cls: 'badge-red', text: 'Cancelled' };
+  return { cls: 'badge-green', text: 'Booked' };
+}
+
 function renderApptTable(appts, containerId, withCheckboxes, showDate) {
   var el = document.getElementById(containerId);
   if (!appts || !appts.length) {
@@ -641,24 +706,25 @@ function renderApptTable(appts, containerId, withCheckboxes, showDate) {
   html += '<th>Time</th><th>Patient</th><th>Phone</th><th>Service</th><th>Location</th><th>Status</th><th></th></tr></thead><tbody>';
   for (var i = 0; i < appts.length; i++) {
     var a = appts[i];
-    var statusClass = 'badge-green';
-    var statusText = 'Booked';
-    if (a.status === 'RELOCATED_SPINOLA') statusText = 'Spinola';
-    else if (a.status && a.status.indexOf('CANCELLED') >= 0) { statusClass = 'badge-red'; statusText = 'Cancelled'; }
+    var badge = getStatusBadge(a.status);
     html += '<tr' + (showDate ? ' style="cursor:pointer" onclick="goToDate(\'' + esc(a.dateKey) + '\')"' : '') + '>';
     if (withCheckboxes) html += '<td><input type="checkbox" class="appt-cb" value="' + esc(a.appointmentId) + '"></td>';
     if (showDate) html += '<td><b>' + esc(a.dateKey) + '</b></td>';
     html += '<td><b>' + esc(a.startTime) + ' - ' + esc(a.endTime) + '</b></td>';
-    html += '<td>' + esc(a.fullName) + '</td>';
+    html += '<td><a class="patient-link" href="#" onclick="event.stopPropagation();event.preventDefault();showPatientHistory(\'' + esc(a.email) + '\',\'' + esc(a.phone) + '\')">' + esc(a.fullName) + '</a></td>';
     html += '<td>' + esc(a.phone) + '</td>';
     html += '<td>' + esc(a.serviceName) + '</td>';
     html += '<td>' + esc(a.location) + '</td>';
-    html += '<td><span class="badge ' + statusClass + '">' + statusText + '</span></td>';
-    if (a.status && a.status.indexOf('CANCELLED') < 0) {
-      html += '<td><button class="btn btn-sm btn-danger" onclick="event.stopPropagation();cancelSingleAppt(\'' + esc(a.appointmentId) + '\', \'' + containerId + '\')">Cancel</button></td>';
-    } else {
-      html += '<td></td>';
+    html += '<td><span class="badge ' + badge.cls + '">' + badge.text + '</span></td>';
+    html += '<td>';
+    if (a.status === 'BOOKED' || a.status === 'RELOCATED_SPINOLA') {
+      html += '<button class="btn btn-sm btn-danger" onclick="event.stopPropagation();cancelSingleAppt(\'' + esc(a.appointmentId) + '\', \'' + containerId + '\')">Cancel</button>';
+      html += '<span class="att-btns">';
+      html += '<button class="btn btn-sm btn-good" onclick="event.stopPropagation();markAttendance(\'' + esc(a.appointmentId) + '\',\'' + esc(a.dateKey) + '\',true,\'' + containerId + '\')" title="Attended">&#x2713;</button>';
+      html += '<button class="btn btn-sm btn-warn" onclick="event.stopPropagation();markAttendance(\'' + esc(a.appointmentId) + '\',\'' + esc(a.dateKey) + '\',false,\'' + containerId + '\')" title="No-Show">&#x2717;</button>';
+      html += '</span>';
     }
+    html += '</td>';
     html += '</tr>';
   }
   html += '</tbody></table></div>';
@@ -776,8 +842,8 @@ function loadDashboard() {
 
       document.getElementById('statBooked').textContent = res.stats.weekBooked;
       document.getElementById('statCancelled').textContent = res.stats.weekCancelled;
-      document.getElementById('statToday').textContent = res.todayAppointments.length;
       document.getElementById('statTomorrow').textContent = res.tomorrowAppointments.length;
+      updateFillRing(res.todayAppointments.length, res.stats.todayCapacity || 0);
 
       renderOverrides(res.doctorOffEntries, res.extraSlotEntries);
 
@@ -949,18 +1015,15 @@ function doSearch(query) {
       html += '<div class="table-wrap"><table><thead><tr><th>Date</th><th>Time</th><th>Patient</th><th>Phone</th><th>Service</th><th>Location</th><th>Status</th></tr></thead><tbody>';
       for (var i = 0; i < res.results.length; i++) {
         var r = res.results[i];
-        var statusClass = 'badge-green';
-        var statusText = 'Booked';
-        if (r.status === 'RELOCATED_SPINOLA') statusText = 'Spinola';
-        else if (r.status && r.status.indexOf('CANCELLED') >= 0) { statusClass = 'badge-red'; statusText = 'Cancelled'; }
+        var badge = getStatusBadge(r.status);
         html += '<tr style="cursor:pointer" onclick="goToDate(\'' + esc(r.dateKey) + '\')">';
         html += '<td><b>' + esc(r.dateKey) + '</b></td>';
         html += '<td>' + esc(r.startTime) + ' - ' + esc(r.endTime) + '</td>';
-        html += '<td>' + esc(r.fullName) + '</td>';
+        html += '<td><a class="patient-link" href="#" onclick="event.stopPropagation();event.preventDefault();showPatientHistory(\'' + esc(r.email) + '\',\'' + esc(r.phone) + '\')">' + esc(r.fullName) + '</a></td>';
         html += '<td>' + esc(r.phone) + '</td>';
         html += '<td>' + esc(r.serviceName) + '</td>';
         html += '<td>' + esc(r.location) + '</td>';
-        html += '<td><span class="badge ' + statusClass + '">' + statusText + '</span></td>';
+        html += '<td><span class="badge ' + badge.cls + '">' + badge.text + '</span></td>';
         html += '</tr>';
       }
       html += '</tbody></table></div></div>';
@@ -1435,8 +1498,8 @@ function doAutoRefresh() {
 
       document.getElementById('statBooked').textContent = res.stats.weekBooked;
       document.getElementById('statCancelled').textContent = res.stats.weekCancelled;
-      document.getElementById('statToday').textContent = res.todayAppointments.length;
       document.getElementById('statTomorrow').textContent = res.tomorrowAppointments.length;
+      updateFillRing(res.todayAppointments.length, res.stats.todayCapacity || 0);
 
       renderOverrides(res.doctorOffEntries, res.extraSlotEntries);
 
@@ -1616,6 +1679,112 @@ function saveSettings() {
   });
 }
 
+// ========== Fill Ring ==========
+
+function updateFillRing(booked, capacity) {
+  var cap = capacity || 0;
+  document.getElementById('statToday').textContent = booked + '/' + cap;
+  document.getElementById('statTodayLabel').textContent = 'Today filled';
+  var circumference = 2 * Math.PI * 22; // ~138.2
+  var pct = cap > 0 ? booked / cap : 0;
+  var offset = circumference * (1 - pct);
+  var fg = document.getElementById('fillRingFg');
+  fg.style.strokeDashoffset = offset;
+  fg.style.stroke = pct >= 0.9 ? 'var(--bad)' : pct >= 0.75 ? '#f59e0b' : 'var(--good)';
+}
+
+// ========== Attendance Tracking ==========
+
+function markAttendance(appointmentId, dateKey, attended, containerId) {
+  var label = attended ? 'attended' : 'no-show';
+  showLoading('Updating...', 'Marking as ' + label + '.');
+  google.script.run
+    .withSuccessHandler(function(res) {
+      hideLoading();
+      if (!res || !res.ok) { showMsg('globalMsg', 'bad', res.reason || 'Failed.'); return; }
+      // Reload the view that contains this appointment
+      if (containerId === 'actionApptsList') loadActionAppts();
+      else if (containerId === 'notifyApptsList') loadNotifyAppts();
+      else loadSchedAppts();
+      // Also refresh dashboard stats
+      doAutoRefresh();
+    })
+    .withFailureHandler(function(err) {
+      hideLoading();
+      showMsg('globalMsg', 'bad', 'Error: ' + (err && err.message ? err.message : String(err)));
+    })
+    .apiAdminMarkAttendance(SIG, appointmentId, dateKey, attended);
+}
+
+// ========== Patient History ==========
+
+function showPatientHistory(email, phone) {
+  var overlay = document.getElementById('patientOverlay');
+  overlay.style.display = 'flex';
+  requestAnimationFrame(function(){ requestAnimationFrame(function(){ overlay.classList.add('show'); }); });
+  document.getElementById('patientTitle').textContent = 'Patient History';
+  document.getElementById('patientContent').innerHTML = '<div class="empty">Loading...</div>';
+
+  google.script.run
+    .withSuccessHandler(function(res) {
+      if (!res || !res.ok) {
+        document.getElementById('patientContent').innerHTML = '<div class="empty">' + esc(res.reason || 'Failed.') + '</div>';
+        return;
+      }
+      var p = res.patient;
+      document.getElementById('patientTitle').textContent = p.name || 'Patient History';
+
+      var html = '';
+      // Contact info
+      html += '<div style="font-size:13px;color:var(--muted);margin-bottom:8px;">';
+      if (p.email) html += p.email;
+      if (p.email && p.phone) html += ' &middot; ';
+      if (p.phone) html += p.phone;
+      if (res.firstSeen) html += ' &middot; First seen: ' + res.firstSeen;
+      html += '</div>';
+
+      // Summary cards
+      html += '<div class="patient-summary">';
+      html += '<div class="patient-summary-item"><div class="psv">' + res.totalVisits + '</div><div class="psl">Visits</div></div>';
+      html += '<div class="patient-summary-item"><div class="psv">' + res.cancelCount + '</div><div class="psl">Cancellations</div></div>';
+      html += '<div class="patient-summary-item"><div class="psv">' + res.noShowCount + '</div><div class="psl">No-Shows</div></div>';
+      html += '</div>';
+
+      // Appointment table
+      if (res.appointments && res.appointments.length > 0) {
+        html += '<div class="table-wrap" style="margin-top:10px;"><table><thead><tr>';
+        html += '<th>Date</th><th>Time</th><th>Status</th><th>Location</th><th>Notes</th>';
+        html += '</tr></thead><tbody>';
+        for (var i = 0; i < res.appointments.length; i++) {
+          var a = res.appointments[i];
+          var badge = getStatusBadge(a.status);
+          html += '<tr>';
+          html += '<td><b>' + esc(a.dateKey) + '</b></td>';
+          html += '<td>' + esc(a.startTime) + ' - ' + esc(a.endTime) + '</td>';
+          html += '<td><span class="badge ' + badge.cls + '">' + badge.text + '</span></td>';
+          html += '<td>' + esc(a.location) + '</td>';
+          html += '<td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(a.comments || '') + '</td>';
+          html += '</tr>';
+        }
+        html += '</tbody></table></div>';
+      } else {
+        html += '<div class="empty">No appointment history found.</div>';
+      }
+
+      document.getElementById('patientContent').innerHTML = html;
+    })
+    .withFailureHandler(function(err) {
+      document.getElementById('patientContent').innerHTML = '<div class="empty">Error: ' + esc(err && err.message ? err.message : String(err)) + '</div>';
+    })
+    .apiAdminGetPatientHistory(SIG, email, phone);
+}
+
+function hidePatientHistory() {
+  var overlay = document.getElementById('patientOverlay');
+  overlay.classList.remove('show');
+  setTimeout(function(){ overlay.style.display = 'none'; }, 200);
+}
+
 // ========== Statistics Tab ==========
 
 var _statsLoaded = false;
@@ -1645,6 +1814,11 @@ function renderAllStats(s) {
   renderProgressRing(s.utilization);
   document.getElementById('heroUtil').textContent = s.utilization + '%';
   document.getElementById('heroBooked').textContent = s.totalBooked;
+  // Trend arrow on appointments
+  var trendArrow = '';
+  if (s.trendDirection === 'up') trendArrow = '<span class="trend-arrow trend-up">&uarr;' + s.trendPct + '%</span>';
+  else if (s.trendDirection === 'down') trendArrow = '<span class="trend-arrow trend-down">&darr;' + s.trendPct + '%</span>';
+  document.getElementById('heroBookedSub').innerHTML = 'last 28 days ' + trendArrow;
   document.getElementById('heroCancelRate').textContent = s.cancelRate + '%';
   var crEl = document.getElementById('heroCancelRate');
   crEl.style.color = s.cancelRate < 10 ? 'var(--good)' : s.cancelRate < 20 ? '#f59e0b' : 'var(--bad)';
@@ -1659,6 +1833,51 @@ function renderAllStats(s) {
   renderTopPatients(s.topPatients);
   renderCancelBreakdown(s);
   renderBusiestDay(s.busiestDay);
+  renderLeadTime(s);
+  renderAttendance(s);
+}
+
+function renderLeadTime(s) {
+  var el = document.getElementById('leadTimeChart');
+  var html = '<div style="text-align:center;padding:12px 0;">';
+  html += '<div style="font-size:42px;font-weight:900;color:#2563eb;">' + (s.avgLeadTimeDays || 0) + '</div>';
+  html += '<div style="font-size:14px;font-weight:700;margin-top:4px;">days average</div>';
+  html += '<div style="font-size:12px;color:var(--muted);margin-top:2px;">How far ahead patients book</div>';
+  if (s.sameDayCancels > 0) {
+    html += '<div style="margin-top:12px;padding:8px 12px;background:rgba(245,158,11,0.08);border-radius:10px;display:inline-block;">';
+    html += '<span style="font-size:18px;font-weight:800;color:#b45309;">' + s.sameDayCancels + '</span>';
+    html += '<span style="font-size:12px;color:#b45309;margin-left:6px;">same-day cancellations</span>';
+    html += '</div>';
+  }
+  html += '</div>';
+  el.innerHTML = html;
+}
+
+function renderAttendance(s) {
+  var el = document.getElementById('attendanceChart');
+  var attended = s.totalAttended || 0;
+  var noShow = s.totalNoShow || 0;
+  var total = attended + noShow;
+
+  var html = '<div style="text-align:center;padding:8px 0;">';
+  if (total > 0) {
+    var noShowRate = s.noShowRate || 0;
+    var noShowColor = noShowRate < 5 ? 'var(--good)' : noShowRate < 15 ? '#f59e0b' : 'var(--bad)';
+    html += '<div style="font-size:36px;font-weight:900;color:' + noShowColor + ';">' + noShowRate + '%</div>';
+    html += '<div style="font-size:12px;color:var(--muted);margin-bottom:12px;">No-show rate</div>';
+    html += '<div class="h-bar-row"><div class="h-bar-label" style="width:70px;">Attended</div>';
+    var pctA = total > 0 ? Math.round(attended / total * 100) : 0;
+    html += '<div class="h-bar-track"><div class="h-bar-fill" style="width:' + pctA + '%;background:var(--good);"></div></div>';
+    html += '<div class="h-bar-pct">' + attended + '</div></div>';
+    html += '<div class="h-bar-row"><div class="h-bar-label" style="width:70px;">No-Show</div>';
+    var pctN = 100 - pctA;
+    html += '<div class="h-bar-track"><div class="h-bar-fill" style="width:' + pctN + '%;background:#f59e0b;"></div></div>';
+    html += '<div class="h-bar-pct">' + noShow + '</div></div>';
+  } else {
+    html += '<div class="empty">No attendance data yet.<br><span style="font-size:11px;">Use the &#x2713; and &#x2717; buttons on today\'s appointments to track attendance.</span></div>';
+  }
+  html += '</div>';
+  el.innerHTML = html;
 }
 
 function renderProgressRing(pct) {

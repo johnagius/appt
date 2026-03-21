@@ -3003,6 +3003,35 @@ var _HTML_TEMPLATES = {
     .badge{display:inline-block;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:700;}
     .badge-red{background:rgba(239,68,68,0.1);color:#dc2626;}
     .badge-green{background:rgba(16,185,129,0.1);color:#059669;}
+    .badge-dark{background:rgba(17,24,39,0.1);color:#111827;}
+    .badge-amber{background:rgba(245,158,11,0.1);color:#b45309;}
+
+    /* Fill ring in stats bar */
+    .stat-fill{display:flex;align-items:center;gap:10px;justify-content:center;}
+    .fill-ring{flex-shrink:0;}
+    .fill-bg{fill:none;stroke:var(--line);stroke-width:4;}
+    .fill-fg{fill:none;stroke:var(--good);stroke-width:4;stroke-linecap:round;transition:stroke-dashoffset 0.6s ease;}
+
+    /* Patient history modal */
+    .patient-modal{width:min(640px,100%);background:#fff;border-radius:18px;padding:18px;border:1px solid var(--line);box-shadow:var(--shadow);max-height:80vh;overflow-y:auto;display:flex;flex-direction:column;gap:12px;}
+    .patient-modal-header{display:flex;justify-content:space-between;align-items:center;}
+    .patient-summary{display:flex;gap:12px;flex-wrap:wrap;}
+    .patient-summary-item{background:var(--bg);border-radius:12px;padding:10px 14px;flex:1;min-width:80px;text-align:center;}
+    .patient-summary-item .psv{font-size:22px;font-weight:900;}
+    .patient-summary-item .psl{font-size:11px;color:var(--muted);}
+    .patient-link{color:var(--blue);cursor:pointer;text-decoration:none;font-weight:inherit;}
+    .patient-link:hover{text-decoration:underline;}
+
+    /* Attendance buttons */
+    .att-btns{display:inline-flex;gap:4px;margin-left:4px;}
+    .att-btns .btn{min-height:28px;padding:4px 10px;font-size:12px;font-weight:800;}
+    .btn-warn{background:#f59e0b;color:#78350f;}
+
+    /* Trend arrow */
+    .trend-arrow{font-size:13px;font-weight:700;margin-left:4px;}
+    .trend-up{color:var(--good);}
+    .trend-down{color:var(--bad);}
+    .trend-flat{color:var(--muted);}
 
     /* Auto-refresh bar */
     .refresh-bar{position:fixed;bottom:0;left:0;right:0;background:rgba(17,24,39,0.92);color:#e5e7eb;font-size:12px;padding:6px 14px;display:flex;justify-content:space-between;align-items:center;z-index:1500;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);font-weight:500;}
@@ -3190,7 +3219,13 @@ var _HTML_TEMPLATES = {
   <div class="stats" id="statsBar">
     <div class="stat"><div class="num" id="statBooked">-</div><div class="label">Booked this week</div></div>
     <div class="stat"><div class="num" id="statCancelled">-</div><div class="label">Cancelled this week</div></div>
-    <div class="stat"><div class="num" id="statToday">-</div><div class="label">Today</div></div>
+    <div class="stat stat-fill">
+      <svg class="fill-ring" width="52" height="52" viewBox="0 0 52 52">
+        <circle class="fill-bg" cx="26" cy="26" r="22"/>
+        <circle class="fill-fg" cx="26" cy="26" r="22" id="fillRingFg" stroke-dasharray="138.2" stroke-dashoffset="138.2" transform="rotate(-90 26 26)"/>
+      </svg>
+      <div><div class="num" id="statToday">-</div><div class="label" id="statTodayLabel">Today</div></div>
+    </div>
     <div class="stat"><div class="num" id="statTomorrow">-</div><div class="label">Tomorrow</div></div>
   </div>
 
@@ -3472,7 +3507,29 @@ var _HTML_TEMPLATES = {
     </div>
   </div>
 
+  <div class="stats-grid" style="margin-top:12px;">
+    <div class="card">
+      <h3>Booking Lead Time</h3>
+      <div id="leadTimeChart"></div>
+    </div>
+    <div class="card">
+      <h3>Attendance</h3>
+      <div id="attendanceChart"></div>
+    </div>
+  </div>
+
   <div class="msg" id="statsMsg"></div>
+</div>
+
+<!-- Patient History modal -->
+<div class="overlay" id="patientOverlay">
+  <div class="patient-modal">
+    <div class="patient-modal-header">
+      <h3 id="patientTitle" style="margin:0;">Patient History</h3>
+      <button class="btn btn-ghost btn-sm" onclick="hidePatientHistory()">&#x2715;</button>
+    </div>
+    <div id="patientContent"><div class="empty">Loading...</div></div>
+  </div>
 </div>
 
 <!-- Confirm modal -->
@@ -3567,6 +3624,14 @@ function switchTab(name) {
   if (name === 'statistics') loadStatistics();
 }
 
+function getStatusBadge(status) {
+  if (status === 'ATTENDED') return { cls: 'badge-dark', text: 'Attended' };
+  if (status === 'NO_SHOW') return { cls: 'badge-amber', text: 'No-Show' };
+  if (status === 'RELOCATED_SPINOLA') return { cls: 'badge-green', text: 'Spinola' };
+  if (status && status.indexOf('CANCELLED') >= 0) return { cls: 'badge-red', text: 'Cancelled' };
+  return { cls: 'badge-green', text: 'Booked' };
+}
+
 function renderApptTable(appts, containerId, withCheckboxes, showDate) {
   var el = document.getElementById(containerId);
   if (!appts || !appts.length) {
@@ -3579,24 +3644,25 @@ function renderApptTable(appts, containerId, withCheckboxes, showDate) {
   html += '<th>Time</th><th>Patient</th><th>Phone</th><th>Service</th><th>Location</th><th>Status</th><th></th></tr></thead><tbody>';
   for (var i = 0; i < appts.length; i++) {
     var a = appts[i];
-    var statusClass = 'badge-green';
-    var statusText = 'Booked';
-    if (a.status === 'RELOCATED_SPINOLA') statusText = 'Spinola';
-    else if (a.status && a.status.indexOf('CANCELLED') >= 0) { statusClass = 'badge-red'; statusText = 'Cancelled'; }
+    var badge = getStatusBadge(a.status);
     html += '<tr' + (showDate ? ' style="cursor:pointer" onclick="goToDate(\\'' + esc(a.dateKey) + '\\')"' : '') + '>';
     if (withCheckboxes) html += '<td><input type="checkbox" class="appt-cb" value="' + esc(a.appointmentId) + '"></td>';
     if (showDate) html += '<td><b>' + esc(a.dateKey) + '</b></td>';
     html += '<td><b>' + esc(a.startTime) + ' - ' + esc(a.endTime) + '</b></td>';
-    html += '<td>' + esc(a.fullName) + '</td>';
+    html += '<td><a class="patient-link" href="#" onclick="event.stopPropagation();event.preventDefault();showPatientHistory(\\'' + esc(a.email) + '\\',\\'' + esc(a.phone) + '\\')">' + esc(a.fullName) + '</a></td>';
     html += '<td>' + esc(a.phone) + '</td>';
     html += '<td>' + esc(a.serviceName) + '</td>';
     html += '<td>' + esc(a.location) + '</td>';
-    html += '<td><span class="badge ' + statusClass + '">' + statusText + '</span></td>';
-    if (a.status && a.status.indexOf('CANCELLED') < 0) {
-      html += '<td><button class="btn btn-sm btn-danger" onclick="event.stopPropagation();cancelSingleAppt(\\'' + esc(a.appointmentId) + '\\', \\'' + containerId + '\\')">Cancel</button></td>';
-    } else {
-      html += '<td></td>';
+    html += '<td><span class="badge ' + badge.cls + '">' + badge.text + '</span></td>';
+    html += '<td>';
+    if (a.status === 'BOOKED' || a.status === 'RELOCATED_SPINOLA') {
+      html += '<button class="btn btn-sm btn-danger" onclick="event.stopPropagation();cancelSingleAppt(\\'' + esc(a.appointmentId) + '\\', \\'' + containerId + '\\')">Cancel</button>';
+      html += '<span class="att-btns">';
+      html += '<button class="btn btn-sm btn-good" onclick="event.stopPropagation();markAttendance(\\'' + esc(a.appointmentId) + '\\',\\'' + esc(a.dateKey) + '\\',true,\\'' + containerId + '\\')" title="Attended">&#x2713;</button>';
+      html += '<button class="btn btn-sm btn-warn" onclick="event.stopPropagation();markAttendance(\\'' + esc(a.appointmentId) + '\\',\\'' + esc(a.dateKey) + '\\',false,\\'' + containerId + '\\')" title="No-Show">&#x2717;</button>';
+      html += '</span>';
     }
+    html += '</td>';
     html += '</tr>';
   }
   html += '</tbody></table></div>';
@@ -3714,8 +3780,8 @@ function loadDashboard() {
 
       document.getElementById('statBooked').textContent = res.stats.weekBooked;
       document.getElementById('statCancelled').textContent = res.stats.weekCancelled;
-      document.getElementById('statToday').textContent = res.todayAppointments.length;
       document.getElementById('statTomorrow').textContent = res.tomorrowAppointments.length;
+      updateFillRing(res.todayAppointments.length, res.stats.todayCapacity || 0);
 
       renderOverrides(res.doctorOffEntries, res.extraSlotEntries);
 
@@ -3887,18 +3953,15 @@ function doSearch(query) {
       html += '<div class="table-wrap"><table><thead><tr><th>Date</th><th>Time</th><th>Patient</th><th>Phone</th><th>Service</th><th>Location</th><th>Status</th></tr></thead><tbody>';
       for (var i = 0; i < res.results.length; i++) {
         var r = res.results[i];
-        var statusClass = 'badge-green';
-        var statusText = 'Booked';
-        if (r.status === 'RELOCATED_SPINOLA') statusText = 'Spinola';
-        else if (r.status && r.status.indexOf('CANCELLED') >= 0) { statusClass = 'badge-red'; statusText = 'Cancelled'; }
+        var badge = getStatusBadge(r.status);
         html += '<tr style="cursor:pointer" onclick="goToDate(\\'' + esc(r.dateKey) + '\\')">';
         html += '<td><b>' + esc(r.dateKey) + '</b></td>';
         html += '<td>' + esc(r.startTime) + ' - ' + esc(r.endTime) + '</td>';
-        html += '<td>' + esc(r.fullName) + '</td>';
+        html += '<td><a class="patient-link" href="#" onclick="event.stopPropagation();event.preventDefault();showPatientHistory(\\'' + esc(r.email) + '\\',\\'' + esc(r.phone) + '\\')">' + esc(r.fullName) + '</a></td>';
         html += '<td>' + esc(r.phone) + '</td>';
         html += '<td>' + esc(r.serviceName) + '</td>';
         html += '<td>' + esc(r.location) + '</td>';
-        html += '<td><span class="badge ' + statusClass + '">' + statusText + '</span></td>';
+        html += '<td><span class="badge ' + badge.cls + '">' + badge.text + '</span></td>';
         html += '</tr>';
       }
       html += '</tbody></table></div></div>';
@@ -4373,8 +4436,8 @@ function doAutoRefresh() {
 
       document.getElementById('statBooked').textContent = res.stats.weekBooked;
       document.getElementById('statCancelled').textContent = res.stats.weekCancelled;
-      document.getElementById('statToday').textContent = res.todayAppointments.length;
       document.getElementById('statTomorrow').textContent = res.tomorrowAppointments.length;
+      updateFillRing(res.todayAppointments.length, res.stats.todayCapacity || 0);
 
       renderOverrides(res.doctorOffEntries, res.extraSlotEntries);
 
@@ -4554,6 +4617,112 @@ function saveSettings() {
   });
 }
 
+// ========== Fill Ring ==========
+
+function updateFillRing(booked, capacity) {
+  var cap = capacity || 0;
+  document.getElementById('statToday').textContent = booked + '/' + cap;
+  document.getElementById('statTodayLabel').textContent = 'Today filled';
+  var circumference = 2 * Math.PI * 22; // ~138.2
+  var pct = cap > 0 ? booked / cap : 0;
+  var offset = circumference * (1 - pct);
+  var fg = document.getElementById('fillRingFg');
+  fg.style.strokeDashoffset = offset;
+  fg.style.stroke = pct >= 0.9 ? 'var(--bad)' : pct >= 0.75 ? '#f59e0b' : 'var(--good)';
+}
+
+// ========== Attendance Tracking ==========
+
+function markAttendance(appointmentId, dateKey, attended, containerId) {
+  var label = attended ? 'attended' : 'no-show';
+  showLoading('Updating...', 'Marking as ' + label + '.');
+  google.script.run
+    .withSuccessHandler(function(res) {
+      hideLoading();
+      if (!res || !res.ok) { showMsg('globalMsg', 'bad', res.reason || 'Failed.'); return; }
+      // Reload the view that contains this appointment
+      if (containerId === 'actionApptsList') loadActionAppts();
+      else if (containerId === 'notifyApptsList') loadNotifyAppts();
+      else loadSchedAppts();
+      // Also refresh dashboard stats
+      doAutoRefresh();
+    })
+    .withFailureHandler(function(err) {
+      hideLoading();
+      showMsg('globalMsg', 'bad', 'Error: ' + (err && err.message ? err.message : String(err)));
+    })
+    .apiAdminMarkAttendance(SIG, appointmentId, dateKey, attended);
+}
+
+// ========== Patient History ==========
+
+function showPatientHistory(email, phone) {
+  var overlay = document.getElementById('patientOverlay');
+  overlay.style.display = 'flex';
+  requestAnimationFrame(function(){ requestAnimationFrame(function(){ overlay.classList.add('show'); }); });
+  document.getElementById('patientTitle').textContent = 'Patient History';
+  document.getElementById('patientContent').innerHTML = '<div class="empty">Loading...</div>';
+
+  google.script.run
+    .withSuccessHandler(function(res) {
+      if (!res || !res.ok) {
+        document.getElementById('patientContent').innerHTML = '<div class="empty">' + esc(res.reason || 'Failed.') + '</div>';
+        return;
+      }
+      var p = res.patient;
+      document.getElementById('patientTitle').textContent = p.name || 'Patient History';
+
+      var html = '';
+      // Contact info
+      html += '<div style="font-size:13px;color:var(--muted);margin-bottom:8px;">';
+      if (p.email) html += p.email;
+      if (p.email && p.phone) html += ' &middot; ';
+      if (p.phone) html += p.phone;
+      if (res.firstSeen) html += ' &middot; First seen: ' + res.firstSeen;
+      html += '</div>';
+
+      // Summary cards
+      html += '<div class="patient-summary">';
+      html += '<div class="patient-summary-item"><div class="psv">' + res.totalVisits + '</div><div class="psl">Visits</div></div>';
+      html += '<div class="patient-summary-item"><div class="psv">' + res.cancelCount + '</div><div class="psl">Cancellations</div></div>';
+      html += '<div class="patient-summary-item"><div class="psv">' + res.noShowCount + '</div><div class="psl">No-Shows</div></div>';
+      html += '</div>';
+
+      // Appointment table
+      if (res.appointments && res.appointments.length > 0) {
+        html += '<div class="table-wrap" style="margin-top:10px;"><table><thead><tr>';
+        html += '<th>Date</th><th>Time</th><th>Status</th><th>Location</th><th>Notes</th>';
+        html += '</tr></thead><tbody>';
+        for (var i = 0; i < res.appointments.length; i++) {
+          var a = res.appointments[i];
+          var badge = getStatusBadge(a.status);
+          html += '<tr>';
+          html += '<td><b>' + esc(a.dateKey) + '</b></td>';
+          html += '<td>' + esc(a.startTime) + ' - ' + esc(a.endTime) + '</td>';
+          html += '<td><span class="badge ' + badge.cls + '">' + badge.text + '</span></td>';
+          html += '<td>' + esc(a.location) + '</td>';
+          html += '<td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(a.comments || '') + '</td>';
+          html += '</tr>';
+        }
+        html += '</tbody></table></div>';
+      } else {
+        html += '<div class="empty">No appointment history found.</div>';
+      }
+
+      document.getElementById('patientContent').innerHTML = html;
+    })
+    .withFailureHandler(function(err) {
+      document.getElementById('patientContent').innerHTML = '<div class="empty">Error: ' + esc(err && err.message ? err.message : String(err)) + '</div>';
+    })
+    .apiAdminGetPatientHistory(SIG, email, phone);
+}
+
+function hidePatientHistory() {
+  var overlay = document.getElementById('patientOverlay');
+  overlay.classList.remove('show');
+  setTimeout(function(){ overlay.style.display = 'none'; }, 200);
+}
+
 // ========== Statistics Tab ==========
 
 var _statsLoaded = false;
@@ -4583,6 +4752,11 @@ function renderAllStats(s) {
   renderProgressRing(s.utilization);
   document.getElementById('heroUtil').textContent = s.utilization + '%';
   document.getElementById('heroBooked').textContent = s.totalBooked;
+  // Trend arrow on appointments
+  var trendArrow = '';
+  if (s.trendDirection === 'up') trendArrow = '<span class="trend-arrow trend-up">&uarr;' + s.trendPct + '%</span>';
+  else if (s.trendDirection === 'down') trendArrow = '<span class="trend-arrow trend-down">&darr;' + s.trendPct + '%</span>';
+  document.getElementById('heroBookedSub').innerHTML = 'last 28 days ' + trendArrow;
   document.getElementById('heroCancelRate').textContent = s.cancelRate + '%';
   var crEl = document.getElementById('heroCancelRate');
   crEl.style.color = s.cancelRate < 10 ? 'var(--good)' : s.cancelRate < 20 ? '#f59e0b' : 'var(--bad)';
@@ -4597,6 +4771,51 @@ function renderAllStats(s) {
   renderTopPatients(s.topPatients);
   renderCancelBreakdown(s);
   renderBusiestDay(s.busiestDay);
+  renderLeadTime(s);
+  renderAttendance(s);
+}
+
+function renderLeadTime(s) {
+  var el = document.getElementById('leadTimeChart');
+  var html = '<div style="text-align:center;padding:12px 0;">';
+  html += '<div style="font-size:42px;font-weight:900;color:#2563eb;">' + (s.avgLeadTimeDays || 0) + '</div>';
+  html += '<div style="font-size:14px;font-weight:700;margin-top:4px;">days average</div>';
+  html += '<div style="font-size:12px;color:var(--muted);margin-top:2px;">How far ahead patients book</div>';
+  if (s.sameDayCancels > 0) {
+    html += '<div style="margin-top:12px;padding:8px 12px;background:rgba(245,158,11,0.08);border-radius:10px;display:inline-block;">';
+    html += '<span style="font-size:18px;font-weight:800;color:#b45309;">' + s.sameDayCancels + '</span>';
+    html += '<span style="font-size:12px;color:#b45309;margin-left:6px;">same-day cancellations</span>';
+    html += '</div>';
+  }
+  html += '</div>';
+  el.innerHTML = html;
+}
+
+function renderAttendance(s) {
+  var el = document.getElementById('attendanceChart');
+  var attended = s.totalAttended || 0;
+  var noShow = s.totalNoShow || 0;
+  var total = attended + noShow;
+
+  var html = '<div style="text-align:center;padding:8px 0;">';
+  if (total > 0) {
+    var noShowRate = s.noShowRate || 0;
+    var noShowColor = noShowRate < 5 ? 'var(--good)' : noShowRate < 15 ? '#f59e0b' : 'var(--bad)';
+    html += '<div style="font-size:36px;font-weight:900;color:' + noShowColor + ';">' + noShowRate + '%</div>';
+    html += '<div style="font-size:12px;color:var(--muted);margin-bottom:12px;">No-show rate</div>';
+    html += '<div class="h-bar-row"><div class="h-bar-label" style="width:70px;">Attended</div>';
+    var pctA = total > 0 ? Math.round(attended / total * 100) : 0;
+    html += '<div class="h-bar-track"><div class="h-bar-fill" style="width:' + pctA + '%;background:var(--good);"></div></div>';
+    html += '<div class="h-bar-pct">' + attended + '</div></div>';
+    html += '<div class="h-bar-row"><div class="h-bar-label" style="width:70px;">No-Show</div>';
+    var pctN = 100 - pctA;
+    html += '<div class="h-bar-track"><div class="h-bar-fill" style="width:' + pctN + '%;background:#f59e0b;"></div></div>';
+    html += '<div class="h-bar-pct">' + noShow + '</div></div>';
+  } else {
+    html += '<div class="empty">No attendance data yet.<br><span style="font-size:11px;">Use the &#x2713; and &#x2717; buttons on today\\'s appointments to track attendance.</span></div>';
+  }
+  html += '</div>';
+  el.innerHTML = html;
 }
 
 function renderProgressRing(pct) {
@@ -5680,6 +5899,31 @@ function appendAppointment_(dateKey, apptObj) {
 function apptIsActive_(appt) {
   var st = String(appt.status || '').trim();
   return (st === 'BOOKED' || st === 'RELOCATED_SPINOLA');
+}
+
+/**
+ * List non-cancelled appointments for a date (includes ATTENDED and NO_SHOW).
+ */
+function listNonCancelledAppointmentsForDate_(dateKey) {
+  var all = listAppointmentsForDate_(dateKey);
+  var result = [];
+  for (var i = 0; i < all.length; i++) {
+    var st = String(all[i].status || '').trim();
+    if (st.indexOf('CANCELLED') < 0) result.push(all[i]);
+  }
+  result.sort(function(a, b) {
+    return parseTimeToMinutes_(a.startTime) - parseTimeToMinutes_(b.startTime);
+  });
+  return result;
+}
+
+/**
+ * Calculate days between two YYYY-MM-DD date strings.
+ */
+function daysBetween_(dateStr1, dateStr2) {
+  var d1 = parseDateKey_(dateStr1);
+  var d2 = parseDateKey_(dateStr2);
+  return Math.round((d2.getTime() - d1.getTime()) / 86400000);
 }
 
 function countActiveAppointmentsInWindow_(email, phone) {
@@ -6828,8 +7072,8 @@ function apiAdminGetDashboard(sig) {
   var tomorrow = addMinutes_(today, 24 * 60);
   var tomorrowKey = toDateKey_(tomorrow);
 
-  var todayAppts = listActiveAppointmentsForDate_(todayKey);
-  var tomorrowAppts = listActiveAppointmentsForDate_(tomorrowKey);
+  var todayAppts = listNonCancelledAppointmentsForDate_(todayKey);
+  var tomorrowAppts = listNonCancelledAppointmentsForDate_(tomorrowKey);
 
   // Get doctor-off entries for upcoming days
   var offRows = getDoctorOffRows_();
@@ -6862,8 +7106,28 @@ function apiAdminGetDashboard(sig) {
     var vals = sh.getRange(2, 1, lr - 1, 18).getValues();
     for (var r = 0; r < vals.length; r++) {
       var status = String(vals[r][10] || '');
-      if (status === 'BOOKED' || status === 'RELOCATED_SPINOLA') weekBooked++;
+      if (status === 'BOOKED' || status === 'RELOCATED_SPINOLA' || status === 'ATTENDED') weekBooked++;
       if (status.indexOf('CANCELLED') >= 0) weekCancelled++;
+    }
+  }
+
+  // Today's capacity
+  var offMap = getDoctorOffDates_();
+  var extraMap = getDoctorExtraSlots_();
+  var todaySlots = buildSlotsForDate_(today, extraMap[todayKey] || null);
+  var todayCapacity = todaySlots.length;
+  var offEntry = offMap[todayKey];
+  if (offEntry) {
+    if (offEntry.allDay) { todayCapacity = 0; }
+    else if (offEntry.blocks) {
+      for (var s = 0; s < todaySlots.length; s++) {
+        var slotMin = parseTimeToMinutes_(todaySlots[s].start);
+        for (var bl = 0; bl < offEntry.blocks.length; bl++) {
+          if (slotMin >= offEntry.blocks[bl].startMin && slotMin < offEntry.blocks[bl].endMin) {
+            todayCapacity--; break;
+          }
+        }
+      }
     }
   }
 
@@ -6877,7 +7141,8 @@ function apiAdminGetDashboard(sig) {
     extraSlotEntries: futureExtraRows,
     stats: {
       weekBooked: weekBooked,
-      weekCancelled: weekCancelled
+      weekCancelled: weekCancelled,
+      todayCapacity: todayCapacity
     }
   };
 }
@@ -6890,7 +7155,7 @@ function apiAdminGetDateAppointments(sig, dateKey) {
   dateKey = String(dateKey || '').trim();
   if (!dateKey) return { ok: false, reason: 'Missing date.' };
 
-  var appts = listActiveAppointmentsForDate_(dateKey);
+  var appts = listNonCancelledAppointmentsForDate_(dateKey);
   return { ok: true, dateKey: dateKey, appointments: appts };
 }
 
@@ -7313,7 +7578,7 @@ function apiAdminGetWeekOverview(sig, weekStartDate) {
       var vals = sh.getRange(2, 1, sh.getLastRow() - 1, 18).getValues();
       for (var r = 0; r < vals.length; r++) {
         var st = String(vals[r][10] || '');
-        if (st === 'BOOKED' || st === 'RELOCATED_SPINOLA') count++;
+        if (st === 'BOOKED' || st === 'RELOCATED_SPINOLA' || st === 'ATTENDED') count++;
       }
     }
 
@@ -7498,6 +7763,9 @@ function apiAdminGetStatistics(sig) {
   var totalBooked = 0, totalCancelled = 0;
   var cancelByDoctor = 0, cancelByPatient = 0;
   var locationPotters = 0, locationSpinola = 0;
+  var totalNoShow = 0, totalAttended = 0, sameDayCancels = 0;
+  var leadTimes = [];
+  var recentBooked = 0, prevBooked = 0; // for period comparison
   var hourCounts = []; for (var h = 0; h < 24; h++) hourCounts.push(0);
   var dowBooked = { MON:0, TUE:0, WED:0, THU:0, FRI:0, SAT:0, SUN:0 };
   var dowSlots = { MON:0, TUE:0, WED:0, THU:0, FRI:0, SAT:0, SUN:0 };
@@ -7559,7 +7827,7 @@ function apiAdminGetStatistics(sig) {
           var status = String(vals[r][10] || '');
           var startTime = normalizeTimeCell_(vals[r][2]);
 
-          if (status === 'BOOKED' || status === 'RELOCATED_SPINOLA') {
+          if (status === 'BOOKED' || status === 'RELOCATED_SPINOLA' || status === 'ATTENDED') {
             totalBooked++;
             dayBooked++;
 
@@ -7587,15 +7855,41 @@ function apiAdminGetStatistics(sig) {
               }
               patientMap[pKey].count++;
             }
+
+            // Lead time (days between booking creation and appointment date)
+            var createdAt = String(vals[r][12] || '');
+            if (createdAt && createdAt.length >= 10) {
+              var createdDate = createdAt.substring(0, 10);
+              var leadDays = daysBetween_(createdDate, dk);
+              if (leadDays >= 0) leadTimes.push(leadDays);
+            }
+
+            // Attendance tracking
+            if (status === 'ATTENDED') totalAttended++;
+          } else if (status === 'NO_SHOW') {
+            totalNoShow++;
+            dayBooked++; // Count in booked totals for capacity purposes
+            totalBooked++;
+            dowBooked[dow]++;
           } else if (status.indexOf('CANCELLED') >= 0) {
             totalCancelled++;
             dayCancelled++;
             if (status === 'CANCELLED_DOCTOR') cancelByDoctor++;
             else cancelByPatient++;
+
+            // Same-day cancellation check
+            var cancelledAt = String(vals[r][16] || '');
+            if (cancelledAt && cancelledAt.length >= 10 && cancelledAt.substring(0, 10) === dk) {
+              sameDayCancels++;
+            }
           }
         }
       }
     }
+
+    // Period comparison (recent 14 days vs previous 14 days)
+    if (i >= -PAST_DAYS && i < -PAST_DAYS / 2) prevBooked += dayBooked;
+    else if (i >= -PAST_DAYS / 2 && i <= 0) recentBooked += dayBooked;
 
     // Busiest day
     if (dayBooked > busiestDay.count) {
@@ -7663,6 +7957,22 @@ function apiAdminGetStatistics(sig) {
   // Take last 4 weeks
   if (weeklyTrend.length > 4) weeklyTrend = weeklyTrend.slice(weeklyTrend.length - 4);
 
+  // Lead time average
+  var avgLeadTimeDays = 0;
+  if (leadTimes.length > 0) {
+    var sum = 0;
+    for (var li = 0; li < leadTimes.length; li++) sum += leadTimes[li];
+    avgLeadTimeDays = Math.round(sum / leadTimes.length * 10) / 10;
+  }
+
+  // No-show rate
+  var attendanceTotal = totalAttended + totalNoShow;
+  var noShowRate = attendanceTotal > 0 ? Math.round(totalNoShow / attendanceTotal * 1000) / 10 : 0;
+
+  // Trend direction
+  var trendDirection = recentBooked > prevBooked ? 'up' : recentBooked < prevBooked ? 'down' : 'flat';
+  var trendPct = prevBooked > 0 ? Math.round(Math.abs(recentBooked - prevBooked) / prevBooked * 100) : 0;
+
   return {
     ok: true,
     generated: Utilities.formatDate(new Date(), getTimeZone_(), "yyyy-MM-dd HH:mm"),
@@ -7680,7 +7990,119 @@ function apiAdminGetStatistics(sig) {
     totalUniquePatients: totalUniquePatients,
     repeatPatients: repeatPatients,
     topPatients: topPatients,
-    upcomingLoad: upcomingLoad
+    upcomingLoad: upcomingLoad,
+    avgLeadTimeDays: avgLeadTimeDays,
+    totalNoShow: totalNoShow,
+    totalAttended: totalAttended,
+    noShowRate: noShowRate,
+    sameDayCancels: sameDayCancels,
+    trendDirection: trendDirection,
+    trendPct: trendPct
+  };
+}
+
+/**
+ * Mark appointment as attended or no-show.
+ */
+function apiAdminMarkAttendance(sig, appointmentId, dateKey, attended) {
+  if (!verifyAdminSig_(sig)) return { ok: false, reason: 'Access denied.' };
+
+  appointmentId = String(appointmentId || '').trim();
+  dateKey = String(dateKey || '').trim();
+  if (!appointmentId || !dateKey) return { ok: false, reason: 'Missing appointment ID or date.' };
+
+  var ss = getAppointmentsSpreadsheet_();
+  var sh = ss.getSheetByName(dateKey);
+  if (!sh) return { ok: false, reason: 'Date sheet not found.' };
+
+  var lr = sh.getLastRow();
+  if (lr < 2) return { ok: false, reason: 'No appointments on this date.' };
+
+  var vals = sh.getRange(2, 1, lr - 1, 18).getValues();
+  for (var r = 0; r < vals.length; r++) {
+    if (String(vals[r][0] || '') === appointmentId) {
+      var newStatus = attended ? 'ATTENDED' : 'NO_SHOW';
+      updateAppointmentStatus_(dateKey, r + 2, { status: newStatus });
+      return { ok: true, message: 'Marked as ' + (attended ? 'attended' : 'no-show') + '.' };
+    }
+  }
+
+  return { ok: false, reason: 'Appointment not found.' };
+}
+
+/**
+ * Get patient history by email or phone.
+ */
+function apiAdminGetPatientHistory(sig, email, phone) {
+  if (!verifyAdminSig_(sig)) return { ok: false, reason: 'Access denied.' };
+
+  email = String(email || '').trim().toLowerCase();
+  phone = String(phone || '').trim();
+  if (!email && !phone) return { ok: false, reason: 'Missing email or phone.' };
+
+  var today = todayLocal_();
+  var ss = getAppointmentsSpreadsheet_();
+  var results = [];
+  var patientName = '';
+  var patientEmail = '';
+  var patientPhone = '';
+  var firstSeen = '';
+
+  // Search 90 days back + 14 forward
+  for (var d = -90; d <= 14; d++) {
+    if (results.length >= 100) break;
+    var dt = addMinutes_(today, d * 1440);
+    var dk = toDateKey_(dt);
+    var sh = ss.getSheetByName(dk);
+    if (!sh || sh.getLastRow() < 2) continue;
+
+    var vals = sh.getRange(2, 1, sh.getLastRow() - 1, 18).getValues();
+    for (var r = 0; r < vals.length; r++) {
+      var e = String(vals[r][7] || '').trim().toLowerCase();
+      var p = String(vals[r][8] || '').trim();
+      var match = false;
+      if (email && e === email) match = true;
+      if (phone && p === phone) match = true;
+      if (!match) continue;
+
+      if (!patientName) patientName = String(vals[r][6] || '');
+      if (!patientEmail && e) patientEmail = e;
+      if (!patientPhone && p) patientPhone = p;
+      if (!firstSeen || dk < firstSeen) firstSeen = dk;
+
+      results.push({
+        dateKey: dk,
+        startTime: normalizeTimeCell_(vals[r][2]),
+        endTime: normalizeTimeCell_(vals[r][3]),
+        serviceName: String(vals[r][5] || ''),
+        status: String(vals[r][10] || ''),
+        location: String(vals[r][11] || ''),
+        comments: String(vals[r][9] || ''),
+        createdAt: String(vals[r][12] || '')
+      });
+    }
+  }
+
+  // Sort by date descending
+  results.sort(function(a, b) { return a.dateKey > b.dateKey ? -1 : a.dateKey < b.dateKey ? 1 : 0; });
+
+  // Compute stats
+  var totalVisits = 0, cancelCount = 0, noShowCount = 0;
+  for (var i = 0; i < results.length; i++) {
+    var st = results[i].status;
+    if (st === 'BOOKED' || st === 'RELOCATED_SPINOLA' || st === 'ATTENDED') totalVisits++;
+    else if (st.indexOf('CANCELLED') >= 0) cancelCount++;
+    else if (st === 'NO_SHOW') noShowCount++;
+  }
+
+  return {
+    ok: true,
+    patient: { name: patientName, email: patientEmail, phone: patientPhone },
+    totalVisits: totalVisits,
+    cancelCount: cancelCount,
+    noShowCount: noShowCount,
+    firstSeen: firstSeen,
+    appointments: results
   };
 }
 
@@ -8367,6 +8789,8 @@ function wipeScriptProperties_(execute) {
     apiAdminGetSettings: apiAdminGetSettings,
     apiAdminSaveSettings: apiAdminSaveSettings,
     apiAdminGetStatistics: apiAdminGetStatistics,
+    apiAdminMarkAttendance: apiAdminMarkAttendance,
+    apiAdminGetPatientHistory: apiAdminGetPatientHistory,
     sendDailyDoctorSchedule_: sendDailyDoctorSchedule_,
     install: install,
     repairSheets: repairSheets,

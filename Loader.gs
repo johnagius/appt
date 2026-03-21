@@ -243,6 +243,8 @@ function apiAdminSearchAppointments(s, q)    { return _getApp().apiAdminSearchAp
 function apiAdminGetSettings(s)              { return _getApp().apiAdminGetSettings(s); }
 function apiAdminSaveSettings(s, p)          { return _getApp().apiAdminSaveSettings(s, p); }
 function apiAdminGetStatistics(s)            { return _getApp().apiAdminGetStatistics(s); }
+function apiAdminMarkAttendance(s, a, d, t)  { return _getApp().apiAdminMarkAttendance(s, a, d, t); }
+function apiAdminGetPatientHistory(s, e, p)  { return _getApp().apiAdminGetPatientHistory(s, e, p); }
 
 // ----- Trigger (daily schedule email at 7am) -----
 function sendDailyDoctorSchedule_()          { return _getApp()['sendDailyDoctorSchedule_'](); }
