@@ -1959,7 +1959,7 @@ var _HTML_TEMPLATES = {
       return selectedCountry.code + local;
     }
 
-    const EXEC_URL_AFTER_BOOKING = 'https://script.google.com/macros/s/AKfycbxQGnxKNEe9BpU8F7TSDHzc1kybq9TBi-RpUOwX4BsRcX2HUU2V5TfcuHsvQA6duZQ/exec';
+    const EXEC_URL_AFTER_BOOKING = '<?= WEBAPP_URL ?>';
 
     function goToExecAfterBooking_(){
       const target = EXEC_URL_AFTER_BOOKING;
@@ -5331,7 +5331,7 @@ function doGet(e) {
       .addMetaTag('viewport', 'width=device-width, initial-scale=1, viewport-fit=cover');
   }
 
-  return _serveHtml('Index', {})
+  return _serveHtml('Index', { WEBAPP_URL: getWebAppUrl_() })
     .setTitle('Dr Kevin Navarro Gera - Booking')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1, viewport-fit=cover');
 }
