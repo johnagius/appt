@@ -3545,7 +3545,7 @@ function loadDashboard() {
 
       // Load schedule for current date and week
       loadSchedAppts();
-      loadWeekOverview();
+      try { loadWeekOverview(); } catch(e) { console.error('Week overview error:', e); }
 
       // Set default dates for Quick Actions
       document.getElementById('actionDate').value = res.todayKey;
@@ -7746,6 +7746,10 @@ function wipeScriptProperties_(execute) {
     apiAdminRemoveDoctorOff: apiAdminRemoveDoctorOff,
     apiAdminRemoveExtraSlots: apiAdminRemoveExtraSlots,
     apiAdminNotifyPatients: apiAdminNotifyPatients,
+    apiAdminGetWeekOverview: apiAdminGetWeekOverview,
+    apiAdminSearchAppointments: apiAdminSearchAppointments,
+    apiAdminGetSettings: apiAdminGetSettings,
+    apiAdminSaveSettings: apiAdminSaveSettings,
     sendDailyDoctorSchedule_: sendDailyDoctorSchedule_,
     install: install,
     repairSheets: repairSheets,
