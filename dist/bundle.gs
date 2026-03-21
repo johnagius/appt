@@ -1998,6 +1998,14 @@ var _HTML_TEMPLATES = {
     function showConfirmModal(text){
       els.confirmText.textContent = text;
       showOverlay(els.confirmOverlay);
+      // Auto-close after 4 seconds and continue as if user clicked OK
+      setTimeout(function() {
+        if (els.confirmOverlay.classList.contains('show')) {
+          hideConfirmModal();
+          applyLanguage('en');
+          goToExecAfterBooking_();
+        }
+      }, 4000);
     }
     function hideConfirmModal(){
       hideOverlay(els.confirmOverlay);
@@ -2386,6 +2394,21 @@ var _HTML_TEMPLATES = {
       document.addEventListener('visibilitychange', () => {
         if (!document.hidden) refreshDateOptions();
       });
+
+      // Full page reload after 5 minutes of idle (no interaction)
+      var lastActivity = Date.now();
+      var IDLE_RELOAD_MS = 5 * 60 * 1000;
+
+      ['pointerdown', 'keydown', 'scroll', 'touchstart'].forEach(function(evt) {
+        document.addEventListener(evt, function() { lastActivity = Date.now(); }, { passive: true });
+      });
+
+      setInterval(function() {
+        if (Date.now() - lastActivity >= IDLE_RELOAD_MS) {
+          lastActivity = Date.now();
+          goToExecAfterBooking_();
+        }
+      }, 30000);
     }
 
     function init() {
