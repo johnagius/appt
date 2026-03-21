@@ -644,6 +644,10 @@
       flex:0 0 auto;
     }
     @keyframes spin{ to { transform: rotate(360deg); } }
+
+    .idle-bar{position:fixed;bottom:0;left:0;right:0;background:rgba(17,24,39,0.92);color:#e5e7eb;font-size:12px;padding:6px 14px;display:flex;justify-content:space-between;align-items:center;z-index:1500;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);font-weight:500;}
+    .idle-bar .idle-dot{width:6px;height:6px;border-radius:50%;background:var(--good);display:inline-block;margin-right:4px;animation:idle-pulse 2s ease-in-out infinite;}
+    @keyframes idle-pulse{0%,100%{opacity:1;}50%{opacity:0.3;}}
     .loadingText h4{ margin:0 0 4px 0; font-size:14px; }
     .loadingText div{ margin:0; color: var(--muted); font-size:12.5px; line-height:1.35; }
   </style>
@@ -765,6 +769,10 @@
       <div id="resultMsg" class="msg"></div>
     </div>
 
+  </div>
+
+  <div class="idle-bar" id="idleBar" style="display:none;">
+    <span><span class="idle-dot"></span> Page refreshes in: <span id="idleCountdown">5:00</span></span>
   </div>
 
   <!-- Confirmation modal -->
@@ -2391,17 +2399,25 @@
       // Full page reload after 5 minutes of idle (no interaction)
       var lastActivity = Date.now();
       var IDLE_RELOAD_MS = 5 * 60 * 1000;
+      var idleBarEl = document.getElementById('idleBar');
+      var idleCountdownEl = document.getElementById('idleCountdown');
 
       ['pointerdown', 'keydown', 'scroll', 'touchstart'].forEach(function(evt) {
         document.addEventListener(evt, function() { lastActivity = Date.now(); }, { passive: true });
       });
 
       setInterval(function() {
-        if (Date.now() - lastActivity >= IDLE_RELOAD_MS) {
+        var remaining = Math.max(0, IDLE_RELOAD_MS - (Date.now() - lastActivity));
+        var secs = Math.ceil(remaining / 1000);
+        var m = Math.floor(secs / 60);
+        var s = secs % 60;
+        idleCountdownEl.textContent = m + ':' + (s < 10 ? '0' : '') + s;
+        idleBarEl.style.display = '';
+        if (remaining <= 0) {
           lastActivity = Date.now();
           goToExecAfterBooking_();
         }
-      }, 30000);
+      }, 1000);
     }
 
     function init() {
