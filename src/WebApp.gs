@@ -38,7 +38,7 @@ function doGet(e) {
       .addMetaTag('viewport', 'width=device-width, initial-scale=1, viewport-fit=cover');
   }
 
-  return _serveHtml('Index', {})
+  return _serveHtml('Index', { WEBAPP_URL: getWebAppUrl_() })
     .setTitle('Dr Kevin Navarro Gera - Booking')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1, viewport-fit=cover');
 }
