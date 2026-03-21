@@ -242,6 +242,7 @@ function apiAdminGetWeekOverview(s, w)       { return _getApp().apiAdminGetWeekO
 function apiAdminSearchAppointments(s, q)    { return _getApp().apiAdminSearchAppointments(s, q); }
 function apiAdminGetSettings(s)              { return _getApp().apiAdminGetSettings(s); }
 function apiAdminSaveSettings(s, p)          { return _getApp().apiAdminSaveSettings(s, p); }
+function apiAdminGetStatistics(s)            { return _getApp().apiAdminGetStatistics(s); }
 
 // ----- Trigger (daily schedule email at 7am) -----
 function sendDailyDoctorSchedule_()          { return _getApp()['sendDailyDoctorSchedule_'](); }

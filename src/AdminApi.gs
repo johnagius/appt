@@ -660,3 +660,211 @@ function apiAdminSaveSettings(sig, settings) {
 
   return { ok: true, message: 'Settings saved successfully.' };
 }
+
+/**
+ * Statistics data for admin analytics dashboard.
+ * Scans 28 days back + 7 days forward.
+ */
+function apiAdminGetStatistics(sig) {
+  if (!verifyAdminSig_(sig)) return { ok: false, reason: 'Access denied.' };
+
+  var today = todayLocal_();
+  var todayKey = toDateKey_(today);
+  var ss = getAppointmentsSpreadsheet_();
+  var offMap = getDoctorOffDates_();
+  var extraMap = getDoctorExtraSlots_();
+
+  var PAST_DAYS = 28;
+  var FUTURE_DAYS = 7;
+  var dayLabels = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  var dowKeys = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
+
+  // Accumulators
+  var totalBooked = 0, totalCancelled = 0;
+  var cancelByDoctor = 0, cancelByPatient = 0;
+  var locationPotters = 0, locationSpinola = 0;
+  var hourCounts = []; for (var h = 0; h < 24; h++) hourCounts.push(0);
+  var dowBooked = { MON:0, TUE:0, WED:0, THU:0, FRI:0, SAT:0, SUN:0 };
+  var dowSlots = { MON:0, TUE:0, WED:0, THU:0, FRI:0, SAT:0, SUN:0 };
+  var patientMap = {}; // email/phone -> { name, count }
+  var busiestDay = { dateKey: '', count: 0, dayName: '' };
+
+  // Weekly trend: bucket by week (Mon-Sun)
+  var weekBuckets = {}; // mondayKey -> { booked, cancelled, label }
+
+  // Upcoming load (future days only)
+  var upcomingLoad = [];
+
+  var fromKey = toDateKey_(addMinutes_(today, -PAST_DAYS * 1440));
+  var toKey = toDateKey_(addMinutes_(today, FUTURE_DAYS * 1440));
+
+  for (var i = -PAST_DAYS; i <= FUTURE_DAYS; i++) {
+    var d = addMinutes_(today, i * 1440);
+    var dk = toDateKey_(d);
+    var dow = dayOfWeekKey_(d);
+
+    // Compute available slots for this day
+    var holiday = isHolidayOrClosed_(d);
+    var daySlotCount = 0;
+    if (!holiday.closed) {
+      var offEntry = offMap[dk];
+      if (!offEntry || !offEntry.allDay) {
+        var extraSlots = extraMap[dk] || [];
+        var slots = buildSlotsForDate_(d, extraSlots);
+        // Subtract blocked time slots
+        if (offEntry && offEntry.blocks) {
+          var unblockedSlots = [];
+          for (var s = 0; s < slots.length; s++) {
+            var slotMin = parseTimeToMinutes_(slots[s].start);
+            var blocked = false;
+            for (var b = 0; b < offEntry.blocks.length; b++) {
+              if (slotMin >= offEntry.blocks[b].startMin && slotMin < offEntry.blocks[b].endMin) {
+                blocked = true; break;
+              }
+            }
+            if (!blocked) unblockedSlots.push(slots[s]);
+          }
+          daySlotCount = unblockedSlots.length;
+        } else {
+          daySlotCount = slots.length;
+        }
+      }
+    }
+    dowSlots[dow] += daySlotCount;
+
+    // Read appointments for this day
+    var sh = ss.getSheetByName(dk);
+    var dayBooked = 0;
+    var dayCancelled = 0;
+    if (sh) {
+      var lr = sh.getLastRow();
+      if (lr >= 2) {
+        var vals = sh.getRange(2, 1, lr - 1, 18).getValues();
+        for (var r = 0; r < vals.length; r++) {
+          var status = String(vals[r][10] || '');
+          var startTime = normalizeTimeCell_(vals[r][2]);
+
+          if (status === 'BOOKED' || status === 'RELOCATED_SPINOLA') {
+            totalBooked++;
+            dayBooked++;
+
+            // Hour distribution
+            if (startTime) {
+              var hr = Math.floor(parseTimeToMinutes_(startTime) / 60);
+              if (hr >= 0 && hr < 24) hourCounts[hr]++;
+            }
+
+            // Location
+            var loc = String(vals[r][11] || '').toLowerCase();
+            if (loc.indexOf('spinola') >= 0) locationSpinola++;
+            else locationPotters++;
+
+            // DOW booked count
+            dowBooked[dow]++;
+
+            // Patient tracking
+            var email = String(vals[r][7] || '').trim().toLowerCase();
+            var phone = String(vals[r][8] || '').trim();
+            var pKey = email || phone;
+            if (pKey) {
+              if (!patientMap[pKey]) {
+                patientMap[pKey] = { name: String(vals[r][6] || ''), count: 0 };
+              }
+              patientMap[pKey].count++;
+            }
+          } else if (status.indexOf('CANCELLED') >= 0) {
+            totalCancelled++;
+            dayCancelled++;
+            if (status === 'CANCELLED_DOCTOR') cancelByDoctor++;
+            else cancelByPatient++;
+          }
+        }
+      }
+    }
+
+    // Busiest day
+    if (dayBooked > busiestDay.count) {
+      busiestDay = { dateKey: dk, count: dayBooked, dayName: dayLabels[d.getDay()] };
+    }
+
+    // Weekly trend bucketing (find Monday of this day's week)
+    var dayOfWeek = d.getDay(); // 0=Sun
+    var mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+    var monday = addMinutes_(d, mondayOffset * 1440);
+    var mondayKey = toDateKey_(monday);
+    if (!weekBuckets[mondayKey]) {
+      var monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      weekBuckets[mondayKey] = { booked: 0, cancelled: 0, label: monthNames[monday.getMonth()] + ' ' + monday.getDate() };
+    }
+    weekBuckets[mondayKey].booked += dayBooked;
+    weekBuckets[mondayKey].cancelled += dayCancelled;
+
+    // Upcoming load (future days including today)
+    if (i >= 0 && i <= FUTURE_DAYS) {
+      upcomingLoad.push({
+        dateKey: dk,
+        dayLabel: dayLabels[d.getDay()],
+        booked: dayBooked,
+        capacity: daySlotCount
+      });
+    }
+  }
+
+  // Compute utilization
+  var totalSlots = 0, totalUsed = 0;
+  var utilizationByDay = {};
+  var dayOrder = ['MON','TUE','WED','THU','FRI','SAT','SUN'];
+  for (var di = 0; di < dayOrder.length; di++) {
+    var dayK = dayOrder[di];
+    totalSlots += dowSlots[dayK];
+    totalUsed += dowBooked[dayK];
+    utilizationByDay[dayK] = dowSlots[dayK] > 0 ? Math.round(dowBooked[dayK] / dowSlots[dayK] * 100) : 0;
+  }
+  var utilization = totalSlots > 0 ? Math.round(totalUsed / totalSlots * 1000) / 10 : 0;
+
+  // Cancel rate
+  var totalAll = totalBooked + totalCancelled;
+  var cancelRate = totalAll > 0 ? Math.round(totalCancelled / totalAll * 1000) / 10 : 0;
+
+  // Patient insights
+  var patientKeys = Object.keys(patientMap);
+  var totalUniquePatients = patientKeys.length;
+  var repeatPatients = 0;
+  var patientList = [];
+  for (var pi = 0; pi < patientKeys.length; pi++) {
+    var p = patientMap[patientKeys[pi]];
+    if (p.count >= 2) repeatPatients++;
+    patientList.push(p);
+  }
+  patientList.sort(function(a, b) { return b.count - a.count; });
+  var topPatients = patientList.slice(0, 5).map(function(p) { return { name: p.name, count: p.count }; });
+
+  // Weekly trend: sort by date and take last 4 weeks
+  var weekKeys = Object.keys(weekBuckets).sort();
+  var weeklyTrend = [];
+  for (var wi = 0; wi < weekKeys.length; wi++) {
+    weeklyTrend.push(weekBuckets[weekKeys[wi]]);
+  }
+  // Take last 4 weeks
+  if (weeklyTrend.length > 4) weeklyTrend = weeklyTrend.slice(weeklyTrend.length - 4);
+
+  return {
+    ok: true,
+    generated: Utilities.formatDate(new Date(), getTimeZone_(), "yyyy-MM-dd HH:mm"),
+    period: { from: fromKey, to: toKey },
+    totalBooked: totalBooked,
+    totalCancelled: totalCancelled,
+    cancelRate: cancelRate,
+    utilization: utilization,
+    utilizationByDay: utilizationByDay,
+    weeklyTrend: weeklyTrend,
+    hourlyDistribution: hourCounts,
+    busiestDay: busiestDay,
+    locationSplit: { potters: locationPotters, spinola: locationSpinola },
+    cancelBreakdown: { byDoctor: cancelByDoctor, byPatient: cancelByPatient },
+    totalUniquePatients: totalUniquePatients,
+    repeatPatients: repeatPatients,
+    topPatients: topPatients,
+    upcomingLoad: upcomingLoad
+  };
+}
