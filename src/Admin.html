@@ -174,7 +174,7 @@
     .tl-date-nav button{border:none;background:none;cursor:pointer;font-size:18px;color:var(--muted);padding:4px 8px;border-radius:8px;}
     .tl-date-nav button:hover{background:rgba(17,24,39,0.06);}
     .tl-date-label{font-weight:700;font-size:14px;min-width:140px;text-align:center;}
-    .tl-outer{position:relative;margin-bottom:6px;}
+    .tl-outer{position:relative;margin-bottom:6px;padding-top:28px;}
     .tl-wrap{position:relative;height:48px;background:#f3f4f6;border-radius:10px;overflow:hidden;cursor:crosshair;border:1px solid var(--line);}
     .tl-seg{position:absolute;top:0;height:100%;transition:opacity 0.15s;}
     .tl-seg.regular{background:var(--good);opacity:0.55;}
@@ -184,14 +184,16 @@
     .tl-ticks{position:relative;height:18px;display:flex;pointer-events:none;}
     .tl-tick{flex:1;position:relative;border-left:1px solid var(--line);}
     .tl-tick:last-child{border-right:1px solid var(--line);}
-    .tl-tick-label{position:absolute;top:2px;left:-1px;font-size:10px;color:var(--muted);font-weight:600;white-space:nowrap;transform:translateX(-50%);left:0;}
+    .tl-tick-label{position:absolute;top:2px;left:0;font-size:10px;color:var(--muted);font-weight:600;white-space:nowrap;transform:translateX(-50%);}
     .tl-legend{display:flex;gap:12px;margin-top:10px;font-size:11px;color:var(--muted);justify-content:center;}
     .tl-legend-dot{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:middle;}
     .tl-tooltip{position:absolute;bottom:calc(100% + 6px);background:#111827;color:#fff;padding:4px 8px;border-radius:6px;font-size:11px;white-space:nowrap;pointer-events:none;z-index:10;transform:translateX(-50%);display:none;}
-    .tl-sel-label{position:absolute;top:-22px;left:50%;transform:translateX(-50%);background:var(--blue);color:#fff;padding:2px 8px;border-radius:4px;font-size:12px;font-weight:700;white-space:nowrap;pointer-events:none;z-index:11;}
+    .tl-sel-label{position:absolute;top:0;left:50%;transform:translateX(-50%);background:var(--blue);color:#fff;padding:2px 10px;border-radius:4px;font-size:13px;font-weight:700;white-space:nowrap;pointer-events:none;z-index:11;display:none;}
     .tl-actions{display:flex;gap:6px;margin-top:8px;justify-content:center;}
     .tl-actions .btn{font-size:12px;padding:6px 14px;}
-    .tl-sel{position:absolute;top:0;height:100%;background:rgba(37,99,235,0.25);border:2px solid var(--blue);border-radius:4px;pointer-events:none;z-index:5;display:none;}
+    .tl-sel{position:absolute;top:28px;height:48px;background:rgba(37,99,235,0.25);border:2px solid var(--blue);border-radius:4px;pointer-events:none;z-index:5;display:none;}
+    .tl-cursor{position:absolute;top:28px;width:2px;height:48px;background:var(--blue);pointer-events:none;z-index:8;display:none;opacity:0.7;}
+    .tl-cursor-label{position:absolute;top:-20px;left:50%;transform:translateX(-50%);background:#111827;color:#fff;padding:1px 6px;border-radius:3px;font-size:11px;font-weight:600;white-space:nowrap;}
 
     /* Search bar */
     .search-wrap{position:relative;margin-bottom:14px;}
@@ -422,11 +424,13 @@
         <div class="tl-date-label" id="tlDateLabel">Today</div>
         <button onclick="tlNavDate(1)" title="Next day">&#9654;</button>
       </div>
-      <div class="tl-outer">
+      <div class="tl-outer" id="tlOuter">
+        <div class="tl-sel-label" id="tlSelLabel"></div>
         <div class="tl-wrap" id="tlBar">
-          <div class="tl-sel" id="tlSel"><div class="tl-sel-label" id="tlSelLabel"></div></div>
           <div class="tl-tooltip" id="tlTip"></div>
         </div>
+        <div class="tl-sel" id="tlSel"></div>
+        <div class="tl-cursor" id="tlCursor"><div class="tl-cursor-label" id="tlCursorLabel"></div></div>
         <div class="tl-ticks" id="tlTicks"></div>
       </div>
       <div class="tl-legend">
@@ -1257,17 +1261,20 @@ function parseHHMM(str) {
   return parseInt(parts[0], 10) * 60 + parseInt(parts[1] || '0', 10);
 }
 
-// Drag-to-select on timeline
+// Drag-to-select and hover cursor on timeline
 (function initTimelineDrag() {
   var bar = document.getElementById('tlBar');
+  var outer = document.getElementById('tlOuter');
   if (!bar) return;
 
-  function getMinFromX(e) {
+  function getPctFromX(e) {
     var rect = bar.getBoundingClientRect();
-    var pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    return Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+  }
+
+  function getMinFromX(e) {
     var totalMin = (_tlDayEnd - _tlDayStart) * 60;
-    var rawMin = _tlDayStart * 60 + pct * totalMin;
-    // Snap to 10-minute intervals
+    var rawMin = _tlDayStart * 60 + getPctFromX(e) * totalMin;
     return Math.round(rawMin / 10) * 10;
   }
 
@@ -1275,7 +1282,12 @@ function parseHHMM(str) {
     if (_tlSelStart === null || _tlSelEnd === null) return;
     var s = Math.min(_tlSelStart, _tlSelEnd);
     var e = Math.max(_tlSelStart, _tlSelEnd);
-    if (e - s < 10) { document.getElementById('tlSel').style.display = 'none'; return; }
+    var selLabel = document.getElementById('tlSelLabel');
+    if (e - s < 10) {
+      document.getElementById('tlSel').style.display = 'none';
+      selLabel.style.display = 'none';
+      return;
+    }
     var totalMin = (_tlDayEnd - _tlDayStart) * 60;
     var left = (s - _tlDayStart * 60) / totalMin * 100;
     var width = (e - s) / totalMin * 100;
@@ -1283,17 +1295,36 @@ function parseHHMM(str) {
     sel.style.left = left + '%';
     sel.style.width = width + '%';
     sel.style.display = 'block';
-    // Show live time label
-    var selLabel = document.getElementById('tlSelLabel');
-    selLabel.textContent = minToHHMM(s) + ' - ' + minToHHMM(e);
+    // Position label above selection, centered
+    selLabel.textContent = minToHHMM(s) + ' \u2192 ' + minToHHMM(e);
+    selLabel.style.left = (left + width / 2) + '%';
+    selLabel.style.display = 'block';
   }
+
+  // Hover cursor
+  bar.addEventListener('mousemove', function(e) {
+    if (_tlDragging) return;
+    var cursor = document.getElementById('tlCursor');
+    var cursorLabel = document.getElementById('tlCursorLabel');
+    var pct = getPctFromX(e);
+    var m = getMinFromX(e);
+    cursor.style.left = (pct * 100) + '%';
+    cursorLabel.textContent = minToHHMM(m);
+    cursor.style.display = 'block';
+  });
+
+  bar.addEventListener('mouseleave', function() {
+    if (!_tlDragging) document.getElementById('tlCursor').style.display = 'none';
+  });
 
   bar.addEventListener('mousedown', function(e) {
     if (e.button !== 0) return;
+    e.preventDefault();
     _tlDragging = true;
     _tlSelStart = getMinFromX(e);
     _tlSelEnd = _tlSelStart;
     document.getElementById('tlActions').style.display = 'none';
+    document.getElementById('tlCursor').style.display = 'none';
     updateSel();
   });
 
@@ -1332,6 +1363,7 @@ function parseHHMM(str) {
       updateSel();
     } else {
       document.getElementById('tlSel').style.display = 'none';
+      document.getElementById('tlSelLabel').style.display = 'none';
       _tlSelStart = null;
       _tlSelEnd = null;
     }
