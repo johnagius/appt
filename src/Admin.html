@@ -847,6 +847,7 @@ function loadDashboard() {
 
       renderOverrides(res.doctorOffEntries, res.extraSlotEntries);
       _cachedDashboard = _dashboardHash(res);
+      if (res._v !== undefined) _cachedVersion = res._v;
 
       // Initialize schedule to today if not set
       if (!_schedDate) {
@@ -865,10 +866,10 @@ function loadDashboard() {
       document.getElementById('notifyDate').value = res.todayKey;
       loadNotifyAppts();
 
-      // Reset auto-refresh timer after manual load
+      // Reset poll timer after manual load
       _lastRefreshTime = Date.now();
-      if (_refreshTimerId) { clearInterval(_refreshTimerId); }
-      _refreshTimerId = setInterval(doAutoRefresh, REFRESH_INTERVAL_SEC * 1000);
+      if (_pollTimerId) { clearInterval(_pollTimerId); }
+      _pollTimerId = setInterval(doPollAndRefresh, POLL_INTERVAL_SEC * 1000);
     })
     .withFailureHandler(function(err) {
       hideLoading();
@@ -1483,16 +1484,44 @@ if (document.readyState === 'complete' || document.readyState === 'interactive')
 }
 
 // ========== Auto-Refresh ==========
-var REFRESH_INTERVAL_SEC = 60; // 60s instead of 30s to save quota
+// ── Version-based polling ──
+// Instead of fetching the full dashboard every 60s (~11 sheet reads),
+// we poll a lightweight version counter (1 PropertiesService read).
+// Full dashboard is only fetched when the version actually changed.
+var POLL_INTERVAL_SEC = 15;
 var _lastRefreshTime = Date.now();
-var _refreshTimerId = null;
+var _pollTimerId = null;
 var _isRefreshing = false;
-var _cachedDashboard = null; // Cache to detect actual changes
+var _isPolling = false;
+var _cachedVersion = 0;
+var _cachedDashboard = null;
 
-function doAutoRefresh() {
+function doPollAndRefresh() {
+  if (_isPolling || _isRefreshing || document.hidden) return;
+  _isPolling = true;
+
+  google.script.run
+    .withSuccessHandler(function(res) {
+      _isPolling = false;
+      if (!res) return;
+
+      if (res.v !== _cachedVersion) {
+        // Data changed — do a full dashboard refresh
+        _cachedVersion = res.v;
+        doFullRefresh();
+      } else {
+        // No change — just update the display timer
+        _lastRefreshTime = Date.now();
+      }
+    })
+    .withFailureHandler(function() {
+      _isPolling = false;
+    })
+    .apiPoll();
+}
+
+function doFullRefresh() {
   if (_isRefreshing) return;
-  // Skip refresh when tab is hidden (saves quota)
-  if (document.hidden) return;
   _isRefreshing = true;
 
   google.script.run
@@ -1501,7 +1530,9 @@ function doAutoRefresh() {
       _lastRefreshTime = Date.now();
       if (!res || !res.ok) return;
 
-      // Always update stats bar (cheap DOM ops)
+      if (res._v !== undefined) _cachedVersion = res._v;
+
+      // Update stats bar
       document.getElementById('statBooked').textContent = res.stats.weekBooked;
       document.getElementById('statCancelled').textContent = res.stats.weekCancelled;
       document.getElementById('statTomorrow').textContent = res.tomorrowAppointments.length;
@@ -1509,7 +1540,7 @@ function doAutoRefresh() {
 
       renderOverrides(res.doctorOffEntries, res.extraSlotEntries);
 
-      // Only reload schedule/week if data actually changed (avoid 2 extra API calls)
+      // Only reload schedule/week if data shape changed (avoid 2 extra API calls)
       var newHash = _dashboardHash(res);
       if (!_cachedDashboard || _cachedDashboard !== newHash) {
         _cachedDashboard = newHash;
@@ -1524,7 +1555,9 @@ function doAutoRefresh() {
     .apiAdminGetDashboard(SIG);
 }
 
-// Quick hash of dashboard data to detect changes
+// Keep the old name so _scheduleStatsRefresh still works
+function doAutoRefresh() { doPollAndRefresh(); }
+
 function _dashboardHash(res) {
   return res.stats.weekBooked + '|' + res.stats.weekCancelled + '|' +
     res.todayAppointments.length + '|' + res.tomorrowAppointments.length + '|' +
@@ -1533,7 +1566,7 @@ function _dashboardHash(res) {
 
 function updateRefreshDisplay() {
   var elapsed = Math.floor((Date.now() - _lastRefreshTime) / 1000);
-  var remaining = Math.max(0, REFRESH_INTERVAL_SEC - elapsed);
+  var remaining = Math.max(0, POLL_INTERVAL_SEC - elapsed);
 
   var lastEl = document.getElementById('refreshLastText');
   if (lastEl) {
@@ -1543,18 +1576,17 @@ function updateRefreshDisplay() {
   }
 
   var countEl = document.getElementById('refreshCountdown');
-  if (countEl) countEl.textContent = 'Refreshes in: ' + remaining + 's';
+  if (countEl) countEl.textContent = 'Next check: ' + remaining + 's';
 }
 
-_refreshTimerId = setInterval(doAutoRefresh, REFRESH_INTERVAL_SEC * 1000);
+_pollTimerId = setInterval(doPollAndRefresh, POLL_INTERVAL_SEC * 1000);
 setInterval(updateRefreshDisplay, 1000);
 
-// Pause auto-refresh when tab is not visible (saves quota)
+// On tab visibility change — poll immediately if stale
 document.addEventListener('visibilitychange', function() {
   if (!document.hidden) {
-    // Tab became visible — do a refresh if stale (>30s since last)
     var elapsed = (Date.now() - _lastRefreshTime) / 1000;
-    if (elapsed > 30) doAutoRefresh();
+    if (elapsed > 10) doPollAndRefresh();
   }
 });
 
@@ -1768,15 +1800,16 @@ function markAttendance(appointmentId, dateKey, attended, containerId) {
     .apiAdminMarkAttendance(SIG, appointmentId, dateKey, attended);
 }
 
-// Debounced stats refresh — batches multiple rapid actions into one refresh
+// Debounced stats refresh — batches multiple rapid actions into one refresh.
+// After a write action we know data changed, so skip the poll and go straight to full refresh.
 var _statsRefreshTimer = null;
 function _scheduleStatsRefresh() {
   if (_statsRefreshTimer) clearTimeout(_statsRefreshTimer);
   _statsRefreshTimer = setTimeout(function() {
     _statsRefreshTimer = null;
-    _lastRefreshTime = Date.now(); // Reset auto-refresh countdown
-    doAutoRefresh();
-  }, 3000); // Wait 3s for rapid clicks to settle before refreshing
+    _lastRefreshTime = Date.now();
+    doFullRefresh();
+  }, 3000);
 }
 
 // ========== Patient History ==========

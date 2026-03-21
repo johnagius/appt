@@ -2338,6 +2338,7 @@ var _HTML_TEMPLATES = {
           if (!isSilentRefresh) hideLoading();
 
           if (res && res._debug) console.log('[APPT DEBUG]', JSON.stringify(res._debug));
+          if (res && res._v !== undefined) _cachedVersion = res._v;
           if (!res || !res.ok) {
             renderSlots([]);
             showHint(els.timeHint, 'bad', (res && res.reason) ? res.reason : t('noAvailability'));
@@ -2415,6 +2416,29 @@ var _HTML_TEMPLATES = {
     });
 
     // Auto-refresh (keeps page accurate if someone else books online or doctor adds overrides)
+    // ── Version-based polling ──
+    // Instead of re-reading sheets every 20s, we poll a lightweight version counter.
+    // Full data is only fetched when something actually changed.
+    var _cachedVersion = 0;
+    var _pollInFlight = false;
+
+    function pollForChanges() {
+      if (_pollInFlight || document.hidden) return;
+      _pollInFlight = true;
+      google.script.run
+        .withSuccessHandler(function(res) {
+          _pollInFlight = false;
+          if (!res) return;
+          if (res.v !== _cachedVersion) {
+            _cachedVersion = res.v;
+            // Data changed — refresh dates + availability
+            refreshDateOptions();
+          }
+        })
+        .withFailureHandler(function() { _pollInFlight = false; })
+        .apiPoll();
+    }
+
     function refreshDateOptions() {
       google.script.run
         .withSuccessHandler(function(dateOptions) {
@@ -2422,7 +2446,6 @@ var _HTML_TEMPLATES = {
           var prevSelected = state.selectedDateKey;
           state.dateOptions = dateOptions;
           renderDates();
-          // Restore selection if the previously selected date is still available
           if (prevSelected) {
             var still = state.dateOptions.find(function(o) { return o.dateKey === prevSelected && !o.disabled; });
             if (still) {
@@ -2441,20 +2464,14 @@ var _HTML_TEMPLATES = {
     function installAutoRefresh() {
       if (_autoRefreshInstalled) return;
       _autoRefreshInstalled = true;
-      // Refresh slots every 20s
-      setInterval(() => {
-        if (state.selectedDateKey) loadAvailability(true);
-      }, 20000);
 
-      // Refresh date options every 60s (picks up new overrides, closed days, etc.)
-      setInterval(refreshDateOptions, 60000);
+      // Poll version every 15s — costs 1 PropertiesService read, no sheet access
+      setInterval(pollForChanges, 15000);
 
-      window.addEventListener('focus', () => {
-        refreshDateOptions();
-      });
-
-      document.addEventListener('visibilitychange', () => {
-        if (!document.hidden) refreshDateOptions();
+      // On tab focus, poll immediately (catches changes while tab was hidden)
+      window.addEventListener('focus', function() { pollForChanges(); });
+      document.addEventListener('visibilitychange', function() {
+        if (!document.hidden) pollForChanges();
       });
 
       // Full page reload after 5 minutes of idle (no interaction)
@@ -2490,6 +2507,7 @@ var _HTML_TEMPLATES = {
 
           state.config = data.config;
           state.dateOptions = data.dateOptions || [];
+          if (data._v !== undefined) _cachedVersion = data._v;
 
           els.docName.textContent = state.config.doctorName;
           els.docMeta.textContent = state.config.pottersLocation;
@@ -3785,6 +3803,7 @@ function loadDashboard() {
 
       renderOverrides(res.doctorOffEntries, res.extraSlotEntries);
       _cachedDashboard = _dashboardHash(res);
+      if (res._v !== undefined) _cachedVersion = res._v;
 
       // Initialize schedule to today if not set
       if (!_schedDate) {
@@ -3803,10 +3822,10 @@ function loadDashboard() {
       document.getElementById('notifyDate').value = res.todayKey;
       loadNotifyAppts();
 
-      // Reset auto-refresh timer after manual load
+      // Reset poll timer after manual load
       _lastRefreshTime = Date.now();
-      if (_refreshTimerId) { clearInterval(_refreshTimerId); }
-      _refreshTimerId = setInterval(doAutoRefresh, REFRESH_INTERVAL_SEC * 1000);
+      if (_pollTimerId) { clearInterval(_pollTimerId); }
+      _pollTimerId = setInterval(doPollAndRefresh, POLL_INTERVAL_SEC * 1000);
     })
     .withFailureHandler(function(err) {
       hideLoading();
@@ -4421,16 +4440,44 @@ if (document.readyState === 'complete' || document.readyState === 'interactive')
 }
 
 // ========== Auto-Refresh ==========
-var REFRESH_INTERVAL_SEC = 60; // 60s instead of 30s to save quota
+// ── Version-based polling ──
+// Instead of fetching the full dashboard every 60s (~11 sheet reads),
+// we poll a lightweight version counter (1 PropertiesService read).
+// Full dashboard is only fetched when the version actually changed.
+var POLL_INTERVAL_SEC = 15;
 var _lastRefreshTime = Date.now();
-var _refreshTimerId = null;
+var _pollTimerId = null;
 var _isRefreshing = false;
-var _cachedDashboard = null; // Cache to detect actual changes
+var _isPolling = false;
+var _cachedVersion = 0;
+var _cachedDashboard = null;
 
-function doAutoRefresh() {
+function doPollAndRefresh() {
+  if (_isPolling || _isRefreshing || document.hidden) return;
+  _isPolling = true;
+
+  google.script.run
+    .withSuccessHandler(function(res) {
+      _isPolling = false;
+      if (!res) return;
+
+      if (res.v !== _cachedVersion) {
+        // Data changed — do a full dashboard refresh
+        _cachedVersion = res.v;
+        doFullRefresh();
+      } else {
+        // No change — just update the display timer
+        _lastRefreshTime = Date.now();
+      }
+    })
+    .withFailureHandler(function() {
+      _isPolling = false;
+    })
+    .apiPoll();
+}
+
+function doFullRefresh() {
   if (_isRefreshing) return;
-  // Skip refresh when tab is hidden (saves quota)
-  if (document.hidden) return;
   _isRefreshing = true;
 
   google.script.run
@@ -4439,7 +4486,9 @@ function doAutoRefresh() {
       _lastRefreshTime = Date.now();
       if (!res || !res.ok) return;
 
-      // Always update stats bar (cheap DOM ops)
+      if (res._v !== undefined) _cachedVersion = res._v;
+
+      // Update stats bar
       document.getElementById('statBooked').textContent = res.stats.weekBooked;
       document.getElementById('statCancelled').textContent = res.stats.weekCancelled;
       document.getElementById('statTomorrow').textContent = res.tomorrowAppointments.length;
@@ -4447,7 +4496,7 @@ function doAutoRefresh() {
 
       renderOverrides(res.doctorOffEntries, res.extraSlotEntries);
 
-      // Only reload schedule/week if data actually changed (avoid 2 extra API calls)
+      // Only reload schedule/week if data shape changed (avoid 2 extra API calls)
       var newHash = _dashboardHash(res);
       if (!_cachedDashboard || _cachedDashboard !== newHash) {
         _cachedDashboard = newHash;
@@ -4462,7 +4511,9 @@ function doAutoRefresh() {
     .apiAdminGetDashboard(SIG);
 }
 
-// Quick hash of dashboard data to detect changes
+// Keep the old name so _scheduleStatsRefresh still works
+function doAutoRefresh() { doPollAndRefresh(); }
+
 function _dashboardHash(res) {
   return res.stats.weekBooked + '|' + res.stats.weekCancelled + '|' +
     res.todayAppointments.length + '|' + res.tomorrowAppointments.length + '|' +
@@ -4471,7 +4522,7 @@ function _dashboardHash(res) {
 
 function updateRefreshDisplay() {
   var elapsed = Math.floor((Date.now() - _lastRefreshTime) / 1000);
-  var remaining = Math.max(0, REFRESH_INTERVAL_SEC - elapsed);
+  var remaining = Math.max(0, POLL_INTERVAL_SEC - elapsed);
 
   var lastEl = document.getElementById('refreshLastText');
   if (lastEl) {
@@ -4481,18 +4532,17 @@ function updateRefreshDisplay() {
   }
 
   var countEl = document.getElementById('refreshCountdown');
-  if (countEl) countEl.textContent = 'Refreshes in: ' + remaining + 's';
+  if (countEl) countEl.textContent = 'Next check: ' + remaining + 's';
 }
 
-_refreshTimerId = setInterval(doAutoRefresh, REFRESH_INTERVAL_SEC * 1000);
+_pollTimerId = setInterval(doPollAndRefresh, POLL_INTERVAL_SEC * 1000);
 setInterval(updateRefreshDisplay, 1000);
 
-// Pause auto-refresh when tab is not visible (saves quota)
+// On tab visibility change — poll immediately if stale
 document.addEventListener('visibilitychange', function() {
   if (!document.hidden) {
-    // Tab became visible — do a refresh if stale (>30s since last)
     var elapsed = (Date.now() - _lastRefreshTime) / 1000;
-    if (elapsed > 30) doAutoRefresh();
+    if (elapsed > 10) doPollAndRefresh();
   }
 });
 
@@ -4706,15 +4756,16 @@ function markAttendance(appointmentId, dateKey, attended, containerId) {
     .apiAdminMarkAttendance(SIG, appointmentId, dateKey, attended);
 }
 
-// Debounced stats refresh — batches multiple rapid actions into one refresh
+// Debounced stats refresh — batches multiple rapid actions into one refresh.
+// After a write action we know data changed, so skip the poll and go straight to full refresh.
 var _statsRefreshTimer = null;
 function _scheduleStatsRefresh() {
   if (_statsRefreshTimer) clearTimeout(_statsRefreshTimer);
   _statsRefreshTimer = setTimeout(function() {
     _statsRefreshTimer = null;
-    _lastRefreshTime = Date.now(); // Reset auto-refresh countdown
-    doAutoRefresh();
-  }, 3000); // Wait 3s for rapid clicks to settle before refreshing
+    _lastRefreshTime = Date.now();
+    doFullRefresh();
+  }, 3000);
 }
 
 // ========== Patient History ==========
@@ -5156,6 +5207,20 @@ function getTimeZone_() {
   var props = getScriptProps_();
   _tzCache = props.getProperty(CFG().PROP_TIMEZONE) || Session.getScriptTimeZone() || 'Europe/Malta';
   return _tzCache;
+}
+
+/** Data version counter — stored in Script Properties for cheapest possible reads. */
+var _PROP_DATA_VERSION = 'DATA_VERSION';
+
+function getDataVersion_() {
+  return Number(getScriptProps_().getProperty(_PROP_DATA_VERSION) || '0');
+}
+
+function bumpVersion_() {
+  var props = getScriptProps_();
+  var v = Number(props.getProperty(_PROP_DATA_VERSION) || '0') + 1;
+  props.setProperty(_PROP_DATA_VERSION, String(v));
+  return v;
 }
 
 function getOrCreateSigningSecret_() {
@@ -6605,6 +6670,15 @@ function _serveHtml(name, vars) {
   return HtmlService.createHtmlOutput(html);
 }
 
+/**
+ * Lightweight poll endpoint — returns only the data version number.
+ * Clients compare against their cached version to decide if a full refetch is needed.
+ * Cost: 1 PropertiesService read (no sheet access).
+ */
+function apiPoll() {
+  return { v: getDataVersion_() };
+}
+
 function apiInit() {
   var extraMap = getDoctorExtraSlots_();
   return {
@@ -6619,7 +6693,8 @@ function apiInit() {
       spinolaLocation: (getScriptProps_().getProperty(CFG().PROP_SPINOLA_LOCATION) || 'Spinola Clinic'),
       workingHours: CFG().HOURS
     },
-    dateOptions: apiGetDateOptions(extraMap)
+    dateOptions: apiGetDateOptions(extraMap),
+    _v: getDataVersion_()
   };
 }
 
@@ -6772,7 +6847,7 @@ function apiGetAvailability(dateKey) {
     });
   }
 
-  return { ok: true, dateKey: dateKey, slots: outSlots, _debug: { extraKeys: extraKeys, extras: extras, slotCount: baseSlots.length } };
+  return { ok: true, dateKey: dateKey, slots: outSlots, _v: getDataVersion_(), _debug: { extraKeys: extraKeys, extras: extras, slotCount: baseSlots.length } };
 }
 
 function getDoctorOffEntryForDate_(offMap, dateKey) {
@@ -6943,6 +7018,7 @@ function apiBook(payload) {
     apptObj.calendarEventId = eventId;
 
     appendAppointment_(dateKey, apptObj);
+    bumpVersion_();
 
     sendClientConfirmationEmail_(apptObj);
     var dayList = listAppointmentsForDate_(dateKey);
@@ -7027,6 +7103,7 @@ function apiCancelAppointment(token, sig) {
       cancelReason: 'Cancelled by client via email link',
       calendarEventId: ''
     });
+    bumpVersion_();
 
     try { sendClientCancelledEmail_(appt, 'Your appointment has been cancelled.'); } catch (e1) {}
     try { sendDoctorCancellationEmail_(appt, 'Client cancelled via email link.'); } catch (e2) {}
@@ -7083,6 +7160,7 @@ function apiDoctorAction(token, act, sig) {
         cancelReason: 'Cancelled by doctor',
         calendarEventId: ''
       });
+      bumpVersion_();
 
       try { sendClientCancelledEmail_(appt, 'Your appointment has been cancelled by the clinic. Please rebook if needed.'); } catch (e1) {}
       try { sendDoctorCancellationEmail_(appt, 'You cancelled this appointment.'); } catch (e2) {}
@@ -7097,6 +7175,7 @@ function apiDoctorAction(token, act, sig) {
         status: 'RELOCATED_SPINOLA',
         location: spinolaLocation
       });
+      bumpVersion_();
 
       var calEventId = String(appt.calendarEventId || '').trim();
       if (calEventId) {
@@ -7206,7 +7285,8 @@ function apiAdminGetDashboard(sig) {
       weekBooked: weekBooked,
       weekCancelled: weekCancelled,
       todayCapacity: todayCapacity
-    }
+    },
+    _v: getDataVersion_()
   };
 }
 
@@ -7246,6 +7326,7 @@ function apiAdminMarkDoctorOff(sig, payload) {
   if (endTime && !/^\d{2}:\d{2}$/.test(endTime)) return { ok: false, reason: 'Invalid end time format. Use HH:mm.' };
 
   addDoctorOffRow_(startDate, endDate, startTime, endTime, reason);
+  bumpVersion_();
 
   // Find affected appointments
   var affected = [];
@@ -7321,6 +7402,8 @@ function apiAdminAddExtraSlots(sig, payload) {
     daysAdded++;
     cur.setDate(cur.getDate() + 1);
   }
+
+  bumpVersion_();
 
   var slotsPerDay = Math.floor((enMin - stMin) / CFG().APPT_DURATION_MIN);
   var totalSlots = slotsPerDay * daysAdded;
@@ -7546,6 +7629,8 @@ function apiAdminProcessAppointments(sig, payload) {
       }
     }
 
+    if (results.length > 0) bumpVersion_();
+
     return {
       ok: true,
       message: 'Processed ' + results.length + ' appointment(s).',
@@ -7567,6 +7652,7 @@ function apiAdminRemoveDoctorOff(sig, rowIndex) {
   rowIndex = Number(rowIndex);
   if (isNaN(rowIndex) || rowIndex < 2) return { ok: false, reason: 'Invalid row index.' };
   deleteDoctorOffRow_(rowIndex);
+  bumpVersion_();
   return { ok: true, message: 'Doctor-off entry removed. Slots are now available for booking.' };
 }
 
@@ -7578,6 +7664,7 @@ function apiAdminRemoveExtraSlots(sig, rowIndex) {
   rowIndex = Number(rowIndex);
   if (isNaN(rowIndex) || rowIndex < 2) return { ok: false, reason: 'Invalid row index.' };
   deleteDoctorExtraRow_(rowIndex);
+  bumpVersion_();
   return { ok: true, message: 'Extra slots entry removed.' };
 }
 
@@ -8086,6 +8173,7 @@ function apiAdminMarkAttendance(sig, appointmentId, dateKey, attended) {
     if (String(vals[r][0] || '') === appointmentId) {
       var newStatus = attended ? 'ATTENDED' : 'NO_SHOW';
       updateAppointmentStatus_(dateKey, r + 2, { status: newStatus });
+      bumpVersion_();
       return { ok: true, message: 'Marked as ' + (attended ? 'attended' : 'no-show') + '.' };
     }
   }
