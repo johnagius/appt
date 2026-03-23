@@ -33,6 +33,13 @@
   button,input{font:inherit;}
   .stack{display:flex;flex-direction:column;gap:14px;}
   .date-label{font-size:15px;font-weight:800;color:var(--text);padding:4px 2px 0;}
+  .day-nav{display:flex;align-items:center;gap:10px;}
+  .day-nav-arrow{width:38px;height:38px;border-radius:50%;border:1px solid var(--line);background:#fff;font-size:18px;font-weight:900;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--text);transition:background .15s,opacity .15s;flex-shrink:0;}
+  .day-nav-arrow:hover{background:#f0f4ff;}
+  .day-nav-arrow:disabled{opacity:.25;cursor:default;background:#fff;}
+  .not-today-banner{font-size:12px;color:#b45309;font-weight:700;margin-top:2px;}
+  .not-today-banner a{color:#1d4ed8;text-decoration:underline;}
+  .viewing-future .card{border-left:3px solid #f59e0b;}
   .card{background:var(--card);border-radius:var(--radius);padding:18px;box-shadow:var(--shadow);}
   .session-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:10px;}
   .session-title{font-size:20px;font-weight:900;line-height:1.1;}
@@ -174,7 +181,16 @@
   </div>
 
   <div class="stack">
-    <div id="dateLabel" class="date-label"></div>
+    <div class="day-nav">
+      <button class="day-nav-arrow" id="dayPrev" onclick="navigateDay(-1)">&larr;</button>
+      <div>
+        <div id="dateLabel" class="date-label"></div>
+        <div id="notTodayBanner" class="not-today-banner" style="display:none;">
+          You are viewing a future date &mdash; <a href="#" onclick="navigateToToday();return false;">back to today</a>
+        </div>
+      </div>
+      <button class="day-nav-arrow" id="dayNext" onclick="navigateDay(1)">&rarr;</button>
+    </div>
 
     <section class="card" id="morningCard">
       <div class="session-head">
@@ -355,6 +371,7 @@
 <script>
 var SIG = '<?= adminSig ?>';
 var _todayKey = '';
+var _selectedDateKey = '';
 var _workingHours = null;
 var _offEntries = [];
 var _extraEntries = [];
@@ -485,7 +502,7 @@ function getDayWindows(dateKey) {
   return (_workingHours && _workingHours[dowKeys[d.getDay()]]) || [];
 }
 function classifyBaseWindow(session) {
-  var windows = getDayWindows(_todayKey);
+  var windows = getDayWindows(_selectedDateKey);
   for (var i = 0; i < windows.length; i++) {
     var startHour = parseInt(String(windows[i].start || '00:00').split(':')[0], 10);
     if (session === 'morning' && startHour < 13) return windows[i];
@@ -502,7 +519,7 @@ function buildSessionState(session) {
   var rowIndices = [];
   for (var i = 0; i < _offEntries.length; i++) {
     var off = _offEntries[i];
-    if (_todayKey < off.startDate || _todayKey > (off.endDate || off.startDate)) continue;
+    if (_selectedDateKey < off.startDate || _selectedDateKey > (off.endDate || off.startDate)) continue;
     var blockStart = off.startTime ? timeToMin(off.startTime) : 0;
     var blockEnd = off.endTime ? timeToMin(off.endTime) : 1440;
     if (!off.startTime && !off.endTime) {
@@ -522,7 +539,7 @@ function buildSessionState(session) {
   var extraSegments = [];
   for (var e = 0; e < _extraEntries.length; e++) {
     var ex = _extraEntries[e];
-    if (ex.date !== _todayKey) continue;
+    if (ex.date !== _selectedDateKey) continue;
     var exStart = timeToMin(ex.startTime);
     // Classify: morning if start < 13:00, evening otherwise
     if ((session === 'morning' && exStart >= 780) || (session === 'evening' && exStart < 780)) continue;
@@ -664,11 +681,58 @@ function resumeDashboardFromIdle() {
     })
     .finally(function() { _refreshInFlight = false; });
 }
+function navigateDay(delta) {
+  var d = addDays(_selectedDateKey, delta);
+  var newKey = toDateKey(d);
+  if (newKey < _todayKey) return;
+  var maxDate = toDateKey(addDays(_todayKey, 7));
+  if (newKey > maxDate) return;
+  _selectedDateKey = newKey;
+  _cachedDateAppointments = {};
+  showLoading('Loading ' + newKey + '…');
+  loadTodayAppointments().then(function() {
+    showDateLabel();
+    updateDayNavButtons();
+    buildAllSessionState();
+    hideLoading();
+  }).catch(function(err) {
+    hideLoading();
+    showMsg('morningMsg', 'bad', String(err && err.message ? err.message : err));
+  });
+}
+
+function navigateToToday() {
+  _selectedDateKey = _todayKey;
+  _cachedDateAppointments = {};
+  showLoading('Loading today…');
+  loadTodayAppointments().then(function() {
+    showDateLabel();
+    updateDayNavButtons();
+    buildAllSessionState();
+    hideLoading();
+  }).catch(function(err) {
+    hideLoading();
+  });
+}
+
+function updateDayNavButtons() {
+  var prevBtn = document.getElementById('dayPrev');
+  var nextBtn = document.getElementById('dayNext');
+  prevBtn.disabled = _selectedDateKey <= _todayKey;
+  var maxDate = toDateKey(addDays(_todayKey, 7));
+  nextBtn.disabled = _selectedDateKey >= maxDate;
+}
+
 function showDateLabel() {
-  var d = new Date(_todayKey + 'T12:00:00');
-  document.getElementById('dateLabel').textContent = d.toLocaleDateString('en-GB', {
+  var d = new Date(_selectedDateKey + 'T12:00:00');
+  var label = d.toLocaleDateString('en-GB', {
     weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
   });
+  if (_selectedDateKey === _todayKey) label += ' (Today)';
+  document.getElementById('dateLabel').textContent = label;
+  var isToday = _selectedDateKey === _todayKey;
+  document.getElementById('notTodayBanner').style.display = isToday ? 'none' : '';
+  document.querySelector('.stack').classList.toggle('viewing-future', !isToday);
 }
 function fetchDashboard() {
   return new Promise(function(resolve, reject) {
@@ -767,6 +831,7 @@ async function reloadAll() {
   var res = await fetchDashboard();
   if (!res || !res.ok) throw new Error('Could not load dashboard.');
   _todayKey = res.todayKey;
+  if (!_selectedDateKey) _selectedDateKey = _todayKey;
   _workingHours = res.workingHours || {};
   _offEntries = res.doctorOffEntries || [];
   _extraEntries = res.extraSlotEntries || [];
@@ -775,12 +840,13 @@ async function reloadAll() {
     _calendarMonth = new Date(tomorrow.getFullYear(), tomorrow.getMonth(), 1);
   }
   showDateLabel();
+  updateDayNavButtons();
   await loadTodayAppointments();
   buildAllSessionState();
   renderCalendar();
 }
 async function loadTodayAppointments() {
-  var appts = await fetchDateAppointments(_todayKey);
+  var appts = await fetchDateAppointments(_selectedDateKey);
   _appointmentsBySession.morning = [];
   _appointmentsBySession.evening = [];
   for (var i = 0; i < appts.length; i++) {
@@ -818,7 +884,7 @@ async function toggleSession(session) {
       title: session === 'morning' ? 'Morning patients must be handled first' : 'Evening patients must be handled first',
       text: 'Before changing this session, every affected patient must be sent to Spinola, pushed to the next day, or cancelled.',
       summary: 'Selected patients affected: ' + affected.length + '.',
-      appointments: affected.map(function(appt) { appt.dateKey = _todayKey; return appt; }),
+      appointments: affected.map(function(appt) { appt.dateKey = _selectedDateKey; return appt; }),
       apply: function() { return applySessionChanges(session, blocks, []); },
       successMsgId: session + 'Msg',
       successMessage: 'Session updated.'
@@ -852,8 +918,8 @@ async function applySessionChanges(session, blocks, extras) {
   // Add new off blocks
   for (var j = 0; j < blocks.length; j++) {
     await markDoctorOff({
-      startDate: _todayKey,
-      endDate: _todayKey,
+      startDate: _selectedDateKey,
+      endDate: _selectedDateKey,
       startTime: blocks[j].start,
       endTime: blocks[j].end,
       reason: 'Doctor not coming'
@@ -862,7 +928,7 @@ async function applySessionChanges(session, blocks, extras) {
   // Add new extra entries
   for (var k = 0; k < (extras || []).length; k++) {
     await addExtraSlots({
-      date: _todayKey,
+      date: _selectedDateKey,
       startTime: extras[k].start,
       endTime: extras[k].end,
       reason: 'Doctor adjusted shift'
@@ -890,7 +956,10 @@ function roundUpToSlot(timeStr) {
 function openBreakModal(session) {
   var state = _sessionState[session];
   if (!state || !state.segments.length) return;
-  _breakContext = { session: session, duration: null };
+  var isToday = _selectedDateKey === _todayKey;
+  var breakLabel = isToday ? 'The break starts now.' : 'Choose the break duration for this day.';
+  document.querySelector('#breakModal .modal-text').textContent = 'How long do you need? ' + breakLabel;
+  _breakContext = { session: session, duration: null, isToday: isToday };
   document.getElementById('breakSummary').textContent = '';
   document.getElementById('breakConfirmBtn').disabled = true;
   [20, 30, 40].forEach(function(d) {
@@ -910,8 +979,14 @@ function selectBreakDuration(mins) {
   [20, 30, 40].forEach(function(d) {
     document.getElementById('breakOpt' + d).classList.toggle('selected', d === mins);
   });
-  var nowTime = getNowTime();
-  var breakStart = roundUpToSlot(nowTime);
+  var breakStart;
+  if (_breakContext.isToday) {
+    breakStart = roundUpToSlot(getNowTime());
+  } else {
+    // For future dates, break starts at the session's first segment
+    var state = _sessionState[_breakContext.session];
+    breakStart = state && state.segments.length ? timeToMin(state.segments[0].start) : 0;
+  }
   var breakEnd = breakStart + mins;
   _breakContext.breakStartMin = breakStart;
   _breakContext.breakEndMin = breakEnd;
@@ -943,13 +1018,13 @@ async function confirmBreak() {
       title: 'Patients booked during your break',
       text: 'These patients have appointments during your break time. Choose what should happen first.',
       summary: allAppts.length + ' affected patient(s) during ' + breakStart + ' – ' + breakEnd + '.',
-      appointments: allAppts.map(function(appt) { appt.dateKey = _todayKey; return appt; }),
+      appointments: allAppts.map(function(appt) { appt.dateKey = _selectedDateKey; return appt; }),
       allowPushSameDay: true,
       breakEndTime: breakEnd,
       apply: function() {
         return markDoctorOff({
-          startDate: _todayKey,
-          endDate: _todayKey,
+          startDate: _selectedDateKey,
+          endDate: _selectedDateKey,
           startTime: breakStart,
           endTime: breakEnd,
           reason: 'Doctor break'
@@ -965,8 +1040,8 @@ async function confirmBreak() {
   try {
     showLoading('Setting break…');
     await markDoctorOff({
-      startDate: _todayKey,
-      endDate: _todayKey,
+      startDate: _selectedDateKey,
+      endDate: _selectedDateKey,
       startTime: breakStart,
       endTime: breakEnd,
       reason: 'Doctor break'
@@ -1120,7 +1195,7 @@ async function saveAdjustModal() {
       title: 'Appointments must be handled before saving',
       text: 'These patients are outside the updated working times. Choose what should happen first.',
       summary: 'Affected patients: ' + affected.length + '.',
-      appointments: affected.map(function(appt) { appt.dateKey = _todayKey; return appt; }),
+      appointments: affected.map(function(appt) { appt.dateKey = _selectedDateKey; return appt; }),
       apply: function() { return applySessionChanges(session, blocks, extras); },
       successMsgId: session + 'Msg',
       successMessage: 'Shift updated.'
