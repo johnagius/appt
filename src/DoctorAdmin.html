@@ -54,9 +54,12 @@
   .btn:disabled{opacity:.45;cursor:not-allowed;transform:none;}
   .patient-list{display:flex;flex-direction:column;gap:10px;}
   .patient-card{border:1px solid var(--line);border-radius:18px;padding:12px 14px;display:flex;align-items:center;gap:12px;background:#fff;}
+  .patient-card.relocated{background:#f8fafc;border-style:dashed;}
   .patient-main{flex:1;min-width:0;}
+  .patient-copy-muted{opacity:.68;text-decoration:line-through;}
   .patient-name{font-size:15px;font-weight:800;line-height:1.25;}
   .patient-meta{font-size:12px;color:var(--muted);line-height:1.45;margin-top:3px;word-break:break-word;}
+  .patient-status{display:inline-flex;align-items:center;gap:6px;margin-top:7px;padding:5px 10px;border-radius:999px;background:#dbeafe;color:var(--blue-dark);font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.04em;}
   .patient-time{font-size:14px;font-weight:900;color:var(--blue-dark);text-align:right;white-space:nowrap;}
   .empty{padding:14px;border-radius:16px;background:#f9fafb;border:1px dashed var(--line);font-size:13px;color:var(--muted);text-align:center;}
 
@@ -123,6 +126,17 @@
   .loading-overlay.show{display:flex;}
   .loading-spinner{width:38px;height:38px;border:4px solid #dbeafe;border-top-color:var(--blue);border-radius:50%;animation:spin .8s linear infinite;}
   .loading-text{font-size:14px;font-weight:900;}
+  .idle-overlay{position:fixed;inset:0;z-index:1200;display:flex;align-items:center;justify-content:center;background:rgba(245,247,251,0.72);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);cursor:pointer;opacity:0;visibility:hidden;pointer-events:none;transition:opacity .35s ease,visibility .35s ease;}
+  .idle-overlay.show{opacity:1;visibility:visible;pointer-events:auto;}
+  .idle-card{text-align:center;padding:40px 28px;max-width:360px;animation:idle-float 3s ease-in-out infinite;}
+  .idle-icon{font-size:54px;margin-bottom:16px;animation:idle-pulse-icon 2.5s ease-in-out infinite;}
+  .idle-title{font-size:24px;font-weight:900;margin-bottom:8px;}
+  .idle-sub{font-size:14px;color:var(--muted);line-height:1.5;margin-bottom:22px;}
+  .idle-cta{display:inline-flex;align-items:center;gap:8px;padding:12px 24px;border-radius:999px;background:var(--blue);color:#fff;font-size:15px;font-weight:900;box-shadow:0 8px 24px rgba(37,99,235,.28);}
+  .idle-arrow{display:inline-block;transition:transform .2s ease;}
+  .idle-overlay:hover .idle-arrow{transform:translateX(4px);}
+  .contact-link{color:inherit;text-decoration:none;font-weight:800;}
+  .contact-link:hover{text-decoration:underline;}
   @keyframes spin{to{transform:rotate(360deg);}}
   @keyframes idle-float{0%,100%{transform:translateY(0);}50%{transform:translateY(-8px);}}
   @keyframes idle-pulse-icon{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.75;transform:scale(.95);}}
@@ -138,6 +152,15 @@
   <div class="loading-overlay" id="loadingOverlay">
     <div class="loading-spinner"></div>
     <div class="loading-text" id="loadingText">Loading…</div>
+  </div>
+
+  <div class="idle-overlay" id="idleOverlay">
+    <div class="idle-card">
+      <div class="idle-icon">🩺</div>
+      <div class="idle-title">Doctor Dashboard Paused</div>
+      <div class="idle-sub">Automatic updates are paused to save resources. Tap anywhere to resume live updates.</div>
+      <div class="idle-cta">Resume Dashboard <span class="idle-arrow">→</span></div>
+    </div>
   </div>
 
   <div class="stack">
@@ -302,6 +325,14 @@ var _cachedDateAppointments = {};
 var _adjustContext = null;
 var _pendingFlow = null;
 var SLOT_MINUTES = 15;
+var AUTO_REFRESH_MS = 20 * 1000;
+var IDLE_TIMEOUT_MS = 2 * 60 * 1000;
+var _idlePaused = false;
+var _lastActivityAt = Date.now();
+var _autoRefreshTimerId = null;
+var _idleCheckTimerId = null;
+var _refreshInFlight = false;
+var _idleOverlay = document.getElementById('idleOverlay');
 
 function showLoading(msg) {
   document.getElementById('loadingText').textContent = msg || 'Loading…';
@@ -485,7 +516,6 @@ function renderSession(session) {
   renderPatientList(session);
 }
 function renderPatientList(session) {
-  var state = _sessionState[session];
   var appts = _appointmentsBySession[session] || [];
   var el = document.getElementById(session + 'Patients');
   if (!appts.length) {
@@ -495,15 +525,77 @@ function renderPatientList(session) {
   var html = '';
   for (var i = 0; i < appts.length; i++) {
     var a = appts[i];
-    html += '<div class="patient-card">';
+    var phoneText = formatPhoneDisplay(a.phone);
+    var phoneHref = buildPhoneHref(a.phone);
+    var emailText = String(a.email || '').trim();
+    var relocated = a.status === 'RELOCATED_SPINOLA';
+    html += '<div class="patient-card' + (relocated ? ' relocated' : '') + '">';
     html += '<div class="patient-main">';
+    html += '<div class="patient-details' + (relocated ? ' patient-copy-muted' : '') + '">';
     html += '<div class="patient-name">' + esc(a.fullName || 'Patient') + '</div>';
-    html += '<div class="patient-meta">' + esc(a.phone || '') + (a.phone && a.email ? ' • ' : '') + esc(a.email || '') + '</div>';
+    html += '<div class="patient-meta">';
+    if (phoneText) {
+      if (phoneHref) html += '<a class="contact-link" href="' + esc(phoneHref) + '">' + esc(phoneText) + '</a>';
+      else html += esc(phoneText);
+    }
+    if (phoneText && emailText) html += ' • ';
+    if (emailText) html += '<a class="contact-link" href="mailto:' + esc(emailText) + '">' + esc(emailText) + '</a>';
     html += '</div>';
-    html += '<div class="patient-time">' + esc(a.startTime || '') + '</div>';
+    html += '</div>';
+    if (relocated) html += '<div class="patient-status">Sent to Spinola</div>';
+    html += '</div>';
+    html += '<div class="patient-time' + (relocated ? ' patient-copy-muted' : '') + '">' + esc(a.startTime || '') + '</div>';
     html += '</div>';
   }
   el.innerHTML = html;
+}
+function formatPhoneDisplay(phone) {
+  var raw = String(phone || '').trim();
+  if (!raw) return '';
+  return raw.charAt(0) === '+' ? raw : '+' + raw;
+}
+function buildPhoneHref(phone) {
+  var display = formatPhoneDisplay(phone);
+  if (!display) return '';
+  var normalized = display.replace(/[^\d+]/g, '');
+  return normalized ? 'tel:' + normalized : '';
+}
+function markUserActivity() {
+  _lastActivityAt = Date.now();
+}
+function stopAutoRefresh() {
+  if (_autoRefreshTimerId) {
+    clearInterval(_autoRefreshTimerId);
+    _autoRefreshTimerId = null;
+  }
+}
+function startAutoRefresh() {
+  stopAutoRefresh();
+  _autoRefreshTimerId = setInterval(function() {
+    if (_idlePaused || document.hidden || _refreshInFlight) return;
+    _refreshInFlight = true;
+    reloadAll()
+      .catch(function() {})
+      .finally(function() { _refreshInFlight = false; });
+  }, AUTO_REFRESH_MS);
+}
+function pauseDashboardForIdle() {
+  if (_idlePaused) return;
+  _idlePaused = true;
+  stopAutoRefresh();
+  _idleOverlay.classList.add('show');
+}
+function resumeDashboardFromIdle() {
+  _idlePaused = false;
+  markUserActivity();
+  _idleOverlay.classList.remove('show');
+  startAutoRefresh();
+  _refreshInFlight = true;
+  reloadAll()
+    .catch(function(err) {
+      showMsg('calendarMsg', 'bad', String(err && err.message ? err.message : err));
+    })
+    .finally(function() { _refreshInFlight = false; });
 }
 function showDateLabel() {
   var d = new Date(_todayKey + 'T12:00:00');
@@ -985,11 +1077,28 @@ document.getElementById('adjustModal').addEventListener('click', function(e) {
 document.getElementById('actionModal').addEventListener('click', function(e) {
   if (e.target === this) closeActionModal();
 });
+['pointerdown', 'keydown', 'scroll', 'touchstart', 'mousemove'].forEach(function(evt) {
+  document.addEventListener(evt, function() {
+    if (_idlePaused) return;
+    markUserActivity();
+  }, { passive: true });
+});
+document.addEventListener('visibilitychange', function() {
+  if (document.hidden) pauseDashboardForIdle();
+});
+_idleCheckTimerId = setInterval(function() {
+  if (_idlePaused) return;
+  if (Date.now() - _lastActivityAt >= IDLE_TIMEOUT_MS) pauseDashboardForIdle();
+}, 1000);
+_idleOverlay.addEventListener('click', function() {
+  resumeDashboardFromIdle();
+});
 
 (async function init() {
   try {
     showLoading('Loading schedule…');
     await reloadAll();
+    startAutoRefresh();
   } catch (err) {
     showMsg('calendarMsg', 'bad', String(err && err.message ? err.message : err));
   } finally {
