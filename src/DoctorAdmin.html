@@ -54,6 +54,9 @@
   .btn:disabled{opacity:.45;cursor:not-allowed;transform:none;}
   .patient-list{display:flex;flex-direction:column;gap:10px;}
   .patient-card{border:1px solid var(--line);border-radius:18px;padding:12px 14px;display:flex;align-items:center;gap:12px;background:#fff;}
+  .patient-card.relocated{opacity:.55;text-decoration:line-through;text-decoration-color:var(--muted);}
+  .patient-badge{display:inline-block;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;padding:2px 8px;border-radius:8px;margin-top:4px;text-decoration:none;}
+  .patient-badge.spinola{background:#fef3c7;color:#92400e;}
   .patient-main{flex:1;min-width:0;}
   .patient-name{font-size:15px;font-weight:800;line-height:1.25;}
   .patient-meta{font-size:12px;color:var(--muted);line-height:1.45;margin-top:3px;word-break:break-word;}
@@ -525,7 +528,8 @@ function renderPatientList(session) {
     var phoneText = formatPhoneDisplay(a.phone);
     var phoneHref = buildPhoneHref(a.phone);
     var emailText = String(a.email || '').trim();
-    html += '<div class="patient-card">';
+    var isSpinola = (a.status === 'RELOCATED_SPINOLA');
+    html += '<div class="patient-card' + (isSpinola ? ' relocated' : '') + '">';
     html += '<div class="patient-main">';
     html += '<div class="patient-name">' + esc(a.fullName || 'Patient') + '</div>';
     html += '<div class="patient-meta">';
@@ -536,6 +540,7 @@ function renderPatientList(session) {
     if (phoneText && emailText) html += ' • ';
     if (emailText) html += '<a class="contact-link" href="mailto:' + esc(emailText) + '">' + esc(emailText) + '</a>';
     html += '</div>';
+    if (isSpinola) html += '<div class="patient-badge spinola">Sent to Spinola</div>';
     html += '</div>';
     html += '<div class="patient-time">' + esc(a.startTime || '') + '</div>';
     html += '</div>';
