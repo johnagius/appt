@@ -5918,6 +5918,8 @@ function renderBusiestDay(day) {
   .loading-spinner{width:38px;height:38px;border:4px solid #dbeafe;border-top-color:var(--blue);border-radius:50%;animation:spin .8s linear infinite;}
   .loading-text{font-size:14px;font-weight:900;}
   @keyframes spin{to{transform:rotate(360deg);}}
+  @keyframes idle-float{0%,100%{transform:translateY(0);}50%{transform:translateY(-8px);}}
+  @keyframes idle-pulse-icon{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.75;transform:scale(.95);}}
 
   @media (max-width:420px){
     .session-actions,.calendar-actions,.modal-actions{grid-template-columns:1fr;}
