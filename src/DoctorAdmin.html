@@ -54,7 +54,10 @@
   .btn:disabled{opacity:.45;cursor:not-allowed;transform:none;}
   .patient-list{display:flex;flex-direction:column;gap:10px;}
   .patient-card{border:1px solid var(--line);border-radius:18px;padding:12px 14px;display:flex;align-items:center;gap:12px;background:#fff;}
-  .patient-card.relocated{opacity:.55;text-decoration:line-through;text-decoration-color:var(--muted);}
+  .patient-card.relocated{opacity:.55;}
+  .patient-card.relocated .patient-name,
+  .patient-card.relocated .patient-meta,
+  .patient-card.relocated .patient-time{text-decoration:line-through;text-decoration-color:var(--muted);}
   .patient-badge{display:inline-block;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;padding:2px 8px;border-radius:8px;margin-top:4px;text-decoration:none;}
   .patient-badge.spinola{background:#fef3c7;color:#92400e;}
   .patient-main{flex:1;min-width:0;}
@@ -707,6 +710,7 @@ function buildAllSessionState() {
 function getSessionAffectedAppointments(session, segments) {
   var all = _appointmentsBySession[session] || [];
   return all.filter(function(appt) {
+    if (appt.status === 'RELOCATED_SPINOLA' || appt.status === 'CANCELLED_DOCTOR' || appt.status === 'CANCELLED_CLIENT') return false;
     return !isWithinAnySegment(appt.startTime, appt.endTime, segments);
   });
 }
@@ -767,9 +771,18 @@ function openAdjustModal(session) {
   if (!state) return;
   var baseStart = timeToMin(state.base.start);
   var baseEnd = timeToMin(state.base.end);
+  // Allow wider range: morning 7:30-13:00, afternoon 13:00-22:00
+  var rangeStart, rangeEnd;
+  if (session === 'morning') {
+    rangeStart = Math.min(baseStart, 450);  // 07:30
+    rangeEnd = Math.max(baseEnd, 780);      // 13:00
+  } else {
+    rangeStart = Math.min(baseStart, 780);  // 13:00
+    rangeEnd = Math.max(baseEnd, 1320);     // 22:00
+  }
   var points = [];
-  for (var min = baseStart; min <= baseEnd; min += SLOT_MINUTES) points.push(min);
-  if (points[points.length - 1] !== baseEnd) points.push(baseEnd);
+  for (var min = rangeStart; min <= rangeEnd; min += SLOT_MINUTES) points.push(min);
+  if (points[points.length - 1] !== rangeEnd) points.push(rangeEnd);
 
   var firstSeg = state.segments[0] || { start: state.base.start, end: state.base.end };
   var lastSeg = state.segments[state.segments.length - 1] || { start: state.base.start, end: state.base.end };
