@@ -2,178 +2,307 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <style>
   *{box-sizing:border-box;margin:0;padding:0;}
   :root{
-    --bg:#f6f7fb;--card:#fff;--text:#111827;--muted:#6b7280;--line:#e5e7eb;
-    --bad:#ef4444;--good:#10b981;--blue:#2563eb;--orange:#f59e0b;
-    --radius:18px;--shadow:0 10px 30px rgba(17,24,39,0.08);
+    --bg:#f5f7fb;
+    --card:#ffffff;
+    --text:#111827;
+    --muted:#6b7280;
+    --line:#e5e7eb;
+    --good:#10b981;
+    --good-dark:#047857;
+    --bad:#ef4444;
+    --bad-dark:#b91c1c;
+    --blue:#2563eb;
+    --blue-dark:#1d4ed8;
+    --amber:#f59e0b;
+    --amber-soft:#fffbeb;
+    --shadow:0 14px 40px rgba(15,23,42,0.10);
+    --radius:22px;
   }
-  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);padding:16px;max-width:600px;margin:0 auto;}
-  h1{font-size:20px;font-weight:800;margin-bottom:4px;}
-  .subtitle{color:var(--muted);font-size:13px;margin-bottom:16px;}
-  .card{background:var(--card);border-radius:var(--radius);padding:18px;margin-bottom:14px;box-shadow:var(--shadow);}
-  .card h2{font-size:16px;font-weight:700;margin-bottom:10px;}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+    background:var(--bg);
+    color:var(--text);
+    max-width:680px;
+    margin:0 auto;
+    padding:14px 14px 28px;
+  }
+  button,input{font:inherit;}
+  .stack{display:flex;flex-direction:column;gap:14px;}
+  .date-label{font-size:15px;font-weight:800;color:var(--text);padding:4px 2px 0;}
+  .card{background:var(--card);border-radius:var(--radius);padding:18px;box-shadow:var(--shadow);}
+  .session-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:10px;}
+  .session-title{font-size:20px;font-weight:900;line-height:1.1;}
+  .status-pill{display:inline-flex;align-items:center;gap:8px;border-radius:999px;padding:7px 12px;font-size:12px;font-weight:800;margin-top:8px;}
+  .status-pill.coming{background:#d1fae5;color:var(--good-dark);}
+  .status-pill.not-coming{background:#fee2e2;color:var(--bad-dark);}
+  .dot{width:8px;height:8px;border-radius:50%;background:currentColor;}
+  .work-summary{display:flex;flex-direction:column;gap:6px;margin-bottom:14px;}
+  .work-summary .label{font-size:12px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;}
+  .work-summary .value{font-size:17px;font-weight:900;line-height:1.25;}
+  .work-summary .hint{font-size:12px;color:var(--muted);line-height:1.4;}
+  .session-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;}
+  .btn{border:none;border-radius:18px;padding:14px 16px;font-weight:900;cursor:pointer;transition:transform .12s ease,opacity .12s ease,background .12s ease;}
+  .btn:active{transform:scale(.98);}
+  .btn-primary{background:var(--good);color:#fff;}
+  .btn-danger{background:var(--bad);color:#fff;}
+  .btn-secondary{background:#eff6ff;color:var(--blue-dark);}
+  .btn-ghost{background:#f3f4f6;color:var(--text);}
+  .btn:disabled{opacity:.45;cursor:not-allowed;transform:none;}
+  .patient-list{display:flex;flex-direction:column;gap:10px;}
+  .patient-card{border:1px solid var(--line);border-radius:18px;padding:12px 14px;display:flex;align-items:center;gap:12px;background:#fff;}
+  .patient-main{flex:1;min-width:0;}
+  .patient-name{font-size:15px;font-weight:800;line-height:1.25;}
+  .patient-meta{font-size:12px;color:var(--muted);line-height:1.45;margin-top:3px;word-break:break-word;}
+  .patient-time{font-size:14px;font-weight:900;color:var(--blue-dark);text-align:right;white-space:nowrap;}
+  .empty{padding:14px;border-radius:16px;background:#f9fafb;border:1px dashed var(--line);font-size:13px;color:var(--muted);text-align:center;}
 
-  /* Session toggle */
-  .session{margin-bottom:6px;}
-  .session-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
-  .session-label{font-size:18px;font-weight:800;}
-  .toggle{position:relative;width:80px;height:42px;border-radius:999px;cursor:pointer;border:none;transition:background 0.2s;outline:none;}
-  .toggle.on{background:var(--good);}
-  .toggle.off{background:var(--bad);}
-  .toggle-knob{position:absolute;top:3px;width:36px;height:36px;border-radius:50%;background:#fff;box-shadow:0 2px 6px rgba(0,0,0,0.2);transition:left 0.2s;}
-  .toggle.on .toggle-knob{left:41px;}
-  .toggle.off .toggle-knob{left:3px;}
-  .toggle-text{position:absolute;top:50%;transform:translateY(-50%);font-size:13px;font-weight:800;color:#fff;}
-  .toggle.on .toggle-text{left:12px;}
-  .toggle.off .toggle-text{right:10px;}
-  .session-status{font-size:13px;font-weight:700;margin-top:4px;}
-  .session-status.on{color:var(--good);}
-  .session-status.off{color:var(--bad);}
+  .calendar-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px;}
+  .calendar-title{font-size:18px;font-weight:900;}
+  .calendar-subtitle{font-size:13px;color:var(--muted);line-height:1.4;margin-bottom:14px;}
+  .calendar-nav{display:flex;align-items:center;gap:8px;}
+  .icon-btn{width:40px;height:40px;border:none;border-radius:14px;background:#eef2ff;color:var(--blue-dark);font-size:18px;font-weight:900;cursor:pointer;}
+  .calendar-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;}
+  .dow{font-size:11px;color:var(--muted);font-weight:800;text-align:center;padding-bottom:2px;}
+  .day-btn{position:relative;min-height:62px;border:none;border-radius:18px;background:#f8fafc;color:var(--text);padding:9px 6px 8px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:4px;border:1px solid transparent;}
+  .day-btn.disabled{opacity:.32;cursor:not-allowed;}
+  .day-btn.selected{border-color:var(--blue);background:#dbeafe;}
+  .day-btn.cancelled{background:#fee2e2;border-color:#fca5a5;color:var(--bad-dark);}
+  .day-btn.cancelled.selected{background:#fecaca;}
+  .day-num{font-size:16px;font-weight:900;line-height:1;}
+  .day-mark{font-size:11px;font-weight:900;line-height:1.2;min-height:13px;}
+  .day-x{position:absolute;top:7px;right:7px;font-size:16px;font-weight:900;color:var(--bad-dark);}
+  .calendar-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;}
+  .selection-summary{margin-top:10px;font-size:12px;color:var(--muted);line-height:1.5;}
 
-  /* Patient table */
-  .pt-table{width:100%;border-collapse:collapse;margin-top:8px;font-size:13px;}
-  .pt-table th{text-align:left;padding:6px 8px;border-bottom:2px solid var(--line);color:var(--muted);font-size:11px;text-transform:uppercase;}
-  .pt-table td{padding:8px;border-bottom:1px solid var(--line);}
-  .pt-table tr:last-child td{border-bottom:none;}
-  .pt-check{width:20px;height:20px;cursor:pointer;}
-  .pt-name{font-weight:600;}
-  .pt-time{color:var(--muted);font-size:12px;}
-  .pt-empty{color:var(--muted);text-align:center;padding:16px;font-style:italic;}
+  .modal-overlay{position:fixed;inset:0;background:rgba(15,23,42,.48);display:none;align-items:flex-end;justify-content:center;padding:16px;z-index:1001;}
+  .modal-overlay.show{display:flex;}
+  .modal-card{width:100%;max-width:680px;background:#fff;border-radius:26px 26px 22px 22px;box-shadow:0 18px 50px rgba(15,23,42,.24);padding:18px 18px 20px;max-height:min(88vh,780px);overflow:auto;}
+  .modal-handle{width:52px;height:5px;border-radius:999px;background:#d1d5db;margin:0 auto 12px;}
+  .modal-title{font-size:20px;font-weight:900;margin-bottom:6px;}
+  .modal-text{font-size:13px;color:var(--muted);line-height:1.45;margin-bottom:14px;}
+  .range-block{padding:12px 0;border-top:1px solid var(--line);}
+  .range-block:first-of-type{border-top:none;padding-top:0;}
+  .range-top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:8px;}
+  .range-label{font-size:13px;font-weight:900;}
+  .range-value{font-size:14px;font-weight:900;color:var(--blue-dark);text-align:right;}
+  .range-hint{font-size:12px;color:var(--muted);line-height:1.35;margin-top:4px;}
+  input[type=range]{width:100%;height:34px;background:transparent;-webkit-appearance:none;appearance:none;}
+  input[type=range]::-webkit-slider-runnable-track{height:8px;border-radius:999px;background:#dbeafe;}
+  input[type=range]::-moz-range-track{height:8px;border-radius:999px;background:#dbeafe;}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:28px;height:28px;border-radius:50%;background:var(--blue);margin-top:-10px;border:none;box-shadow:0 4px 10px rgba(37,99,235,.35);}
+  input[type=range]::-moz-range-thumb{width:28px;height:28px;border-radius:50%;background:var(--blue);border:none;box-shadow:0 4px 10px rgba(37,99,235,.35);}
+  .switch-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-top:1px solid var(--line);}
+  .switch-copy{flex:1;}
+  .switch-copy strong{display:block;font-size:14px;margin-bottom:4px;}
+  .switch-copy span{font-size:12px;color:var(--muted);line-height:1.4;}
+  .switch{position:relative;display:inline-block;width:58px;height:32px;flex:0 0 auto;}
+  .switch input{opacity:0;width:0;height:0;}
+  .switch-slider{position:absolute;cursor:pointer;inset:0;background:#d1d5db;border-radius:999px;transition:.2s;}
+  .switch-slider:before{content:'';position:absolute;height:24px;width:24px;left:4px;top:4px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 2px 6px rgba(0,0,0,.2);}
+  .switch input:checked + .switch-slider{background:var(--blue);}
+  .switch input:checked + .switch-slider:before{transform:translateX(26px);}
+  .modal-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px;}
 
-  /* Action panel (shown when turning off with patients) */
-  .action-panel{background:#fef3c7;border:2px solid var(--orange);border-radius:14px;padding:14px;margin-top:10px;display:none;}
-  .action-panel h3{font-size:14px;font-weight:700;color:#92400e;margin-bottom:8px;}
-  .action-panel p{font-size:12px;color:#92400e;margin-bottom:10px;}
-  .action-btns{display:flex;flex-direction:column;gap:8px;}
-  .action-btn{border:none;padding:14px;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;text-align:center;}
-  .action-btn.spinola{background:var(--blue);color:#fff;}
-  .action-btn.push{background:var(--good);color:#fff;}
-  .action-btn.cancel-btn{background:var(--bad);color:#fff;}
-  .action-btn:hover{opacity:0.9;}
+  .action-summary{padding:12px 14px;border-radius:16px;background:var(--amber-soft);border:1px solid #fcd34d;color:#92400e;font-size:13px;line-height:1.5;margin-bottom:14px;}
+  .affected-list{display:flex;flex-direction:column;gap:10px;max-height:32vh;overflow:auto;margin-bottom:14px;}
+  .affected-card{border:1px solid var(--line);border-radius:16px;padding:12px;background:#fff;}
+  .affected-date{font-size:12px;font-weight:900;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;}
+  .affected-name{font-size:15px;font-weight:900;}
+  .affected-meta{font-size:12px;color:var(--muted);line-height:1.4;margin-top:2px;}
+  .action-grid{display:grid;gap:10px;}
 
-  /* Future days cancel */
-  .future-section{margin-top:6px;}
-  .future-date-row{display:flex;gap:8px;align-items:center;margin-bottom:10px;}
-  .future-date-row input{flex:1;padding:10px;border:1px solid var(--line);border-radius:10px;font-size:14px;}
-  .future-cancel-btn{border:none;background:var(--bad);color:#fff;padding:10px 18px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;}
-  .future-cancel-btn:hover{opacity:0.9;}
-  .future-cancel-btn:disabled{opacity:0.5;cursor:not-allowed;}
-
-  /* Messages */
-  .msg{margin-top:8px;padding:8px 12px;border-radius:10px;font-size:13px;font-weight:600;display:none;}
+  .msg{display:none;margin-top:12px;padding:11px 13px;border-radius:14px;font-size:13px;font-weight:800;line-height:1.4;}
   .msg.good{display:block;background:#d1fae5;color:#065f46;}
   .msg.bad{display:block;background:#fee2e2;color:#991b1b;}
 
-  /* Loading overlay */
-  .loading-overlay{position:fixed;inset:0;background:rgba(255,255,255,0.85);display:none;align-items:center;justify-content:center;z-index:1000;flex-direction:column;gap:10px;}
+  .loading-overlay{position:fixed;inset:0;background:rgba(255,255,255,.86);display:none;align-items:center;justify-content:center;z-index:1100;flex-direction:column;gap:10px;}
   .loading-overlay.show{display:flex;}
-  .loading-spinner{width:36px;height:36px;border:4px solid var(--line);border-top-color:var(--blue);border-radius:50%;animation:spin 0.8s linear infinite;}
-  .loading-text{font-weight:700;font-size:14px;}
+  .loading-spinner{width:38px;height:38px;border:4px solid #dbeafe;border-top-color:var(--blue);border-radius:50%;animation:spin .8s linear infinite;}
+  .loading-text{font-size:14px;font-weight:900;}
   @keyframes spin{to{transform:rotate(360deg);}}
 
-  /* Date label */
-  .date-label{font-size:14px;color:var(--muted);font-weight:600;margin-bottom:12px;}
+  @media (max-width:420px){
+    .session-actions,.calendar-actions,.modal-actions{grid-template-columns:1fr;}
+    .session-title{font-size:18px;}
+    .patient-card{align-items:flex-start;}
+  }
 </style>
 </head>
 <body>
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="loading-spinner"></div>
+    <div class="loading-text" id="loadingText">Loading…</div>
+  </div>
 
-<h1>Dr Kevin - Schedule</h1>
-<p class="subtitle">Quick schedule management</p>
+  <div class="stack">
+    <div id="dateLabel" class="date-label"></div>
 
-<div class="loading-overlay" id="loadingOverlay">
-  <div class="loading-spinner"></div>
-  <div class="loading-text" id="loadingText">Loading...</div>
-</div>
+    <section class="card" id="morningCard">
+      <div class="session-head">
+        <div>
+          <div class="session-title">Morning</div>
+          <div class="status-pill coming" id="morningPill"><span class="dot"></span><span id="morningPillText">Coming to Work</span></div>
+        </div>
+      </div>
+      <div class="work-summary">
+        <div class="label">Working times</div>
+        <div class="value" id="morningTimes">—</div>
+        <div class="hint" id="morningHint"></div>
+      </div>
+      <div class="session-actions">
+        <button class="btn btn-danger" id="morningToggleBtn" onclick="toggleSession('morning')">Not Coming to Work</button>
+        <button class="btn btn-secondary" onclick="openAdjustModal('morning')">Adjust Shift Time</button>
+      </div>
+      <div class="patient-list" id="morningPatients"></div>
+      <div class="msg" id="morningMsg"></div>
+    </section>
 
-<div id="dateLabel" class="date-label"></div>
+    <section class="card" id="eveningCard">
+      <div class="session-head">
+        <div>
+          <div class="session-title">Evening</div>
+          <div class="status-pill coming" id="eveningPill"><span class="dot"></span><span id="eveningPillText">Coming to Work</span></div>
+        </div>
+      </div>
+      <div class="work-summary">
+        <div class="label">Working times</div>
+        <div class="value" id="eveningTimes">—</div>
+        <div class="hint" id="eveningHint"></div>
+      </div>
+      <div class="session-actions">
+        <button class="btn btn-danger" id="eveningToggleBtn" onclick="toggleSession('evening')">Not Coming to Work</button>
+        <button class="btn btn-secondary" onclick="openAdjustModal('evening')">Adjust Shift Time</button>
+      </div>
+      <div class="patient-list" id="eveningPatients"></div>
+      <div class="msg" id="eveningMsg"></div>
+    </section>
 
-<!-- MORNING SESSION -->
-<div class="card">
-  <div class="session" id="morningSession">
-    <div class="session-header">
-      <span class="session-label">Morning</span>
-      <button class="toggle on" id="morningToggle" onclick="toggleSession('morning')">
-        <span class="toggle-text">ON</span>
-        <div class="toggle-knob"></div>
-      </button>
-    </div>
-    <div class="session-status on" id="morningStatus">Working this morning</div>
-    <div id="morningPatients"></div>
-    <div class="action-panel" id="morningActions">
-      <h3>What should happen to these patients?</h3>
-      <p>You must choose an action before cancelling this session.</p>
-      <div class="action-btns">
-        <button class="action-btn spinola" onclick="doSessionAction('morning','redirect_spinola')">Send to Spinola</button>
-        <button class="action-btn push" onclick="doSessionAction('morning','push_next_day')">Push to Next Day</button>
-        <button class="action-btn cancel-btn" onclick="doSessionAction('morning','cancel')">Cancel Appointments</button>
+    <section class="card">
+      <div class="calendar-head">
+        <div class="calendar-title">Cancel or Reactivate Dates</div>
+        <div class="calendar-nav">
+          <button class="icon-btn" onclick="changeCalendarMonth(-1)">‹</button>
+          <button class="icon-btn" onclick="changeCalendarMonth(1)">›</button>
+        </div>
+      </div>
+      <div class="calendar-subtitle">Tap one or more future days. Cancelled days are marked with an X. Tap them again to reactivate.</div>
+      <div class="date-label" id="calendarMonthLabel" style="padding:0 0 10px;"></div>
+      <div class="calendar-grid" id="calendarGrid"></div>
+      <div class="calendar-actions">
+        <button class="btn btn-danger" id="cancelDaysBtn" onclick="startCancelSelectedDays()">Cancel Selected Days</button>
+        <button class="btn btn-secondary" id="reactivateDaysBtn" onclick="reactivateSelectedDays()">Reactivate Selected Days</button>
+      </div>
+      <div class="selection-summary" id="calendarSelectionSummary">No days selected.</div>
+      <div class="msg" id="calendarMsg"></div>
+    </section>
+  </div>
+
+  <div class="modal-overlay" id="adjustModal">
+    <div class="modal-card">
+      <div class="modal-handle"></div>
+      <div class="modal-title" id="adjustTitle">Adjust shift</div>
+      <div class="modal-text" id="adjustText"></div>
+
+      <div class="range-block">
+        <div class="range-top">
+          <div>
+            <div class="range-label">Shift starts</div>
+            <div class="range-hint">Slide to choose when work starts.</div>
+          </div>
+          <div class="range-value" id="adjustStartValue">—</div>
+        </div>
+        <input type="range" id="adjustStartRange" min="0" max="0" step="1" oninput="syncAdjustModal()">
+      </div>
+
+      <div class="range-block">
+        <div class="range-top">
+          <div>
+            <div class="range-label">Shift ends</div>
+            <div class="range-hint">Slide to choose when work ends.</div>
+          </div>
+          <div class="range-value" id="adjustEndValue">—</div>
+        </div>
+        <input type="range" id="adjustEndRange" min="0" max="0" step="1" oninput="syncAdjustModal()">
+      </div>
+
+      <div class="switch-row">
+        <div class="switch-copy">
+          <strong>Insert a block</strong>
+          <span>Add a gap inside the shift where patients cannot book.</span>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="gapEnabled" onchange="syncAdjustModal()">
+          <span class="switch-slider"></span>
+        </label>
+      </div>
+
+      <div id="gapControls" style="display:none;">
+        <div class="range-block">
+          <div class="range-top">
+            <div>
+              <div class="range-label">Block starts</div>
+              <div class="range-hint">Choose when the gap begins.</div>
+            </div>
+            <div class="range-value" id="gapStartValue">—</div>
+          </div>
+          <input type="range" id="gapStartRange" min="0" max="0" step="1" oninput="syncAdjustModal()">
+        </div>
+        <div class="range-block">
+          <div class="range-top">
+            <div>
+              <div class="range-label">Block ends</div>
+              <div class="range-hint">Choose when the gap finishes.</div>
+            </div>
+            <div class="range-value" id="gapEndValue">—</div>
+          </div>
+          <input type="range" id="gapEndRange" min="0" max="0" step="1" oninput="syncAdjustModal()">
+        </div>
+      </div>
+
+      <div class="action-summary" id="adjustSummary"></div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" onclick="closeAdjustModal()">Close</button>
+        <button class="btn btn-primary" onclick="saveAdjustModal()">Save Shift</button>
       </div>
     </div>
-    <div class="msg" id="morningMsg"></div>
   </div>
-</div>
 
-<!-- EVENING SESSION -->
-<div class="card">
-  <div class="session" id="eveningSession">
-    <div class="session-header">
-      <span class="session-label">Evening</span>
-      <button class="toggle on" id="eveningToggle" onclick="toggleSession('evening')">
-        <span class="toggle-text">ON</span>
-        <div class="toggle-knob"></div>
-      </button>
-    </div>
-    <div class="session-status on" id="eveningStatus">Working this evening</div>
-    <div id="eveningPatients"></div>
-    <div class="action-panel" id="eveningActions">
-      <h3>What should happen to these patients?</h3>
-      <p>You must choose an action before cancelling this session.</p>
-      <div class="action-btns">
-        <button class="action-btn spinola" onclick="doSessionAction('evening','redirect_spinola')">Send to Spinola</button>
-        <button class="action-btn push" onclick="doSessionAction('evening','push_next_day')">Push to Next Day</button>
-        <button class="action-btn cancel-btn" onclick="doSessionAction('evening','cancel')">Cancel Appointments</button>
+  <div class="modal-overlay" id="actionModal">
+    <div class="modal-card">
+      <div class="modal-handle"></div>
+      <div class="modal-title" id="actionTitle">Appointments must be handled first</div>
+      <div class="modal-text" id="actionText"></div>
+      <div class="action-summary" id="actionSummary"></div>
+      <div class="affected-list" id="affectedList"></div>
+      <div class="action-grid">
+        <button class="btn btn-secondary" onclick="handlePendingAction('redirect_spinola')">Send to Spinola</button>
+        <button class="btn btn-primary" onclick="handlePendingAction('push_next_day')">Push to Next Day</button>
+        <button class="btn btn-danger" onclick="handlePendingAction('cancel')">Cancel Appointments</button>
+        <button class="btn btn-ghost" onclick="closeActionModal()">Back</button>
       </div>
     </div>
-    <div class="msg" id="eveningMsg"></div>
   </div>
-</div>
-
-<!-- CANCEL FUTURE DATES -->
-<div class="card future-section">
-  <h2>Cancel a Future Date</h2>
-  <div class="future-date-row">
-    <input type="date" id="futureDate" onchange="loadFutureDate()">
-    <button class="future-cancel-btn" id="futureCancelBtn" disabled onclick="startFutureCancel()">Cancel Day</button>
-  </div>
-  <div id="futurePatients"></div>
-  <div class="action-panel" id="futureActions">
-    <h3>What should happen to these patients?</h3>
-    <p>You must choose an action before cancelling this day.</p>
-    <div class="action-btns">
-      <button class="action-btn spinola" onclick="doFutureAction('redirect_spinola')">Send to Spinola</button>
-      <button class="action-btn push" onclick="doFutureAction('push_next_day')">Push to Next Day</button>
-      <button class="action-btn cancel-btn" onclick="doFutureAction('cancel')">Cancel Appointments</button>
-    </div>
-  </div>
-  <div class="msg" id="futureMsg"></div>
-</div>
 
 <script>
 var SIG = '<?= adminSig ?>';
 var _todayKey = '';
-var _morningOff = false;
-var _eveningOff = false;
-var _morningAppts = [];
-var _eveningAppts = [];
-var _futureAppts = [];
-var _offEntries = []; // to track which off entries exist
-var _morningOffRowIndex = null;
-var _eveningOffRowIndex = null;
 var _workingHours = null;
+var _offEntries = [];
+var _sessionState = { morning: null, evening: null };
+var _appointmentsBySession = { morning: [], evening: [] };
+var _calendarMonth = null;
+var _selectedDates = {};
+var _cachedDateAppointments = {};
+var _adjustContext = null;
+var _pendingFlow = null;
+var SLOT_MINUTES = 15;
 
 function showLoading(msg) {
-  document.getElementById('loadingText').textContent = msg || 'Loading...';
+  document.getElementById('loadingText').textContent = msg || 'Loading…';
   document.getElementById('loadingOverlay').classList.add('show');
 }
 function hideLoading() {
@@ -185,402 +314,686 @@ function showMsg(id, type, msg) {
   el.textContent = msg;
   setTimeout(function() { el.className = 'msg'; }, 6000);
 }
-
-// ========== Init ==========
-
-showLoading('Loading schedule...');
-google.script.run
-  .withSuccessHandler(function(res) {
-    hideLoading();
-    if (!res || !res.ok) return;
-
-    _todayKey = res.todayKey;
-    _workingHours = res.workingHours;
-    _offEntries = res.doctorOffEntries || [];
-
-    var d = new Date(_todayKey + 'T12:00:00');
-    var dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-    var monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    document.getElementById('dateLabel').textContent = dayNames[d.getDay()] + ', ' + d.getDate() + ' ' + monthNames[d.getMonth()] + ' ' + d.getFullYear();
-
-    // Set min date for future picker to tomorrow
-    var tomorrow = new Date(d);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    document.getElementById('futureDate').min = tomorrow.toISOString().slice(0, 10);
-
-    // Check if morning/evening are already blocked
-    checkOffStatus();
-    loadTodayAppointments();
-  })
-  .withFailureHandler(function(err) {
-    hideLoading();
-  })
-  .apiAdminGetDashboard(SIG);
-
-function checkOffStatus() {
-  _morningOff = false;
-  _eveningOff = false;
-  _morningOffRowIndex = null;
-  _eveningOffRowIndex = null;
-
-  // Get today's working hours to know morning/evening ranges
-  var d = new Date(_todayKey + 'T12:00:00');
-  var dowKeys = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
-  var dow = dowKeys[d.getDay()];
-  var windows = (_workingHours && _workingHours[dow]) || [];
-
-  // Classify windows into morning (before 13:00) and evening (13:00+)
-  var morningWindow = null, eveningWindow = null;
-  for (var i = 0; i < windows.length; i++) {
-    var startH = parseInt(windows[i].start.split(':')[0], 10);
-    if (startH < 13) morningWindow = windows[i];
-    else eveningWindow = windows[i];
-  }
-
-  for (var j = 0; j < _offEntries.length; j++) {
-    var off = _offEntries[j];
-    if (_todayKey >= off.startDate && _todayKey <= (off.endDate || off.startDate)) {
-      if (!off.startTime && !off.endTime) {
-        // All day block
-        _morningOff = true;
-        _eveningOff = true;
-        _morningOffRowIndex = off.rowIndex;
-        _eveningOffRowIndex = off.rowIndex;
-      } else if (off.startTime && off.endTime) {
-        var offStartH = parseInt(off.startTime.split(':')[0], 10);
-        if (offStartH < 13) { _morningOff = true; _morningOffRowIndex = off.rowIndex; }
-        else { _eveningOff = true; _eveningOffRowIndex = off.rowIndex; }
-      }
-    }
-  }
-
-  updateToggleUI('morning', !_morningOff);
-  updateToggleUI('evening', !_eveningOff);
-
-  // Hide morning/evening if no window configured
-  if (!morningWindow) document.getElementById('morningSession').parentElement.style.display = 'none';
-  if (!eveningWindow) document.getElementById('eveningSession').parentElement.style.display = 'none';
-}
-
-function updateToggleUI(session, isOn) {
-  var toggle = document.getElementById(session + 'Toggle');
-  var status = document.getElementById(session + 'Status');
-  var label = session === 'morning' ? 'morning' : 'evening';
-
-  toggle.className = 'toggle ' + (isOn ? 'on' : 'off');
-  toggle.querySelector('.toggle-text').textContent = isOn ? 'ON' : 'OFF';
-  status.className = 'session-status ' + (isOn ? 'on' : 'off');
-  status.textContent = isOn ? 'Working this ' + label : 'NOT working this ' + label;
-}
-
-function loadTodayAppointments() {
-  google.script.run
-    .withSuccessHandler(function(res) {
-      if (!res || !res.ok) return;
-      var appts = res.appointments || [];
-      _morningAppts = [];
-      _eveningAppts = [];
-
-      for (var i = 0; i < appts.length; i++) {
-        var a = appts[i];
-        var h = parseInt((a.startTime || '00:00').split(':')[0], 10);
-        if (h < 13) _morningAppts.push(a);
-        else _eveningAppts.push(a);
-      }
-
-      renderPatientTable('morning', _morningAppts);
-      renderPatientTable('evening', _eveningAppts);
-    })
-    .withFailureHandler(function() {})
-    .apiAdminGetDateAppointments(SIG, _todayKey);
-}
-
-function renderPatientTable(session, appts) {
-  var el = document.getElementById(session + 'Patients');
-  if (!appts.length) {
-    el.innerHTML = '<div class="pt-empty">No patients booked</div>';
-    return;
-  }
-
-  var html = '<table class="pt-table"><thead><tr><th></th><th>Time</th><th>Patient</th><th>Phone</th></tr></thead><tbody>';
-  for (var i = 0; i < appts.length; i++) {
-    var a = appts[i];
-    html += '<tr>';
-    html += '<td><input type="checkbox" class="pt-check" checked data-id="' + a.appointmentId + '" data-session="' + session + '"></td>';
-    html += '<td class="pt-time">' + (a.startTime || '') + '</td>';
-    html += '<td class="pt-name">' + esc(a.fullName || '') + '</td>';
-    html += '<td>' + esc(a.phone || '') + '</td>';
-    html += '</tr>';
-  }
-  html += '</tbody></table>';
-  el.innerHTML = html;
-}
-
 function esc(s) {
   var d = document.createElement('div');
-  d.textContent = s;
+  d.textContent = s == null ? '' : String(s);
   return d.innerHTML;
 }
-
-// ========== Toggle Session ==========
-
-function toggleSession(session) {
-  var isCurrentlyOn = (session === 'morning') ? !_morningOff : !_eveningOff;
-
-  if (isCurrentlyOn) {
-    // Turning OFF - check if there are patients
-    var appts = session === 'morning' ? _morningAppts : _eveningAppts;
-    var checked = getCheckedIds(session);
-
-    if (checked.length > 0) {
-      // Show action panel - must handle patients first
-      document.getElementById(session + 'Actions').style.display = 'block';
-      return;
+function timeToMin(t) {
+  if (!t) return 0;
+  var p = String(t).split(':');
+  return Number(p[0] || 0) * 60 + Number(p[1] || 0);
+}
+function minToTime(m) {
+  var hours = Math.floor(m / 60);
+  var mins = m % 60;
+  return String(hours).padStart(2, '0') + ':' + String(mins).padStart(2, '0');
+}
+function addDays(dateKey, days) {
+  var d = new Date(dateKey + 'T00:00:00');
+  d.setDate(d.getDate() + days);
+  return d;
+}
+function toDateKey(dateObj) {
+  var y = dateObj.getFullYear();
+  var m = String(dateObj.getMonth() + 1).padStart(2, '0');
+  var d = String(dateObj.getDate()).padStart(2, '0');
+  return y + '-' + m + '-' + d;
+}
+function dateLabel(dateKey) {
+  var d = new Date(dateKey + 'T12:00:00');
+  return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+}
+function getTomorrowKey() {
+  return toDateKey(addDays(_todayKey, 1));
+}
+function sortTimeRanges(ranges) {
+  return ranges.slice().sort(function(a, b) { return timeToMin(a.start) - timeToMin(b.start); });
+}
+function mergeRanges(ranges) {
+  if (!ranges.length) return [];
+  var sorted = ranges.slice().sort(function(a, b) { return a.startMin - b.startMin; });
+  var merged = [sorted[0]];
+  for (var i = 1; i < sorted.length; i++) {
+    var prev = merged[merged.length - 1];
+    var cur = sorted[i];
+    if (cur.startMin <= prev.endMin) {
+      prev.endMin = Math.max(prev.endMin, cur.endMin);
+    } else {
+      merged.push({ startMin: cur.startMin, endMin: cur.endMin });
     }
-
-    // No patients (or none checked) - just block the time
-    blockSession(session);
-  } else {
-    // Turning ON - unblock
-    unblockSession(session);
   }
+  return merged;
 }
-
-function getCheckedIds(session) {
-  var checks = document.querySelectorAll('.pt-check[data-session="' + session + '"]');
-  var ids = [];
-  for (var i = 0; i < checks.length; i++) {
-    if (checks[i].checked) ids.push(checks[i].dataset.id);
+function subtractBlocks(base, blocks) {
+  if (!base) return [];
+  if (!blocks.length) return [{ start: base.start, end: base.end }];
+  var cursor = timeToMin(base.start);
+  var end = timeToMin(base.end);
+  var merged = mergeRanges(blocks);
+  var result = [];
+  for (var i = 0; i < merged.length; i++) {
+    var block = merged[i];
+    if (block.startMin > cursor) result.push({ start: minToTime(cursor), end: minToTime(block.startMin) });
+    cursor = Math.max(cursor, block.endMin);
   }
-  return ids;
+  if (cursor < end) result.push({ start: minToTime(cursor), end: minToTime(end) });
+  return result.filter(function(seg) { return timeToMin(seg.end) > timeToMin(seg.start); });
 }
-
-function getSessionTimeRange(session) {
-  var d = new Date(_todayKey + 'T12:00:00');
+function blocksFromSegments(base, segments) {
+  var blocks = [];
+  var cursor = timeToMin(base.start);
+  var end = timeToMin(base.end);
+  var ordered = sortTimeRanges(segments);
+  for (var i = 0; i < ordered.length; i++) {
+    var segStart = timeToMin(ordered[i].start);
+    var segEnd = timeToMin(ordered[i].end);
+    if (segStart > cursor) blocks.push({ start: minToTime(cursor), end: minToTime(segStart) });
+    cursor = Math.max(cursor, segEnd);
+  }
+  if (cursor < end) blocks.push({ start: minToTime(cursor), end: minToTime(end) });
+  return blocks.filter(function(block) { return timeToMin(block.end) > timeToMin(block.start); });
+}
+function isWithinAnySegment(startTime, endTime, segments) {
+  var start = timeToMin(startTime);
+  var end = timeToMin(endTime);
+  for (var i = 0; i < segments.length; i++) {
+    if (start >= timeToMin(segments[i].start) && end <= timeToMin(segments[i].end)) return true;
+  }
+  return false;
+}
+function isSessionAvailable(session) {
+  return !!(_sessionState[session] && _sessionState[session].segments.length);
+}
+function getDayWindows(dateKey) {
+  var d = new Date(dateKey + 'T12:00:00');
   var dowKeys = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
-  var dow = dowKeys[d.getDay()];
-  var windows = (_workingHours && _workingHours[dow]) || [];
-
+  return (_workingHours && _workingHours[dowKeys[d.getDay()]]) || [];
+}
+function classifyBaseWindow(session) {
+  var windows = getDayWindows(_todayKey);
   for (var i = 0; i < windows.length; i++) {
-    var startH = parseInt(windows[i].start.split(':')[0], 10);
-    if (session === 'morning' && startH < 13) return windows[i];
-    if (session === 'evening' && startH >= 13) return windows[i];
+    var startHour = parseInt(String(windows[i].start || '00:00').split(':')[0], 10);
+    if (session === 'morning' && startHour < 13) return windows[i];
+    if (session === 'evening' && startHour >= 13) return windows[i];
   }
-  return session === 'morning' ? { start: '09:00', end: '12:00' } : { start: '17:00', end: '19:00' };
+  return null;
 }
-
-function doSessionAction(session, action) {
-  var ids = getCheckedIds(session);
-  if (!ids.length) {
-    showMsg(session + 'Msg', 'bad', 'No patients selected.');
+function buildSessionState(session) {
+  var base = classifyBaseWindow(session);
+  if (!base) return null;
+  var baseStart = timeToMin(base.start);
+  var baseEnd = timeToMin(base.end);
+  var blocks = [];
+  var rowIndices = [];
+  for (var i = 0; i < _offEntries.length; i++) {
+    var off = _offEntries[i];
+    if (_todayKey < off.startDate || _todayKey > (off.endDate || off.startDate)) continue;
+    var blockStart = off.startTime ? timeToMin(off.startTime) : 0;
+    var blockEnd = off.endTime ? timeToMin(off.endTime) : 1440;
+    if (!off.startTime && !off.endTime) {
+      blockStart = 0;
+      blockEnd = 1440;
+    }
+    var startMin = Math.max(baseStart, blockStart);
+    var endMin = Math.min(baseEnd, blockEnd);
+    if (endMin <= startMin) continue;
+    blocks.push({ startMin: startMin, endMin: endMin, rowIndex: off.rowIndex });
+    rowIndices.push(off.rowIndex);
+  }
+  var segments = subtractBlocks(base, blocks);
+  var uniqueRowIndices = [];
+  var seen = {};
+  for (var j = 0; j < rowIndices.length; j++) {
+    if (!seen[rowIndices[j]]) {
+      seen[rowIndices[j]] = true;
+      uniqueRowIndices.push(rowIndices[j]);
+    }
+  }
+  return {
+    session: session,
+    base: base,
+    blocks: blocksFromSegments(base, segments),
+    segments: segments,
+    rowIndices: uniqueRowIndices
+  };
+}
+function renderSession(session) {
+  var state = _sessionState[session];
+  var card = document.getElementById(session + 'Card');
+  if (!state) {
+    card.style.display = 'none';
     return;
   }
+  card.style.display = '';
 
-  showLoading('Processing patients...');
-  google.script.run
-    .withSuccessHandler(function(res) {
-      hideLoading();
-      if (!res || !res.ok) {
-        showMsg(session + 'Msg', 'bad', res.reason || 'Failed.');
-        return;
-      }
-      showMsg(session + 'Msg', 'good', res.message || 'Done!');
-      document.getElementById(session + 'Actions').style.display = 'none';
+  var available = state.segments.length > 0;
+  var pill = document.getElementById(session + 'Pill');
+  var pillText = document.getElementById(session + 'PillText');
+  pill.className = 'status-pill ' + (available ? 'coming' : 'not-coming');
+  pillText.textContent = available ? 'Coming to Work' : 'Not Coming to Work';
+  document.getElementById(session + 'ToggleBtn').textContent = available ? 'Not Coming to Work' : 'Coming to Work';
+  document.getElementById(session + 'ToggleBtn').className = 'btn ' + (available ? 'btn-danger' : 'btn-primary');
 
-      // Now block the session
-      blockSession(session);
-    })
-    .withFailureHandler(function(err) {
-      hideLoading();
-      showMsg(session + 'Msg', 'bad', 'Error: ' + (err && err.message ? err.message : String(err)));
-    })
-    .apiAdminProcessAppointments(SIG, {
-      dateKey: _todayKey,
-      action: action,
-      appointmentIds: ids
-    });
+  document.getElementById(session + 'Times').textContent = available
+    ? state.segments.map(function(seg) { return seg.start + ' - ' + seg.end; }).join(' • ')
+    : 'Not coming to work for this session';
+  document.getElementById(session + 'Hint').textContent = 'Normal hours: ' + state.base.start + ' - ' + state.base.end + '.';
+
+  renderPatientList(session);
 }
-
-function blockSession(session) {
-  var range = getSessionTimeRange(session);
-  showLoading('Blocking ' + session + '...');
-  google.script.run
-    .withSuccessHandler(function(res) {
-      hideLoading();
-      if (!res || !res.ok) {
-        showMsg(session + 'Msg', 'bad', res.reason || 'Failed.');
-        return;
-      }
-      if (session === 'morning') _morningOff = true;
-      else _eveningOff = true;
-      updateToggleUI(session, false);
-      reloadAll();
-    })
-    .withFailureHandler(function(err) {
-      hideLoading();
-      showMsg(session + 'Msg', 'bad', 'Error: ' + (err && err.message ? err.message : String(err)));
-    })
-    .apiAdminMarkDoctorOff(SIG, {
-      startDate: _todayKey,
-      startTime: range.start,
-      endTime: range.end,
-      reason: 'Doctor not coming'
-    });
-}
-
-function unblockSession(session) {
-  var rowIndex = session === 'morning' ? _morningOffRowIndex : _eveningOffRowIndex;
-  if (!rowIndex) {
-    // No row to remove, just update UI
-    if (session === 'morning') _morningOff = false;
-    else _eveningOff = false;
-    updateToggleUI(session, true);
+function renderPatientList(session) {
+  var state = _sessionState[session];
+  var appts = _appointmentsBySession[session] || [];
+  var el = document.getElementById(session + 'Patients');
+  if (!appts.length) {
+    el.innerHTML = '<div class="empty">No patients booked for this ' + session + '.</div>';
     return;
   }
-
-  showLoading('Unblocking ' + session + '...');
-  google.script.run
-    .withSuccessHandler(function(res) {
-      hideLoading();
-      if (!res || !res.ok) {
-        showMsg(session + 'Msg', 'bad', res.reason || 'Failed.');
-        return;
-      }
-      if (session === 'morning') { _morningOff = false; _morningOffRowIndex = null; }
-      else { _eveningOff = false; _eveningOffRowIndex = null; }
-      updateToggleUI(session, true);
-      reloadAll();
-    })
-    .withFailureHandler(function(err) {
-      hideLoading();
-      showMsg(session + 'Msg', 'bad', 'Error: ' + (err && err.message ? err.message : String(err)));
-    })
-    .apiAdminRemoveDoctorOff(SIG, rowIndex);
-}
-
-function reloadAll() {
-  google.script.run
-    .withSuccessHandler(function(res) {
-      if (!res || !res.ok) return;
-      _offEntries = res.doctorOffEntries || [];
-      _workingHours = res.workingHours;
-      checkOffStatus();
-      loadTodayAppointments();
-    })
-    .withFailureHandler(function() {})
-    .apiAdminGetDashboard(SIG);
-}
-
-// ========== Future Date Cancel ==========
-
-function loadFutureDate() {
-  var dateKey = document.getElementById('futureDate').value;
-  if (!dateKey) return;
-
-  document.getElementById('futureCancelBtn').disabled = false;
-  document.getElementById('futureActions').style.display = 'none';
-
-  google.script.run
-    .withSuccessHandler(function(res) {
-      if (!res || !res.ok) return;
-      _futureAppts = res.appointments || [];
-      renderFutureTable();
-    })
-    .withFailureHandler(function() {})
-    .apiAdminGetDateAppointments(SIG, dateKey);
-}
-
-function renderFutureTable() {
-  var el = document.getElementById('futurePatients');
-  if (!_futureAppts.length) {
-    el.innerHTML = '<div class="pt-empty">No patients booked on this date</div>';
-    return;
+  var html = '';
+  for (var i = 0; i < appts.length; i++) {
+    var a = appts[i];
+    html += '<div class="patient-card">';
+    html += '<div class="patient-main">';
+    html += '<div class="patient-name">' + esc(a.fullName || 'Patient') + '</div>';
+    html += '<div class="patient-meta">' + esc(a.phone || '') + (a.phone && a.email ? ' • ' : '') + esc(a.email || '') + '</div>';
+    html += '</div>';
+    html += '<div class="patient-time">' + esc(a.startTime || '') + '</div>';
+    html += '</div>';
   }
-
-  var html = '<table class="pt-table"><thead><tr><th></th><th>Time</th><th>Patient</th><th>Phone</th></tr></thead><tbody>';
-  for (var i = 0; i < _futureAppts.length; i++) {
-    var a = _futureAppts[i];
-    html += '<tr>';
-    html += '<td><input type="checkbox" class="pt-check" checked data-id="' + a.appointmentId + '" data-session="future"></td>';
-    html += '<td class="pt-time">' + (a.startTime || '') + '</td>';
-    html += '<td class="pt-name">' + esc(a.fullName || '') + '</td>';
-    html += '<td>' + esc(a.phone || '') + '</td>';
-    html += '</tr>';
-  }
-  html += '</tbody></table>';
   el.innerHTML = html;
 }
+function showDateLabel() {
+  var d = new Date(_todayKey + 'T12:00:00');
+  document.getElementById('dateLabel').textContent = d.toLocaleDateString('en-GB', {
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+  });
+}
+function fetchDashboard() {
+  return new Promise(function(resolve, reject) {
+    google.script.run
+      .withSuccessHandler(function(res) { resolve(res); })
+      .withFailureHandler(function(err) { reject(err); })
+      .apiAdminGetDashboard(SIG);
+  });
+}
+function fetchDateAppointments(dateKey) {
+  if (_cachedDateAppointments[dateKey]) return Promise.resolve(_cachedDateAppointments[dateKey]);
+  return new Promise(function(resolve, reject) {
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (res && res.ok) {
+          _cachedDateAppointments[dateKey] = res.appointments || [];
+          resolve(_cachedDateAppointments[dateKey]);
+        } else {
+          reject((res && res.reason) || 'Failed to load appointments.');
+        }
+      })
+      .withFailureHandler(function(err) { reject(err); })
+      .apiAdminGetDateAppointments(SIG, dateKey);
+  });
+}
+function processAppointments(dateKey, action, ids) {
+  return new Promise(function(resolve, reject) {
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (res && res.ok) resolve(res);
+        else reject((res && res.reason) || 'Failed to process appointments.');
+      })
+      .withFailureHandler(function(err) { reject(err); })
+      .apiAdminProcessAppointments(SIG, { dateKey: dateKey, action: action, appointmentIds: ids || [] });
+  });
+}
+function markDoctorOff(payload) {
+  return new Promise(function(resolve, reject) {
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (res && res.ok) resolve(res);
+        else reject((res && res.reason) || 'Failed to block time.');
+      })
+      .withFailureHandler(function(err) { reject(err); })
+      .apiAdminMarkDoctorOff(SIG, payload);
+  });
+}
+function removeDoctorOff(rowIndex) {
+  return new Promise(function(resolve, reject) {
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (res && res.ok) resolve(res);
+        else reject((res && res.reason) || 'Failed to reactivate time.');
+      })
+      .withFailureHandler(function(err) { reject(err); })
+      .apiAdminRemoveDoctorOff(SIG, rowIndex);
+  });
+}
+function setDoctorOffDates(mode, dateKeys) {
+  return new Promise(function(resolve, reject) {
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (res && res.ok) resolve(res);
+        else reject((res && res.reason) || 'Failed to update dates.');
+      })
+      .withFailureHandler(function(err) { reject(err); })
+      .apiAdminSetDoctorOffDates(SIG, { mode: mode, dateKeys: dateKeys });
+  });
+}
+async function reloadAll() {
+  _cachedDateAppointments = {};
+  var res = await fetchDashboard();
+  if (!res || !res.ok) throw new Error('Could not load dashboard.');
+  _todayKey = res.todayKey;
+  _workingHours = res.workingHours || {};
+  _offEntries = res.doctorOffEntries || [];
+  if (!_calendarMonth) {
+    var tomorrow = addDays(_todayKey, 1);
+    _calendarMonth = new Date(tomorrow.getFullYear(), tomorrow.getMonth(), 1);
+  }
+  showDateLabel();
+  await loadTodayAppointments();
+  buildAllSessionState();
+  renderCalendar();
+}
+async function loadTodayAppointments() {
+  var appts = await fetchDateAppointments(_todayKey);
+  _appointmentsBySession.morning = [];
+  _appointmentsBySession.evening = [];
+  for (var i = 0; i < appts.length; i++) {
+    var a = appts[i];
+    var mins = timeToMin(a.startTime || '00:00');
+    var morningBase = classifyBaseWindow('morning');
+    var eveningBase = classifyBaseWindow('evening');
+    if (morningBase && mins < timeToMin(morningBase.end)) _appointmentsBySession.morning.push(a);
+    else if (eveningBase) _appointmentsBySession.evening.push(a);
+  }
+}
+function buildAllSessionState() {
+  _sessionState.morning = buildSessionState('morning');
+  _sessionState.evening = buildSessionState('evening');
+  renderSession('morning');
+  renderSession('evening');
+}
+function getSessionAffectedAppointments(session, segments) {
+  var all = _appointmentsBySession[session] || [];
+  return all.filter(function(appt) {
+    return !isWithinAnySegment(appt.startTime, appt.endTime, segments);
+  });
+}
+async function toggleSession(session) {
+  var state = _sessionState[session];
+  if (!state) return;
+  var currentlyAvailable = state.segments.length > 0;
+  var newSegments = currentlyAvailable ? [] : [{ start: state.base.start, end: state.base.end }];
+  var affected = getSessionAffectedAppointments(session, newSegments);
+  var blocks = blocksFromSegments(state.base, newSegments);
 
-function startFutureCancel() {
-  var dateKey = document.getElementById('futureDate').value;
-  if (!dateKey) return;
-
-  var checked = getCheckedIds('future');
-  if (_futureAppts.length > 0 && checked.length > 0) {
-    // Has patients - must choose action
-    document.getElementById('futureActions').style.display = 'block';
+  if (affected.length) {
+    openActionModal({
+      title: session === 'morning' ? 'Morning patients must be handled first' : 'Evening patients must be handled first',
+      text: 'Before changing this session, every affected patient must be sent to Spinola, pushed to the next day, or cancelled.',
+      summary: 'Selected patients affected: ' + affected.length + '.',
+      appointments: affected.map(function(appt) { appt.dateKey = _todayKey; return appt; }),
+      apply: function() { return applySessionBlocks(session, blocks); },
+      successMsgId: session + 'Msg',
+      successMessage: 'Session updated.'
+    });
     return;
   }
 
-  // No patients - just block the day
-  blockFutureDay(dateKey);
+  try {
+    showLoading('Updating ' + session + '…');
+    await applySessionBlocks(session, blocks);
+    showMsg(session + 'Msg', 'good', currentlyAvailable ? 'Session marked as not coming to work.' : 'Session reactivated.');
+  } catch (err) {
+    showMsg(session + 'Msg', 'bad', String(err && err.message ? err.message : err));
+  } finally {
+    hideLoading();
+  }
 }
+async function applySessionBlocks(session, blocks) {
+  var state = _sessionState[session];
+  if (!state) return;
+  for (var i = 0; i < state.rowIndices.length; i++) {
+    await removeDoctorOff(state.rowIndices[i]);
+  }
+  for (var j = 0; j < blocks.length; j++) {
+    await markDoctorOff({
+      startDate: _todayKey,
+      endDate: _todayKey,
+      startTime: blocks[j].start,
+      endTime: blocks[j].end,
+      reason: 'Doctor not coming'
+    });
+  }
+  await reloadAll();
+}
+function closeAdjustModal() {
+  document.getElementById('adjustModal').classList.remove('show');
+  _adjustContext = null;
+}
+function openAdjustModal(session) {
+  var state = _sessionState[session];
+  if (!state) return;
+  var baseStart = timeToMin(state.base.start);
+  var baseEnd = timeToMin(state.base.end);
+  var points = [];
+  for (var min = baseStart; min <= baseEnd; min += SLOT_MINUTES) points.push(min);
+  if (points[points.length - 1] !== baseEnd) points.push(baseEnd);
 
-function doFutureAction(action) {
-  var dateKey = document.getElementById('futureDate').value;
-  var ids = getCheckedIds('future');
-  if (!ids.length && _futureAppts.length > 0) {
-    showMsg('futureMsg', 'bad', 'No patients selected.');
+  var firstSeg = state.segments[0] || { start: state.base.start, end: state.base.end };
+  var lastSeg = state.segments[state.segments.length - 1] || { start: state.base.start, end: state.base.end };
+  var gapSeg = state.segments.length > 1 ? { start: state.segments[0].end, end: state.segments[1].start } : null;
+
+  _adjustContext = { session: session, points: points };
+  document.getElementById('adjustTitle').textContent = (session === 'morning' ? 'Morning' : 'Evening') + ' shift time';
+  document.getElementById('adjustText').textContent = 'Use the sliders to choose the start time, end time, and an optional block inside the shift.';
+
+  setRange('adjustStartRange', points, timeToMin(firstSeg.start));
+  setRange('adjustEndRange', points, timeToMin(lastSeg.end));
+  setRange('gapStartRange', points, gapSeg ? timeToMin(gapSeg.start) : timeToMin(firstSeg.start));
+  setRange('gapEndRange', points, gapSeg ? timeToMin(gapSeg.end) : timeToMin(lastSeg.end));
+  document.getElementById('gapEnabled').checked = !!gapSeg;
+  syncAdjustModal();
+  document.getElementById('adjustModal').classList.add('show');
+}
+function setRange(id, points, value) {
+  var input = document.getElementById(id);
+  input.min = 0;
+  input.max = points.length - 1;
+  var idx = 0;
+  for (var i = 0; i < points.length; i++) {
+    if (points[i] === value) { idx = i; break; }
+    if (points[i] <= value) idx = i;
+  }
+  input.value = idx;
+}
+function currentRangeValue(id) {
+  var input = document.getElementById(id);
+  return _adjustContext.points[Number(input.value)];
+}
+function syncAdjustModal() {
+  if (!_adjustContext) return;
+  var startMin = currentRangeValue('adjustStartRange');
+  var endMin = currentRangeValue('adjustEndRange');
+  if (startMin >= endMin) {
+    var endRange = document.getElementById('adjustEndRange');
+    var startRange = document.getElementById('adjustStartRange');
+    if (document.activeElement === endRange) {
+      startRange.value = Math.max(0, Number(endRange.value) - 1);
+      startMin = currentRangeValue('adjustStartRange');
+    } else {
+      endRange.value = Math.min(_adjustContext.points.length - 1, Number(startRange.value) + 1);
+      endMin = currentRangeValue('adjustEndRange');
+    }
+  }
+
+  document.getElementById('gapControls').style.display = document.getElementById('gapEnabled').checked ? '' : 'none';
+
+  var gapStartMin = currentRangeValue('gapStartRange');
+  var gapEndMin = currentRangeValue('gapEndRange');
+  if (gapStartMin < startMin) {
+    setRange('gapStartRange', _adjustContext.points, startMin);
+    gapStartMin = currentRangeValue('gapStartRange');
+  }
+  if (gapEndMin > endMin) {
+    setRange('gapEndRange', _adjustContext.points, endMin);
+    gapEndMin = currentRangeValue('gapEndRange');
+  }
+  if (gapStartMin >= gapEndMin) {
+    var gapStartRange = document.getElementById('gapStartRange');
+    var gapEndRange = document.getElementById('gapEndRange');
+    if (document.activeElement === gapEndRange) {
+      gapStartRange.value = Math.max(Number(document.getElementById('adjustStartRange').value), Number(gapEndRange.value) - 1);
+    } else {
+      gapEndRange.value = Math.min(Number(document.getElementById('adjustEndRange').value), Number(gapStartRange.value) + 1);
+    }
+    gapStartMin = currentRangeValue('gapStartRange');
+    gapEndMin = currentRangeValue('gapEndRange');
+  }
+
+  document.getElementById('adjustStartValue').textContent = minToTime(startMin);
+  document.getElementById('adjustEndValue').textContent = minToTime(endMin);
+  document.getElementById('gapStartValue').textContent = minToTime(gapStartMin);
+  document.getElementById('gapEndValue').textContent = minToTime(gapEndMin);
+
+  var summary = minToTime(startMin) + ' - ' + minToTime(endMin);
+  if (document.getElementById('gapEnabled').checked) summary += ' with a block from ' + minToTime(gapStartMin) + ' - ' + minToTime(gapEndMin);
+  document.getElementById('adjustSummary').textContent = 'New working times: ' + summary + '.';
+}
+async function saveAdjustModal() {
+  if (!_adjustContext) return;
+  var session = _adjustContext.session;
+  var state = _sessionState[session];
+  var startMin = currentRangeValue('adjustStartRange');
+  var endMin = currentRangeValue('adjustEndRange');
+  var segments = [{ start: minToTime(startMin), end: minToTime(endMin) }];
+
+  if (document.getElementById('gapEnabled').checked) {
+    var gapStartMin = currentRangeValue('gapStartRange');
+    var gapEndMin = currentRangeValue('gapEndRange');
+    segments = [];
+    if (gapStartMin > startMin) segments.push({ start: minToTime(startMin), end: minToTime(gapStartMin) });
+    if (gapEndMin < endMin) segments.push({ start: minToTime(gapEndMin), end: minToTime(endMin) });
+  }
+
+  var blocks = blocksFromSegments(state.base, segments);
+  var affected = getSessionAffectedAppointments(session, segments);
+
+  if (affected.length) {
+    closeAdjustModal();
+    openActionModal({
+      title: 'Appointments must be handled before saving',
+      text: 'These patients are outside the updated working times. Choose what should happen first.',
+      summary: 'Affected patients: ' + affected.length + '.',
+      appointments: affected.map(function(appt) { appt.dateKey = _todayKey; return appt; }),
+      apply: function() { return applySessionBlocks(session, blocks); },
+      successMsgId: session + 'Msg',
+      successMessage: 'Shift updated.'
+    });
     return;
   }
 
-  showLoading('Processing patients...');
-  google.script.run
-    .withSuccessHandler(function(res) {
-      hideLoading();
-      if (!res || !res.ok) {
-        showMsg('futureMsg', 'bad', res.reason || 'Failed.');
-        return;
-      }
-      showMsg('futureMsg', 'good', res.message || 'Done!');
-      document.getElementById('futureActions').style.display = 'none';
-
-      // Now block the whole day
-      blockFutureDay(dateKey);
-    })
-    .withFailureHandler(function(err) {
-      hideLoading();
-      showMsg('futureMsg', 'bad', 'Error: ' + (err && err.message ? err.message : String(err)));
-    })
-    .apiAdminProcessAppointments(SIG, {
-      dateKey: dateKey,
-      action: action,
-      appointmentIds: ids
-    });
+  try {
+    showLoading('Saving shift…');
+    await applySessionBlocks(session, blocks);
+    closeAdjustModal();
+    showMsg(session + 'Msg', 'good', 'Shift updated.');
+  } catch (err) {
+    showMsg(session + 'Msg', 'bad', String(err && err.message ? err.message : err));
+  } finally {
+    hideLoading();
+  }
+}
+function isDateAllDayOff(dateKey) {
+  for (var i = 0; i < _offEntries.length; i++) {
+    var off = _offEntries[i];
+    if (off.startTime || off.endTime) continue;
+    if (dateKey >= off.startDate && dateKey <= (off.endDate || off.startDate)) return true;
+  }
+  return false;
+}
+function changeCalendarMonth(delta) {
+  var target = new Date(_calendarMonth.getFullYear(), _calendarMonth.getMonth() + delta, 1);
+  var tomorrow = new Date(getTomorrowKey() + 'T00:00:00');
+  if (target < new Date(tomorrow.getFullYear(), tomorrow.getMonth(), 1)) return;
+  _calendarMonth = target;
+  renderCalendar();
+}
+function toggleDateSelection(dateKey) {
+  if (dateKey < getTomorrowKey()) return;
+  if (_selectedDates[dateKey]) delete _selectedDates[dateKey];
+  else _selectedDates[dateKey] = true;
+  renderCalendar();
+}
+function renderCalendar() {
+  var grid = document.getElementById('calendarGrid');
+  var monthLabel = document.getElementById('calendarMonthLabel');
+  monthLabel.textContent = _calendarMonth.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+  var daysHtml = ['<div class="dow">Mon</div>','<div class="dow">Tue</div>','<div class="dow">Wed</div>','<div class="dow">Thu</div>','<div class="dow">Fri</div>','<div class="dow">Sat</div>','<div class="dow">Sun</div>'];
+  var first = new Date(_calendarMonth.getFullYear(), _calendarMonth.getMonth(), 1);
+  var last = new Date(_calendarMonth.getFullYear(), _calendarMonth.getMonth() + 1, 0);
+  var startPad = (first.getDay() + 6) % 7;
+  for (var p = 0; p < startPad; p++) daysHtml.push('<div></div>');
+  for (var day = 1; day <= last.getDate(); day++) {
+    var dateObj = new Date(_calendarMonth.getFullYear(), _calendarMonth.getMonth(), day);
+    var dateKey = toDateKey(dateObj);
+    var disabled = dateKey < getTomorrowKey();
+    var cancelled = isDateAllDayOff(dateKey);
+    var selected = !!_selectedDates[dateKey];
+    var cls = 'day-btn';
+    if (disabled) cls += ' disabled';
+    if (cancelled) cls += ' cancelled';
+    if (selected) cls += ' selected';
+    daysHtml.push('<button class="' + cls + '"' + (disabled ? ' disabled' : ' onclick="toggleDateSelection(\'' + dateKey + '\')"') + '>'
+      + (cancelled ? '<span class="day-x">×</span>' : '')
+      + '<span class="day-num">' + day + '</span>'
+      + '<span class="day-mark">' + (cancelled ? 'Cancelled' : (selected ? 'Selected' : '&nbsp;')) + '</span>'
+      + '</button>');
+  }
+  grid.innerHTML = daysHtml.join('');
+  renderCalendarSelectionSummary();
+}
+function selectedDateBuckets() {
+  var active = [];
+  var cancelled = [];
+  Object.keys(_selectedDates).sort().forEach(function(dateKey) {
+    if (isDateAllDayOff(dateKey)) cancelled.push(dateKey);
+    else active.push(dateKey);
+  });
+  return { active: active, cancelled: cancelled };
+}
+function renderCalendarSelectionSummary() {
+  var buckets = selectedDateBuckets();
+  document.getElementById('cancelDaysBtn').disabled = buckets.active.length === 0;
+  document.getElementById('reactivateDaysBtn').disabled = buckets.cancelled.length === 0;
+  var parts = [];
+  if (buckets.active.length) parts.push(buckets.active.length + ' active day(s) selected to cancel');
+  if (buckets.cancelled.length) parts.push(buckets.cancelled.length + ' cancelled day(s) selected to reactivate');
+  document.getElementById('calendarSelectionSummary').textContent = parts.length ? parts.join(' • ') : 'No days selected.';
+}
+async function gatherAppointmentsForDates(dateKeys) {
+  var all = [];
+  for (var i = 0; i < dateKeys.length; i++) {
+    var appts = await fetchDateAppointments(dateKeys[i]);
+    for (var j = 0; j < appts.length; j++) {
+      var copy = {};
+      for (var key in appts[j]) copy[key] = appts[j][key];
+      copy.dateKey = dateKeys[i];
+      all.push(copy);
+    }
+  }
+  return all;
+}
+async function startCancelSelectedDays() {
+  var buckets = selectedDateBuckets();
+  if (!buckets.active.length) return;
+  try {
+    showLoading('Checking selected days…');
+    var affected = await gatherAppointmentsForDates(buckets.active);
+    hideLoading();
+    if (affected.length) {
+      openActionModal({
+        title: 'Appointments must be handled before cancelling these days',
+        text: 'Every patient on the selected days must be sent to Spinola, pushed to the next day, or cancelled before those dates can be marked off.',
+        summary: 'Affected appointments across ' + buckets.active.length + ' date(s): ' + affected.length + '.',
+        appointments: affected,
+        apply: function() { return cancelSelectedDays(buckets.active); },
+        successMsgId: 'calendarMsg',
+        successMessage: 'Selected dates cancelled.'
+      });
+      return;
+    }
+    showLoading('Cancelling selected days…');
+    await cancelSelectedDays(buckets.active);
+    showMsg('calendarMsg', 'good', 'Selected dates cancelled.');
+  } catch (err) {
+    showMsg('calendarMsg', 'bad', String(err && err.message ? err.message : err));
+  } finally {
+    hideLoading();
+  }
+}
+async function cancelSelectedDays(dateKeys) {
+  await setDoctorOffDates('cancel', dateKeys);
+  for (var i = 0; i < dateKeys.length; i++) delete _selectedDates[dateKeys[i]];
+  await reloadAll();
+}
+async function reactivateSelectedDays() {
+  var buckets = selectedDateBuckets();
+  if (!buckets.cancelled.length) return;
+  try {
+    showLoading('Reactivating selected days…');
+    await setDoctorOffDates('reactivate', buckets.cancelled);
+    for (var i = 0; i < buckets.cancelled.length; i++) delete _selectedDates[buckets.cancelled[i]];
+    await reloadAll();
+    showMsg('calendarMsg', 'good', 'Selected days reactivated.');
+  } catch (err) {
+    showMsg('calendarMsg', 'bad', String(err && err.message ? err.message : err));
+  } finally {
+    hideLoading();
+  }
+}
+function openActionModal(flow) {
+  _pendingFlow = flow;
+  document.getElementById('actionTitle').textContent = flow.title;
+  document.getElementById('actionText').textContent = flow.text;
+  document.getElementById('actionSummary').textContent = flow.summary;
+  var html = '';
+  for (var i = 0; i < flow.appointments.length; i++) {
+    var appt = flow.appointments[i];
+    html += '<div class="affected-card">';
+    html += '<div class="affected-date">' + esc(dateLabel(appt.dateKey)) + '</div>';
+    html += '<div class="affected-name">' + esc(appt.fullName || 'Patient') + '</div>';
+    html += '<div class="affected-meta">' + esc(appt.startTime || '') + ' • ' + esc(appt.phone || '') + '</div>';
+    html += '</div>';
+  }
+  document.getElementById('affectedList').innerHTML = html;
+  document.getElementById('actionModal').classList.add('show');
+}
+function closeActionModal() {
+  document.getElementById('actionModal').classList.remove('show');
+  _pendingFlow = null;
+}
+async function handlePendingAction(action) {
+  if (!_pendingFlow) return;
+  var flow = _pendingFlow;
+  try {
+    showLoading('Processing appointments…');
+    var grouped = {};
+    for (var i = 0; i < flow.appointments.length; i++) {
+      var appt = flow.appointments[i];
+      if (!grouped[appt.dateKey]) grouped[appt.dateKey] = [];
+      grouped[appt.dateKey].push(appt.appointmentId);
+    }
+    var dates = Object.keys(grouped).sort();
+    for (var d = 0; d < dates.length; d++) {
+      await processAppointments(dates[d], action, grouped[dates[d]]);
+    }
+    await flow.apply();
+    closeActionModal();
+    showMsg(flow.successMsgId, 'good', flow.successMessage);
+  } catch (err) {
+    showMsg((flow && flow.successMsgId) || 'calendarMsg', 'bad', String(err && err.message ? err.message : err));
+  } finally {
+    hideLoading();
+  }
 }
 
-function blockFutureDay(dateKey) {
-  showLoading('Blocking day...');
-  google.script.run
-    .withSuccessHandler(function(res) {
-      hideLoading();
-      if (!res || !res.ok) {
-        showMsg('futureMsg', 'bad', res.reason || 'Failed.');
-        return;
-      }
-      showMsg('futureMsg', 'good', dateKey + ' has been cancelled.');
-      document.getElementById('futurePatients').innerHTML = '<div class="pt-empty">Day cancelled</div>';
-      document.getElementById('futureCancelBtn').disabled = true;
-    })
-    .withFailureHandler(function(err) {
-      hideLoading();
-      showMsg('futureMsg', 'bad', 'Error: ' + (err && err.message ? err.message : String(err)));
-    })
-    .apiAdminMarkDoctorOff(SIG, {
-      startDate: dateKey,
-      reason: 'Doctor not available'
-    });
-}
+document.getElementById('adjustModal').addEventListener('click', function(e) {
+  if (e.target === this) closeAdjustModal();
+});
+document.getElementById('actionModal').addEventListener('click', function(e) {
+  if (e.target === this) closeActionModal();
+});
+
+(async function init() {
+  try {
+    showLoading('Loading schedule…');
+    await reloadAll();
+  } catch (err) {
+    showMsg('calendarMsg', 'bad', String(err && err.message ? err.message : err));
+  } finally {
+    hideLoading();
+  }
+})();
 </script>
 </body>
 </html>
