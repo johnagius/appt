@@ -28,6 +28,7 @@
  *   6. Run setWebAppUrlAuto() from the editor
  *   7. Run repairSheets() to set up new sheets (DoctorExtra, etc.)
  *   8. Run generateAdminLink() and check the execution log for your admin URL
+ *   9. Run generateDoctorLink() for the simplified doctor schedule page URL
  *
  * HOW IT WORKS:
  *   - On first call per execution, fetches dist/bundle.gs from GitHub
@@ -263,6 +264,7 @@ function setSpinolaLocation(t)               { return _getApp().setSpinolaLocati
 function setDoubleCheckCalendar(v)           { return _getApp().setDoubleCheckCalendar(v); }
 function setMaxActiveAppointmentsPerPerson(n){ return _getApp().setMaxActiveAppointmentsPerPerson(n); }
 function generateAdminLink()                 { return _getApp().generateAdminLink(); }
+function generateDoctorLink()                { return _getApp().generateDoctorLink(); }
 function setWebAppUrlAuto()                  { return _getApp().setWebAppUrlAuto(); }
 
 // ----- Uninstall (run from GAS editor) -----
