@@ -320,6 +320,7 @@ var SIG = '<?= adminSig ?>';
 var _todayKey = '';
 var _workingHours = null;
 var _offEntries = [];
+var _extraEntries = [];
 var _sessionState = { morning: null, evening: null };
 var _appointmentsBySession = { morning: [], evening: [] };
 var _calendarMonth = null;
@@ -477,7 +478,34 @@ function buildSessionState(session) {
     blocks.push({ startMin: startMin, endMin: endMin, rowIndex: off.rowIndex });
     rowIndices.push(off.rowIndex);
   }
-  var segments = subtractBlocks(base, blocks);
+  var baseSegments = subtractBlocks(base, blocks);
+
+  // Find extra entries for today in this session
+  var extraRowIndices = [];
+  var extraSegments = [];
+  for (var e = 0; e < _extraEntries.length; e++) {
+    var ex = _extraEntries[e];
+    if (ex.date !== _todayKey) continue;
+    var exStart = timeToMin(ex.startTime);
+    // Classify: morning if start < 13:00, evening otherwise
+    if ((session === 'morning' && exStart >= 780) || (session === 'evening' && exStart < 780)) continue;
+    extraSegments.push({ start: ex.startTime, end: ex.endTime });
+    extraRowIndices.push(ex.rowIndex);
+  }
+
+  // Merge base segments with extras, sort and merge overlapping
+  var allSegments = baseSegments.concat(extraSegments);
+  allSegments.sort(function(a, b) { return timeToMin(a.start) - timeToMin(b.start); });
+  var merged = [];
+  for (var m = 0; m < allSegments.length; m++) {
+    var seg = allSegments[m];
+    if (merged.length && timeToMin(seg.start) <= timeToMin(merged[merged.length - 1].end)) {
+      merged[merged.length - 1].end = minToTime(Math.max(timeToMin(merged[merged.length - 1].end), timeToMin(seg.end)));
+    } else {
+      merged.push({ start: seg.start, end: seg.end });
+    }
+  }
+
   var uniqueRowIndices = [];
   var seen = {};
   for (var j = 0; j < rowIndices.length; j++) {
@@ -489,9 +517,10 @@ function buildSessionState(session) {
   return {
     session: session,
     base: base,
-    blocks: blocksFromSegments(base, segments),
-    segments: segments,
-    rowIndices: uniqueRowIndices
+    blocks: blocksFromSegments(base, baseSegments),
+    segments: merged,
+    rowIndices: uniqueRowIndices,
+    extraRowIndices: extraRowIndices
   };
 }
 function renderSession(session) {
@@ -661,6 +690,28 @@ function removeDoctorOff(rowIndex) {
       .apiAdminRemoveDoctorOff(SIG, rowIndex);
   });
 }
+function addExtraSlots(payload) {
+  return new Promise(function(resolve, reject) {
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (res && res.ok) resolve(res);
+        else reject((res && res.reason) || 'Failed to add extra slots.');
+      })
+      .withFailureHandler(function(err) { reject(err); })
+      .apiAdminAddExtraSlots(SIG, payload);
+  });
+}
+function removeExtraSlots(rowIndex) {
+  return new Promise(function(resolve, reject) {
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (res && res.ok) resolve(res);
+        else reject((res && res.reason) || 'Failed to remove extra slots.');
+      })
+      .withFailureHandler(function(err) { reject(err); })
+      .apiAdminRemoveExtraSlots(SIG, rowIndex);
+  });
+}
 function setDoctorOffDates(mode, dateKeys) {
   return new Promise(function(resolve, reject) {
     google.script.run
@@ -679,6 +730,7 @@ async function reloadAll() {
   _todayKey = res.todayKey;
   _workingHours = res.workingHours || {};
   _offEntries = res.doctorOffEntries || [];
+  _extraEntries = res.extraSlotEntries || [];
   if (!_calendarMonth) {
     var tomorrow = addDays(_todayKey, 1);
     _calendarMonth = new Date(tomorrow.getFullYear(), tomorrow.getMonth(), 1);
@@ -728,7 +780,7 @@ async function toggleSession(session) {
       text: 'Before changing this session, every affected patient must be sent to Spinola, pushed to the next day, or cancelled.',
       summary: 'Selected patients affected: ' + affected.length + '.',
       appointments: affected.map(function(appt) { appt.dateKey = _todayKey; return appt; }),
-      apply: function() { return applySessionBlocks(session, blocks); },
+      apply: function() { return applySessionChanges(session, blocks, []); },
       successMsgId: session + 'Msg',
       successMessage: 'Session updated.'
     });
@@ -737,7 +789,7 @@ async function toggleSession(session) {
 
   try {
     showLoading('Updating ' + session + '…');
-    await applySessionBlocks(session, blocks);
+    await applySessionChanges(session, blocks, []);
     showMsg(session + 'Msg', 'good', currentlyAvailable ? 'Session marked as not coming to work.' : 'Session reactivated.');
   } catch (err) {
     showMsg(session + 'Msg', 'bad', String(err && err.message ? err.message : err));
@@ -745,12 +797,20 @@ async function toggleSession(session) {
     hideLoading();
   }
 }
-async function applySessionBlocks(session, blocks) {
+async function applySessionChanges(session, blocks, extras) {
   var state = _sessionState[session];
   if (!state) return;
-  for (var i = 0; i < state.rowIndices.length; i++) {
-    await removeDoctorOff(state.rowIndices[i]);
+  // Remove old extra entries first (descending row order to avoid index shifts)
+  var extraRows = (state.extraRowIndices || []).slice().sort(function(a, b) { return b - a; });
+  for (var e = 0; e < extraRows.length; e++) {
+    await removeExtraSlots(extraRows[e]);
   }
+  // Remove old off blocks (descending row order)
+  var offRows = state.rowIndices.slice().sort(function(a, b) { return b - a; });
+  for (var i = 0; i < offRows.length; i++) {
+    await removeDoctorOff(offRows[i]);
+  }
+  // Add new off blocks
   for (var j = 0; j < blocks.length; j++) {
     await markDoctorOff({
       startDate: _todayKey,
@@ -758,6 +818,15 @@ async function applySessionBlocks(session, blocks) {
       startTime: blocks[j].start,
       endTime: blocks[j].end,
       reason: 'Doctor not coming'
+    });
+  }
+  // Add new extra entries
+  for (var k = 0; k < (extras || []).length; k++) {
+    await addExtraSlots({
+      date: _todayKey,
+      startTime: extras[k].start,
+      endTime: extras[k].end,
+      reason: 'Doctor adjusted shift'
     });
   }
   await reloadAll();
@@ -880,7 +949,20 @@ async function saveAdjustModal() {
     if (gapEndMin < endMin) segments.push({ start: minToTime(gapEndMin), end: minToTime(endMin) });
   }
 
-  var blocks = blocksFromSegments(state.base, segments);
+  // Compute extras (time outside base) and blocks (gaps within base)
+  var baseStart = timeToMin(state.base.start);
+  var baseEnd = timeToMin(state.base.end);
+  var extras = [];
+  for (var s = 0; s < segments.length; s++) {
+    var sStart = timeToMin(segments[s].start);
+    var sEnd = timeToMin(segments[s].end);
+    if (sStart < baseStart) extras.push({ start: minToTime(sStart), end: minToTime(Math.min(sEnd, baseStart)) });
+    if (sEnd > baseEnd) extras.push({ start: minToTime(Math.max(sStart, baseEnd)), end: minToTime(sEnd) });
+  }
+  var clippedSegments = segments.map(function(seg) {
+    return { start: minToTime(Math.max(timeToMin(seg.start), baseStart)), end: minToTime(Math.min(timeToMin(seg.end), baseEnd)) };
+  }).filter(function(seg) { return timeToMin(seg.end) > timeToMin(seg.start); });
+  var blocks = blocksFromSegments(state.base, clippedSegments);
   var affected = getSessionAffectedAppointments(session, segments);
 
   if (affected.length) {
@@ -890,7 +972,7 @@ async function saveAdjustModal() {
       text: 'These patients are outside the updated working times. Choose what should happen first.',
       summary: 'Affected patients: ' + affected.length + '.',
       appointments: affected.map(function(appt) { appt.dateKey = _todayKey; return appt; }),
-      apply: function() { return applySessionBlocks(session, blocks); },
+      apply: function() { return applySessionChanges(session, blocks, extras); },
       successMsgId: session + 'Msg',
       successMessage: 'Shift updated.'
     });
@@ -899,7 +981,7 @@ async function saveAdjustModal() {
 
   try {
     showLoading('Saving shift…');
-    await applySessionBlocks(session, blocks);
+    await applySessionChanges(session, blocks, extras);
     closeAdjustModal();
     showMsg(session + 'Msg', 'good', 'Shift updated.');
   } catch (err) {
