@@ -235,8 +235,8 @@ function apiAdminProcessAppointments(sig, payload) {
     if (!dateKey) return { ok: false, reason: 'Missing date.' };
     if (!action) return { ok: false, reason: 'Missing action.' };
 
-    var validActions = ['cancel', 'redirect_spinola', 'push_next_day'];
-    if (validActions.indexOf(action) < 0) return { ok: false, reason: 'Invalid action. Use: cancel, redirect_spinola, or push_next_day.' };
+    var validActions = ['cancel', 'redirect_spinola', 'push_next_day', 'push_same_day'];
+    if (validActions.indexOf(action) < 0) return { ok: false, reason: 'Invalid action.' };
 
     var allAppts = listActiveAppointmentsForDate_(dateKey);
 
@@ -424,6 +424,132 @@ function apiAdminProcessAppointments(sig, payload) {
         try { sendAppointmentPushedEmail_(appt3, nextDay, newStartTime, newEndTime); } catch (e8) {}
 
         results.push({ appointmentId: newAppt.appointmentId, action: 'pushed', patient: appt3.fullName, newDate: nextDay, newTime: newStartTime });
+      }
+    }
+
+    if (action === 'push_same_day') {
+      var breakEndTime = String(payload.breakEndTime || '').trim();
+      if (!breakEndTime) return { ok: false, reason: 'Missing breakEndTime for push_same_day.' };
+      var breakEndMin = parseTimeToMinutes_(breakEndTime);
+
+      // Build available slots for the same day (base + extras)
+      var sameDateObj = parseDateKey_(dateKey);
+      var sameDayExtraMap = getDoctorExtraSlots_();
+      var sameDayExtras = sameDayExtraMap[dateKey] || null;
+      var sameDaySlots = buildSlotsForDate_(sameDateObj, sameDayExtras);
+
+      // Get current off blocks for this date
+      var sameDayOffMap = getDoctorOffDates_();
+      var sameDayOffEntry = getDoctorOffEntryForDate_(sameDayOffMap, dateKey);
+
+      // Get already-taken slots
+      var sameDayAppts = listActiveAppointmentsForDate_(dateKey);
+      var takenSameDay = {};
+      for (var t2 = 0; t2 < sameDayAppts.length; t2++) {
+        takenSameDay[sameDayAppts[t2].startTime] = true;
+      }
+
+      // Find available slots AFTER the break, not blocked by doctor-off
+      var availableAfterBreak = [];
+      for (var sl3 = 0; sl3 < sameDaySlots.length; sl3++) {
+        var slotStartMin = parseTimeToMinutes_(sameDaySlots[sl3].start);
+        if (slotStartMin < breakEndMin) continue;
+        if (takenSameDay[sameDaySlots[sl3].start]) continue;
+        if (slotBlockedByDoctorOff_(sameDayOffEntry, sameDaySlots[sl3].start, sameDaySlots[sl3].end)) continue;
+        availableAfterBreak.push(sameDaySlots[sl3]);
+      }
+
+      // If not enough slots, extend the session to fit all appointments
+      var shortfall = appts.length - availableAfterBreak.length;
+      var dur = CFG().APPT_DURATION_MIN;
+      if (shortfall > 0) {
+        // Find the last slot end time (the day's latest time)
+        var lastSlotEnd = 0;
+        for (var ls = 0; ls < sameDaySlots.length; ls++) {
+          var lse = parseTimeToMinutes_(sameDaySlots[ls].end);
+          if (lse > lastSlotEnd) lastSlotEnd = lse;
+        }
+        // Also check taken appointments
+        for (var lt = 0; lt < sameDayAppts.length; lt++) {
+          var lte = parseTimeToMinutes_(sameDayAppts[lt].endTime);
+          if (lte > lastSlotEnd) lastSlotEnd = lte;
+        }
+        // Extend from the end of the day
+        var extStart = lastSlotEnd;
+        var extEnd = extStart + (shortfall * dur);
+        addDoctorExtraRow_(dateKey, minutesToTime_(extStart), minutesToTime_(extEnd), 'Extended for break reschedule');
+        // Add these extension slots to available
+        for (var em = extStart; em + dur <= extEnd; em += dur) {
+          availableAfterBreak.push({ start: minutesToTime_(em), end: minutesToTime_(em + dur) });
+        }
+      }
+
+      for (var k2 = 0; k2 < appts.length; k2++) {
+        var appt4 = appts[k2];
+        var found4 = findAppointmentByToken_(appt4.token);
+        if (!found4) continue;
+
+        var newSlot = availableAfterBreak.shift();
+        if (!newSlot) {
+          // Fallback: cancel if somehow still no slot
+          var evId4 = String(appt4.calendarEventId || '').trim();
+          if (evId4) { try { deleteCalendarEvent_(evId4); } catch (e9) {} }
+          updateAppointmentStatus_(found4.sheetName, found4.rowIndex, {
+            status: 'CANCELLED_DOCTOR',
+            cancelledAt: nowStr,
+            cancelReason: 'No available slot on same day',
+            calendarEventId: ''
+          });
+          try { sendClientCancelledEmail_(appt4, 'Your appointment could not be rescheduled. Please rebook at your convenience.'); } catch (e10) {}
+          results.push({ appointmentId: appt4.appointmentId, action: 'cancelled_no_slot', patient: appt4.fullName });
+          continue;
+        }
+
+        // Cancel old calendar event
+        var oldEvId4 = String(appt4.calendarEventId || '').trim();
+        if (oldEvId4) { try { deleteCalendarEvent_(oldEvId4); } catch (e11) {} }
+
+        // Cancel old appointment
+        updateAppointmentStatus_(found4.sheetName, found4.rowIndex, {
+          status: 'CANCELLED_DOCTOR',
+          cancelledAt: nowStr,
+          cancelReason: 'Pushed to later today ' + newSlot.start,
+          calendarEventId: ''
+        });
+
+        // Create new appointment on same day at new slot
+        var newToken4 = Utilities.getUuid();
+        var newAppt4 = {
+          appointmentId: 'A-' + Utilities.getUuid(),
+          dateKey: dateKey,
+          startTime: newSlot.start,
+          endTime: newSlot.end,
+          serviceId: appt4.serviceId,
+          serviceName: appt4.serviceName,
+          fullName: appt4.fullName,
+          email: appt4.email,
+          phone: appt4.phone,
+          comments: appt4.comments,
+          status: 'BOOKED',
+          location: appt4.location,
+          createdAt: nowStr,
+          updatedAt: nowStr,
+          token: newToken4,
+          calendarEventId: '',
+          cancelledAt: '',
+          cancelReason: ''
+        };
+
+        var newEventId4 = '';
+        try { newEventId4 = createCalendarEvent_(newAppt4); } catch (e12) {}
+        newAppt4.calendarEventId = newEventId4;
+
+        appendAppointment_(dateKey, newAppt4);
+        takenSameDay[newSlot.start] = true;
+
+        try { sendAppointmentPushedEmail_(appt4, dateKey, newSlot.start, newSlot.end); } catch (e13) {}
+
+        results.push({ appointmentId: newAppt4.appointmentId, action: 'pushed_same_day', patient: appt4.fullName, newTime: newSlot.start });
       }
     }
 
