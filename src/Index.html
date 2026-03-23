@@ -2239,7 +2239,7 @@
       hideHint(els.timeHint);
       hideMsg();
       setStatus('good', t('loadingSlots'));
-      loadAvailability(false);
+      loadAvailability(false, false);
     });
 
     function renderSlots(slots) {
@@ -2341,7 +2341,7 @@
       return null;
     }
 
-    function loadAvailability(isSilentRefresh) {
+    function loadAvailability(isSilentRefresh, autoAdvance) {
       if (!state.selectedDateKey) return;
 
       if (!isSilentRefresh) {
@@ -2360,6 +2360,17 @@
             return;
           }
 
+          // Check if there are any actually available slots (not taken, not past)
+          var hasAvailable = hasAvailableSlots(res.slots || []);
+
+          if (!hasAvailable && autoAdvance) {
+            // No available slots for this day — try the next enabled date
+            if (advanceToNextEnabledDate()) {
+              loadAvailability(false, true);
+              return;
+            }
+          }
+
           renderSlots(res.slots || []);
           setStatus('good', t('slotsLoaded'));
         })
@@ -2370,6 +2381,39 @@
           setStatus('bad', t('errorLoadingSlots'));
         })
         .apiGetAvailability(state.selectedDateKey);
+    }
+
+    function hasAvailableSlots(slots) {
+      var tz = (state.config && state.config.timezone) ? state.config.timezone : 'Europe/Malta';
+      var now = getNowInTimeZoneParts(tz);
+      return (slots || []).some(function(slot) {
+        if (!slot || !slot.start) return false;
+        if (slot.available !== true) return false;
+        if (state.selectedDateKey && state.selectedDateKey === now.dateKey) {
+          var startMin = parseHHMMToMinutes(slot.start);
+          if (startMin < now.minutes) return false;
+        }
+        return true;
+      });
+    }
+
+    function advanceToNextEnabledDate() {
+      var currentIdx = state.dateOptions.findIndex(function(x) {
+        return x.dateKey === state.selectedDateKey;
+      });
+      var next = state.dateOptions.find(function(x, i) {
+        return i > currentIdx && !x.disabled;
+      });
+      if (!next) return false;
+
+      els.dateSelect.value = next.dateKey;
+      state.selectedDateKey = next.dateKey;
+      state.selectedDateLabel = next.label;
+      els.sumDate.textContent = t('dateTemplate', next.label);
+      state.selectedSlot = null;
+      els.sumTime.textContent = t('timeTemplate', t('timeDash'), '').replace(' - ', '');
+      hideHint(els.timeHint);
+      return true;
     }
 
     // Clear inline errors on input
@@ -2539,7 +2583,7 @@
 
           if (state.selectedDateKey) {
             setStatus('good', t('loadingSlots'));
-            loadAvailability(false);
+            loadAvailability(false, true);
           } else {
             setStatus('bad', t('noDatesAvailable'));
           }
