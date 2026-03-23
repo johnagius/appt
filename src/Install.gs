@@ -248,6 +248,16 @@ function generateAdminLink() {
   return { ok: true, adminLink: link };
 }
 
+function generateDoctorLink() {
+  var base = getWebAppUrl_();
+  var sig = computeAdminSig_();
+  var link = base + '?mode=doctor&sig=' + encodeURIComponent(sig);
+  Logger.log('=== DOCTOR LINK ===');
+  Logger.log(link);
+  Logger.log('===================');
+  return { ok: true, doctorLink: link };
+}
+
 function setWebAppUrlAuto() {
   var auto = ScriptApp.getService().getUrl();
   auto = String(auto || '').trim();

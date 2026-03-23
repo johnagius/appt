@@ -40,6 +40,7 @@ FILE_ORDER = [
     'Cancel.html',
     'DocAction.html',
     'Admin.html',
+    'DoctorAdmin.html',
     'Uninstall.gs',
 ]
 
@@ -62,6 +63,7 @@ BUNDLE_HTML = [
     'Cancel.html',
     'DocAction.html',
     'Admin.html',
+    'DoctorAdmin.html',
 ]
 
 # All public functions proxied by Loader.gs
@@ -106,6 +108,7 @@ PUBLIC_FUNCTIONS = [
     'setDoubleCheckCalendar',
     'setMaxActiveAppointmentsPerPerson',
     'generateAdminLink',
+    'generateDoctorLink',
     'setWebAppUrlAuto',
     # Uninstall.gs
     'armUninstall',
