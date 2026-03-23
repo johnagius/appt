@@ -38,6 +38,18 @@ function doGet(e) {
       .addMetaTag('viewport', 'width=device-width, initial-scale=1, viewport-fit=cover');
   }
 
+  if (mode === 'doctor') {
+    var docSig = String((e.parameter && e.parameter.sig) || '');
+    if (!verifyAdminSig_(docSig)) {
+      return HtmlService.createHtmlOutput('<h2>Access Denied</h2><p>Invalid or missing signature.</p>')
+        .setTitle('Access Denied');
+    }
+    var docAdminHtml = _serveHtml('DoctorAdmin', { adminSig: docSig });
+    return docAdminHtml
+      .setTitle('Dr Kevin - Schedule')
+      .addMetaTag('viewport', 'width=device-width, initial-scale=1, viewport-fit=cover');
+  }
+
   return _serveHtml('Index', { WEBAPP_URL: getWebAppUrl_() })
     .setTitle('Dr Kevin Navarro Gera - Booking')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1, viewport-fit=cover');

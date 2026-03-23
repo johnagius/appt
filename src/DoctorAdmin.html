@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;}
+  :root{
+    --bg:#f6f7fb;--card:#fff;--text:#111827;--muted:#6b7280;--line:#e5e7eb;
+    --bad:#ef4444;--good:#10b981;--blue:#2563eb;--orange:#f59e0b;
+    --radius:18px;--shadow:0 10px 30px rgba(17,24,39,0.08);
+  }
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);padding:16px;max-width:600px;margin:0 auto;}
+  h1{font-size:20px;font-weight:800;margin-bottom:4px;}
+  .subtitle{color:var(--muted);font-size:13px;margin-bottom:16px;}
+  .card{background:var(--card);border-radius:var(--radius);padding:18px;margin-bottom:14px;box-shadow:var(--shadow);}
+  .card h2{font-size:16px;font-weight:700;margin-bottom:10px;}
+
+  /* Session toggle */
+  .session{margin-bottom:6px;}
+  .session-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+  .session-label{font-size:18px;font-weight:800;}
+  .toggle{position:relative;width:80px;height:42px;border-radius:999px;cursor:pointer;border:none;transition:background 0.2s;outline:none;}
+  .toggle.on{background:var(--good);}
+  .toggle.off{background:var(--bad);}
+  .toggle-knob{position:absolute;top:3px;width:36px;height:36px;border-radius:50%;background:#fff;box-shadow:0 2px 6px rgba(0,0,0,0.2);transition:left 0.2s;}
+  .toggle.on .toggle-knob{left:41px;}
+  .toggle.off .toggle-knob{left:3px;}
+  .toggle-text{position:absolute;top:50%;transform:translateY(-50%);font-size:13px;font-weight:800;color:#fff;}
+  .toggle.on .toggle-text{left:12px;}
+  .toggle.off .toggle-text{right:10px;}
+  .session-status{font-size:13px;font-weight:700;margin-top:4px;}
+  .session-status.on{color:var(--good);}
+  .session-status.off{color:var(--bad);}
+
+  /* Patient table */
+  .pt-table{width:100%;border-collapse:collapse;margin-top:8px;font-size:13px;}
+  .pt-table th{text-align:left;padding:6px 8px;border-bottom:2px solid var(--line);color:var(--muted);font-size:11px;text-transform:uppercase;}
+  .pt-table td{padding:8px;border-bottom:1px solid var(--line);}
+  .pt-table tr:last-child td{border-bottom:none;}
+  .pt-check{width:20px;height:20px;cursor:pointer;}
+  .pt-name{font-weight:600;}
+  .pt-time{color:var(--muted);font-size:12px;}
+  .pt-empty{color:var(--muted);text-align:center;padding:16px;font-style:italic;}
+
+  /* Action panel (shown when turning off with patients) */
+  .action-panel{background:#fef3c7;border:2px solid var(--orange);border-radius:14px;padding:14px;margin-top:10px;display:none;}
+  .action-panel h3{font-size:14px;font-weight:700;color:#92400e;margin-bottom:8px;}
+  .action-panel p{font-size:12px;color:#92400e;margin-bottom:10px;}
+  .action-btns{display:flex;flex-direction:column;gap:8px;}
+  .action-btn{border:none;padding:14px;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;text-align:center;}
+  .action-btn.spinola{background:var(--blue);color:#fff;}
+  .action-btn.push{background:var(--good);color:#fff;}
+  .action-btn.cancel-btn{background:var(--bad);color:#fff;}
+  .action-btn:hover{opacity:0.9;}
+
+  /* Future days cancel */
+  .future-section{margin-top:6px;}
+  .future-date-row{display:flex;gap:8px;align-items:center;margin-bottom:10px;}
+  .future-date-row input{flex:1;padding:10px;border:1px solid var(--line);border-radius:10px;font-size:14px;}
+  .future-cancel-btn{border:none;background:var(--bad);color:#fff;padding:10px 18px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;}
+  .future-cancel-btn:hover{opacity:0.9;}
+  .future-cancel-btn:disabled{opacity:0.5;cursor:not-allowed;}
+
+  /* Messages */
+  .msg{margin-top:8px;padding:8px 12px;border-radius:10px;font-size:13px;font-weight:600;display:none;}
+  .msg.good{display:block;background:#d1fae5;color:#065f46;}
+  .msg.bad{display:block;background:#fee2e2;color:#991b1b;}
+
+  /* Loading overlay */
+  .loading-overlay{position:fixed;inset:0;background:rgba(255,255,255,0.85);display:none;align-items:center;justify-content:center;z-index:1000;flex-direction:column;gap:10px;}
+  .loading-overlay.show{display:flex;}
+  .loading-spinner{width:36px;height:36px;border:4px solid var(--line);border-top-color:var(--blue);border-radius:50%;animation:spin 0.8s linear infinite;}
+  .loading-text{font-weight:700;font-size:14px;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  /* Date label */
+  .date-label{font-size:14px;color:var(--muted);font-weight:600;margin-bottom:12px;}
+</style>
+</head>
+<body>
+
+<h1>Dr Kevin - Schedule</h1>
+<p class="subtitle">Quick schedule management</p>
+
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="loading-spinner"></div>
+  <div class="loading-text" id="loadingText">Loading...</div>
+</div>
+
+<div id="dateLabel" class="date-label"></div>
+
+<!-- MORNING SESSION -->
+<div class="card">
+  <div class="session" id="morningSession">
+    <div class="session-header">
+      <span class="session-label">Morning</span>
+      <button class="toggle on" id="morningToggle" onclick="toggleSession('morning')">
+        <span class="toggle-text">ON</span>
+        <div class="toggle-knob"></div>
+      </button>
+    </div>
+    <div class="session-status on" id="morningStatus">Working this morning</div>
+    <div id="morningPatients"></div>
+    <div class="action-panel" id="morningActions">
+      <h3>What should happen to these patients?</h3>
+      <p>You must choose an action before cancelling this session.</p>
+      <div class="action-btns">
+        <button class="action-btn spinola" onclick="doSessionAction('morning','redirect_spinola')">Send to Spinola</button>
+        <button class="action-btn push" onclick="doSessionAction('morning','push_next_day')">Push to Next Day</button>
+        <button class="action-btn cancel-btn" onclick="doSessionAction('morning','cancel')">Cancel Appointments</button>
+      </div>
+    </div>
+    <div class="msg" id="morningMsg"></div>
+  </div>
+</div>
+
+<!-- EVENING SESSION -->
+<div class="card">
+  <div class="session" id="eveningSession">
+    <div class="session-header">
+      <span class="session-label">Evening</span>
+      <button class="toggle on" id="eveningToggle" onclick="toggleSession('evening')">
+        <span class="toggle-text">ON</span>
+        <div class="toggle-knob"></div>
+      </button>
+    </div>
+    <div class="session-status on" id="eveningStatus">Working this evening</div>
+    <div id="eveningPatients"></div>
+    <div class="action-panel" id="eveningActions">
+      <h3>What should happen to these patients?</h3>
+      <p>You must choose an action before cancelling this session.</p>
+      <div class="action-btns">
+        <button class="action-btn spinola" onclick="doSessionAction('evening','redirect_spinola')">Send to Spinola</button>
+        <button class="action-btn push" onclick="doSessionAction('evening','push_next_day')">Push to Next Day</button>
+        <button class="action-btn cancel-btn" onclick="doSessionAction('evening','cancel')">Cancel Appointments</button>
+      </div>
+    </div>
+    <div class="msg" id="eveningMsg"></div>
+  </div>
+</div>
+
+<!-- CANCEL FUTURE DATES -->
+<div class="card future-section">
+  <h2>Cancel a Future Date</h2>
+  <div class="future-date-row">
+    <input type="date" id="futureDate" onchange="loadFutureDate()">
+    <button class="future-cancel-btn" id="futureCancelBtn" disabled onclick="startFutureCancel()">Cancel Day</button>
+  </div>
+  <div id="futurePatients"></div>
+  <div class="action-panel" id="futureActions">
+    <h3>What should happen to these patients?</h3>
+    <p>You must choose an action before cancelling this day.</p>
+    <div class="action-btns">
+      <button class="action-btn spinola" onclick="doFutureAction('redirect_spinola')">Send to Spinola</button>
+      <button class="action-btn push" onclick="doFutureAction('push_next_day')">Push to Next Day</button>
+      <button class="action-btn cancel-btn" onclick="doFutureAction('cancel')">Cancel Appointments</button>
+    </div>
+  </div>
+  <div class="msg" id="futureMsg"></div>
+</div>
+
+<script>
+var SIG = '<?= adminSig ?>';
+var _todayKey = '';
+var _morningOff = false;
+var _eveningOff = false;
+var _morningAppts = [];
+var _eveningAppts = [];
+var _futureAppts = [];
+var _offEntries = []; // to track which off entries exist
+var _morningOffRowIndex = null;
+var _eveningOffRowIndex = null;
+var _workingHours = null;
+
+function showLoading(msg) {
+  document.getElementById('loadingText').textContent = msg || 'Loading...';
+  document.getElementById('loadingOverlay').classList.add('show');
+}
+function hideLoading() {
+  document.getElementById('loadingOverlay').classList.remove('show');
+}
+function showMsg(id, type, msg) {
+  var el = document.getElementById(id);
+  el.className = 'msg ' + type;
+  el.textContent = msg;
+  setTimeout(function() { el.className = 'msg'; }, 6000);
+}
+
+// ========== Init ==========
+
+showLoading('Loading schedule...');
+google.script.run
+  .withSuccessHandler(function(res) {
+    hideLoading();
+    if (!res || !res.ok) return;
+
+    _todayKey = res.todayKey;
+    _workingHours = res.workingHours;
+    _offEntries = res.doctorOffEntries || [];
+
+    var d = new Date(_todayKey + 'T12:00:00');
+    var dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    var monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    document.getElementById('dateLabel').textContent = dayNames[d.getDay()] + ', ' + d.getDate() + ' ' + monthNames[d.getMonth()] + ' ' + d.getFullYear();
+
+    // Set min date for future picker to tomorrow
+    var tomorrow = new Date(d);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    document.getElementById('futureDate').min = tomorrow.toISOString().slice(0, 10);
+
+    // Check if morning/evening are already blocked
+    checkOffStatus();
+    loadTodayAppointments();
+  })
+  .withFailureHandler(function(err) {
+    hideLoading();
+  })
+  .apiAdminGetDashboard(SIG);
+
+function checkOffStatus() {
+  _morningOff = false;
+  _eveningOff = false;
+  _morningOffRowIndex = null;
+  _eveningOffRowIndex = null;
+
+  // Get today's working hours to know morning/evening ranges
+  var d = new Date(_todayKey + 'T12:00:00');
+  var dowKeys = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
+  var dow = dowKeys[d.getDay()];
+  var windows = (_workingHours && _workingHours[dow]) || [];
+
+  // Classify windows into morning (before 13:00) and evening (13:00+)
+  var morningWindow = null, eveningWindow = null;
+  for (var i = 0; i < windows.length; i++) {
+    var startH = parseInt(windows[i].start.split(':')[0], 10);
+    if (startH < 13) morningWindow = windows[i];
+    else eveningWindow = windows[i];
+  }
+
+  for (var j = 0; j < _offEntries.length; j++) {
+    var off = _offEntries[j];
+    if (_todayKey >= off.startDate && _todayKey <= (off.endDate || off.startDate)) {
+      if (!off.startTime && !off.endTime) {
+        // All day block
+        _morningOff = true;
+        _eveningOff = true;
+        _morningOffRowIndex = off.rowIndex;
+        _eveningOffRowIndex = off.rowIndex;
+      } else if (off.startTime && off.endTime) {
+        var offStartH = parseInt(off.startTime.split(':')[0], 10);
+        if (offStartH < 13) { _morningOff = true; _morningOffRowIndex = off.rowIndex; }
+        else { _eveningOff = true; _eveningOffRowIndex = off.rowIndex; }
+      }
+    }
+  }
+
+  updateToggleUI('morning', !_morningOff);
+  updateToggleUI('evening', !_eveningOff);
+
+  // Hide morning/evening if no window configured
+  if (!morningWindow) document.getElementById('morningSession').parentElement.style.display = 'none';
+  if (!eveningWindow) document.getElementById('eveningSession').parentElement.style.display = 'none';
+}
+
+function updateToggleUI(session, isOn) {
+  var toggle = document.getElementById(session + 'Toggle');
+  var status = document.getElementById(session + 'Status');
+  var label = session === 'morning' ? 'morning' : 'evening';
+
+  toggle.className = 'toggle ' + (isOn ? 'on' : 'off');
+  toggle.querySelector('.toggle-text').textContent = isOn ? 'ON' : 'OFF';
+  status.className = 'session-status ' + (isOn ? 'on' : 'off');
+  status.textContent = isOn ? 'Working this ' + label : 'NOT working this ' + label;
+}
+
+function loadTodayAppointments() {
+  google.script.run
+    .withSuccessHandler(function(res) {
+      if (!res || !res.ok) return;
+      var appts = res.appointments || [];
+      _morningAppts = [];
+      _eveningAppts = [];
+
+      for (var i = 0; i < appts.length; i++) {
+        var a = appts[i];
+        var h = parseInt((a.startTime || '00:00').split(':')[0], 10);
+        if (h < 13) _morningAppts.push(a);
+        else _eveningAppts.push(a);
+      }
+
+      renderPatientTable('morning', _morningAppts);
+      renderPatientTable('evening', _eveningAppts);
+    })
+    .withFailureHandler(function() {})
+    .apiAdminGetDateAppointments(SIG, _todayKey);
+}
+
+function renderPatientTable(session, appts) {
+  var el = document.getElementById(session + 'Patients');
+  if (!appts.length) {
+    el.innerHTML = '<div class="pt-empty">No patients booked</div>';
+    return;
+  }
+
+  var html = '<table class="pt-table"><thead><tr><th></th><th>Time</th><th>Patient</th><th>Phone</th></tr></thead><tbody>';
+  for (var i = 0; i < appts.length; i++) {
+    var a = appts[i];
+    html += '<tr>';
+    html += '<td><input type="checkbox" class="pt-check" checked data-id="' + a.appointmentId + '" data-session="' + session + '"></td>';
+    html += '<td class="pt-time">' + (a.startTime || '') + '</td>';
+    html += '<td class="pt-name">' + esc(a.fullName || '') + '</td>';
+    html += '<td>' + esc(a.phone || '') + '</td>';
+    html += '</tr>';
+  }
+  html += '</tbody></table>';
+  el.innerHTML = html;
+}
+
+function esc(s) {
+  var d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+// ========== Toggle Session ==========
+
+function toggleSession(session) {
+  var isCurrentlyOn = (session === 'morning') ? !_morningOff : !_eveningOff;
+
+  if (isCurrentlyOn) {
+    // Turning OFF - check if there are patients
+    var appts = session === 'morning' ? _morningAppts : _eveningAppts;
+    var checked = getCheckedIds(session);
+
+    if (checked.length > 0) {
+      // Show action panel - must handle patients first
+      document.getElementById(session + 'Actions').style.display = 'block';
+      return;
+    }
+
+    // No patients (or none checked) - just block the time
+    blockSession(session);
+  } else {
+    // Turning ON - unblock
+    unblockSession(session);
+  }
+}
+
+function getCheckedIds(session) {
+  var checks = document.querySelectorAll('.pt-check[data-session="' + session + '"]');
+  var ids = [];
+  for (var i = 0; i < checks.length; i++) {
+    if (checks[i].checked) ids.push(checks[i].dataset.id);
+  }
+  return ids;
+}
+
+function getSessionTimeRange(session) {
+  var d = new Date(_todayKey + 'T12:00:00');
+  var dowKeys = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
+  var dow = dowKeys[d.getDay()];
+  var windows = (_workingHours && _workingHours[dow]) || [];
+
+  for (var i = 0; i < windows.length; i++) {
+    var startH = parseInt(windows[i].start.split(':')[0], 10);
+    if (session === 'morning' && startH < 13) return windows[i];
+    if (session === 'evening' && startH >= 13) return windows[i];
+  }
+  return session === 'morning' ? { start: '09:00', end: '12:00' } : { start: '17:00', end: '19:00' };
+}
+
+function doSessionAction(session, action) {
+  var ids = getCheckedIds(session);
+  if (!ids.length) {
+    showMsg(session + 'Msg', 'bad', 'No patients selected.');
+    return;
+  }
+
+  showLoading('Processing patients...');
+  google.script.run
+    .withSuccessHandler(function(res) {
+      hideLoading();
+      if (!res || !res.ok) {
+        showMsg(session + 'Msg', 'bad', res.reason || 'Failed.');
+        return;
+      }
+      showMsg(session + 'Msg', 'good', res.message || 'Done!');
+      document.getElementById(session + 'Actions').style.display = 'none';
+
+      // Now block the session
+      blockSession(session);
+    })
+    .withFailureHandler(function(err) {
+      hideLoading();
+      showMsg(session + 'Msg', 'bad', 'Error: ' + (err && err.message ? err.message : String(err)));
+    })
+    .apiAdminProcessAppointments(SIG, {
+      dateKey: _todayKey,
+      action: action,
+      appointmentIds: ids
+    });
+}
+
+function blockSession(session) {
+  var range = getSessionTimeRange(session);
+  showLoading('Blocking ' + session + '...');
+  google.script.run
+    .withSuccessHandler(function(res) {
+      hideLoading();
+      if (!res || !res.ok) {
+        showMsg(session + 'Msg', 'bad', res.reason || 'Failed.');
+        return;
+      }
+      if (session === 'morning') _morningOff = true;
+      else _eveningOff = true;
+      updateToggleUI(session, false);
+      reloadAll();
+    })
+    .withFailureHandler(function(err) {
+      hideLoading();
+      showMsg(session + 'Msg', 'bad', 'Error: ' + (err && err.message ? err.message : String(err)));
+    })
+    .apiAdminMarkDoctorOff(SIG, {
+      startDate: _todayKey,
+      startTime: range.start,
+      endTime: range.end,
+      reason: 'Doctor not coming'
+    });
+}
+
+function unblockSession(session) {
+  var rowIndex = session === 'morning' ? _morningOffRowIndex : _eveningOffRowIndex;
+  if (!rowIndex) {
+    // No row to remove, just update UI
+    if (session === 'morning') _morningOff = false;
+    else _eveningOff = false;
+    updateToggleUI(session, true);
+    return;
+  }
+
+  showLoading('Unblocking ' + session + '...');
+  google.script.run
+    .withSuccessHandler(function(res) {
+      hideLoading();
+      if (!res || !res.ok) {
+        showMsg(session + 'Msg', 'bad', res.reason || 'Failed.');
+        return;
+      }
+      if (session === 'morning') { _morningOff = false; _morningOffRowIndex = null; }
+      else { _eveningOff = false; _eveningOffRowIndex = null; }
+      updateToggleUI(session, true);
+      reloadAll();
+    })
+    .withFailureHandler(function(err) {
+      hideLoading();
+      showMsg(session + 'Msg', 'bad', 'Error: ' + (err && err.message ? err.message : String(err)));
+    })
+    .apiAdminRemoveDoctorOff(SIG, rowIndex);
+}
+
+function reloadAll() {
+  google.script.run
+    .withSuccessHandler(function(res) {
+      if (!res || !res.ok) return;
+      _offEntries = res.doctorOffEntries || [];
+      _workingHours = res.workingHours;
+      checkOffStatus();
+      loadTodayAppointments();
+    })
+    .withFailureHandler(function() {})
+    .apiAdminGetDashboard(SIG);
+}
+
+// ========== Future Date Cancel ==========
+
+function loadFutureDate() {
+  var dateKey = document.getElementById('futureDate').value;
+  if (!dateKey) return;
+
+  document.getElementById('futureCancelBtn').disabled = false;
+  document.getElementById('futureActions').style.display = 'none';
+
+  google.script.run
+    .withSuccessHandler(function(res) {
+      if (!res || !res.ok) return;
+      _futureAppts = res.appointments || [];
+      renderFutureTable();
+    })
+    .withFailureHandler(function() {})
+    .apiAdminGetDateAppointments(SIG, dateKey);
+}
+
+function renderFutureTable() {
+  var el = document.getElementById('futurePatients');
+  if (!_futureAppts.length) {
+    el.innerHTML = '<div class="pt-empty">No patients booked on this date</div>';
+    return;
+  }
+
+  var html = '<table class="pt-table"><thead><tr><th></th><th>Time</th><th>Patient</th><th>Phone</th></tr></thead><tbody>';
+  for (var i = 0; i < _futureAppts.length; i++) {
+    var a = _futureAppts[i];
+    html += '<tr>';
+    html += '<td><input type="checkbox" class="pt-check" checked data-id="' + a.appointmentId + '" data-session="future"></td>';
+    html += '<td class="pt-time">' + (a.startTime || '') + '</td>';
+    html += '<td class="pt-name">' + esc(a.fullName || '') + '</td>';
+    html += '<td>' + esc(a.phone || '') + '</td>';
+    html += '</tr>';
+  }
+  html += '</tbody></table>';
+  el.innerHTML = html;
+}
+
+function startFutureCancel() {
+  var dateKey = document.getElementById('futureDate').value;
+  if (!dateKey) return;
+
+  var checked = getCheckedIds('future');
+  if (_futureAppts.length > 0 && checked.length > 0) {
+    // Has patients - must choose action
+    document.getElementById('futureActions').style.display = 'block';
+    return;
+  }
+
+  // No patients - just block the day
+  blockFutureDay(dateKey);
+}
+
+function doFutureAction(action) {
+  var dateKey = document.getElementById('futureDate').value;
+  var ids = getCheckedIds('future');
+  if (!ids.length && _futureAppts.length > 0) {
+    showMsg('futureMsg', 'bad', 'No patients selected.');
+    return;
+  }
+
+  showLoading('Processing patients...');
+  google.script.run
+    .withSuccessHandler(function(res) {
+      hideLoading();
+      if (!res || !res.ok) {
+        showMsg('futureMsg', 'bad', res.reason || 'Failed.');
+        return;
+      }
+      showMsg('futureMsg', 'good', res.message || 'Done!');
+      document.getElementById('futureActions').style.display = 'none';
+
+      // Now block the whole day
+      blockFutureDay(dateKey);
+    })
+    .withFailureHandler(function(err) {
+      hideLoading();
+      showMsg('futureMsg', 'bad', 'Error: ' + (err && err.message ? err.message : String(err)));
+    })
+    .apiAdminProcessAppointments(SIG, {
+      dateKey: dateKey,
+      action: action,
+      appointmentIds: ids
+    });
+}
+
+function blockFutureDay(dateKey) {
+  showLoading('Blocking day...');
+  google.script.run
+    .withSuccessHandler(function(res) {
+      hideLoading();
+      if (!res || !res.ok) {
+        showMsg('futureMsg', 'bad', res.reason || 'Failed.');
+        return;
+      }
+      showMsg('futureMsg', 'good', dateKey + ' has been cancelled.');
+      document.getElementById('futurePatients').innerHTML = '<div class="pt-empty">Day cancelled</div>';
+      document.getElementById('futureCancelBtn').disabled = true;
+    })
+    .withFailureHandler(function(err) {
+      hideLoading();
+      showMsg('futureMsg', 'bad', 'Error: ' + (err && err.message ? err.message : String(err)));
+    })
+    .apiAdminMarkDoctorOff(SIG, {
+      startDate: dateKey,
+      reason: 'Doctor not available'
+    });
+}
+</script>
+</body>
+</html>
