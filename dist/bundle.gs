@@ -6179,6 +6179,14 @@ var _pendingFlow = null;
 var SLOT_MINUTES = 15;
 var AUTO_REFRESH_MS = 20 * 1000;
 var IDLE_TIMEOUT_MS = 2 * 60 * 1000;
+var GAS_TIMEOUT_MS = 30 * 1000;
+function withTimeout(promise, ms) {
+  ms = ms || GAS_TIMEOUT_MS;
+  return new Promise(function(resolve, reject) {
+    var timer = setTimeout(function() { reject(new Error('Server took too long. Please try again.')); }, ms);
+    promise.then(function(v) { clearTimeout(timer); resolve(v); }, function(e) { clearTimeout(timer); reject(e); });
+  });
+}
 var _idlePaused = false;
 var _lastActivityAt = Date.now();
 var _autoRefreshTimerId = null;
@@ -6529,16 +6537,16 @@ function showDateLabel() {
   document.querySelector('.stack').classList.toggle('viewing-future', !isToday);
 }
 function fetchDashboard() {
-  return new Promise(function(resolve, reject) {
+  return withTimeout(new Promise(function(resolve, reject) {
     google.script.run
       .withSuccessHandler(function(res) { resolve(res); })
       .withFailureHandler(function(err) { reject(err); })
       .apiAdminGetDashboard(SIG);
-  });
+  }));
 }
 function fetchDateAppointments(dateKey) {
   if (_cachedDateAppointments[dateKey]) return Promise.resolve(_cachedDateAppointments[dateKey]);
-  return new Promise(function(resolve, reject) {
+  return withTimeout(new Promise(function(resolve, reject) {
     google.script.run
       .withSuccessHandler(function(res) {
         if (res && res.ok) {
@@ -6550,12 +6558,12 @@ function fetchDateAppointments(dateKey) {
       })
       .withFailureHandler(function(err) { reject(err); })
       .apiAdminGetDateAppointments(SIG, dateKey);
-  });
+  }));
 }
 function processAppointments(dateKey, action, ids, extra) {
   var payload = { dateKey: dateKey, action: action, appointmentIds: ids || [] };
   if (extra) { for (var k in extra) payload[k] = extra[k]; }
-  return new Promise(function(resolve, reject) {
+  return withTimeout(new Promise(function(resolve, reject) {
     google.script.run
       .withSuccessHandler(function(res) {
         if (res && res.ok) resolve(res);
@@ -6563,10 +6571,10 @@ function processAppointments(dateKey, action, ids, extra) {
       })
       .withFailureHandler(function(err) { reject(err); })
       .apiAdminProcessAppointments(SIG, payload);
-  });
+  }));
 }
 function markDoctorOff(payload) {
-  return new Promise(function(resolve, reject) {
+  return withTimeout(new Promise(function(resolve, reject) {
     google.script.run
       .withSuccessHandler(function(res) {
         if (res && res.ok) resolve(res);
@@ -6574,10 +6582,10 @@ function markDoctorOff(payload) {
       })
       .withFailureHandler(function(err) { reject(err); })
       .apiAdminMarkDoctorOff(SIG, payload);
-  });
+  }));
 }
 function removeDoctorOff(rowIndex) {
-  return new Promise(function(resolve, reject) {
+  return withTimeout(new Promise(function(resolve, reject) {
     google.script.run
       .withSuccessHandler(function(res) {
         if (res && res.ok) resolve(res);
@@ -6585,10 +6593,10 @@ function removeDoctorOff(rowIndex) {
       })
       .withFailureHandler(function(err) { reject(err); })
       .apiAdminRemoveDoctorOff(SIG, rowIndex);
-  });
+  }));
 }
 function addExtraSlots(payload) {
-  return new Promise(function(resolve, reject) {
+  return withTimeout(new Promise(function(resolve, reject) {
     google.script.run
       .withSuccessHandler(function(res) {
         if (res && res.ok) resolve(res);
@@ -6596,10 +6604,10 @@ function addExtraSlots(payload) {
       })
       .withFailureHandler(function(err) { reject(err); })
       .apiAdminAddExtraSlots(SIG, payload);
-  });
+  }));
 }
 function removeExtraSlots(rowIndex) {
-  return new Promise(function(resolve, reject) {
+  return withTimeout(new Promise(function(resolve, reject) {
     google.script.run
       .withSuccessHandler(function(res) {
         if (res && res.ok) resolve(res);
@@ -6607,10 +6615,10 @@ function removeExtraSlots(rowIndex) {
       })
       .withFailureHandler(function(err) { reject(err); })
       .apiAdminRemoveExtraSlots(SIG, rowIndex);
-  });
+  }));
 }
 function setDoctorOffDates(mode, dateKeys) {
-  return new Promise(function(resolve, reject) {
+  return withTimeout(new Promise(function(resolve, reject) {
     google.script.run
       .withSuccessHandler(function(res) {
         if (res && res.ok) resolve(res);
@@ -6618,7 +6626,7 @@ function setDoctorOffDates(mode, dateKeys) {
       })
       .withFailureHandler(function(err) { reject(err); })
       .apiAdminSetDoctorOffDates(SIG, { mode: mode, dateKeys: dateKeys });
-  });
+  }));
 }
 async function reloadAll() {
   _cachedDateAppointments = {};
@@ -6702,12 +6710,12 @@ async function applySessionChanges(session, blocks, extras) {
   // Remove old extra entries first (descending row order to avoid index shifts)
   var extraRows = (state.extraRowIndices || []).slice().sort(function(a, b) { return b - a; });
   for (var e = 0; e < extraRows.length; e++) {
-    await removeExtraSlots(extraRows[e]);
+    try { await removeExtraSlots(extraRows[e]); } catch (ex) { /* row may already be gone */ }
   }
   // Remove old off blocks (descending row order)
   var offRows = state.rowIndices.slice().sort(function(a, b) { return b - a; });
   for (var i = 0; i < offRows.length; i++) {
-    await removeDoctorOff(offRows[i]);
+    try { await removeDoctorOff(offRows[i]); } catch (ex) { /* row may already be gone */ }
   }
   // Add new off blocks
   for (var j = 0; j < blocks.length; j++) {
@@ -6716,7 +6724,7 @@ async function applySessionChanges(session, blocks, extras) {
       endDate: _selectedDateKey,
       startTime: blocks[j].start,
       endTime: blocks[j].end,
-      reason: 'Doctor not coming'
+      reason: 'Doctor adjusted shift'
     });
   }
   // Add new extra entries
