@@ -5850,9 +5850,7 @@ function renderBusiestDay(day) {
   .patient-card{border:1px solid var(--line);border-radius:18px;padding:12px 14px;display:flex;align-items:center;gap:12px;background:#fff;}
   .patient-main{flex:1;min-width:0;}
   .patient-name{font-size:15px;font-weight:800;line-height:1.25;}
-  .patient-meta{font-size:12px;color:var(--muted);line-height:1.45;margin-top:3px;word-break:break-word;display:flex;flex-wrap:wrap;gap:6px 10px;}
-  .contact-link{color:var(--blue-dark);font-weight:800;text-decoration:none;}
-  .contact-link:active,.contact-link:focus,.contact-link:hover{text-decoration:underline;}
+  .patient-meta{font-size:12px;color:var(--muted);line-height:1.45;margin-top:3px;word-break:break-word;}
   .patient-time{font-size:14px;font-weight:900;color:var(--blue-dark);text-align:right;white-space:nowrap;}
   .empty{padding:14px;border-radius:16px;background:#f9fafb;border:1px dashed var(--line);font-size:13px;color:var(--muted);text-align:center;}
 
@@ -5919,15 +5917,6 @@ function renderBusiestDay(day) {
   .loading-overlay.show{display:flex;}
   .loading-spinner{width:38px;height:38px;border:4px solid #dbeafe;border-top-color:var(--blue);border-radius:50%;animation:spin .8s linear infinite;}
   .loading-text{font-size:14px;font-weight:900;}
-  .idle-overlay{position:fixed;inset:0;z-index:1090;display:flex;align-items:center;justify-content:center;background:rgba(245,247,251,.70);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);cursor:pointer;opacity:0;visibility:hidden;pointer-events:none;transition:opacity .35s ease,visibility .35s ease;}
-  .idle-overlay.show{opacity:1;visibility:visible;pointer-events:auto;}
-  .idle-card{text-align:center;padding:38px 28px;max-width:340px;animation:idle-float 3s ease-in-out infinite;}
-  .idle-icon{font-size:54px;margin-bottom:16px;animation:idle-pulse-icon 2.5s ease-in-out infinite;}
-  .idle-title{font-size:22px;font-weight:900;margin-bottom:8px;}
-  .idle-sub{font-size:14px;color:var(--muted);line-height:1.5;margin-bottom:22px;}
-  .idle-cta{display:inline-flex;align-items:center;gap:8px;padding:12px 28px;background:var(--blue);color:#fff;border-radius:40px;font-size:15px;font-weight:800;box-shadow:0 4px 20px rgba(37,99,235,.35);}
-  .idle-arrow{display:inline-block;transition:transform .3s;font-size:18px;}
-  .idle-overlay:hover .idle-arrow{transform:translateX(4px);}
   @keyframes spin{to{transform:rotate(360deg);}}
   @keyframes idle-float{0%,100%{transform:translateY(0);}50%{transform:translateY(-8px);}}
   @keyframes idle-pulse-icon{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.75;transform:scale(.95);}}
@@ -5943,15 +5932,6 @@ function renderBusiestDay(day) {
   <div class="loading-overlay" id="loadingOverlay">
     <div class="loading-spinner"></div>
     <div class="loading-text" id="loadingText">Loading…</div>
-  </div>
-
-  <div class="idle-overlay" id="idleOverlay">
-    <div class="idle-card">
-      <div class="idle-icon">🩺</div>
-      <div class="idle-title">Doctor Admin Paused</div>
-      <div class="idle-sub">Updates are paused to save resources. Tap anywhere to refresh and continue.</div>
-      <div class="idle-cta">Resume Updates <span class="idle-arrow">→</span></div>
-    </div>
   </div>
 
   <div class="stack">
@@ -6116,14 +6096,6 @@ var _cachedDateAppointments = {};
 var _adjustContext = null;
 var _pendingFlow = null;
 var SLOT_MINUTES = 15;
-var AUTO_REFRESH_MS = 20 * 1000;
-var IDLE_MS = 2 * 60 * 1000;
-var _idlePaused = false;
-var _lastActivity = Date.now();
-var _autoRefreshTimerId = null;
-var _idleCheckTimerId = null;
-var _reloadPromise = null;
-var _idleOverlay = document.getElementById('idleOverlay');
 
 function showLoading(msg) {
   document.getElementById('loadingText').textContent = msg || 'Loading…';
@@ -6142,61 +6114,6 @@ function esc(s) {
   var d = document.createElement('div');
   d.textContent = s == null ? '' : String(s);
   return d.innerHTML;
-}
-function normalizePhone(phone) {
-  var raw = String(phone || '').trim();
-  if (!raw) return '';
-  if (raw.charAt(0) === '+') return raw;
-  return '+' + raw.replace(/^\\+/, '');
-}
-function phoneHref(phone) {
-  return 'tel:' + normalizePhone(phone).replace(/\\s+/g, '');
-}
-function emailHref(email) {
-  return 'mailto:' + String(email || '').trim();
-}
-function shouldPauseBackgroundWork() {
-  return _idlePaused || document.hidden;
-}
-function canAutoRefresh() {
-  return !shouldPauseBackgroundWork()
-    && !_adjustContext
-    && !_pendingFlow
-    && !document.getElementById('adjustModal').classList.contains('show')
-    && !document.getElementById('actionModal').classList.contains('show');
-}
-function markActivity() {
-  if (!_idlePaused) _lastActivity = Date.now();
-}
-function stopAutoRefresh() {
-  if (_autoRefreshTimerId) { clearInterval(_autoRefreshTimerId); _autoRefreshTimerId = null; }
-}
-function startAutoRefresh() {
-  stopAutoRefresh();
-  _autoRefreshTimerId = setInterval(function() {
-    if (!canAutoRefresh()) return;
-    reloadAll().catch(function() {});
-  }, AUTO_REFRESH_MS);
-}
-function pauseForIdle() {
-  if (_idlePaused) return;
-  _idlePaused = true;
-  stopAutoRefresh();
-  _idleOverlay.classList.add('show');
-}
-async function resumeFromIdle() {
-  _idlePaused = false;
-  _lastActivity = Date.now();
-  _idleOverlay.classList.remove('show');
-  startAutoRefresh();
-  showLoading('Refreshing doctor admin…');
-  try {
-    await reloadAll();
-  } catch (err) {
-    showMsg('calendarMsg', 'bad', String(err && err.message ? err.message : err));
-  } finally {
-    hideLoading();
-  }
 }
 function timeToMin(t) {
   if (!t) return 0;
@@ -6375,12 +6292,7 @@ function renderPatientList(session) {
     html += '<div class="patient-card">';
     html += '<div class="patient-main">';
     html += '<div class="patient-name">' + esc(a.fullName || 'Patient') + '</div>';
-    var phone = normalizePhone(a.phone || '');
-    var email = String(a.email || '').trim();
-    var meta = '';
-    if (phone) meta += '<a class="contact-link" href="' + esc(phoneHref(phone)) + '">' + esc(phone) + '</a>';
-    if (email) meta += '<a class="contact-link" href="' + esc(emailHref(email)) + '">' + esc(email) + '</a>';
-    html += '<div class="patient-meta">' + (meta || 'No contact details') + '</div>';
+    html += '<div class="patient-meta">' + esc(a.phone || '') + (a.phone && a.email ? ' • ' : '') + esc(a.email || '') + '</div>';
     html += '</div>';
     html += '<div class="patient-time">' + esc(a.startTime || '') + '</div>';
     html += '</div>';
@@ -6462,28 +6374,20 @@ function setDoctorOffDates(mode, dateKeys) {
   });
 }
 async function reloadAll() {
-  if (_reloadPromise) return _reloadPromise;
-  _reloadPromise = (async function() {
-    _cachedDateAppointments = {};
-    var res = await fetchDashboard();
-    if (!res || !res.ok) throw new Error('Could not load dashboard.');
-    _todayKey = res.todayKey;
-    _workingHours = res.workingHours || {};
-    _offEntries = res.doctorOffEntries || [];
-    if (!_calendarMonth) {
-      var tomorrow = addDays(_todayKey, 1);
-      _calendarMonth = new Date(tomorrow.getFullYear(), tomorrow.getMonth(), 1);
-    }
-    showDateLabel();
-    await loadTodayAppointments();
-    buildAllSessionState();
-    renderCalendar();
-  })();
-  try {
-    return await _reloadPromise;
-  } finally {
-    _reloadPromise = null;
+  _cachedDateAppointments = {};
+  var res = await fetchDashboard();
+  if (!res || !res.ok) throw new Error('Could not load dashboard.');
+  _todayKey = res.todayKey;
+  _workingHours = res.workingHours || {};
+  _offEntries = res.doctorOffEntries || [];
+  if (!_calendarMonth) {
+    var tomorrow = addDays(_todayKey, 1);
+    _calendarMonth = new Date(tomorrow.getFullYear(), tomorrow.getMonth(), 1);
   }
+  showDateLabel();
+  await loadTodayAppointments();
+  buildAllSessionState();
+  renderCalendar();
 }
 async function loadTodayAppointments() {
   var appts = await fetchDateAppointments(_todayKey);
@@ -6875,25 +6779,11 @@ document.getElementById('adjustModal').addEventListener('click', function(e) {
 document.getElementById('actionModal').addEventListener('click', function(e) {
   if (e.target === this) closeActionModal();
 });
-['pointerdown', 'keydown', 'scroll', 'touchstart'].forEach(function(evt) {
-  document.addEventListener(evt, markActivity, { passive: true });
-});
-document.addEventListener('visibilitychange', function() {
-  if (document.hidden) pauseForIdle();
-});
-_idleCheckTimerId = setInterval(function() {
-  if (_idlePaused) return;
-  if (Date.now() - _lastActivity >= IDLE_MS) pauseForIdle();
-}, 1000);
-_idleOverlay.addEventListener('click', function() {
-  resumeFromIdle();
-});
 
 (async function init() {
   try {
     showLoading('Loading schedule…');
     await reloadAll();
-    startAutoRefresh();
   } catch (err) {
     showMsg('calendarMsg', 'bad', String(err && err.message ? err.message : err));
   } finally {
