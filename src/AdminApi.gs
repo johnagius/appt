@@ -442,6 +442,114 @@ function apiAdminProcessAppointments(sig, payload) {
   }
 }
 
+
+/**
+ * Cancel or reactivate multiple all-day doctor-off dates.
+ */
+function apiAdminSetDoctorOffDates(sig, payload) {
+  if (!verifyAdminSig_(sig)) return { ok: false, reason: 'Access denied.' };
+
+  payload = payload || {};
+  var mode = String(payload.mode || '').trim();
+  var dateKeys = payload.dateKeys || [];
+  if (['cancel', 'reactivate'].indexOf(mode) < 0) {
+    return { ok: false, reason: 'Invalid mode.' };
+  }
+  if (!dateKeys.length) return { ok: false, reason: 'No dates provided.' };
+
+  var unique = [];
+  var seen = {};
+  for (var i = 0; i < dateKeys.length; i++) {
+    var dk = String(dateKeys[i] || '').trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dk) || seen[dk]) continue;
+    seen[dk] = true;
+    unique.push(dk);
+  }
+  if (!unique.length) return { ok: false, reason: 'No valid dates provided.' };
+
+  var ss = getConfigSpreadsheet_();
+  var sh = ss.getSheetByName(CFG().SHEET_DOCTOR_OFF);
+  if (!sh) return { ok: false, reason: 'DoctorOff sheet missing.' };
+
+  if (mode === 'cancel') {
+    var offMap = getDoctorOffDates_();
+    var added = 0;
+    for (var j = 0; j < unique.length; j++) {
+      var entry = offMap[unique[j]];
+      if (entry && entry.allDay) continue;
+      addDoctorOffRow_(unique[j], unique[j], '', '', 'Doctor not available');
+      added++;
+    }
+    if (added > 0) bumpVersion_();
+    return { ok: true, message: 'Cancelled ' + added + ' date(s).', updated: added };
+  }
+
+  var selectedMap = {};
+  for (var k = 0; k < unique.length; k++) selectedMap[unique[k]] = true;
+
+  var rows = getDoctorOffRows_();
+  var rowsToDelete = [];
+  var rowsToAppend = [];
+  var reactivated = 0;
+
+  for (var r = 0; r < rows.length; r++) {
+    var row = rows[r];
+    if (row.startTime || row.endTime) continue;
+
+    var start = parseDateKey_(row.startDate);
+    var end = parseDateKey_(row.endDate || row.startDate);
+    if (end.getTime() < start.getTime()) {
+      var tmp = start; start = end; end = tmp;
+    }
+
+    var remaining = [];
+    var cur = new Date(start.getTime());
+    var touched = false;
+    while (cur.getTime() <= end.getTime()) {
+      var curKey = toDateKey_(cur);
+      if (selectedMap[curKey]) {
+        touched = true;
+        reactivated++;
+      } else {
+        remaining.push(curKey);
+      }
+      cur = addMinutes_(cur, 24 * 60);
+    }
+
+    if (!touched) continue;
+
+    rowsToDelete.push(row.rowIndex);
+    if (!remaining.length) continue;
+
+    var segStart = remaining[0];
+    var prev = remaining[0];
+    for (var idx = 1; idx <= remaining.length; idx++) {
+      var key = remaining[idx];
+      var expectedNext = idx < remaining.length ? toDateKey_(addMinutes_(parseDateKey_(prev), 24 * 60)) : null;
+      if (!key || key !== expectedNext) {
+        rowsToAppend.push([segStart, prev, '', '', row.reason || '']);
+        segStart = key;
+      }
+      prev = key || prev;
+    }
+  }
+
+  rowsToDelete.sort(function(a, b) { return b - a; });
+  for (var d = 0; d < rowsToDelete.length; d++) {
+    sh.deleteRow(rowsToDelete[d]);
+  }
+  for (var a = 0; a < rowsToAppend.length; a++) {
+    sh.appendRow(rowsToAppend[a]);
+  }
+
+  if (rowsToDelete.length || rowsToAppend.length) bumpVersion_();
+  return {
+    ok: true,
+    message: 'Reactivated ' + reactivated + ' date(s).',
+    updated: reactivated
+  };
+}
+
 /**
  * Remove a DoctorOff entry by row index.
  */

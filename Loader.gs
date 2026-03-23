@@ -239,6 +239,7 @@ function apiAdminGetDateAppointments(s, dk)  { return _getApp().apiAdminGetDateA
 function apiAdminMarkDoctorOff(s, p)         { return _getApp().apiAdminMarkDoctorOff(s, p); }
 function apiAdminAddExtraSlots(s, p)         { return _getApp().apiAdminAddExtraSlots(s, p); }
 function apiAdminProcessAppointments(s, p)   { return _getApp().apiAdminProcessAppointments(s, p); }
+function apiAdminSetDoctorOffDates(s, p)     { return _getApp().apiAdminSetDoctorOffDates(s, p); }
 function apiAdminRemoveDoctorOff(s, ri)      { return _getApp().apiAdminRemoveDoctorOff(s, ri); }
 function apiAdminRemoveExtraSlots(s, ri)     { return _getApp().apiAdminRemoveExtraSlots(s, ri); }
 function apiAdminNotifyPatients(s, p)        { return _getApp().apiAdminNotifyPatients(s, p); }

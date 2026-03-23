@@ -85,6 +85,7 @@ PUBLIC_FUNCTIONS = [
     'apiAdminMarkDoctorOff',
     'apiAdminAddExtraSlots',
     'apiAdminProcessAppointments',
+    'apiAdminSetDoctorOffDates',
     'apiAdminRemoveDoctorOff',
     'apiAdminRemoveExtraSlots',
     'apiAdminNotifyPatients',
