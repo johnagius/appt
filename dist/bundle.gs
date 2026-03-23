@@ -5915,6 +5915,13 @@ function renderBusiestDay(day) {
   .affected-meta{font-size:12px;color:var(--muted);line-height:1.4;margin-top:2px;}
   .action-grid{display:grid;gap:10px;}
 
+  .break-options{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px;}
+  .break-opt{border:2px solid var(--line);border-radius:16px;padding:14px 8px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s;background:#fff;}
+  .break-opt.selected{border-color:var(--blue);background:#eff6ff;}
+  .break-opt-mins{font-size:22px;font-weight:900;line-height:1.2;}
+  .break-opt-label{font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.03em;}
+  .break-summary{font-size:13px;color:var(--muted);line-height:1.45;padding:10px 0;}
+
   .msg{display:none;margin-top:12px;padding:11px 13px;border-radius:14px;font-size:13px;font-weight:800;line-height:1.4;}
   .msg.good{display:block;background:#d1fae5;color:#065f46;}
   .msg.bad{display:block;background:#fee2e2;color:#991b1b;}
@@ -5975,9 +5982,10 @@ function renderBusiestDay(day) {
         <div class="value" id="morningTimes">—</div>
         <div class="hint" id="morningHint"></div>
       </div>
-      <div class="session-actions">
+      <div class="session-actions" style="grid-template-columns:1fr 1fr 1fr;">
         <button class="btn btn-danger" id="morningToggleBtn" onclick="toggleSession('morning')">Not Coming to Work</button>
-        <button class="btn btn-secondary" onclick="openAdjustModal('morning')">Adjust Shift Time</button>
+        <button class="btn btn-secondary" onclick="openAdjustModal('morning')">Adjust Shift</button>
+        <button class="btn btn-ghost" onclick="openBreakModal('morning')">Take a Break</button>
       </div>
       <div class="patient-list" id="morningPatients"></div>
       <div class="msg" id="morningMsg"></div>
@@ -5995,9 +6003,10 @@ function renderBusiestDay(day) {
         <div class="value" id="eveningTimes">—</div>
         <div class="hint" id="eveningHint"></div>
       </div>
-      <div class="session-actions">
+      <div class="session-actions" style="grid-template-columns:1fr 1fr 1fr;">
         <button class="btn btn-danger" id="eveningToggleBtn" onclick="toggleSession('evening')">Not Coming to Work</button>
-        <button class="btn btn-secondary" onclick="openAdjustModal('evening')">Adjust Shift Time</button>
+        <button class="btn btn-secondary" onclick="openAdjustModal('evening')">Adjust Shift</button>
+        <button class="btn btn-ghost" onclick="openBreakModal('evening')">Take a Break</button>
       </div>
       <div class="patient-list" id="eveningPatients"></div>
       <div class="msg" id="eveningMsg"></div>
@@ -6093,6 +6102,33 @@ function renderBusiestDay(day) {
     </div>
   </div>
 
+  <div class="modal-overlay" id="breakModal">
+    <div class="modal-card">
+      <div class="modal-handle"></div>
+      <div class="modal-title">Take a Break</div>
+      <div class="modal-text">How long do you need? The break starts now.</div>
+      <div class="break-options">
+        <div class="break-opt" onclick="selectBreakDuration(20)" id="breakOpt20">
+          <div class="break-opt-mins">20</div>
+          <div class="break-opt-label">minutes</div>
+        </div>
+        <div class="break-opt" onclick="selectBreakDuration(30)" id="breakOpt30">
+          <div class="break-opt-mins">30</div>
+          <div class="break-opt-label">minutes</div>
+        </div>
+        <div class="break-opt" onclick="selectBreakDuration(40)" id="breakOpt40">
+          <div class="break-opt-mins">40</div>
+          <div class="break-opt-label">minutes</div>
+        </div>
+      </div>
+      <div class="break-summary" id="breakSummary"></div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" onclick="closeBreakModal()">Cancel</button>
+        <button class="btn btn-primary" id="breakConfirmBtn" onclick="confirmBreak()" disabled>Start Break</button>
+      </div>
+    </div>
+  </div>
+
   <div class="modal-overlay" id="actionModal">
     <div class="modal-card">
       <div class="modal-handle"></div>
@@ -6102,6 +6138,7 @@ function renderBusiestDay(day) {
       <div class="affected-list" id="affectedList"></div>
       <div class="action-grid">
         <button class="btn btn-secondary" onclick="handlePendingAction('redirect_spinola')">Send to Spinola</button>
+        <button class="btn btn-primary" id="actionPushSameDay" style="display:none;" onclick="handlePendingAction('push_same_day')">Push to Later Today</button>
         <button class="btn btn-primary" onclick="handlePendingAction('push_next_day')">Push to Next Day</button>
         <button class="btn btn-danger" onclick="handlePendingAction('cancel')">Cancel Appointments</button>
         <button class="btn btn-ghost" onclick="closeActionModal()">Back</button>
@@ -6451,7 +6488,9 @@ function fetchDateAppointments(dateKey) {
       .apiAdminGetDateAppointments(SIG, dateKey);
   });
 }
-function processAppointments(dateKey, action, ids) {
+function processAppointments(dateKey, action, ids, extra) {
+  var payload = { dateKey: dateKey, action: action, appointmentIds: ids || [] };
+  if (extra) { for (var k in extra) payload[k] = extra[k]; }
   return new Promise(function(resolve, reject) {
     google.script.run
       .withSuccessHandler(function(res) {
@@ -6459,7 +6498,7 @@ function processAppointments(dateKey, action, ids) {
         else reject((res && res.reason) || 'Failed to process appointments.');
       })
       .withFailureHandler(function(err) { reject(err); })
-      .apiAdminProcessAppointments(SIG, { dateKey: dateKey, action: action, appointmentIds: ids || [] });
+      .apiAdminProcessAppointments(SIG, payload);
   });
 }
 function markDoctorOff(payload) {
@@ -6625,6 +6664,116 @@ async function applySessionChanges(session, blocks, extras) {
   }
   await reloadAll();
 }
+// ===== Break modal =====
+var _breakContext = null;
+
+function getNowTime() {
+  var now = new Date();
+  var h = String(now.getHours()).padStart(2, '0');
+  var m = String(now.getMinutes()).padStart(2, '0');
+  return h + ':' + m;
+}
+
+function roundUpToSlot(timeStr) {
+  var mins = timeToMin(timeStr);
+  var rem = mins % SLOT_MINUTES;
+  if (rem > 0) mins += (SLOT_MINUTES - rem);
+  return mins;
+}
+
+function openBreakModal(session) {
+  var state = _sessionState[session];
+  if (!state || !state.segments.length) return;
+  _breakContext = { session: session, duration: null };
+  document.getElementById('breakSummary').textContent = '';
+  document.getElementById('breakConfirmBtn').disabled = true;
+  [20, 30, 40].forEach(function(d) {
+    document.getElementById('breakOpt' + d).classList.remove('selected');
+  });
+  document.getElementById('breakModal').classList.add('show');
+}
+
+function closeBreakModal() {
+  document.getElementById('breakModal').classList.remove('show');
+  _breakContext = null;
+}
+
+function selectBreakDuration(mins) {
+  if (!_breakContext) return;
+  _breakContext.duration = mins;
+  [20, 30, 40].forEach(function(d) {
+    document.getElementById('breakOpt' + d).classList.toggle('selected', d === mins);
+  });
+  var nowTime = getNowTime();
+  var breakStart = roundUpToSlot(nowTime);
+  var breakEnd = breakStart + mins;
+  _breakContext.breakStartMin = breakStart;
+  _breakContext.breakEndMin = breakEnd;
+  document.getElementById('breakSummary').textContent =
+    'Break from ' + minToTime(breakStart) + ' to ' + minToTime(breakEnd) + ' (' + mins + ' min).';
+  document.getElementById('breakConfirmBtn').disabled = false;
+}
+
+async function confirmBreak() {
+  if (!_breakContext || !_breakContext.duration) return;
+  var session = _breakContext.session;
+  var breakStartMin = _breakContext.breakStartMin;
+  var breakEndMin = _breakContext.breakEndMin;
+  var breakStart = minToTime(breakStartMin);
+  var breakEnd = minToTime(breakEndMin);
+
+  // Find affected appointments during the break
+  var allAppts = (_appointmentsBySession[session] || []).filter(function(a) {
+    if (a.status === 'RELOCATED_SPINOLA' || a.status === 'CANCELLED_DOCTOR' || a.status === 'CANCELLED_CLIENT') return false;
+    var aStart = timeToMin(a.startTime);
+    var aEnd = timeToMin(a.endTime);
+    return aStart < breakEndMin && aEnd > breakStartMin;
+  });
+
+  closeBreakModal();
+
+  if (allAppts.length) {
+    openActionModal({
+      title: 'Patients booked during your break',
+      text: 'These patients have appointments during your break time. Choose what should happen first.',
+      summary: allAppts.length + ' affected patient(s) during ' + breakStart + ' – ' + breakEnd + '.',
+      appointments: allAppts.map(function(appt) { appt.dateKey = _todayKey; return appt; }),
+      allowPushSameDay: true,
+      breakEndTime: breakEnd,
+      apply: function() {
+        return markDoctorOff({
+          startDate: _todayKey,
+          endDate: _todayKey,
+          startTime: breakStart,
+          endTime: breakEnd,
+          reason: 'Doctor break'
+        }).then(function() { return reloadAll(); });
+      },
+      successMsgId: session + 'Msg',
+      successMessage: 'Break set: ' + breakStart + ' – ' + breakEnd + '.'
+    });
+    return;
+  }
+
+  // No affected appointments — just block the time
+  try {
+    showLoading('Setting break…');
+    await markDoctorOff({
+      startDate: _todayKey,
+      endDate: _todayKey,
+      startTime: breakStart,
+      endTime: breakEnd,
+      reason: 'Doctor break'
+    });
+    await reloadAll();
+    showMsg(session + 'Msg', 'good', 'Break set: ' + breakStart + ' – ' + breakEnd + '.');
+  } catch (err) {
+    showMsg(session + 'Msg', 'bad', String(err && err.message ? err.message : err));
+  } finally {
+    hideLoading();
+  }
+}
+
 function closeAdjustModal() {
   document.getElementById('adjustModal').classList.remove('show');
   _adjustContext = null;
@@ -6917,6 +7066,7 @@ function openActionModal(flow) {
   document.getElementById('actionTitle').textContent = flow.title;
   document.getElementById('actionText').textContent = flow.text;
   document.getElementById('actionSummary').textContent = flow.summary;
+  document.getElementById('actionPushSameDay').style.display = flow.allowPushSameDay ? '' : 'none';
   var html = '';
   for (var i = 0; i < flow.appointments.length; i++) {
     var appt = flow.appointments[i];
@@ -6944,9 +7094,13 @@ async function handlePendingAction(action) {
       if (!grouped[appt.dateKey]) grouped[appt.dateKey] = [];
       grouped[appt.dateKey].push(appt.appointmentId);
     }
+    var extra = {};
+    if (action === 'push_same_day' && flow.breakEndTime) {
+      extra.breakEndTime = flow.breakEndTime;
+    }
     var dates = Object.keys(grouped).sort();
     for (var d = 0; d < dates.length; d++) {
-      await processAppointments(dates[d], action, grouped[dates[d]]);
+      await processAppointments(dates[d], action, grouped[dates[d]], extra);
     }
     await flow.apply();
     closeActionModal();
@@ -6960,6 +7114,9 @@ async function handlePendingAction(action) {
 
 document.getElementById('adjustModal').addEventListener('click', function(e) {
   if (e.target === this) closeAdjustModal();
+});
+document.getElementById('breakModal').addEventListener('click', function(e) {
+  if (e.target === this) closeBreakModal();
 });
 document.getElementById('actionModal').addEventListener('click', function(e) {
   if (e.target === this) closeActionModal();
@@ -9444,8 +9601,8 @@ function apiAdminProcessAppointments(sig, payload) {
     if (!dateKey) return { ok: false, reason: 'Missing date.' };
     if (!action) return { ok: false, reason: 'Missing action.' };
 
-    var validActions = ['cancel', 'redirect_spinola', 'push_next_day'];
-    if (validActions.indexOf(action) < 0) return { ok: false, reason: 'Invalid action. Use: cancel, redirect_spinola, or push_next_day.' };
+    var validActions = ['cancel', 'redirect_spinola', 'push_next_day', 'push_same_day'];
+    if (validActions.indexOf(action) < 0) return { ok: false, reason: 'Invalid action.' };
 
     var allAppts = listActiveAppointmentsForDate_(dateKey);
 
@@ -9633,6 +9790,132 @@ function apiAdminProcessAppointments(sig, payload) {
         try { sendAppointmentPushedEmail_(appt3, nextDay, newStartTime, newEndTime); } catch (e8) {}
 
         results.push({ appointmentId: newAppt.appointmentId, action: 'pushed', patient: appt3.fullName, newDate: nextDay, newTime: newStartTime });
+      }
+    }
+
+    if (action === 'push_same_day') {
+      var breakEndTime = String(payload.breakEndTime || '').trim();
+      if (!breakEndTime) return { ok: false, reason: 'Missing breakEndTime for push_same_day.' };
+      var breakEndMin = parseTimeToMinutes_(breakEndTime);
+
+      // Build available slots for the same day (base + extras)
+      var sameDateObj = parseDateKey_(dateKey);
+      var sameDayExtraMap = getDoctorExtraSlots_();
+      var sameDayExtras = sameDayExtraMap[dateKey] || null;
+      var sameDaySlots = buildSlotsForDate_(sameDateObj, sameDayExtras);
+
+      // Get current off blocks for this date
+      var sameDayOffMap = getDoctorOffDates_();
+      var sameDayOffEntry = getDoctorOffEntryForDate_(sameDayOffMap, dateKey);
+
+      // Get already-taken slots
+      var sameDayAppts = listActiveAppointmentsForDate_(dateKey);
+      var takenSameDay = {};
+      for (var t2 = 0; t2 < sameDayAppts.length; t2++) {
+        takenSameDay[sameDayAppts[t2].startTime] = true;
+      }
+
+      // Find available slots AFTER the break, not blocked by doctor-off
+      var availableAfterBreak = [];
+      for (var sl3 = 0; sl3 < sameDaySlots.length; sl3++) {
+        var slotStartMin = parseTimeToMinutes_(sameDaySlots[sl3].start);
+        if (slotStartMin < breakEndMin) continue;
+        if (takenSameDay[sameDaySlots[sl3].start]) continue;
+        if (slotBlockedByDoctorOff_(sameDayOffEntry, sameDaySlots[sl3].start, sameDaySlots[sl3].end)) continue;
+        availableAfterBreak.push(sameDaySlots[sl3]);
+      }
+
+      // If not enough slots, extend the session to fit all appointments
+      var shortfall = appts.length - availableAfterBreak.length;
+      var dur = CFG().APPT_DURATION_MIN;
+      if (shortfall > 0) {
+        // Find the last slot end time (the day's latest time)
+        var lastSlotEnd = 0;
+        for (var ls = 0; ls < sameDaySlots.length; ls++) {
+          var lse = parseTimeToMinutes_(sameDaySlots[ls].end);
+          if (lse > lastSlotEnd) lastSlotEnd = lse;
+        }
+        // Also check taken appointments
+        for (var lt = 0; lt < sameDayAppts.length; lt++) {
+          var lte = parseTimeToMinutes_(sameDayAppts[lt].endTime);
+          if (lte > lastSlotEnd) lastSlotEnd = lte;
+        }
+        // Extend from the end of the day
+        var extStart = lastSlotEnd;
+        var extEnd = extStart + (shortfall * dur);
+        addDoctorExtraRow_(dateKey, minutesToTime_(extStart), minutesToTime_(extEnd), 'Extended for break reschedule');
+        // Add these extension slots to available
+        for (var em = extStart; em + dur <= extEnd; em += dur) {
+          availableAfterBreak.push({ start: minutesToTime_(em), end: minutesToTime_(em + dur) });
+        }
+      }
+
+      for (var k2 = 0; k2 < appts.length; k2++) {
+        var appt4 = appts[k2];
+        var found4 = findAppointmentByToken_(appt4.token);
+        if (!found4) continue;
+
+        var newSlot = availableAfterBreak.shift();
+        if (!newSlot) {
+          // Fallback: cancel if somehow still no slot
+          var evId4 = String(appt4.calendarEventId || '').trim();
+          if (evId4) { try { deleteCalendarEvent_(evId4); } catch (e9) {} }
+          updateAppointmentStatus_(found4.sheetName, found4.rowIndex, {
+            status: 'CANCELLED_DOCTOR',
+            cancelledAt: nowStr,
+            cancelReason: 'No available slot on same day',
+            calendarEventId: ''
+          });
+          try { sendClientCancelledEmail_(appt4, 'Your appointment could not be rescheduled. Please rebook at your convenience.'); } catch (e10) {}
+          results.push({ appointmentId: appt4.appointmentId, action: 'cancelled_no_slot', patient: appt4.fullName });
+          continue;
+        }
+
+        // Cancel old calendar event
+        var oldEvId4 = String(appt4.calendarEventId || '').trim();
+        if (oldEvId4) { try { deleteCalendarEvent_(oldEvId4); } catch (e11) {} }
+
+        // Cancel old appointment
+        updateAppointmentStatus_(found4.sheetName, found4.rowIndex, {
+          status: 'CANCELLED_DOCTOR',
+          cancelledAt: nowStr,
+          cancelReason: 'Pushed to later today ' + newSlot.start,
+          calendarEventId: ''
+        });
+
+        // Create new appointment on same day at new slot
+        var newToken4 = Utilities.getUuid();
+        var newAppt4 = {
+          appointmentId: 'A-' + Utilities.getUuid(),
+          dateKey: dateKey,
+          startTime: newSlot.start,
+          endTime: newSlot.end,
+          serviceId: appt4.serviceId,
+          serviceName: appt4.serviceName,
+          fullName: appt4.fullName,
+          email: appt4.email,
+          phone: appt4.phone,
+          comments: appt4.comments,
+          status: 'BOOKED',
+          location: appt4.location,
+          createdAt: nowStr,
+          updatedAt: nowStr,
+          token: newToken4,
+          calendarEventId: '',
+          cancelledAt: '',
+          cancelReason: ''
+        };
+
+        var newEventId4 = '';
+        try { newEventId4 = createCalendarEvent_(newAppt4); } catch (e12) {}
+        newAppt4.calendarEventId = newEventId4;
+
+        appendAppointment_(dateKey, newAppt4);
+        takenSameDay[newSlot.start] = true;
+
+        try { sendAppointmentPushedEmail_(appt4, dateKey, newSlot.start, newSlot.end); } catch (e13) {}
+
+        results.push({ appointmentId: newAppt4.appointmentId, action: 'pushed_same_day', patient: appt4.fullName, newTime: newSlot.start });
       }
     }
 
