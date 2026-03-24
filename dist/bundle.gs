@@ -2715,6 +2715,7 @@ var _HTML_TEMPLATES = {
               _spinolaDateKey = dateKey;
               els.btnBookSpinola.disabled = false;
               els.btnBookSpinola.classList.add('active');
+              els.btnBookSpinola.scrollIntoView({ behavior: 'smooth', block: 'end' });
             });
             els.spinolaSlotsGrid.appendChild(b);
           });
@@ -7665,12 +7666,12 @@ var DEFAULT_HOURS = {
 };
 
 var DEFAULT_SPINOLA_HOURS = {
-  MON: [{ start: '09:00', end: '19:00' }],
-  TUE: [{ start: '09:00', end: '19:00' }],
-  WED: [{ start: '09:00', end: '19:00' }],
-  THU: [{ start: '09:00', end: '19:00' }],
-  FRI: [{ start: '09:00', end: '19:00' }],
-  SAT: [{ start: '09:00', end: '19:00' }],
+  MON: [{ start: '09:00', end: '14:00' }, { start: '16:00', end: '19:00' }],
+  TUE: [{ start: '09:00', end: '14:00' }, { start: '16:00', end: '19:00' }],
+  WED: [{ start: '09:00', end: '14:00' }, { start: '16:00', end: '19:00' }],
+  THU: [{ start: '09:00', end: '14:00' }, { start: '16:00', end: '19:00' }],
+  FRI: [{ start: '09:00', end: '14:00' }, { start: '16:00', end: '19:00' }],
+  SAT: [{ start: '09:00', end: '13:00' }, { start: '16:00', end: '19:00' }],
   SUN: [{ start: '10:00', end: '12:00' }]
 };
 
