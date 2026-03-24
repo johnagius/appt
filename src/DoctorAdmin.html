@@ -963,7 +963,10 @@ function roundUpToSlot(timeStr) {
 
 function openBreakModal(session) {
   var state = _sessionState[session];
-  if (!state || !state.segments.length) return;
+  if (!state || !state.segments.length) {
+    showMsg(session + 'Msg', 'bad', 'Cannot take a break — session is set to "Not Coming to Work".');
+    return;
+  }
   var isToday = _selectedDateKey === _todayKey;
   var breakLabel = isToday ? 'The break starts now.' : 'Choose the break duration for this day.';
   document.querySelector('#breakModal .modal-text').textContent = 'How long do you need? ' + breakLabel;
