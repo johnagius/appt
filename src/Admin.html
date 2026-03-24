@@ -224,7 +224,9 @@
     .week-cell{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px 4px;text-align:center;cursor:pointer;transition:all 0.15s ease;position:relative;}
     .week-cell:hover{border-color:#d1d5db;background:rgba(17,24,39,0.02);transform:translateY(-1px);}
     .week-cell.today{border-color:var(--blue);box-shadow:0 0 0 2px rgba(37,99,235,0.15);}
+    .week-cell.today .wc-num{color:var(--blue);}
     .week-cell.selected{background:#111827;color:#fff;border-color:#111827;}
+    .week-cell.selected.today .wc-num{color:#fff;}
     .week-cell.selected:hover{background:#1f2937;}
     .week-cell .wc-day{font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;}
     .week-cell.selected .wc-day{color:rgba(255,255,255,0.7);}

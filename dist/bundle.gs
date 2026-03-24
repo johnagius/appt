@@ -2613,10 +2613,12 @@ var _HTML_TEMPLATES = {
       }
 
       if (!filtered.length) {
-        showHint(els.timeHint, 'bad', t('noSlots'));
         // Use prefetched Spinola data if available for this date
         if (_spinolaPrefetchedSlots && _spinolaPrefetchDateKey === state.selectedDateKey) {
+          hideHint(els.timeHint);
           showSpinolaInlineWithData(_spinolaPrefetchedSlots);
+        } else {
+          showHint(els.timeHint, 'bad', t('noSlots'));
         }
         return;
       }
@@ -2647,6 +2649,7 @@ var _HTML_TEMPLATES = {
 
       hideMsg();
       setStatus('good', t('timeSelected'));
+      setTimeout(function() { els.confirmBtn.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 150);
     }
 
     function clearFieldErrors() {
@@ -2689,10 +2692,10 @@ var _HTML_TEMPLATES = {
       return null;
     }
 
-    function loadAvailability(isSilentRefresh, autoAdvance) {
+    function loadAvailability(isSilentRefresh, autoAdvance, keepLoading) {
       if (!state.selectedDateKey) return;
 
-      if (!isSilentRefresh) {
+      if (!isSilentRefresh && !keepLoading) {
         showLoading(t('loadingSlotsTitle'), t('loadingSlotsDesc'));
       }
 
@@ -2857,6 +2860,7 @@ var _HTML_TEMPLATES = {
               els.sumTime.textContent = t('timeTemplate', to12h(slot.start), to12h(slot.end));
               els.sumLoc.textContent = t('locationTemplate', spinolaLoc);
               hideMsg();
+              setTimeout(function() { els.confirmBtn.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 150);
             });
             els.spinolaSlotsGrid.appendChild(b);
           });
@@ -3062,8 +3066,6 @@ var _HTML_TEMPLATES = {
 
       google.script.run
         .withSuccessHandler((data) => {
-          hideLoading();
-
           state.config = data.config;
           state.dateOptions = data.dateOptions || [];
 
@@ -3079,8 +3081,9 @@ var _HTML_TEMPLATES = {
 
           if (state.selectedDateKey) {
             setStatus('good', t('loadingSlots'));
-            loadAvailability(false, true);
+            loadAvailability(false, true, true);
           } else {
+            hideLoading();
             setStatus('bad', t('noDatesAvailable'));
           }
 
@@ -3738,7 +3741,9 @@ var _HTML_TEMPLATES = {
     .week-cell{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px 4px;text-align:center;cursor:pointer;transition:all 0.15s ease;position:relative;}
     .week-cell:hover{border-color:#d1d5db;background:rgba(17,24,39,0.02);transform:translateY(-1px);}
     .week-cell.today{border-color:var(--blue);box-shadow:0 0 0 2px rgba(37,99,235,0.15);}
+    .week-cell.today .wc-num{color:var(--blue);}
     .week-cell.selected{background:#111827;color:#fff;border-color:#111827;}
+    .week-cell.selected.today .wc-num{color:#fff;}
     .week-cell.selected:hover{background:#1f2937;}
     .week-cell .wc-day{font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;}
     .week-cell.selected .wc-day{color:rgba(255,255,255,0.7);}

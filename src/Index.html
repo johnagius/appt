@@ -2606,10 +2606,12 @@
       }
 
       if (!filtered.length) {
-        showHint(els.timeHint, 'bad', t('noSlots'));
         // Use prefetched Spinola data if available for this date
         if (_spinolaPrefetchedSlots && _spinolaPrefetchDateKey === state.selectedDateKey) {
+          hideHint(els.timeHint);
           showSpinolaInlineWithData(_spinolaPrefetchedSlots);
+        } else {
+          showHint(els.timeHint, 'bad', t('noSlots'));
         }
         return;
       }
@@ -2640,6 +2642,7 @@
 
       hideMsg();
       setStatus('good', t('timeSelected'));
+      setTimeout(function() { els.confirmBtn.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 150);
     }
 
     function clearFieldErrors() {
@@ -2682,10 +2685,10 @@
       return null;
     }
 
-    function loadAvailability(isSilentRefresh, autoAdvance) {
+    function loadAvailability(isSilentRefresh, autoAdvance, keepLoading) {
       if (!state.selectedDateKey) return;
 
-      if (!isSilentRefresh) {
+      if (!isSilentRefresh && !keepLoading) {
         showLoading(t('loadingSlotsTitle'), t('loadingSlotsDesc'));
       }
 
@@ -2850,6 +2853,7 @@
               els.sumTime.textContent = t('timeTemplate', to12h(slot.start), to12h(slot.end));
               els.sumLoc.textContent = t('locationTemplate', spinolaLoc);
               hideMsg();
+              setTimeout(function() { els.confirmBtn.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 150);
             });
             els.spinolaSlotsGrid.appendChild(b);
           });
@@ -3055,8 +3059,6 @@
 
       google.script.run
         .withSuccessHandler((data) => {
-          hideLoading();
-
           state.config = data.config;
           state.dateOptions = data.dateOptions || [];
 
@@ -3072,8 +3074,9 @@
 
           if (state.selectedDateKey) {
             setStatus('good', t('loadingSlots'));
-            loadAvailability(false, true);
+            loadAvailability(false, true, true);
           } else {
+            hideLoading();
             setStatus('bad', t('noDatesAvailable'));
           }
 
