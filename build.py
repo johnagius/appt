@@ -108,6 +108,7 @@ PUBLIC_FUNCTIONS = [
     'setDoctorEmail',
     'setPottersLocation',
     'setSpinolaLocation',
+    'setupSpinola',
     'setSpinolaCalendarId',
     'setSpinolaSpreadsheetId',
     'setDoubleCheckCalendar',
