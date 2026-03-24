@@ -946,6 +946,9 @@ var _HTML_TEMPLATES = {
         <p class="spinola-date-label" id="spinolaDateLabel"></p>
         <div class="spinola-slots-grid" id="spinolaSlotsGrid"></div>
         <div class="spinola-no-slots" id="spinolaNoSlots" style="display:none">No slots available at Spinola for this date.</div>
+        <div class="spinola-actions">
+          <button class="btnSpinola" id="btnBookSpinola" disabled>Book at Spinola Clinic</button>
+        </div>
       </div>
 
       <div class="spinola-divider">&mdash; or &mdash;</div>
@@ -957,10 +960,6 @@ var _HTML_TEMPLATES = {
       </div>
 
       <button class="btnSpinolaDismiss" id="btnSpinolaDismiss">Cancel</button>
-
-      <div class="spinola-actions">
-        <button class="btnSpinola" id="btnBookSpinola" disabled>Book at Spinola Clinic</button>
-      </div>
     </div>
   </div>
 
