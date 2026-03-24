@@ -4280,6 +4280,65 @@ var _HTML_TEMPLATES = {
     </div>
   </div>
 
+  <!-- Spinola Clinic Section -->
+  <div style="margin-top:24px;padding-top:16px;border-top:2px solid var(--line);">
+    <h2 style="margin:0 0 4px;font-size:18px;color:#8b5cf6;">Spinola Clinic</h2>
+    <p style="margin:0 0 14px;font-size:12px;color:var(--muted);">Booking statistics for Spinola (direct + redirected from Potter's)</p>
+
+    <div class="hero-stats" id="spHeroStats">
+      <div class="hero-card">
+        <div class="hero-value" id="spHeroBooked" style="color:#8b5cf6;">-</div>
+        <div class="hero-label">Total Bookings</div>
+      </div>
+      <div class="hero-card">
+        <div class="hero-value" id="spHeroCancelRate">-</div>
+        <div class="hero-label">Cancel Rate</div>
+      </div>
+      <div class="hero-card">
+        <div class="hero-value" id="spHeroNoShowRate">-</div>
+        <div class="hero-label">No-Show Rate</div>
+      </div>
+      <div class="hero-card">
+        <div class="hero-value" id="spHeroPatients" style="color:#8b5cf6;">-</div>
+        <div class="hero-label">Unique Patients</div>
+      </div>
+    </div>
+
+    <div class="stats-grid" style="margin-top:12px;">
+      <div class="card">
+        <h3>Direct vs Redirected</h3>
+        <div id="spDirectSplitChart"></div>
+      </div>
+      <div class="card">
+        <h3>Weekly Trend</h3>
+        <div class="bar-chart" id="spWeeklyTrendChart"></div>
+        <div class="legend">
+          <span><span class="legend-dot" style="background:#8b5cf6;"></span>Booked</span>
+          <span><span class="legend-dot" style="background:#ef4444;"></span>Cancelled</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="stats-grid" style="margin-top:12px;">
+      <div class="card">
+        <h3>Peak Hours</h3>
+        <div class="heatmap" id="spPeakHoursMap"></div>
+      </div>
+      <div class="card">
+        <h3>Top Patients</h3>
+        <div id="spTopPatientsChart"></div>
+      </div>
+    </div>
+
+    <div class="stats-grid" style="margin-top:12px;">
+      <div class="card">
+        <h3>Bookings by Country</h3>
+        <div id="spCountryChart"></div>
+      </div>
+      <div class="card"></div>
+    </div>
+  </div>
+
   <div class="msg" id="statsMsg"></div>
 </div>
 
@@ -6187,6 +6246,7 @@ function renderAllStats(s) {
   renderDoctorActions(s);
   renderCountryBreakdown(s.countryBreakdown);
   renderTopCancellers(s.topCancellers);
+  renderSpinolaStats(s.spinola);
 }
 
 function renderLeadTime(s) {
@@ -6474,6 +6534,135 @@ function renderTopCancellers(cancellers) {
     html += '<div class="patient-rank" style="background:rgba(239,68,68,0.1);color:#ef4444;">' + (i + 1) + '</div>';
     html += '<div class="patient-name">' + esc(c.name) + '</div>';
     html += '<div class="patient-count" style="color:#ef4444;">' + c.count + ' cancelled</div>';
+    html += '</div>';
+  }
+  el.innerHTML = html;
+}
+
+// ── Spinola Clinic Stats ──
+
+function renderSpinolaStats(sp) {
+  if (!sp) return;
+  document.getElementById('spHeroBooked').textContent = sp.totalBooked;
+  var crEl = document.getElementById('spHeroCancelRate');
+  crEl.textContent = sp.cancelRate + '%';
+  crEl.style.color = sp.cancelRate < 10 ? 'var(--good)' : sp.cancelRate < 20 ? '#f59e0b' : 'var(--bad)';
+  var nsEl = document.getElementById('spHeroNoShowRate');
+  nsEl.textContent = sp.noShowRate + '%';
+  nsEl.style.color = sp.noShowRate < 5 ? 'var(--good)' : sp.noShowRate < 15 ? '#f59e0b' : 'var(--bad)';
+  document.getElementById('spHeroPatients').textContent = sp.uniquePatients;
+
+  renderSpDirectSplit(sp);
+  renderSpWeeklyTrend(sp.weeklyTrend);
+  renderSpPeakHours(sp.peakHours);
+  renderSpTopPatients(sp.topPatients);
+  renderSpCountryBreakdown(sp.countryBreakdown);
+}
+
+function renderSpDirectSplit(sp) {
+  var el = document.getElementById('spDirectSplitChart');
+  var direct = sp.directBookings || 0;
+  var redir = sp.relocatedBookings || 0;
+  var total = direct + redir;
+  if (total === 0) { el.innerHTML = '<div class="empty">No Spinola bookings yet.</div>'; return; }
+
+  var pctD = Math.round(direct / total * 100);
+  var pctR = 100 - pctD;
+  var html = '';
+  html += '<div class="h-bar-row"><div class="h-bar-label" style="width:80px;">Direct</div>';
+  html += '<div class="h-bar-track"><div class="h-bar-fill" style="width:' + pctD + '%;background:#8b5cf6;"></div></div>';
+  html += '<div class="h-bar-pct">' + direct + '</div></div>';
+  html += '<div class="h-bar-row"><div class="h-bar-label" style="width:80px;">Redirected</div>';
+  html += '<div class="h-bar-track"><div class="h-bar-fill" style="width:' + pctR + '%;background:#2563eb;"></div></div>';
+  html += '<div class="h-bar-pct">' + redir + '</div></div>';
+  html += '<div style="margin-top:8px;font-size:11px;color:var(--muted);">Direct = booked via system &bull; Redirected = moved from Potter\\'s</div>';
+  el.innerHTML = html;
+}
+
+function renderSpWeeklyTrend(weeks) {
+  var el = document.getElementById('spWeeklyTrendChart');
+  if (!weeks || !weeks.length) { el.innerHTML = '<div class="empty">No weekly data yet.</div>'; return; }
+
+  var maxVal = 1;
+  for (var i = 0; i < weeks.length; i++) {
+    var total = weeks[i].booked + weeks[i].cancelled;
+    if (total > maxVal) maxVal = total;
+  }
+  var html = '';
+  for (var i = 0; i < weeks.length; i++) {
+    var w = weeks[i];
+    var bH = Math.round((w.booked / maxVal) * 100);
+    var cH = Math.round((w.cancelled / maxVal) * 100);
+    html += '<div class="bar-col">';
+    html += '<div class="bar-val">' + w.booked + '</div>';
+    html += '<div class="bar-stack" style="height:100%;">';
+    html += '<div style="flex:1;"></div>';
+    if (w.cancelled > 0) html += '<div class="bar cancelled" style="height:' + cH + '%;"></div>';
+    html += '<div class="bar" style="height:' + bH + '%;background:#8b5cf6;border-radius:4px 4px 0 0;"></div>';
+    html += '</div>';
+    html += '<div class="bar-label">' + esc(w.label) + '</div>';
+    html += '</div>';
+  }
+  el.innerHTML = html;
+}
+
+function renderSpPeakHours(dist) {
+  var el = document.getElementById('spPeakHoursMap');
+  if (!dist) { el.innerHTML = '<div class="empty">No data.</div>'; return; }
+
+  var maxCount = 1;
+  for (var h = 0; h < 24; h++) { if (dist[h] > maxCount) maxCount = dist[h]; }
+
+  var html = '';
+  for (var h = 7; h <= 20; h++) {
+    var count = dist[h] || 0;
+    var intensity = maxCount > 0 ? count / maxCount : 0;
+    var r = Math.round(245 - intensity * 106);
+    var g = Math.round(243 - intensity * 151);
+    var b = Math.round(255 - intensity * 9);
+    var textColor = intensity > 0.6 ? '#fff' : 'var(--fg)';
+    if (count === 0) { r = 249; g = 250; b = 251; textColor = 'var(--muted)'; }
+    var label = h < 12 ? h + 'am' : (h === 12 ? '12pm' : (h - 12) + 'pm');
+    html += '<div class="heat-cell" style="background:rgb(' + r + ',' + g + ',' + b + ');color:' + textColor + ';">';
+    html += '<span class="heat-hour">' + label + '</span>';
+    html += count;
+    html += '</div>';
+  }
+  el.innerHTML = html;
+}
+
+function renderSpTopPatients(patients) {
+  var el = document.getElementById('spTopPatientsChart');
+  if (!patients || !patients.length) { el.innerHTML = '<div class="empty">No patient data yet.</div>'; return; }
+
+  var html = '';
+  for (var i = 0; i < patients.length; i++) {
+    var p = patients[i];
+    html += '<div class="patient-row">';
+    html += '<div class="patient-rank" style="background:rgba(139,92,246,0.15);color:#8b5cf6;">' + (i + 1) + '</div>';
+    html += '<div class="patient-name">' + esc(p.name) + '</div>';
+    html += '<div class="patient-count">' + p.count + ' visits</div>';
+    html += '</div>';
+  }
+  el.innerHTML = html;
+}
+
+function renderSpCountryBreakdown(countries) {
+  var el = document.getElementById('spCountryChart');
+  if (!countries || !countries.length) { el.innerHTML = '<div class="empty">No country data yet.</div>'; return; }
+
+  var maxCount = countries[0].count || 1;
+  var colors = ['#8b5cf6','#a78bfa','#c4b5fd','#7c3aed','#6d28d9','#5b21b6','#4c1d95','#ddd6fe','#ede9fe','#f5f3ff'];
+
+  var html = '';
+  for (var i = 0; i < countries.length; i++) {
+    var c = countries[i];
+    var pct = Math.round(c.count / maxCount * 100);
+    var color = colors[i % colors.length];
+    html += '<div class="h-bar-row">';
+    html += '<div class="h-bar-label" style="width:90px;font-size:12px;">' + esc(c.country) + '</div>';
+    html += '<div class="h-bar-track"><div class="h-bar-fill" style="width:' + pct + '%;background:' + color + ';"></div></div>';
+    html += '<div class="h-bar-pct">' + c.count + '</div>';
     html += '</div>';
   }
   el.innerHTML = html;
@@ -11668,6 +11857,14 @@ function apiAdminGetStatistics(sig) {
   var cancellerMap = {}; // email/phone -> { name, count }
   var busiestDay = { dateKey: '', count: 0, dayName: '' };
 
+  // Spinola-specific accumulators
+  var spBooked = 0, spCancelled = 0, spAttended = 0, spNoShow = 0;
+  var spCancelByDoctor = 0, spCancelByPatient = 0;
+  var spPatientMap = {};
+  var spCountryMap = {};
+  var spHourCounts = []; for (var sh = 0; sh < 24; sh++) spHourCounts.push(0);
+  var spWeekBuckets = {};
+
   // Weekly trend: bucket by week (Mon-Sun)
   var weekBuckets = {}; // mondayKey -> { booked, cancelled, label }
 
@@ -11715,6 +11912,8 @@ function apiAdminGetStatistics(sig) {
     var vals = getDayRows_(dk);
     var dayBooked = 0;
     var dayCancelled = 0;
+    var spDayBooked = 0;
+    var spDayCancelled = 0;
     if (vals.length) {
         for (var r = 0; r < vals.length; r++) {
           var status = String(vals[r][10] || '');
@@ -11732,9 +11931,21 @@ function apiAdminGetStatistics(sig) {
 
             // Location
             var loc = String(vals[r][11] || '').toLowerCase();
-            if (loc.indexOf('spinola') >= 0) locationSpinola++;
+            var isSpinola = loc.indexOf('spinola') >= 0;
+            if (isSpinola) locationSpinola++;
             else locationPotters++;
             if (status === 'RELOCATED_SPINOLA') relocatedSpinola++;
+
+            // Spinola-specific tracking
+            if (isSpinola) {
+              spBooked++;
+              spDayBooked++;
+              if (startTime) {
+                var sphr = Math.floor(parseTimeToMinutes_(startTime) / 60);
+                if (sphr >= 0 && sphr < 24) spHourCounts[sphr]++;
+              }
+              if (status === 'ATTENDED') spAttended++;
+            }
 
             // DOW booked count
             dowBooked[dow]++;
@@ -11748,6 +11959,10 @@ function apiAdminGetStatistics(sig) {
                 patientMap[pKey] = { name: String(vals[r][6] || ''), count: 0 };
               }
               patientMap[pKey].count++;
+              if (isSpinola) {
+                if (!spPatientMap[pKey]) spPatientMap[pKey] = { name: String(vals[r][6] || ''), count: 0 };
+                spPatientMap[pKey].count++;
+              }
             }
 
             // Country tracking from phone prefix
@@ -11756,6 +11971,10 @@ function apiAdminGetStatistics(sig) {
               if (cc) {
                 if (!countryMap[cc]) countryMap[cc] = 0;
                 countryMap[cc]++;
+                if (isSpinola) {
+                  if (!spCountryMap[cc]) spCountryMap[cc] = 0;
+                  spCountryMap[cc]++;
+                }
               }
             }
 
@@ -11774,11 +11993,19 @@ function apiAdminGetStatistics(sig) {
             dayBooked++; // Count in booked totals for capacity purposes
             totalBooked++;
             dowBooked[dow]++;
+            var nLoc = String(vals[r][11] || '').toLowerCase();
+            if (nLoc.indexOf('spinola') >= 0) { spNoShow++; spBooked++; spDayBooked++; }
           } else if (status.indexOf('CANCELLED') >= 0) {
             totalCancelled++;
             dayCancelled++;
             if (status === 'CANCELLED_DOCTOR') cancelByDoctor++;
             else cancelByPatient++;
+            var cLoc = String(vals[r][11] || '').toLowerCase();
+            if (cLoc.indexOf('spinola') >= 0) {
+              spCancelled++; spDayCancelled++;
+              if (status === 'CANCELLED_DOCTOR') spCancelByDoctor++;
+              else spCancelByPatient++;
+            }
 
             // Same-day cancellation check
             var cancelledAt = String(vals[r][16] || '');
@@ -11817,9 +12044,11 @@ function apiAdminGetStatistics(sig) {
           totalBooked++;
           dayBooked++;
           locationSpinola++;
+          spBooked++;
+          spDayBooked++;
           if (sStartTime) {
             var shr = Math.floor(parseTimeToMinutes_(sStartTime) / 60);
-            if (shr >= 0 && shr < 24) hourCounts[shr]++;
+            if (shr >= 0 && shr < 24) { hourCounts[shr]++; spHourCounts[shr]++; }
           }
           dowBooked[dow]++;
 
@@ -11829,6 +12058,8 @@ function apiAdminGetStatistics(sig) {
           if (sPKey) {
             if (!patientMap[sPKey]) patientMap[sPKey] = { name: String(spinolaVals[sr][6] || ''), count: 0 };
             patientMap[sPKey].count++;
+            if (!spPatientMap[sPKey]) spPatientMap[sPKey] = { name: String(spinolaVals[sr][6] || ''), count: 0 };
+            spPatientMap[sPKey].count++;
           }
 
           // Country tracking from phone prefix
@@ -11837,6 +12068,8 @@ function apiAdminGetStatistics(sig) {
             if (scc) {
               if (!countryMap[scc]) countryMap[scc] = 0;
               countryMap[scc]++;
+              if (!spCountryMap[scc]) spCountryMap[scc] = 0;
+              spCountryMap[scc]++;
             }
           }
 
@@ -11846,18 +12079,23 @@ function apiAdminGetStatistics(sig) {
             if (sLeadDays >= 0) leadTimes.push(sLeadDays);
           }
 
-          if (sStatus === 'ATTENDED') totalAttended++;
+          if (sStatus === 'ATTENDED') { totalAttended++; spAttended++; }
         } else if (sStatus === 'NO_SHOW') {
           totalNoShow++;
           dayBooked++;
           totalBooked++;
           dowBooked[dow]++;
           locationSpinola++;
+          spNoShow++;
+          spBooked++;
+          spDayBooked++;
         } else if (sStatus.indexOf('CANCELLED') >= 0) {
           totalCancelled++;
           dayCancelled++;
-          if (sStatus === 'CANCELLED_DOCTOR') cancelByDoctor++;
-          else cancelByPatient++;
+          spCancelled++;
+          spDayCancelled++;
+          if (sStatus === 'CANCELLED_DOCTOR') { cancelByDoctor++; spCancelByDoctor++; }
+          else { cancelByPatient++; spCancelByPatient++; }
 
           var sCancelledAt = String(spinolaVals[sr][16] || '');
           if (sCancelledAt && sCancelledAt.length >= 10 && sCancelledAt.substring(0, 10) === dk) {
@@ -11901,6 +12139,16 @@ function apiAdminGetStatistics(sig) {
     }
     weekBuckets[mondayKey].booked += dayBooked;
     weekBuckets[mondayKey].cancelled += dayCancelled;
+
+    // Spinola weekly trend bucketing
+    if (spDayBooked > 0 || spDayCancelled > 0) {
+      if (!spWeekBuckets[mondayKey]) {
+        var spMonthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        spWeekBuckets[mondayKey] = { booked: 0, cancelled: 0, label: spMonthNames[monday.getMonth()] + ' ' + monday.getDate() };
+      }
+      spWeekBuckets[mondayKey].booked += spDayBooked;
+      spWeekBuckets[mondayKey].cancelled += spDayCancelled;
+    }
 
     // Upcoming load (future days including today)
     if (i >= 0 && i <= FUTURE_DAYS) {
@@ -12008,6 +12256,35 @@ function apiAdminGetStatistics(sig) {
   cancellerList.sort(function(a, b) { return b.count - a.count; });
   var topCancellers = cancellerList.slice(0, 5).map(function(c) { return { name: c.name, count: c.count }; });
 
+  // Spinola derived metrics
+  var spTotalAll = spBooked + spCancelled;
+  var spCancelRate = spTotalAll > 0 ? Math.round(spCancelled / spTotalAll * 1000) / 10 : 0;
+  var spAttTotal = spAttended + spNoShow;
+  var spNoShowRate = spAttTotal > 0 ? Math.round(spNoShow / spAttTotal * 1000) / 10 : 0;
+
+  var spPatientKeys = Object.keys(spPatientMap);
+  var spUniquePatients = spPatientKeys.length;
+  var spPatientList = [];
+  for (var spi = 0; spi < spPatientKeys.length; spi++) {
+    spPatientList.push(spPatientMap[spPatientKeys[spi]]);
+  }
+  spPatientList.sort(function(a, b) { return b.count - a.count; });
+  var spTopPatients = spPatientList.slice(0, 5).map(function(p) { return { name: p.name, count: p.count }; });
+
+  var spCountryList = [];
+  var spCKeys = Object.keys(spCountryMap);
+  for (var sci = 0; sci < spCKeys.length; sci++) {
+    spCountryList.push({ country: spCKeys[sci], count: spCountryMap[spCKeys[sci]] });
+  }
+  spCountryList.sort(function(a, b) { return b.count - a.count; });
+
+  var spWeekKeys = Object.keys(spWeekBuckets).sort();
+  var spWeeklyTrend = [];
+  for (var swi = 0; swi < spWeekKeys.length; swi++) {
+    spWeeklyTrend.push(spWeekBuckets[spWeekKeys[swi]]);
+  }
+  if (spWeeklyTrend.length > 4) spWeeklyTrend = spWeeklyTrend.slice(spWeeklyTrend.length - 4);
+
   return {
     ok: true,
     generated: Utilities.formatDate(new Date(), getTimeZone_(), "yyyy-MM-dd HH:mm"),
@@ -12037,7 +12314,22 @@ function apiAdminGetStatistics(sig) {
     pushedNextDay: pushedNextDay,
     pushedSameDay: pushedSameDay,
     countryBreakdown: countryList,
-    topCancellers: topCancellers
+    topCancellers: topCancellers,
+    spinola: {
+      totalBooked: spBooked,
+      totalCancelled: spCancelled,
+      cancelRate: spCancelRate,
+      totalAttended: spAttended,
+      totalNoShow: spNoShow,
+      noShowRate: spNoShowRate,
+      uniquePatients: spUniquePatients,
+      topPatients: spTopPatients,
+      countryBreakdown: spCountryList,
+      peakHours: spHourCounts,
+      directBookings: Math.max(0, spBooked - relocatedSpinola),
+      relocatedBookings: relocatedSpinola,
+      weeklyTrend: spWeeklyTrend
+    }
   };
 }
 
