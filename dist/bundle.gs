@@ -2715,6 +2715,7 @@ var _HTML_TEMPLATES = {
               _spinolaDateKey = dateKey;
               els.btnBookSpinola.disabled = false;
               els.btnBookSpinola.classList.add('active');
+              els.btnBookSpinola.scrollIntoView({ behavior: 'smooth', block: 'end' });
             });
             els.spinolaSlotsGrid.appendChild(b);
           });
