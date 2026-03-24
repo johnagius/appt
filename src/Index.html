@@ -2714,6 +2714,7 @@
               var dateOpt = (state.dateOptions || []).find(function(o) { return o.dateKey === _spinolaDateKey; });
               var dateLabel2 = dateOpt ? dateOpt.label : _spinolaDateKey;
               var text = t('confirmMsg', res.serviceName, dateLabel2, to12h(res.startTime), to12h(res.endTime), res.location);
+              if (res.calWarning) console.warn('SPINOLA CAL:', res.calWarning);
               showConfirmModal(text);
               return;
             }

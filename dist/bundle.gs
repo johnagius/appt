@@ -2721,6 +2721,7 @@ var _HTML_TEMPLATES = {
               var dateOpt = (state.dateOptions || []).find(function(o) { return o.dateKey === _spinolaDateKey; });
               var dateLabel2 = dateOpt ? dateOpt.label : _spinolaDateKey;
               var text = t('confirmMsg', res.serviceName, dateLabel2, to12h(res.startTime), to12h(res.endTime), res.location);
+              if (res.calWarning) console.warn('SPINOLA CAL:', res.calWarning);
               showConfirmModal(text);
               return;
             }
@@ -10044,11 +10045,13 @@ function apiBookSpinola(payload) {
     };
 
     // Create event on Spinola calendar
+    var calWarning = '';
     try {
       var eventId = createSpinolaCalendarEvent_(apptObj);
       apptObj.calendarEventId = eventId;
     } catch (e) {
-      Logger.log('WARN: Failed to create Spinola calendar event: ' + e.message);
+      calWarning = 'Calendar event failed: ' + e.message;
+      Logger.log('WARN: ' + calWarning + ' | Stack: ' + (e.stack || ''));
     }
 
     // Append to Spinola spreadsheet
@@ -10061,7 +10064,7 @@ function apiBookSpinola(payload) {
       sendDoctorBookingEmail_(apptObj, dayList);
     } catch (e) {}
 
-    return {
+    var result = {
       ok: true,
       appointmentId: appointmentId,
       dateKey: dateKey,
@@ -10070,6 +10073,8 @@ function apiBookSpinola(payload) {
       serviceName: apptObj.serviceName,
       location: apptObj.location
     };
+    if (calWarning) result.calWarning = calWarning;
+    return result;
   } finally {
     lock.releaseLock();
   }

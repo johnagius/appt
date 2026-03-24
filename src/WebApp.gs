@@ -635,11 +635,13 @@ function apiBookSpinola(payload) {
     };
 
     // Create event on Spinola calendar
+    var calWarning = '';
     try {
       var eventId = createSpinolaCalendarEvent_(apptObj);
       apptObj.calendarEventId = eventId;
     } catch (e) {
-      Logger.log('WARN: Failed to create Spinola calendar event: ' + e.message);
+      calWarning = 'Calendar event failed: ' + e.message;
+      Logger.log('WARN: ' + calWarning + ' | Stack: ' + (e.stack || ''));
     }
 
     // Append to Spinola spreadsheet
@@ -652,7 +654,7 @@ function apiBookSpinola(payload) {
       sendDoctorBookingEmail_(apptObj, dayList);
     } catch (e) {}
 
-    return {
+    var result = {
       ok: true,
       appointmentId: appointmentId,
       dateKey: dateKey,
@@ -661,6 +663,8 @@ function apiBookSpinola(payload) {
       serviceName: apptObj.serviceName,
       location: apptObj.location
     };
+    if (calWarning) result.calWarning = calWarning;
+    return result;
   } finally {
     lock.releaseLock();
   }
