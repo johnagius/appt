@@ -813,15 +813,15 @@
 
       <!-- Spinola inline offer (shown when no Potter's slots & Spinola is open) -->
       <div class="spinola-inline" id="spinolaInline">
-        <h3 id="spinolaTitle">No slots available at Potter's Clinic</h3>
-        <p class="spinola-subtitle" id="spinolaSubtitle">Would you like to see another doctor or try another day?</p>
+        <h3 id="spinolaTitle" data-i18n="spinolaOfferTitle">No slots available at Potter's Clinic</h3>
+        <p class="spinola-subtitle" id="spinolaSubtitle" data-i18n="spinolaSubtitle">Would you like to see another doctor or try another day?</p>
 
         <div class="spinola-option-card" id="spinolaOptionCard">
-          <h4 id="spinolaDrLabel">See Dr James at Spinola Clinic</h4>
+          <h4 id="spinolaDrLabel" data-i18n="spinolaOfferDrJames">See Dr James at Spinola Clinic</h4>
           <p class="spinola-loc-details" id="spinolaLocDetails">Near McDonald's, Love Statue, near bus stop, in Spinola</p>
           <p class="spinola-date-label" id="spinolaDateLabel"></p>
           <div class="spinola-slots-grid" id="spinolaSlotsGrid"></div>
-          <div class="spinola-no-slots" id="spinolaNoSlots" style="display:none">No slots available at Spinola for this date.</div>
+          <div class="spinola-no-slots" id="spinolaNoSlots" style="display:none" data-i18n="spinolaNoSlots">No slots available at Spinola for this date.</div>
         </div>
       </div>
 
@@ -870,11 +870,11 @@
 
       <!-- Dr Kevin next day option (shown when no Potter's slots) -->
       <div class="spinola-inline" id="kevinNextSection">
-        <div class="spinola-divider">&mdash; or &mdash;</div>
+        <div class="spinola-divider" id="spinolaOrDivider" data-i18n="spinolaOrDivider">&mdash; or &mdash;</div>
         <div class="spinola-option-card">
-          <h4 id="spinolaKevinLabel">See Dr Kevin on another day</h4>
-          <p class="spinola-loc-details" id="spinolaKevinDesc">We'll find the next available day for Dr Kevin at Potter's Clinic.</p>
-          <button class="btnKevinNext" id="btnKevinNext">Next available Dr Kevin day</button>
+          <h4 id="spinolaKevinLabel" data-i18n="spinolaOfferDrKevin">See Dr Kevin on another day</h4>
+          <p class="spinola-loc-details" id="spinolaKevinDesc" data-i18n="spinolaKevinNextDesc">We'll find the next available day for Dr Kevin at Potter's Clinic.</p>
+          <button class="btnKevinNext" id="btnKevinNext" data-i18n="spinolaKevinNextBtn">Next available Dr Kevin day</button>
         </div>
       </div>
 
@@ -1069,6 +1069,8 @@
       valService:'Please select a service.',valDate:'Please select a date.',valTime:'Please select a time slot.',
       valName:'Full name is required.',valPhone:'Phone number is required.',valEmail:'Email is required.',
       valEmailFormat:'Please enter a valid email.',timeDash:'—',
+      spinolaSubtitle:'Would you like to see another doctor or try another day?',
+      spinolaOrDivider:'\u2014 or \u2014',
       spinolaOfferTitle:"No slots available at Potter's Clinic",
       spinolaOfferDrJames:'See Dr James at Spinola Clinic',
       spinolaOfferDrKevin:'See Dr Kevin on another day',
@@ -1103,7 +1105,17 @@
       noAvailability:'Pas de disponibilité.',
       valService:'Veuillez sélectionner un service.',valDate:'Veuillez sélectionner une date.',valTime:'Veuillez sélectionner un créneau.',
       valName:'Le nom complet est requis.',valPhone:'Le numéro de téléphone est requis.',valEmail:'L\'e-mail est requis.',
-      valEmailFormat:'Veuillez entrer un e-mail valide.',timeDash:'—'
+      valEmailFormat:'Veuillez entrer un e-mail valide.',timeDash:'—',
+      spinolaSubtitle:'Souhaitez-vous voir un autre médecin ou essayer un autre jour ?',
+      spinolaOrDivider:'\u2014 ou \u2014',
+      spinolaOfferTitle:'Aucun créneau disponible à Potter\'s Clinic',
+      spinolaOfferDrJames:'Voir Dr James à Spinola Clinic',
+      spinolaOfferDrKevin:'Voir Dr Kevin un autre jour',
+      spinolaKevinNextDesc:'Nous trouverons le prochain jour disponible pour Dr Kevin à Potter\'s Clinic.',
+      spinolaKevinNextBtn:'Prochain jour Dr Kevin disponible',
+      spinolaBookBtn:'Réserver à Spinola Clinic',
+      spinolaDateSlots:'Créneaux disponibles pour',
+      spinolaNoSlots:'Aucun créneau disponible à Spinola Clinic pour cette date.'
     };
 
     TR.es = {
@@ -1130,7 +1142,17 @@
       noAvailability:'Sin disponibilidad.',
       valService:'Seleccione un servicio.',valDate:'Seleccione una fecha.',valTime:'Seleccione un turno.',
       valName:'El nombre completo es obligatorio.',valPhone:'El teléfono es obligatorio.',valEmail:'El correo es obligatorio.',
-      valEmailFormat:'Ingrese un correo válido.',timeDash:'—'
+      valEmailFormat:'Ingrese un correo válido.',timeDash:'—',
+      spinolaSubtitle:'¿Le gustaría ver a otro médico o probar otro día?',
+      spinolaOrDivider:'\u2014 o \u2014',
+      spinolaOfferTitle:'No hay turnos disponibles en Potter\'s Clinic',
+      spinolaOfferDrJames:'Ver Dr James en Spinola Clinic',
+      spinolaOfferDrKevin:'Ver Dr Kevin otro día',
+      spinolaKevinNextDesc:'Buscaremos el próximo día disponible para Dr Kevin en Potter\'s Clinic.',
+      spinolaKevinNextBtn:'Próximo día Dr Kevin disponible',
+      spinolaBookBtn:'Reservar en Spinola Clinic',
+      spinolaDateSlots:'Turnos disponibles para',
+      spinolaNoSlots:'No hay turnos disponibles en Spinola Clinic para esta fecha.'
     };
 
     TR.it = {
@@ -1158,6 +1180,8 @@
       valService:'Seleziona un servizio.',valDate:'Seleziona una data.',valTime:'Seleziona un orario.',
       valName:'Il nome completo è obbligatorio.',valPhone:'Il telefono è obbligatorio.',valEmail:'L\'email è obbligatoria.',
       valEmailFormat:'Inserisci un\'email valida.',timeDash:'—',
+      spinolaSubtitle:'Vuoi vedere un altro dottore o provare un altro giorno?',
+      spinolaOrDivider:'\u2014 oppure \u2014',
       spinolaOfferTitle:'Nessuno slot disponibile presso la Clinica Potter\'s',
       spinolaOfferDrJames:'Vedi Dr James alla Clinica Spinola',
       spinolaOfferDrKevin:'Vedi Dr Kevin un altro giorno',
@@ -1192,7 +1216,17 @@
       noAvailability:'无可用时间。',
       valService:'请选择服务。',valDate:'请选择日期。',valTime:'请选择时段。',
       valName:'请填写全名。',valPhone:'请填写电话号码。',valEmail:'请填写邮箱。',
-      valEmailFormat:'请输入有效的邮箱地址。',timeDash:'—'
+      valEmailFormat:'请输入有效的邮箱地址。',timeDash:'—',
+      spinolaSubtitle:'您想看另一位医生还是换一天？',
+      spinolaOrDivider:'\u2014 或 \u2014',
+      spinolaOfferTitle:'Potter\'s Clinic 没有可用时段',
+      spinolaOfferDrJames:'在 Spinola Clinic 看 Dr James',
+      spinolaOfferDrKevin:'换一天看 Dr Kevin',
+      spinolaKevinNextDesc:'我们会为您查找 Dr Kevin 在 Potter\'s Clinic 的下一个可用日期。',
+      spinolaKevinNextBtn:'下一个 Dr Kevin 可用日',
+      spinolaBookBtn:'在 Spinola Clinic 预约',
+      spinolaDateSlots:'可用时段：',
+      spinolaNoSlots:'Spinola Clinic 在此日期没有可用时段。'
     };
 
     TR.hi = {
@@ -1219,7 +1253,17 @@
       noAvailability:'कोई उपलब्धता नहीं।',
       valService:'कृपया एक सेवा चुनें।',valDate:'कृपया एक तारीख चुनें।',valTime:'कृपया एक समय स्लॉट चुनें।',
       valName:'पूरा नाम आवश्यक है।',valPhone:'फ़ोन नंबर आवश्यक है।',valEmail:'ईमेल आवश्यक है।',
-      valEmailFormat:'कृपया एक मान्य ईमेल दर्ज करें।',timeDash:'—'
+      valEmailFormat:'कृपया एक मान्य ईमेल दर्ज करें।',timeDash:'—',
+      spinolaSubtitle:'क्या आप किसी अन्य डॉक्टर को दिखाना चाहेंगे या कोई अन्य दिन आज़माना चाहेंगे?',
+      spinolaOrDivider:'\u2014 या \u2014',
+      spinolaOfferTitle:'Potter\'s Clinic में कोई स्लॉट उपलब्ध नहीं',
+      spinolaOfferDrJames:'Spinola Clinic में Dr James से मिलें',
+      spinolaOfferDrKevin:'Dr Kevin को किसी अन्य दिन दिखाएँ',
+      spinolaKevinNextDesc:'हम Potter\'s Clinic में Dr Kevin के लिए अगला उपलब्ध दिन खोजेंगे।',
+      spinolaKevinNextBtn:'अगला Dr Kevin उपलब्ध दिन',
+      spinolaBookBtn:'Spinola Clinic में बुक करें',
+      spinolaDateSlots:'उपलब्ध स्लॉट:',
+      spinolaNoSlots:'इस तारीख के लिए Spinola Clinic में कोई स्लॉट उपलब्ध नहीं।'
     };
 
     TR.pt = {
@@ -1246,7 +1290,17 @@
       noAvailability:'Sem disponibilidade.',
       valService:'Selecione um serviço.',valDate:'Selecione uma data.',valTime:'Selecione um horário.',
       valName:'Nome completo é obrigatório.',valPhone:'Telefone é obrigatório.',valEmail:'E-mail é obrigatório.',
-      valEmailFormat:'Insira um e-mail válido.',timeDash:'—'
+      valEmailFormat:'Insira um e-mail válido.',timeDash:'—',
+      spinolaSubtitle:'Gostaria de ver outro médico ou tentar outro dia?',
+      spinolaOrDivider:'\u2014 ou \u2014',
+      spinolaOfferTitle:'Sem horários disponíveis em Potter\'s Clinic',
+      spinolaOfferDrJames:'Ver Dr James em Spinola Clinic',
+      spinolaOfferDrKevin:'Ver Dr Kevin noutro dia',
+      spinolaKevinNextDesc:'Encontraremos o próximo dia disponível para Dr Kevin em Potter\'s Clinic.',
+      spinolaKevinNextBtn:'Próximo dia Dr Kevin disponível',
+      spinolaBookBtn:'Reservar em Spinola Clinic',
+      spinolaDateSlots:'Horários disponíveis para',
+      spinolaNoSlots:'Sem horários disponíveis em Spinola Clinic para esta data.'
     };
 
     TR.ru = {
@@ -1273,7 +1327,17 @@
       noAvailability:'Нет доступного времени.',
       valService:'Выберите услугу.',valDate:'Выберите дату.',valTime:'Выберите время.',
       valName:'ФИО обязательно.',valPhone:'Телефон обязателен.',valEmail:'Эл. почта обязательна.',
-      valEmailFormat:'Введите корректный адрес эл. почты.',timeDash:'—'
+      valEmailFormat:'Введите корректный адрес эл. почты.',timeDash:'—',
+      spinolaSubtitle:'Хотите записаться к другому врачу или попробовать другой день?',
+      spinolaOrDivider:'\u2014 или \u2014',
+      spinolaOfferTitle:'Нет свободных слотов в Potter\'s Clinic',
+      spinolaOfferDrJames:'Записаться к Dr James в Spinola Clinic',
+      spinolaOfferDrKevin:'Записаться к Dr Kevin на другой день',
+      spinolaKevinNextDesc:'Мы найдём ближайший свободный день для Dr Kevin в Potter\'s Clinic.',
+      spinolaKevinNextBtn:'Ближайший день Dr Kevin',
+      spinolaBookBtn:'Записаться в Spinola Clinic',
+      spinolaDateSlots:'Доступные слоты на',
+      spinolaNoSlots:'Нет свободных слотов в Spinola Clinic на эту дату.'
     };
 
 
@@ -1301,7 +1365,17 @@
       noAvailability:'空きがありません。',
       valService:'サービスを選択してください。',valDate:'日付を選択してください。',valTime:'時間枠を選択してください。',
       valName:'氏名は必須です。',valPhone:'電話番号は必須です。',valEmail:'メールは必須です。',
-      valEmailFormat:'有効なメールアドレスを入力してください。',timeDash:'—'
+      valEmailFormat:'有効なメールアドレスを入力してください。',timeDash:'—',
+      spinolaSubtitle:'別の医師の診察を希望しますか、それとも別の日をお試しになりますか？',
+      spinolaOrDivider:'\u2014 または \u2014',
+      spinolaOfferTitle:'Potter\'s Clinic に空きがありません',
+      spinolaOfferDrJames:'Spinola Clinic で Dr James の診察',
+      spinolaOfferDrKevin:'別の日に Dr Kevin の診察',
+      spinolaKevinNextDesc:'Potter\'s Clinic での Dr Kevin の次の空き日を検索します。',
+      spinolaKevinNextBtn:'次の Dr Kevin 空き日',
+      spinolaBookBtn:'Spinola Clinic で予約',
+      spinolaDateSlots:'利用可能な時間帯：',
+      spinolaNoSlots:'この日は Spinola Clinic に空きがありません。'
     };
 
     TR.pa = {
@@ -1328,7 +1402,17 @@
       noAvailability:'ਕੋਈ ਉਪਲਬਧਤਾ ਨਹੀਂ।',
       valService:'ਕਿਰਪਾ ਕਰਕੇ ਇੱਕ ਸੇਵਾ ਚੁਣੋ।',valDate:'ਕਿਰਪਾ ਕਰਕੇ ਇੱਕ ਤਾਰੀਖ ਚੁਣੋ।',valTime:'ਕਿਰਪਾ ਕਰਕੇ ਇੱਕ ਸਮਾਂ ਸਲਾਟ ਚੁਣੋ।',
       valName:'ਪੂਰਾ ਨਾਮ ਜ਼ਰੂਰੀ ਹੈ।',valPhone:'ਫ਼ੋਨ ਨੰਬਰ ਜ਼ਰੂਰੀ ਹੈ।',valEmail:'ਈਮੇਲ ਜ਼ਰੂਰੀ ਹੈ।',
-      valEmailFormat:'ਕਿਰਪਾ ਕਰਕੇ ਇੱਕ ਵੈਧ ਈਮੇਲ ਦਰਜ ਕਰੋ।',timeDash:'—'
+      valEmailFormat:'ਕਿਰਪਾ ਕਰਕੇ ਇੱਕ ਵੈਧ ਈਮੇਲ ਦਰਜ ਕਰੋ।',timeDash:'—',
+      spinolaSubtitle:'ਕੀ ਤੁਸੀਂ ਕਿਸੇ ਹੋਰ ਡਾਕਟਰ ਨੂੰ ਮਿਲਣਾ ਚਾਹੋਗੇ ਜਾਂ ਕੋਈ ਹੋਰ ਦਿਨ ਅਜ਼ਮਾਉਣਾ ਚਾਹੋਗੇ?',
+      spinolaOrDivider:'\u2014 ਜਾਂ \u2014',
+      spinolaOfferTitle:'Potter\'s Clinic ਵਿੱਚ ਕੋਈ ਸਲਾਟ ਉਪਲਬਧ ਨਹੀਂ',
+      spinolaOfferDrJames:'Spinola Clinic ਵਿੱਚ Dr James ਨੂੰ ਮਿਲੋ',
+      spinolaOfferDrKevin:'Dr Kevin ਨੂੰ ਕਿਸੇ ਹੋਰ ਦਿਨ ਮਿਲੋ',
+      spinolaKevinNextDesc:'ਅਸੀਂ Potter\'s Clinic ਵਿੱਚ Dr Kevin ਲਈ ਅਗਲਾ ਉਪਲਬਧ ਦਿਨ ਲੱਭਾਂਗੇ।',
+      spinolaKevinNextBtn:'ਅਗਲਾ Dr Kevin ਉਪਲਬਧ ਦਿਨ',
+      spinolaBookBtn:'Spinola Clinic ਵਿੱਚ ਬੁੱਕ ਕਰੋ',
+      spinolaDateSlots:'ਉਪਲਬਧ ਸਲਾਟ:',
+      spinolaNoSlots:'ਇਸ ਤਾਰੀਖ਼ ਲਈ Spinola Clinic ਵਿੱਚ ਕੋਈ ਸਲਾਟ ਉਪਲਬਧ ਨਹੀਂ।'
     };
 
     TR.tr = {
@@ -1355,7 +1439,17 @@
       noAvailability:'Müsaitlik yok.',
       valService:'Lütfen bir hizmet seçin.',valDate:'Lütfen bir tarih seçin.',valTime:'Lütfen bir saat seçin.',
       valName:'Ad Soyad gereklidir.',valPhone:'Telefon gereklidir.',valEmail:'E-posta gereklidir.',
-      valEmailFormat:'Geçerli bir e-posta girin.',timeDash:'—'
+      valEmailFormat:'Geçerli bir e-posta girin.',timeDash:'—',
+      spinolaSubtitle:'Başka bir doktora gitmek veya başka bir gün denemek ister misiniz?',
+      spinolaOrDivider:'\u2014 veya \u2014',
+      spinolaOfferTitle:'Potter\'s Clinic\'te uygun randevu yok',
+      spinolaOfferDrJames:'Spinola Clinic\'te Dr James\'i görün',
+      spinolaOfferDrKevin:'Dr Kevin\'i başka bir gün görün',
+      spinolaKevinNextDesc:'Potter\'s Clinic\'te Dr Kevin için bir sonraki uygun günü bulacağız.',
+      spinolaKevinNextBtn:'Sonraki Dr Kevin uygun günü',
+      spinolaBookBtn:'Spinola Clinic\'te randevu alın',
+      spinolaDateSlots:'Uygun randevular:',
+      spinolaNoSlots:'Bu tarihte Spinola Clinic\'te uygun randevu yok.'
     };
 
     TR.ar = {
@@ -1382,7 +1476,17 @@
       noAvailability:'لا توجد أوقات متاحة.',
       valService:'يرجى اختيار خدمة.',valDate:'يرجى اختيار تاريخ.',valTime:'يرجى اختيار وقت.',
       valName:'الاسم الكامل مطلوب.',valPhone:'رقم الهاتف مطلوب.',valEmail:'البريد الإلكتروني مطلوب.',
-      valEmailFormat:'يرجى إدخال بريد إلكتروني صحيح.',timeDash:'—'
+      valEmailFormat:'يرجى إدخال بريد إلكتروني صحيح.',timeDash:'—',
+      spinolaSubtitle:'هل ترغب في رؤية طبيب آخر أو تجربة يوم آخر؟',
+      spinolaOrDivider:'\u2014 أو \u2014',
+      spinolaOfferTitle:'لا توجد مواعيد متاحة في Potter\'s Clinic',
+      spinolaOfferDrJames:'زيارة Dr James في Spinola Clinic',
+      spinolaOfferDrKevin:'زيارة Dr Kevin في يوم آخر',
+      spinolaKevinNextDesc:'سنجد اليوم التالي المتاح لـ Dr Kevin في Potter\'s Clinic.',
+      spinolaKevinNextBtn:'اليوم التالي المتاح لـ Dr Kevin',
+      spinolaBookBtn:'حجز في Spinola Clinic',
+      spinolaDateSlots:'المواعيد المتاحة لـ',
+      spinolaNoSlots:'لا توجد مواعيد متاحة في Spinola Clinic لهذا التاريخ.'
     };
 
     TR.pl = {
@@ -1409,7 +1513,17 @@
       noAvailability:'Brak dostępności.',
       valService:'Wybierz usługę.',valDate:'Wybierz datę.',valTime:'Wybierz godzinę.',
       valName:'Imię i nazwisko jest wymagane.',valPhone:'Telefon jest wymagany.',valEmail:'E-mail jest wymagany.',
-      valEmailFormat:'Wprowadź prawidłowy e-mail.',timeDash:'—'
+      valEmailFormat:'Wprowadź prawidłowy e-mail.',timeDash:'—',
+      spinolaSubtitle:'Czy chcesz umówić się do innego lekarza lub spróbować innego dnia?',
+      spinolaOrDivider:'\u2014 lub \u2014',
+      spinolaOfferTitle:'Brak dostępnych terminów w Potter\'s Clinic',
+      spinolaOfferDrJames:'Wizyta u Dr James w Spinola Clinic',
+      spinolaOfferDrKevin:'Wizyta u Dr Kevin innego dnia',
+      spinolaKevinNextDesc:'Znajdziemy najbliższy dostępny termin Dr Kevin w Potter\'s Clinic.',
+      spinolaKevinNextBtn:'Następny dostępny dzień Dr Kevin',
+      spinolaBookBtn:'Zarezerwuj w Spinola Clinic',
+      spinolaDateSlots:'Dostępne terminy na',
+      spinolaNoSlots:'Brak dostępnych terminów w Spinola Clinic na ten dzień.'
     };
 
     TR.sr = {
@@ -1436,7 +1550,17 @@
       noAvailability:'Nema dostupnosti.',
       valService:'Izaberite uslugu.',valDate:'Izaberite datum.',valTime:'Izaberite termin.',
       valName:'Ime i prezime je obavezno.',valPhone:'Telefon je obavezan.',valEmail:'E-mail je obavezan.',
-      valEmailFormat:'Unesite ispravnu e-mail adresu.',timeDash:'—'
+      valEmailFormat:'Unesite ispravnu e-mail adresu.',timeDash:'—',
+      spinolaSubtitle:'Да ли желите да видите другог лекара или да пробате други дан?',
+      spinolaOrDivider:'\u2014 или \u2014',
+      spinolaOfferTitle:'Нема доступних термина у Potter\'s Clinic',
+      spinolaOfferDrJames:'Посетите Dr James у Spinola Clinic',
+      spinolaOfferDrKevin:'Посетите Dr Kevin другог дана',
+      spinolaKevinNextDesc:'Пронаћи ћемо следећи доступан дан за Dr Kevin у Potter\'s Clinic.',
+      spinolaKevinNextBtn:'Следећи доступан дан Dr Kevin',
+      spinolaBookBtn:'Резервишите у Spinola Clinic',
+      spinolaDateSlots:'Доступни термини за',
+      spinolaNoSlots:'Нема доступних термина у Spinola Clinic за овај датум.'
     };
 
     TR.hr = {
@@ -1463,7 +1587,17 @@
       noAvailability:'Nema dostupnosti.',
       valService:'Odaberite uslugu.',valDate:'Odaberite datum.',valTime:'Odaberite termin.',
       valName:'Ime i prezime je obavezno.',valPhone:'Telefon je obavezan.',valEmail:'E-mail je obavezan.',
-      valEmailFormat:'Unesite ispravnu e-mail adresu.',timeDash:'—'
+      valEmailFormat:'Unesite ispravnu e-mail adresu.',timeDash:'—',
+      spinolaSubtitle:'Želite li posjetiti drugog liječnika ili pokušati drugi dan?',
+      spinolaOrDivider:'\u2014 ili \u2014',
+      spinolaOfferTitle:'Nema dostupnih termina u Potter\'s Clinic',
+      spinolaOfferDrJames:'Posjetite Dr James u Spinola Clinic',
+      spinolaOfferDrKevin:'Posjetite Dr Kevin drugi dan',
+      spinolaKevinNextDesc:'Pronaći ćemo sljedeći dostupan dan za Dr Kevin u Potter\'s Clinic.',
+      spinolaKevinNextBtn:'Sljedeći dostupan dan Dr Kevin',
+      spinolaBookBtn:'Rezervirajte u Spinola Clinic',
+      spinolaDateSlots:'Dostupni termini za',
+      spinolaNoSlots:'Nema dostupnih termina u Spinola Clinic za ovaj datum.'
     };
 
     TR.bs = {
@@ -1490,7 +1624,17 @@
       noAvailability:'Nema dostupnosti.',
       valService:'Odaberite uslugu.',valDate:'Odaberite datum.',valTime:'Odaberite termin.',
       valName:'Ime i prezime je obavezno.',valPhone:'Telefon je obavezan.',valEmail:'E-mail je obavezan.',
-      valEmailFormat:'Unesite ispravnu e-mail adresu.',timeDash:'—'
+      valEmailFormat:'Unesite ispravnu e-mail adresu.',timeDash:'—',
+      spinolaSubtitle:'Želite li posjetiti drugog ljekara ili pokušati drugi dan?',
+      spinolaOrDivider:'\u2014 ili \u2014',
+      spinolaOfferTitle:'Nema dostupnih termina u Potter\'s Clinic',
+      spinolaOfferDrJames:'Posjetite Dr James u Spinola Clinic',
+      spinolaOfferDrKevin:'Posjetite Dr Kevin drugi dan',
+      spinolaKevinNextDesc:'Pronaći ćemo sljedeći dostupan dan za Dr Kevin u Potter\'s Clinic.',
+      spinolaKevinNextBtn:'Sljedeći dostupan dan Dr Kevin',
+      spinolaBookBtn:'Rezervišite u Spinola Clinic',
+      spinolaDateSlots:'Dostupni termini za',
+      spinolaNoSlots:'Nema dostupnih termina u Spinola Clinic za ovaj datum.'
     };
 
     TR.uk = {
@@ -1517,7 +1661,17 @@
       noAvailability:'Немає доступного часу.',
       valService:'Оберіть послугу.',valDate:'Оберіть дату.',valTime:'Оберіть час.',
       valName:'Повне ім\'я обов\'язкове.',valPhone:'Телефон обов\'язковий.',valEmail:'Ел. пошта обов\'язкова.',
-      valEmailFormat:'Введіть дійсну ел. пошту.',timeDash:'—'
+      valEmailFormat:'Введіть дійсну ел. пошту.',timeDash:'—',
+      spinolaSubtitle:'Бажаєте записатися до іншого лікаря або спробувати інший день?',
+      spinolaOrDivider:'\u2014 або \u2014',
+      spinolaOfferTitle:'Немає вільних слотів у Potter\'s Clinic',
+      spinolaOfferDrJames:'Записатися до Dr James у Spinola Clinic',
+      spinolaOfferDrKevin:'Записатися до Dr Kevin на інший день',
+      spinolaKevinNextDesc:'Ми знайдемо найближчий вільний день Dr Kevin у Potter\'s Clinic.',
+      spinolaKevinNextBtn:'Наступний вільний день Dr Kevin',
+      spinolaBookBtn:'Записатися в Spinola Clinic',
+      spinolaDateSlots:'Доступні слоти на',
+      spinolaNoSlots:'Немає вільних слотів у Spinola Clinic на цю дату.'
     };
 
     TR.fil = {
@@ -1544,7 +1698,17 @@
       noAvailability:'Walang availability.',
       valService:'Pumili ng serbisyo.',valDate:'Pumili ng petsa.',valTime:'Pumili ng oras.',
       valName:'Kailangan ang buong pangalan.',valPhone:'Kailangan ang telepono.',valEmail:'Kailangan ang email.',
-      valEmailFormat:'Maglagay ng tamang email.',timeDash:'—'
+      valEmailFormat:'Maglagay ng tamang email.',timeDash:'—',
+      spinolaSubtitle:'Gusto mo bang magpatingin sa ibang doktor o subukan sa ibang araw?',
+      spinolaOrDivider:'\u2014 o \u2014',
+      spinolaOfferTitle:'Walang available na slot sa Potter\'s Clinic',
+      spinolaOfferDrJames:'Magpatingin kay Dr James sa Spinola Clinic',
+      spinolaOfferDrKevin:'Magpatingin kay Dr Kevin sa ibang araw',
+      spinolaKevinNextDesc:'Hahanapin namin ang susunod na available na araw para kay Dr Kevin sa Potter\'s Clinic.',
+      spinolaKevinNextBtn:'Susunod na available na araw ni Dr Kevin',
+      spinolaBookBtn:'Mag-book sa Spinola Clinic',
+      spinolaDateSlots:'Available na slot para sa',
+      spinolaNoSlots:'Walang available na slot sa Spinola Clinic para sa petsa na ito.'
     };
 
     TR.bg = {
@@ -1571,7 +1735,17 @@
       noAvailability:'Няма наличност.',
       valService:'Моля, изберете услуга.',valDate:'Моля, изберете дата.',valTime:'Моля, изберете час.',
       valName:'Пълното име е задължително.',valPhone:'Телефонът е задължителен.',valEmail:'Имейлът е задължителен.',
-      valEmailFormat:'Въведете валиден имейл.',timeDash:'—'
+      valEmailFormat:'Въведете валиден имейл.',timeDash:'—',
+      spinolaSubtitle:'Желаете ли да посетите друг лекар или да опитате друг ден?',
+      spinolaOrDivider:'\u2014 или \u2014',
+      spinolaOfferTitle:'Няма свободни часове в Potter\'s Clinic',
+      spinolaOfferDrJames:'Посетете Dr James в Spinola Clinic',
+      spinolaOfferDrKevin:'Посетете Dr Kevin друг ден',
+      spinolaKevinNextDesc:'Ще намерим следващия свободен ден за Dr Kevin в Potter\'s Clinic.',
+      spinolaKevinNextBtn:'Следващ свободен ден на Dr Kevin',
+      spinolaBookBtn:'Резервирайте в Spinola Clinic',
+      spinolaDateSlots:'Свободни часове за',
+      spinolaNoSlots:'Няма свободни часове в Spinola Clinic за тази дата.'
     };
 
     TR.ro = {
@@ -1598,7 +1772,17 @@
       noAvailability:'Fără disponibilitate.',
       valService:'Selectați un serviciu.',valDate:'Selectați o dată.',valTime:'Selectați o oră.',
       valName:'Numele complet este obligatoriu.',valPhone:'Telefonul este obligatoriu.',valEmail:'E-mailul este obligatoriu.',
-      valEmailFormat:'Introduceți un e-mail valid.',timeDash:'—'
+      valEmailFormat:'Introduceți un e-mail valid.',timeDash:'—',
+      spinolaSubtitle:'Doriți să consultați un alt medic sau să încercați o altă zi?',
+      spinolaOrDivider:'\u2014 sau \u2014',
+      spinolaOfferTitle:'Nu sunt locuri disponibile la Potter\'s Clinic',
+      spinolaOfferDrJames:'Consultați Dr James la Spinola Clinic',
+      spinolaOfferDrKevin:'Consultați Dr Kevin într-o altă zi',
+      spinolaKevinNextDesc:'Vom găsi următoarea zi disponibilă pentru Dr Kevin la Potter\'s Clinic.',
+      spinolaKevinNextBtn:'Următoarea zi disponibilă Dr Kevin',
+      spinolaBookBtn:'Rezervați la Spinola Clinic',
+      spinolaDateSlots:'Locuri disponibile pentru',
+      spinolaNoSlots:'Nu sunt locuri disponibile la Spinola Clinic pentru această dată.'
     };
 
     TR.lt = {
@@ -1625,7 +1809,17 @@
       noAvailability:'Nėra prieinamumo.',
       valService:'Prašome pasirinkti paslaugą.',valDate:'Prašome pasirinkti datą.',valTime:'Prašome pasirinkti laiką.',
       valName:'Vardas ir pavardė privalomi.',valPhone:'Telefono numeris privalomas.',valEmail:'El. paštas privalomas.',
-      valEmailFormat:'Įveskite galiojantį el. paštą.',timeDash:'—'
+      valEmailFormat:'Įveskite galiojantį el. paštą.',timeDash:'—',
+      spinolaSubtitle:'Ar norėtumėte apsilankyti pas kitą gydytoją ar pabandyti kitą dieną?',
+      spinolaOrDivider:'\u2014 arba \u2014',
+      spinolaOfferTitle:'Nėra laisvų laikų Potter\'s Clinic',
+      spinolaOfferDrJames:'Apsilankyti pas Dr James Spinola Clinic',
+      spinolaOfferDrKevin:'Apsilankyti pas Dr Kevin kitą dieną',
+      spinolaKevinNextDesc:'Rasime artimiausią laisvą dieną Dr Kevin Potter\'s Clinic.',
+      spinolaKevinNextBtn:'Kita laisva Dr Kevin diena',
+      spinolaBookBtn:'Registruotis Spinola Clinic',
+      spinolaDateSlots:'Laisvi laikai:',
+      spinolaNoSlots:'Šiai datai nėra laisvų laikų Spinola Clinic.'
     };
 
     TR.mt = {
@@ -1653,6 +1847,8 @@
       valService:'Jekk jogħġbok agħżel servizz.',valDate:'Jekk jogħġbok agħżel data.',valTime:'Jekk jogħġbok agħżel ħin.',
       valName:'L-isem sħiħ huwa meħtieġ.',valPhone:'In-numru tat-telefon huwa meħtieġ.',valEmail:'L-email huwa meħtieġ.',
       valEmailFormat:'Daħħal email validu.',timeDash:'—',
+      spinolaSubtitle:'Trid tara tabib ie\u0127or jew tipprova jum ie\u0127or?',
+      spinolaOrDivider:'\u2014 jew \u2014',
       spinolaOfferTitle:"M'hemmx slots disponibbli fil-Klinika ta' Potter's",
       spinolaOfferDrJames:'Ara Dr James fil-Klinika ta\' Spinola',
       spinolaOfferDrKevin:'Ara Dr Kevin jum ieħor',
@@ -2592,6 +2788,7 @@
       _spinolaDateKey = state.selectedDateKey;
 
       els.spinolaTitle.textContent = t('spinolaOfferTitle');
+      document.getElementById('spinolaSubtitle').textContent = t('spinolaSubtitle');
       els.spinolaSlotsGrid.innerHTML = '';
       els.spinolaNoSlots.style.display = 'none';
 
