@@ -3934,6 +3934,7 @@ var _HTML_TEMPLATES = {
     <div class="tab" data-tab="availability" onclick="switchTab('availability')">Availability</div>
     <div class="tab" data-tab="actions" onclick="switchTab('actions')">Quick Actions</div>
     <div class="tab" data-tab="statistics" onclick="switchTab('statistics')">Statistics</div>
+    <div class="tab" data-tab="reviews" onclick="switchTab('reviews')">Reviews</div>
     <div class="tab" data-tab="settings" onclick="switchTab('settings')">Settings</div>
   </div>
 
@@ -4342,6 +4343,55 @@ var _HTML_TEMPLATES = {
   <div class="msg" id="statsMsg"></div>
 </div>
 
+<!-- Reviews Tab -->
+<div class="tab-content" id="tab-reviews" style="display:none;">
+  <h3 style="margin:0 0 12px;">Request Google Reviews</h3>
+  <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Select today's patients to send a friendly review request email.</p>
+
+  <div style="margin-bottom:14px;">
+    <label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px;">Team members present today:</label>
+    <div style="display:flex;gap:14px;flex-wrap:wrap;">
+      <label style="font-size:13px;cursor:pointer;display:flex;align-items:center;gap:4px;">
+        <input type="checkbox" id="teamJohn" checked> John
+      </label>
+      <label style="font-size:13px;cursor:pointer;display:flex;align-items:center;gap:4px;">
+        <input type="checkbox" id="teamLaura"> Laura
+      </label>
+      <label style="font-size:13px;cursor:pointer;display:flex;align-items:center;gap:4px;">
+        <input type="checkbox" id="teamJovana"> Jovana
+      </label>
+    </div>
+  </div>
+
+  <div class="stats-grid">
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <h3 style="margin:0;">Potter's Pharmacy</h3>
+        <label style="font-size:12px;cursor:pointer;display:flex;align-items:center;gap:4px;">
+          <input type="checkbox" id="revSelectAllPotters" onchange="toggleRevAll('potters',this.checked)"> Select all
+        </label>
+      </div>
+      <div id="revPottersList"><div class="empty">Loading...</div></div>
+      <button class="btn btn-sm" style="margin-top:10px;background:#2563eb;color:#fff;" onclick="sendReviewEmails('potters')">
+        Send Review Request
+      </button>
+    </div>
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <h3 style="margin:0;">Spinola Clinic</h3>
+        <label style="font-size:12px;cursor:pointer;display:flex;align-items:center;gap:4px;">
+          <input type="checkbox" id="revSelectAllSpinola" onchange="toggleRevAll('spinola',this.checked)"> Select all
+        </label>
+      </div>
+      <div id="revSpinolaList"><div class="empty">Loading...</div></div>
+      <button class="btn btn-sm" style="margin-top:10px;background:#8b5cf6;color:#fff;" onclick="sendReviewEmails('spinola')">
+        Send Review Request
+      </button>
+    </div>
+  </div>
+  <div class="msg" id="reviewsMsg"></div>
+</div>
+
 <!-- Patient History modal -->
 <div class="overlay" id="patientOverlay">
   <div class="patient-modal">
@@ -4454,6 +4504,7 @@ function switchTab(name) {
   if (name === 'settings') loadSettings();
   if (name === 'statistics') loadStatistics();
   if (name === 'actions') { loadActionAppts(); if (document.getElementById('notifyDate').value) loadNotifyAppts(); }
+  if (name === 'reviews') loadReviewPatients();
 }
 
 function getStatusBadge(status) {
@@ -6666,6 +6717,90 @@ function renderSpCountryBreakdown(countries) {
     html += '</div>';
   }
   el.innerHTML = html;
+}
+
+// ── Reviews Tab ──
+
+var _reviewPotters = [];
+var _reviewSpinola = [];
+
+function loadReviewPatients() {
+  showMsg('reviewsMsg', '', 'Loading today\\'s patients...');
+  google.script.run
+    .withSuccessHandler(function(res) {
+      if (!res || !res.ok) { showMsg('reviewsMsg', 'bad', res.reason || 'Failed.'); return; }
+      showMsg('reviewsMsg', '', '');
+      _reviewPotters = res.potters || [];
+      _reviewSpinola = res.spinola || [];
+      renderReviewList('potters', _reviewPotters);
+      renderReviewList('spinola', _reviewSpinola);
+    })
+    .withFailureHandler(function(err) {
+      showMsg('reviewsMsg', 'bad', 'Error: ' + (err && err.message ? err.message : String(err)));
+    })
+    .apiAdminGetReviewPatients(SIG);
+}
+
+function renderReviewList(loc, patients) {
+  var elId = loc === 'potters' ? 'revPottersList' : 'revSpinolaList';
+  var el = document.getElementById(elId);
+  if (!patients.length) { el.innerHTML = '<div class="empty">No patients with email today.</div>'; return; }
+
+  var html = '';
+  for (var i = 0; i < patients.length; i++) {
+    var p = patients[i];
+    html += '<div class="patient-row">';
+    html += '<label style="display:flex;align-items:center;gap:8px;flex:1;cursor:pointer;">';
+    html += '<input type="checkbox" class="rev-cb-' + loc + '" value="' + esc(p.appointmentId) + '" data-email="' + esc(p.email) + '">';
+    html += '<div>';
+    html += '<div style="font-size:13px;font-weight:600;">' + esc(p.fullName) + '</div>';
+    html += '<div style="font-size:11px;color:var(--muted);">' + esc(p.email) + ' &bull; ' + esc(p.startTime) + ' &bull; ' + esc(p.serviceName) + '</div>';
+    html += '</div>';
+    html += '</label>';
+    html += '</div>';
+  }
+  el.innerHTML = html;
+}
+
+function toggleRevAll(loc, checked) {
+  var cbs = document.querySelectorAll('.rev-cb-' + loc);
+  for (var i = 0; i < cbs.length; i++) cbs[i].checked = checked;
+}
+
+function getSelectedTeamNames() {
+  var names = [];
+  if (document.getElementById('teamJohn').checked) names.push('John');
+  if (document.getElementById('teamLaura').checked) names.push('Laura');
+  if (document.getElementById('teamJovana').checked) names.push('Jovana');
+  return names;
+}
+
+function sendReviewEmails(loc) {
+  var cbs = document.querySelectorAll('.rev-cb-' + loc + ':checked');
+  if (!cbs.length) { showMsg('reviewsMsg', 'bad', 'No patients selected.'); return; }
+
+  var ids = [];
+  for (var i = 0; i < cbs.length; i++) ids.push(cbs[i].value);
+
+  var teamNames = getSelectedTeamNames();
+  if (!teamNames.length) { showMsg('reviewsMsg', 'bad', 'Please select at least one team member.'); return; }
+
+  var location = loc === 'potters' ? 'potters' : 'spinola';
+  showMsg('reviewsMsg', '', 'Sending ' + ids.length + ' email(s)...');
+
+  google.script.run
+    .withSuccessHandler(function(res) {
+      if (!res || !res.ok) { showMsg('reviewsMsg', 'bad', res.reason || 'Failed.'); return; }
+      showMsg('reviewsMsg', 'good', res.message);
+      // Uncheck sent patients
+      for (var i = 0; i < cbs.length; i++) cbs[i].checked = false;
+      var selAll = document.getElementById(loc === 'potters' ? 'revSelectAllPotters' : 'revSelectAllSpinola');
+      if (selAll) selAll.checked = false;
+    })
+    .withFailureHandler(function(err) {
+      showMsg('reviewsMsg', 'bad', 'Error: ' + (err && err.message ? err.message : String(err)));
+    })
+    .apiAdminSendReviewRequests(SIG, { appointmentIds: ids, location: location, teamNames: teamNames });
 }
 
 </script>
@@ -9957,6 +10092,91 @@ function sendCustomNotificationEmail_(appt, customMessage) {
   });
 }
 
+function sendReviewRequestEmail_(appt, location, teamNames) {
+  var to = String(appt.email || '').trim();
+  if (!to) return;
+
+  var firstName = String(appt.fullName || '').split(' ')[0] || 'there';
+  var isPotters = location === 'potters';
+  var placeName = isPotters ? "Potter's Pharmacy" : 'Spinola Clinic';
+  var reviewUrl = isPotters
+    ? 'https://search.google.com/local/writereview?placeid=ChIJ3dCu7mtFDhMRYBPbRR0pgtE'
+    : 'https://search.google.com/local/writereview?placeid=ChIJ3dCu7mtFDhMRYBPbRR0pgtE';
+
+  var teamLine = '';
+  if (teamNames.length === 1) {
+    teamLine = teamNames[0];
+  } else if (teamNames.length === 2) {
+    teamLine = teamNames[0] + ' &amp; ' + teamNames[1];
+  } else if (teamNames.length >= 3) {
+    teamLine = teamNames.slice(0, -1).join(', ') + ' &amp; ' + teamNames[teamNames.length - 1];
+  }
+
+  var accentColor = isPotters ? '#2563eb' : '#8b5cf6';
+
+  var subject = "We'd love your feedback - " + placeName;
+
+  var html = ''
+    + '<!DOCTYPE html>'
+    + '<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>'
+    + '<body style="margin:0;padding:0;background:#f3f4f6;font-family:Arial,Helvetica,sans-serif;">'
+    + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;">'
+    + '<tr><td align="center" style="padding:32px 16px;">'
+    + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.06);">'
+
+    // Header accent bar
+    + '<tr><td style="height:6px;background:' + accentColor + ';"></td></tr>'
+
+    // Main content
+    + '<tr><td style="padding:36px 32px 24px;">'
+    + '<h1 style="margin:0 0 20px;font-size:22px;font-weight:800;color:#111827;line-height:1.3;">Thank you for visiting ' + escapeHtml_(placeName) + '!</h1>'
+
+    + '<p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#374151;">'
+    + 'Hi ' + escapeHtml_(firstName) + ',</p>'
+
+    + '<p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#374151;">'
+    + 'We hope you had a great experience with us today. If you were happy with the service, we\'d really appreciate it if you could take a moment to leave us a quick Google review.</p>'
+
+    + '<p style="margin:0 0 24px;font-size:15px;line-height:1.6;color:#374151;">'
+    + 'Your feedback helps others discover us and means the world to our team.</p>'
+
+    // CTA Button
+    + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0">'
+    + '<tr><td align="center" style="padding:4px 0 28px;">'
+    + '<a href="' + reviewUrl + '" style="display:inline-block;background:' + accentColor + ';color:#ffffff;text-decoration:none;padding:14px 32px;border-radius:999px;font-size:15px;font-weight:700;letter-spacing:0.3px;">'
+    + '&#9733; Leave a Review'
+    + '</a>'
+    + '</td></tr></table>'
+
+    // Divider
+    + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0">'
+    + '<tr><td style="border-top:1px solid #e5e7eb;padding-top:20px;">'
+    + '<p style="margin:0;font-size:14px;line-height:1.5;color:#6b7280;">Warm regards,</p>'
+    + '<p style="margin:4px 0 0;font-size:15px;font-weight:700;color:#111827;">' + teamLine + '</p>'
+    + '<p style="margin:2px 0 0;font-size:13px;color:#9ca3af;">The Potter\'s Pharmacy Team</p>'
+    + '</td></tr></table>'
+
+    + '</td></tr>'
+
+    // Footer
+    + '<tr><td style="padding:16px 32px 24px;background:#f9fafb;border-top:1px solid #f3f4f6;">'
+    + '<p style="margin:0;font-size:11px;line-height:1.5;color:#9ca3af;text-align:center;">'
+    + 'This email was sent because you visited ' + escapeHtml_(placeName) + ' today.<br>'
+    + 'If you received this by mistake, please disregard it.'
+    + '</p>'
+    + '</td></tr>'
+
+    + '</table>'
+    + '</td></tr></table>'
+    + '</body></html>';
+
+  MailApp.sendEmail({
+    to: to,
+    subject: subject,
+    htmlBody: html
+  });
+}
+
 function escapeHtml_(s) {
   s = String(s === null || s === undefined ? '' : s);
   return s
@@ -11604,6 +11824,114 @@ function apiAdminNotifyPatients(sig, payload) {
   }
 
   return { ok: true, message: 'Notification sent to ' + sent + ' patient(s).', sent: sent };
+}
+
+/**
+ * Get today's patients with emails for review requests.
+ */
+function apiAdminGetReviewPatients(sig) {
+  if (!verifyAdminSig_(sig)) return { ok: false, reason: 'Access denied.' };
+
+  var today = todayLocal_();
+  var dk = toDateKey_(today);
+
+  var pottersAppts = listActiveAppointmentsForDate_(dk);
+  var spinolaAppts = listSpinolaAppointmentsForDate_(dk);
+
+  function filterWithEmail(appts) {
+    var result = [];
+    for (var i = 0; i < appts.length; i++) {
+      var a = appts[i];
+      var email = String(a.email || '').trim();
+      var status = String(a.status || '');
+      if (!email) continue;
+      if (status === 'CANCELLED_DOCTOR' || status === 'CANCELLED_PATIENT') continue;
+      result.push({
+        appointmentId: a.appointmentId,
+        fullName: a.fullName,
+        email: email,
+        startTime: a.startTime,
+        serviceName: a.serviceName,
+        status: a.status
+      });
+    }
+    result.sort(function(a, b) {
+      return String(a.startTime || '').localeCompare(String(b.startTime || ''));
+    });
+    return result;
+  }
+
+  // Separate Potter's vs Spinola from the Potter's sheet
+  var potters = [];
+  var spinolaFromPotters = [];
+  for (var i = 0; i < pottersAppts.length; i++) {
+    var loc = String(pottersAppts[i].location || '').toLowerCase();
+    if (loc.indexOf('spinola') >= 0 || pottersAppts[i].status === 'RELOCATED_SPINOLA') {
+      spinolaFromPotters.push(pottersAppts[i]);
+    } else {
+      potters.push(pottersAppts[i]);
+    }
+  }
+
+  // Merge Spinola lists (relocated + direct) avoiding duplicates
+  var seenIds = {};
+  var allSpinola = [];
+  for (var j = 0; j < spinolaFromPotters.length; j++) {
+    seenIds[spinolaFromPotters[j].appointmentId] = true;
+    allSpinola.push(spinolaFromPotters[j]);
+  }
+  for (var k = 0; k < spinolaAppts.length; k++) {
+    if (!seenIds[spinolaAppts[k].appointmentId]) {
+      allSpinola.push(spinolaAppts[k]);
+    }
+  }
+
+  return {
+    ok: true,
+    potters: filterWithEmail(potters),
+    spinola: filterWithEmail(allSpinola)
+  };
+}
+
+/**
+ * Send review request emails to selected patients.
+ */
+function apiAdminSendReviewRequests(sig, payload) {
+  if (!verifyAdminSig_(sig)) return { ok: false, reason: 'Access denied.' };
+
+  payload = payload || {};
+  var appointmentIds = payload.appointmentIds || [];
+  var location = String(payload.location || 'potters');
+  var teamNames = payload.teamNames || [];
+
+  if (!appointmentIds.length) return { ok: false, reason: 'No patients selected.' };
+  if (!teamNames.length) return { ok: false, reason: 'No team members selected.' };
+
+  var today = todayLocal_();
+  var dk = toDateKey_(today);
+
+  // Gather all appointments from both sheets
+  var allAppts = listActiveAppointmentsForDate_(dk);
+  var spinolaAppts = listSpinolaAppointmentsForDate_(dk);
+  for (var s = 0; s < spinolaAppts.length; s++) allAppts.push(spinolaAppts[s]);
+
+  var idSet = {};
+  for (var i = 0; i < appointmentIds.length; i++) idSet[String(appointmentIds[i])] = true;
+
+  var sent = 0;
+  for (var j = 0; j < allAppts.length; j++) {
+    if (!idSet[allAppts[j].appointmentId]) continue;
+    var email = String(allAppts[j].email || '').trim();
+    if (!email) continue;
+    try {
+      sendReviewRequestEmail_(allAppts[j], location, teamNames);
+      sent++;
+    } catch (e) {
+      Logger.log('WARN: Failed to send review email to ' + email + ': ' + e.message);
+    }
+  }
+
+  return { ok: true, message: 'Review request sent to ' + sent + ' patient(s).', sent: sent };
 }
 
 /**
