@@ -149,9 +149,10 @@ function inAdvanceWindow_(dateObj) {
  * Build slots for a date from normal working hours + optional extra windows.
  * Extra windows come from DoctorExtra sheet (doctor adding more hours).
  */
-function buildSlotsForDate_(dateObj, extraWindows) {
+function buildSlotsForDate_(dateObj, extraWindows, hoursOverride) {
   var dowKey = dayOfWeekKey_(dateObj);
-  var windows = (CFG().HOURS[dowKey] || []).slice();
+  var hoursSource = hoursOverride || CFG().HOURS;
+  var windows = (hoursSource[dowKey] || []).slice();
 
   if (extraWindows && extraWindows.length) {
     for (var i = 0; i < extraWindows.length; i++) {

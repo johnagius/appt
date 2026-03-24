@@ -4,7 +4,9 @@
 
 var _configSsCache = null;
 var _apptsSsCache = null;
+var _spinolaSsCache = null;
 var _daySheetFormatted = {};
+var _spinolaDaySheetFormatted = {};
 var _archiveDataCache = null;
 
 function getConfigSpreadsheet_() {
@@ -21,6 +23,92 @@ function getAppointmentsSpreadsheet_() {
   if (!id) throw new Error('APPOINTMENTS spreadsheet ID not set. Run install().');
   _apptsSsCache = SpreadsheetApp.openById(id);
   return _apptsSsCache;
+}
+
+function getSpinolaSpreadsheet_() {
+  if (_spinolaSsCache) return _spinolaSsCache;
+  var id = getScriptProps_().getProperty(CFG().PROP_SPINOLA_APPTS_SSID);
+  if (!id) throw new Error('SPINOLA APPOINTMENTS spreadsheet ID not set. Run setSpinolaSpreadsheetId().');
+  _spinolaSsCache = SpreadsheetApp.openById(id);
+  return _spinolaSsCache;
+}
+
+function ensureSpinolaDaySheet_(dateKey) {
+  var ss = getSpinolaSpreadsheet_();
+  var sh = ss.getSheetByName(dateKey);
+
+  if (!sh) {
+    sh = ss.insertSheet(dateKey);
+    sh.getRange(1, 1, 1, 18).setValues([[
+      'AppointmentId',
+      'Date(yyyy-MM-dd)',
+      'StartTime',
+      'EndTime',
+      'ServiceId',
+      'ServiceName',
+      'FullName',
+      'Email',
+      'Phone',
+      'Comments',
+      'Status',
+      'Location',
+      'CreatedAt',
+      'UpdatedAt',
+      'Token',
+      'CalendarEventId',
+      'CancelledAt',
+      'CancelReason'
+    ]]);
+    sh.setFrozenRows(1);
+    sh.getRange(1, 1, sh.getMaxRows(), 18).setNumberFormat('@');
+    _spinolaDaySheetFormatted[dateKey] = true;
+  } else if (!_spinolaDaySheetFormatted[dateKey]) {
+    sh.setFrozenRows(1);
+    sh.getRange(1, 1, sh.getMaxRows(), 18).setNumberFormat('@');
+    _spinolaDaySheetFormatted[dateKey] = true;
+  }
+
+  return sh;
+}
+
+function appendSpinolaAppointment_(dateKey, apptObj) {
+  var sh = ensureSpinolaDaySheet_(dateKey);
+
+  sh.appendRow([
+    apptObj.appointmentId,
+    apptObj.dateKey,
+    apptObj.startTime,
+    apptObj.endTime,
+    apptObj.serviceId,
+    apptObj.serviceName,
+    apptObj.fullName,
+    apptObj.email,
+    apptObj.phone,
+    apptObj.comments,
+    apptObj.status,
+    apptObj.location,
+    apptObj.createdAt,
+    apptObj.updatedAt,
+    apptObj.token,
+    apptObj.calendarEventId,
+    apptObj.cancelledAt,
+    apptObj.cancelReason
+  ]);
+
+  return sh.getLastRow();
+}
+
+function listSpinolaAppointmentsForDate_(dateKey) {
+  var sh = ensureSpinolaDaySheet_(dateKey);
+  var lastRow = sh.getLastRow();
+  if (lastRow < 2) return [];
+
+  var values = sh.getRange(2, 1, lastRow - 1, 18).getValues();
+  var rows = [];
+  for (var i = 0; i < values.length; i++) {
+    rows.push(appointmentRowToObj_(values[i]));
+  }
+  return rows;
 }
 
 function ensureDaySheet_(dateKey) {

@@ -617,6 +617,134 @@
       gap:10px;
     }
 
+    /* Spinola offer modal */
+    .spinola-modal{
+      width: min(720px, 100%);
+      background:#fff;
+      border-radius:18px;
+      padding:24px 20px;
+      border:1px solid var(--line);
+      box-shadow: var(--shadow);
+      transform: translateY(10px) scale(0.98);
+      transition: transform 0.2s ease;
+      max-height:90vh;
+      overflow-y:auto;
+    }
+    .overlay.show .spinola-modal{
+      transform: translateY(0) scale(1);
+    }
+    .spinola-modal h3{
+      margin:0 0 6px 0;
+      font-size:16px;
+      font-weight:900;
+    }
+    .spinola-modal .spinola-subtitle{
+      margin:0 0 16px 0;
+      font-size:13px;
+      color:var(--muted);
+    }
+    .spinola-option-card{
+      border:1px solid var(--line);
+      border-radius:14px;
+      padding:14px;
+      margin-bottom:12px;
+      transition: border-color 0.15s;
+    }
+    .spinola-option-card:hover{
+      border-color:var(--accent);
+    }
+    .spinola-option-card h4{
+      margin:0 0 4px 0;
+      font-size:14px;
+      font-weight:700;
+    }
+    .spinola-option-card .spinola-loc-details{
+      margin:0 0 10px 0;
+      font-size:12px;
+      color:var(--muted);
+      line-height:1.4;
+    }
+    .spinola-option-card .spinola-date-label{
+      margin:0 0 8px 0;
+      font-size:12px;
+      font-weight:600;
+      color:var(--text);
+    }
+    .spinola-slots-grid{
+      display:grid;
+      grid-template-columns:repeat(auto-fill,minmax(80px,1fr));
+      gap:6px;
+      margin-bottom:8px;
+    }
+    .spinola-slots-grid .timeBtn{
+      font-size:12px;
+      padding:6px 4px;
+    }
+    .spinola-no-slots{
+      font-size:12px;
+      color:var(--muted);
+      padding:8px 0;
+    }
+    .spinola-divider{
+      text-align:center;
+      font-size:12px;
+      color:var(--muted);
+      margin:14px 0;
+    }
+    .spinola-actions{
+      display:flex;
+      gap:10px;
+      margin-top:14px;
+    }
+    .spinola-actions .btn{
+      flex:1;
+    }
+    .btnSpinola{
+      background:var(--good);
+      color:#fff;
+      border:none;
+      padding:10px 14px;
+      border-radius:999px;
+      font-weight:700;
+      font-size:13px;
+      cursor:pointer;
+      opacity:0.5;
+      pointer-events:none;
+      transition:opacity 0.15s;
+    }
+    .btnSpinola.active{
+      opacity:1;
+      pointer-events:auto;
+    }
+    .btnSpinola.active:hover{
+      filter:brightness(1.08);
+    }
+    .btnKevinNext{
+      background:var(--accent);
+      color:#111;
+      border:none;
+      padding:10px 14px;
+      border-radius:999px;
+      font-weight:700;
+      font-size:13px;
+      cursor:pointer;
+      transition:filter 0.15s;
+    }
+    .btnKevinNext:hover{
+      filter:brightness(1.08);
+    }
+    .btnSpinolaDismiss{
+      background:transparent;
+      color:var(--muted);
+      border:1px solid var(--line);
+      padding:8px 14px;
+      border-radius:999px;
+      font-size:12px;
+      cursor:pointer;
+      margin-top:6px;
+      width:100%;
+    }
+
     .loadingBox{
       width: min(560px, 100%);
       background:#fff;
@@ -799,6 +927,36 @@
     </div>
   </div>
 
+  <!-- Spinola offer modal -->
+  <div class="overlay" id="spinolaOverlay" role="dialog" aria-modal="true">
+    <div class="spinola-modal">
+      <h3 id="spinolaTitle">No slots available at Potter's Clinic</h3>
+      <p class="spinola-subtitle" id="spinolaSubtitle">Would you like to see another doctor or try another day?</p>
+
+      <div class="spinola-option-card" id="spinolaOptionCard">
+        <h4 id="spinolaDrLabel">See Dr James at Spinola Clinic</h4>
+        <p class="spinola-loc-details" id="spinolaLocDetails">Near McDonald's, Love Statue, near bus stop, in Spinola</p>
+        <p class="spinola-date-label" id="spinolaDateLabel"></p>
+        <div class="spinola-slots-grid" id="spinolaSlotsGrid"></div>
+        <div class="spinola-no-slots" id="spinolaNoSlots" style="display:none">No slots available at Spinola for this date.</div>
+      </div>
+
+      <div class="spinola-divider">&mdash; or &mdash;</div>
+
+      <div class="spinola-option-card">
+        <h4 id="spinolaKevinLabel">See Dr Kevin on another day</h4>
+        <p class="spinola-loc-details" id="spinolaKevinDesc">We'll find the next available day for Dr Kevin at Potter's Clinic.</p>
+        <button class="btnKevinNext" id="btnKevinNext">Next available Dr Kevin day</button>
+      </div>
+
+      <button class="btnSpinolaDismiss" id="btnSpinolaDismiss">Cancel</button>
+
+      <div class="spinola-actions">
+        <button class="btnSpinola" id="btnBookSpinola" disabled>Book at Spinola Clinic</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Loading overlay -->
   <div class="overlay" id="loadingOverlay">
     <div class="loadingBox">
@@ -963,7 +1121,15 @@
       noAvailability:'No availability.',
       valService:'Please select a service.',valDate:'Please select a date.',valTime:'Please select a time slot.',
       valName:'Full name is required.',valPhone:'Phone number is required.',valEmail:'Email is required.',
-      valEmailFormat:'Please enter a valid email.',timeDash:'—'
+      valEmailFormat:'Please enter a valid email.',timeDash:'—',
+      spinolaOfferTitle:"No slots available at Potter's Clinic",
+      spinolaOfferDrJames:'See Dr James at Spinola Clinic',
+      spinolaOfferDrKevin:'See Dr Kevin on another day',
+      spinolaKevinNextDesc:"We'll find the next available day for Dr Kevin at Potter's Clinic.",
+      spinolaKevinNextBtn:'Next available Dr Kevin day',
+      spinolaBookBtn:'Book at Spinola Clinic',
+      spinolaDateSlots:'Available slots for',
+      spinolaNoSlots:'No slots available at Spinola Clinic for this date.'
     };
 
     TR.fr = {
@@ -1044,7 +1210,15 @@
       noAvailability:'Nessuna disponibilità.',
       valService:'Seleziona un servizio.',valDate:'Seleziona una data.',valTime:'Seleziona un orario.',
       valName:'Il nome completo è obbligatorio.',valPhone:'Il telefono è obbligatorio.',valEmail:'L\'email è obbligatoria.',
-      valEmailFormat:'Inserisci un\'email valida.',timeDash:'—'
+      valEmailFormat:'Inserisci un\'email valida.',timeDash:'—',
+      spinolaOfferTitle:'Nessuno slot disponibile presso la Clinica Potter\'s',
+      spinolaOfferDrJames:'Vedi Dr James alla Clinica Spinola',
+      spinolaOfferDrKevin:'Vedi Dr Kevin un altro giorno',
+      spinolaKevinNextDesc:'Troveremo il prossimo giorno disponibile per Dr Kevin alla Clinica Potter\'s.',
+      spinolaKevinNextBtn:'Prossimo giorno Dr Kevin disponibile',
+      spinolaBookBtn:'Prenota alla Clinica Spinola',
+      spinolaDateSlots:'Slot disponibili per',
+      spinolaNoSlots:'Nessuno slot disponibile alla Clinica Spinola per questa data.'
     };
 
     TR.zh = {
@@ -1531,7 +1705,15 @@
       noAvailability:'L-ebda disponibbiltà.',
       valService:'Jekk jogħġbok agħżel servizz.',valDate:'Jekk jogħġbok agħżel data.',valTime:'Jekk jogħġbok agħżel ħin.',
       valName:'L-isem sħiħ huwa meħtieġ.',valPhone:'In-numru tat-telefon huwa meħtieġ.',valEmail:'L-email huwa meħtieġ.',
-      valEmailFormat:'Daħħal email validu.',timeDash:'—'
+      valEmailFormat:'Daħħal email validu.',timeDash:'—',
+      spinolaOfferTitle:"M'hemmx slots disponibbli fil-Klinika ta' Potter's",
+      spinolaOfferDrJames:'Ara Dr James fil-Klinika ta\' Spinola',
+      spinolaOfferDrKevin:'Ara Dr Kevin jum ieħor',
+      spinolaKevinNextDesc:"Insibu l-ewwel jum disponibbli għal Dr Kevin fil-Klinika ta' Potter's.",
+      spinolaKevinNextBtn:'L-ewwel jum disponibbli Dr Kevin',
+      spinolaBookBtn:'Ibbukkja fil-Klinika ta\' Spinola',
+      spinolaDateSlots:'Slots disponibbli għal',
+      spinolaNoSlots:"M'hemmx slots disponibbli fil-Klinika ta' Spinola għal din id-data."
     };
 
     // ─── Translation helpers ───
@@ -1687,7 +1869,16 @@
       ccSearch: document.getElementById('ccSearch'),
       ccList: document.getElementById('ccList'),
       dialCode: document.getElementById('dialCode'),
-      comments: document.getElementById('comments')
+      comments: document.getElementById('comments'),
+
+      spinolaOverlay: document.getElementById('spinolaOverlay'),
+      spinolaTitle: document.getElementById('spinolaTitle'),
+      spinolaDateLabel: document.getElementById('spinolaDateLabel'),
+      spinolaSlotsGrid: document.getElementById('spinolaSlotsGrid'),
+      spinolaNoSlots: document.getElementById('spinolaNoSlots'),
+      btnBookSpinola: document.getElementById('btnBookSpinola'),
+      btnKevinNext: document.getElementById('btnKevinNext'),
+      btnSpinolaDismiss: document.getElementById('btnSpinolaDismiss')
     };
 
     // --- Country code picker (193 UN member states, Malta default) ---
@@ -2272,6 +2463,7 @@
 
       if (!filtered.length) {
         showHint(els.timeHint, 'bad', t('noSlots'));
+        showSpinolaOfferModal();
         return;
       }
       hideHint(els.timeHint);
@@ -2425,6 +2617,175 @@
         if (errEl) errEl.textContent = '';
         if (id === 'phone') document.getElementById('phoneWrap').closest('.phoneRow').classList.remove('has-error');
       });
+    });
+
+    /* ===== Spinola Offer Modal Logic ===== */
+
+    var _spinolaSelectedSlot = null;
+    var _spinolaDateKey = null;
+
+    function showSpinolaOfferModal() {
+      _spinolaSelectedSlot = null;
+      _spinolaDateKey = state.selectedDateKey;
+
+      els.spinolaTitle.textContent = t('spinolaOfferTitle');
+      els.btnBookSpinola.disabled = true;
+      els.btnBookSpinola.classList.remove('active');
+      els.btnBookSpinola.textContent = t('spinolaBookBtn');
+      els.spinolaSlotsGrid.innerHTML = '';
+      els.spinolaNoSlots.style.display = 'none';
+
+      // Set location details from config
+      var locDetails = (state.config && state.config.spinolaLocationDetails) || "Near McDonald's, Love Statue, near bus stop, in Spinola";
+      var locDetailsEl = document.getElementById('spinolaLocDetails');
+      if (locDetailsEl) locDetailsEl.textContent = locDetails;
+
+      var drLabel = document.getElementById('spinolaDrLabel');
+      if (drLabel) drLabel.textContent = t('spinolaOfferDrJames');
+
+      var kevinLabel = document.getElementById('spinolaKevinLabel');
+      if (kevinLabel) kevinLabel.textContent = t('spinolaOfferDrKevin');
+
+      var kevinDesc = document.getElementById('spinolaKevinDesc');
+      if (kevinDesc) kevinDesc.textContent = t('spinolaKevinNextDesc');
+
+      els.btnKevinNext.textContent = t('spinolaKevinNextBtn');
+
+      showOverlay(els.spinolaOverlay);
+      loadSpinolaSlots(_spinolaDateKey);
+    }
+
+    function hideSpinolaModal() {
+      hideOverlay(els.spinolaOverlay);
+      _spinolaSelectedSlot = null;
+      _spinolaDateKey = null;
+    }
+
+    function loadSpinolaSlots(dateKey) {
+      els.spinolaSlotsGrid.innerHTML = '';
+      els.spinolaNoSlots.style.display = 'none';
+
+      // Show date label
+      var dateOption = (state.dateOptions || []).find(function(o) { return o.dateKey === dateKey; });
+      var dateLabel = dateOption ? dateOption.label : dateKey;
+      els.spinolaDateLabel.textContent = t('spinolaDateSlots') + ' ' + dateLabel;
+
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (!res || !res.ok || !res.slots) {
+            els.spinolaNoSlots.textContent = (res && res.reason) || t('spinolaNoSlots');
+            els.spinolaNoSlots.style.display = 'block';
+            return;
+          }
+
+          var tz = (state.config && state.config.timezone) || 'Europe/Malta';
+          var now = getNowInTimeZoneParts(tz);
+
+          var available = res.slots.filter(function(slot) {
+            if (!slot || !slot.start || slot.available !== true) return false;
+            if (dateKey === now.dateKey) {
+              if (parseHHMMToMinutes(slot.start) < now.minutes) return false;
+            }
+            return true;
+          });
+
+          if (!available.length) {
+            els.spinolaNoSlots.textContent = t('spinolaNoSlots');
+            els.spinolaNoSlots.style.display = 'block';
+            return;
+          }
+
+          available.forEach(function(slot) {
+            var b = document.createElement('div');
+            b.className = 'timeBtn';
+            b.textContent = to12h(slot.start);
+            b.addEventListener('click', function() {
+              // Deselect previous
+              var prev = els.spinolaSlotsGrid.querySelectorAll('.timeBtn');
+              for (var i = 0; i < prev.length; i++) prev[i].classList.remove('selected');
+              b.classList.add('selected');
+              _spinolaSelectedSlot = slot;
+              _spinolaDateKey = dateKey;
+              els.btnBookSpinola.disabled = false;
+              els.btnBookSpinola.classList.add('active');
+            });
+            els.spinolaSlotsGrid.appendChild(b);
+          });
+        })
+        .withFailureHandler(function(err) {
+          els.spinolaNoSlots.textContent = String(err && err.message ? err.message : err);
+          els.spinolaNoSlots.style.display = 'block';
+        })
+        .apiGetSpinolaAvailability(dateKey);
+    }
+
+    // "Book at Spinola" button
+    els.btnBookSpinola.addEventListener('click', function() {
+      if (!_spinolaSelectedSlot || !_spinolaDateKey) return;
+
+      // Validate form fields
+      var err = validateForm();
+      // Override the slot/date validation since we're using Spinola slot
+      if (!state.selectedServiceId) {
+        showMsg('bad', t('valService'));
+        return;
+      }
+      var fullName = els.fullName.value.trim();
+      var email = els.email.value.trim();
+      var phone = els.phone.value.trim();
+      if (!fullName || !email || !phone) {
+        hideSpinolaModal();
+        showMsg('bad', t('missingFields') || 'Please fill in the required fields first.');
+        return;
+      }
+
+      hideSpinolaModal();
+      showLoading(t('confirmingTitle'), t('confirmingDesc'));
+
+      var payload = {
+        serviceId: state.selectedServiceId,
+        dateKey: _spinolaDateKey,
+        startTime: _spinolaSelectedSlot.start,
+        fullName: els.fullName.value.trim(),
+        email: els.email.value.trim(),
+        phone: getFullPhone(),
+        comments: els.comments.value.trim()
+      };
+
+      google.script.run
+        .withSuccessHandler(function(res) {
+          hideLoading();
+          if (res && res.ok) {
+            var spinolaLoc = (state.config && state.config.spinolaLocation) || 'Spinola Clinic';
+            var dateOpt = (state.dateOptions || []).find(function(o) { return o.dateKey === _spinolaDateKey; });
+            var dateLabel2 = dateOpt ? dateOpt.label : _spinolaDateKey;
+            var text = t('confirmMsg', res.serviceName, dateLabel2, to12h(res.startTime), to12h(res.endTime), res.location);
+            showConfirmModal(text);
+            return;
+          }
+          showMsg('bad', t('couldNotBook'));
+        })
+        .withFailureHandler(function(e) {
+          hideLoading();
+          var msg = (e && e.message) ? e.message : String(e);
+          showMsg('bad', msg);
+        })
+        .apiBookSpinola(payload);
+    });
+
+    // "See Dr Kevin on another day" button
+    els.btnKevinNext.addEventListener('click', function() {
+      hideSpinolaModal();
+      if (advanceToNextEnabledDate()) {
+        loadAvailability(false, true);
+      } else {
+        showMsg('bad', t('noDates'));
+      }
+    });
+
+    // Cancel/dismiss button
+    els.btnSpinolaDismiss.addEventListener('click', function() {
+      hideSpinolaModal();
     });
 
     els.confirmBtn.addEventListener('click', () => {

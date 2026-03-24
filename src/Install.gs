@@ -219,6 +219,18 @@ function setSpinolaLocation(text) {
   return { ok: true, spinolaLocation: text.trim() };
 }
 
+function setSpinolaCalendarId(id) {
+  if (!id || typeof id !== 'string') throw new Error('Missing calendar ID');
+  getScriptProps_().setProperty(CFG().PROP_SPINOLA_CALENDAR_ID, id.trim());
+  return { ok: true, spinolaCalendarId: id.trim() };
+}
+
+function setSpinolaSpreadsheetId(id) {
+  if (!id || typeof id !== 'string') throw new Error('Missing spreadsheet ID');
+  getScriptProps_().setProperty(CFG().PROP_SPINOLA_APPTS_SSID, id.trim());
+  return { ok: true, spinolaSpreadsheetId: id.trim() };
+}
+
 function setDoubleCheckCalendar(enabled) {
   getScriptProps_().setProperty(CFG().PROP_DOUBLECHECK_CALENDAR, String(!!enabled));
   return { ok: true, doubleCheckCalendar: String(!!enabled) };

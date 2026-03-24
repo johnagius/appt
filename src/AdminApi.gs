@@ -285,6 +285,7 @@ function apiAdminProcessAppointments(sig, payload) {
 
     if (action === 'redirect_spinola') {
       var spinolaLoc = getScriptProps_().getProperty(CFG().PROP_SPINOLA_LOCATION) || 'Spinola Clinic';
+      var redirectNowStr = Utilities.formatDate(new Date(), getTimeZone_(), "yyyy-MM-dd HH:mm:ss");
 
       for (var j = 0; j < appts.length; j++) {
         var appt2 = appts[j];
@@ -299,6 +300,41 @@ function apiAdminProcessAppointments(sig, payload) {
         var calEvId = String(appt2.calendarEventId || '').trim();
         if (calEvId) {
           try { updateCalendarEventLocation_(calEvId, spinolaLoc, appt2.serviceName + ' - ' + appt2.fullName + ' [SPINOLA]'); } catch (e2) {}
+        }
+
+        // Also create event on Spinola calendar and append to Spinola spreadsheet
+        var spinolaAppt2 = {
+          appointmentId: appt2.appointmentId,
+          dateKey: appt2.dateKey,
+          startTime: appt2.startTime,
+          endTime: appt2.endTime,
+          serviceId: appt2.serviceId,
+          serviceName: appt2.serviceName,
+          fullName: appt2.fullName,
+          email: appt2.email,
+          phone: appt2.phone,
+          comments: appt2.comments || '',
+          status: 'RELOCATED_SPINOLA',
+          location: spinolaLoc,
+          createdAt: appt2.createdAt,
+          updatedAt: redirectNowStr,
+          token: appt2.token,
+          calendarEventId: '',
+          cancelledAt: '',
+          cancelReason: ''
+        };
+
+        try {
+          var spinEvId = createSpinolaCalendarEvent_(spinolaAppt2);
+          spinolaAppt2.calendarEventId = spinEvId;
+        } catch (e2b) {
+          Logger.log('WARN: Failed to create Spinola calendar event on admin redirect: ' + e2b.message);
+        }
+
+        try {
+          appendSpinolaAppointment_(appt2.dateKey, spinolaAppt2);
+        } catch (e2c) {
+          Logger.log('WARN: Failed to append to Spinola spreadsheet on admin redirect: ' + e2c.message);
         }
 
         try { sendRedirectToSpinolaEmail_(appt2, spinolaLoc); } catch (e3) {}

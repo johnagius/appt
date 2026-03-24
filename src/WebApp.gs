@@ -94,7 +94,10 @@ function apiInit() {
       bookingPolicy: 'Choose a service and then select your time slot. You will receive confirmation by email. You can CANCEL your appointment from the email.',
       pottersLocation: (getScriptProps_().getProperty(CFG().PROP_POTTERS_LOCATION) || "Potter's Pharmacy Clinic"),
       spinolaLocation: (getScriptProps_().getProperty(CFG().PROP_SPINOLA_LOCATION) || 'Spinola Clinic'),
-      workingHours: CFG().HOURS
+      spinolaDoctorName: 'Dr James',
+      spinolaLocationDetails: "Near McDonald's, Love Statue, near bus stop, in Spinola",
+      workingHours: CFG().HOURS,
+      spinolaHours: CFG().SPINOLA_HOURS
     },
     dateOptions: apiGetDateOptions(extraMap),
     _v: getDataVersion_()
@@ -442,6 +445,224 @@ function apiBook(payload) {
 }
 
 
+/* ===== Spinola Clinic APIs ===== */
+
+function apiGetSpinolaAvailability(dateKey) {
+  dateKey = String(dateKey || '').trim();
+  if (!dateKey) throw new Error('Missing dateKey');
+
+  var d = parseDateKey_(dateKey);
+  var today = todayLocal_();
+  var todayKey = toDateKey_(today);
+
+  if (d.getTime() < today.getTime()) {
+    return { ok: false, reason: 'Date is in the past', dateKey: dateKey, slots: [] };
+  }
+
+  if (!inAdvanceWindow_(d)) {
+    return { ok: false, reason: 'Outside booking window', dateKey: dateKey, slots: [] };
+  }
+
+  var holiday = isHolidayOrClosed_(d);
+  if (holiday.closed) {
+    return { ok: false, reason: holiday.reason, dateKey: dateKey, slots: [] };
+  }
+
+  // Spinola uses its own hours, no doctor-off (that's Dr Kevin only)
+  var baseSlots = buildSlotsForDate_(d, null, CFG().SPINOLA_HOURS);
+
+  if (!baseSlots.length) {
+    return { ok: false, reason: 'Spinola Clinic closed', dateKey: dateKey, slots: [] };
+  }
+
+  // Check Spinola spreadsheet for taken slots
+  var appts = listSpinolaAppointmentsForDate_(dateKey);
+  var taken = {};
+  var cancelledSlots = {};
+  for (var i = 0; i < appts.length; i++) {
+    var st = String(appts[i].startTime || '').trim();
+    if (apptIsActive_(appts[i])) {
+      taken[st] = true;
+    } else {
+      cancelledSlots[st] = true;
+    }
+  }
+
+  // Also check Spinola calendar
+  try {
+    var calTaken = listSpinolaCalendarTakenSlots_(dateKey);
+    Object.keys(calTaken).forEach(function(k) {
+      if (!cancelledSlots[k]) {
+        taken[k] = true;
+      }
+    });
+  } catch (e) {
+    // Spinola calendar not configured yet — skip
+  }
+
+  var nowMin = nowMinutesLocal_();
+
+  var outSlots = [];
+  for (var s = 0; s < baseSlots.length; s++) {
+    var slot = baseSlots[s];
+    var startMin = parseTimeToMinutes_(slot.start);
+    var past = (dateKey === todayKey) ? (startMin < nowMin) : false;
+    var isTaken = !!taken[slot.start];
+
+    outSlots.push({
+      start: slot.start,
+      end: slot.end,
+      available: (!past && !isTaken)
+    });
+  }
+
+  return { ok: true, dateKey: dateKey, slots: outSlots };
+}
+
+function apiBookSpinola(payload) {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(25000);
+
+  try {
+    payload = payload || {};
+    var dateKey = String(payload.dateKey || '').trim();
+    var startTime = String(payload.startTime || '').trim();
+    var serviceId = String(payload.serviceId || '').trim();
+
+    var fullName = sanitizeName_(payload.fullName);
+    var email = sanitizeEmail_(payload.email);
+    var phone = sanitizePhone_(payload.phone);
+    var comments = String(payload.comments || '').trim();
+
+    if (!dateKey) throw new Error('Missing date');
+    if (!startTime) throw new Error('Missing time');
+    if (!serviceId) throw new Error('Missing service');
+    if (!fullName) throw new Error('Missing full name');
+    if (!email) throw new Error('Missing email');
+    if (!phone) throw new Error('Missing phone');
+
+    var d = parseDateKey_(dateKey);
+    var today = todayLocal_();
+    var todayKey = toDateKey_(today);
+
+    if (d.getTime() < today.getTime()) throw new Error('You cannot book a past date.');
+    if (!inAdvanceWindow_(d)) throw new Error('You can only book up to 7 days in advance.');
+
+    var holiday = isHolidayOrClosed_(d);
+    if (holiday.closed) throw new Error('Closed: ' + holiday.reason);
+
+    if (dateKey === todayKey) {
+      var nowMin = nowMinutesLocal_();
+      var stMin = parseTimeToMinutes_(startTime);
+      if (stMin < nowMin) {
+        throw new Error('That time is already in the past. Please choose a later slot.');
+      }
+    }
+
+    // Validate slot exists in Spinola hours
+    var slots = buildSlotsForDate_(d, null, CFG().SPINOLA_HOURS);
+    var slotFound = null;
+    for (var i = 0; i < slots.length; i++) {
+      if (slots[i].start === startTime) {
+        slotFound = slots[i];
+        break;
+      }
+    }
+    if (!slotFound) throw new Error('Invalid slot');
+
+    // Check Spinola spreadsheet for taken slots
+    var appts = listSpinolaAppointmentsForDate_(dateKey);
+    for (var j = 0; j < appts.length; j++) {
+      if (apptIsActive_(appts[j]) && String(appts[j].startTime || '').trim() === startTime) {
+        throw new Error('That slot was just taken. Please pick another.');
+      }
+    }
+
+    // Also check Spinola calendar
+    try {
+      var cancelledSlotsBook = {};
+      for (var c = 0; c < appts.length; c++) {
+        if (!apptIsActive_(appts[c])) {
+          cancelledSlotsBook[String(appts[c].startTime || '').trim()] = true;
+        }
+      }
+      var calTaken = listSpinolaCalendarTakenSlots_(dateKey);
+      if (calTaken[startTime] && !cancelledSlotsBook[startTime]) {
+        throw new Error('That slot was just taken. Please pick another.');
+      }
+    } catch (e) {
+      // Spinola calendar check failed — proceed with spreadsheet as source of truth
+    }
+
+    var now = new Date();
+    var nowStr = Utilities.formatDate(now, getTimeZone_(), "yyyy-MM-dd HH:mm:ss");
+
+    var service = null;
+    for (var k = 0; k < CFG().SERVICES.length; k++) {
+      if (CFG().SERVICES[k].id === serviceId) { service = CFG().SERVICES[k]; break; }
+    }
+    if (!service) throw new Error('Unknown service');
+
+    getOrCreateClient_(fullName, email, phone);
+
+    var appointmentId = 'A-' + Utilities.getUuid();
+    var token = Utilities.getUuid();
+
+    var location = getScriptProps_().getProperty(CFG().PROP_SPINOLA_LOCATION) || 'Spinola Clinic';
+
+    var apptObj = {
+      appointmentId: appointmentId,
+      dateKey: dateKey,
+      startTime: slotFound.start,
+      endTime: slotFound.end,
+      serviceId: service.id,
+      serviceName: service.name,
+      fullName: fullName,
+      email: email,
+      phone: phone,
+      comments: comments,
+      status: 'BOOKED',
+      location: location,
+      createdAt: nowStr,
+      updatedAt: nowStr,
+      token: token,
+      calendarEventId: '',
+      cancelledAt: '',
+      cancelReason: ''
+    };
+
+    // Create event on Spinola calendar
+    try {
+      var eventId = createSpinolaCalendarEvent_(apptObj);
+      apptObj.calendarEventId = eventId;
+    } catch (e) {
+      Logger.log('WARN: Failed to create Spinola calendar event: ' + e.message);
+    }
+
+    // Append to Spinola spreadsheet
+    appendSpinolaAppointment_(dateKey, apptObj);
+    bumpVersion_();
+
+    sendSpinolaConfirmationEmail_(apptObj);
+    try {
+      var dayList = listSpinolaAppointmentsForDate_(dateKey);
+      sendDoctorBookingEmail_(apptObj, dayList);
+    } catch (e) {}
+
+    return {
+      ok: true,
+      appointmentId: appointmentId,
+      dateKey: dateKey,
+      startTime: apptObj.startTime,
+      endTime: apptObj.endTime,
+      serviceName: apptObj.serviceName,
+      location: apptObj.location
+    };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 function apiGetCancelInfo(token, sig) {
   token = String(token || '').trim();
   sig = String(sig || '').trim();
@@ -586,6 +807,41 @@ function apiDoctorAction(token, act, sig) {
           updateCalendarEventLocation_(calEventId, spinolaLocation,
             appt.serviceName + ' - ' + appt.fullName + ' [SPINOLA]');
         } catch (e3) {}
+      }
+
+      // Also create event on Spinola calendar and append to Spinola spreadsheet
+      var spinolaAppt = {
+        appointmentId: appt.appointmentId,
+        dateKey: appt.dateKey,
+        startTime: appt.startTime,
+        endTime: appt.endTime,
+        serviceId: appt.serviceId,
+        serviceName: appt.serviceName,
+        fullName: appt.fullName,
+        email: appt.email,
+        phone: appt.phone,
+        comments: appt.comments || '',
+        status: 'RELOCATED_SPINOLA',
+        location: spinolaLocation,
+        createdAt: appt.createdAt,
+        updatedAt: nowStr,
+        token: appt.token,
+        calendarEventId: '',
+        cancelledAt: '',
+        cancelReason: ''
+      };
+
+      try {
+        var spinolaEventId = createSpinolaCalendarEvent_(spinolaAppt);
+        spinolaAppt.calendarEventId = spinolaEventId;
+      } catch (e6) {
+        Logger.log('WARN: Failed to create Spinola calendar event on redirect: ' + e6.message);
+      }
+
+      try {
+        appendSpinolaAppointment_(appt.dateKey, spinolaAppt);
+      } catch (e7) {
+        Logger.log('WARN: Failed to append to Spinola spreadsheet on redirect: ' + e7.message);
       }
 
       try { sendRedirectToSpinolaEmail_(appt, spinolaLocation); } catch (e4) {}
