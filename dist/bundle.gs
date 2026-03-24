@@ -690,31 +690,6 @@ var _HTML_TEMPLATES = {
       color:var(--muted);
       margin:14px 0;
     }
-    .spinola-actions{
-      display:flex;
-      gap:10px;
-      margin-top:14px;
-    }
-    .btnSpinola{
-      background:var(--good);
-      color:#fff;
-      border:none;
-      padding:10px 14px;
-      border-radius:999px;
-      font-weight:700;
-      font-size:13px;
-      cursor:pointer;
-      opacity:0.5;
-      pointer-events:none;
-      transition:opacity 0.15s;
-    }
-    .btnSpinola.active{
-      opacity:1;
-      pointer-events:auto;
-    }
-    .btnSpinola.active:hover{
-      filter:brightness(1.08);
-    }
     .btnKevinNext{
       background:var(--accent);
       color:#111;
@@ -854,17 +829,6 @@ var _HTML_TEMPLATES = {
           <p class="spinola-date-label" id="spinolaDateLabel"></p>
           <div class="spinola-slots-grid" id="spinolaSlotsGrid"></div>
           <div class="spinola-no-slots" id="spinolaNoSlots" style="display:none">No slots available at Spinola for this date.</div>
-          <div class="spinola-actions">
-            <button class="btnSpinola" id="btnBookSpinola" disabled>Book at Spinola Clinic</button>
-          </div>
-        </div>
-
-        <div class="spinola-divider">&mdash; or &mdash;</div>
-
-        <div class="spinola-option-card">
-          <h4 id="spinolaKevinLabel">See Dr Kevin on another day</h4>
-          <p class="spinola-loc-details" id="spinolaKevinDesc">We'll find the next available day for Dr Kevin at Potter's Clinic.</p>
-          <button class="btnKevinNext" id="btnKevinNext">Next available Dr Kevin day</button>
         </div>
       </div>
 
@@ -909,6 +873,16 @@ var _HTML_TEMPLATES = {
 
       <div class="row" style="margin-top:10px; justify-content:flex-start;">
         <button class="btn btnAccent" id="confirmBtn" data-i18n="confirmBtn">Confirm</button>
+      </div>
+
+      <!-- Dr Kevin next day option (shown when no Potter's slots) -->
+      <div class="spinola-inline" id="kevinNextSection">
+        <div class="spinola-divider">&mdash; or &mdash;</div>
+        <div class="spinola-option-card">
+          <h4 id="spinolaKevinLabel">See Dr Kevin on another day</h4>
+          <p class="spinola-loc-details" id="spinolaKevinDesc">We'll find the next available day for Dr Kevin at Potter's Clinic.</p>
+          <button class="btnKevinNext" id="btnKevinNext">Next available Dr Kevin day</button>
+        </div>
       </div>
 
       <div id="resultMsg" class="msg"></div>
@@ -1852,11 +1826,11 @@ var _HTML_TEMPLATES = {
       comments: document.getElementById('comments'),
 
       spinolaInline: document.getElementById('spinolaInline'),
+      kevinNextSection: document.getElementById('kevinNextSection'),
       spinolaTitle: document.getElementById('spinolaTitle'),
       spinolaDateLabel: document.getElementById('spinolaDateLabel'),
       spinolaSlotsGrid: document.getElementById('spinolaSlotsGrid'),
       spinolaNoSlots: document.getElementById('spinolaNoSlots'),
-      btnBookSpinola: document.getElementById('btnBookSpinola'),
       btnKevinNext: document.getElementById('btnKevinNext')
     };
 
@@ -2443,30 +2417,10 @@ var _HTML_TEMPLATES = {
 
       if (!filtered.length) {
         showHint(els.timeHint, 'bad', t('noSlots'));
-        // Check if Spinola is open for this date before showing the offer
-        google.script.run
-          .withSuccessHandler(function(res) {
-            if (res && res.ok && res.slots) {
-              var tz2 = (state.config && state.config.timezone) || 'Europe/Malta';
-              var now2 = getNowInTimeZoneParts(tz2);
-              var avail = res.slots.filter(function(s) {
-                if (!s || !s.start || s.available !== true) return false;
-                if (state.selectedDateKey === now2.dateKey) {
-                  if (parseHHMMToMinutes(s.start) < now2.minutes) return false;
-                }
-                return true;
-              });
-              if (avail.length) {
-                showSpinolaInline();
-                return;
-              }
-            }
-            // Spinola also has no slots — just show the no-slots message
-          })
-          .withFailureHandler(function() {
-            // Spinola not configured or error — just show no-slots message
-          })
-          .apiGetSpinolaAvailability(state.selectedDateKey);
+        // Use prefetched Spinola data if available for this date
+        if (_spinolaPrefetchedSlots && _spinolaPrefetchDateKey === state.selectedDateKey) {
+          showSpinolaInlineWithData(_spinolaPrefetchedSlots);
+        }
         return;
       }
       hideSpinolaInline();
@@ -2520,7 +2474,8 @@ var _HTML_TEMPLATES = {
 
       if (!state.selectedServiceId) return t('valService');
       if (!state.selectedDateKey) return t('valDate');
-      if (!state.selectedSlot || !state.selectedSlot.start) return t('valTime');
+      // Accept either Potter's slot or Spinola slot
+      if ((!state.selectedSlot || !state.selectedSlot.start) && (!_spinolaSelectedSlot || !_spinolaSelectedSlot.start)) return t('valTime');
 
       const fullName = els.fullName.value.trim();
       const email = els.email.value.trim();
@@ -2543,6 +2498,14 @@ var _HTML_TEMPLATES = {
       if (!isSilentRefresh) {
         showLoading(t('loadingSlotsTitle'), t('loadingSlotsDesc'));
       }
+
+      // Prefetch Spinola slots in parallel
+      _spinolaPrefetchedSlots = null;
+      _spinolaPrefetchDateKey = state.selectedDateKey;
+      google.script.run
+        .withSuccessHandler(function(res) { _spinolaPrefetchedSlots = res; })
+        .withFailureHandler(function() { _spinolaPrefetchedSlots = null; })
+        .apiGetSpinolaAvailability(state.selectedDateKey);
 
       google.script.run
         .withSuccessHandler((res) => {
@@ -2627,15 +2590,14 @@ var _HTML_TEMPLATES = {
 
     var _spinolaSelectedSlot = null;
     var _spinolaDateKey = null;
+    var _spinolaPrefetchedSlots = null;
+    var _spinolaPrefetchDateKey = null;
 
-    function showSpinolaInline() {
+    function showSpinolaInlineWithData(res) {
       _spinolaSelectedSlot = null;
       _spinolaDateKey = state.selectedDateKey;
 
       els.spinolaTitle.textContent = t('spinolaOfferTitle');
-      els.btnBookSpinola.disabled = true;
-      els.btnBookSpinola.classList.remove('active');
-      els.btnBookSpinola.textContent = t('spinolaBookBtn');
       els.spinolaSlotsGrid.innerHTML = '';
       els.spinolaNoSlots.style.display = 'none';
 
@@ -2655,131 +2617,67 @@ var _HTML_TEMPLATES = {
 
       els.btnKevinNext.textContent = t('spinolaKevinNextBtn');
 
-      // Hide time grid, show inline Spinola offer
-      els.timeGrid.style.display = 'none';
-      els.spinolaInline.classList.add('show');
-
-      loadSpinolaSlots(_spinolaDateKey);
-    }
-
-    function hideSpinolaInline() {
-      els.spinolaInline.classList.remove('show');
-      els.timeGrid.style.display = '';
-      _spinolaSelectedSlot = null;
-      _spinolaDateKey = null;
-    }
-
-    function loadSpinolaSlots(dateKey) {
-      els.spinolaSlotsGrid.innerHTML = '';
-      els.spinolaNoSlots.style.display = 'none';
-
       // Show date label
-      var dateOption = (state.dateOptions || []).find(function(o) { return o.dateKey === dateKey; });
-      var dateLabel = dateOption ? dateOption.label : dateKey;
-      els.spinolaDateLabel.textContent = t('spinolaDateSlots') + ' ' + dateLabel;
+      var dateOption = (state.dateOptions || []).find(function(o) { return o.dateKey === _spinolaDateKey; });
+      var dateLbl = dateOption ? dateOption.label : _spinolaDateKey;
+      els.spinolaDateLabel.textContent = t('spinolaDateSlots') + ' ' + dateLbl;
 
-      google.script.run
-        .withSuccessHandler(function(res) {
-          if (!res || !res.ok || !res.slots) {
-            els.spinolaNoSlots.textContent = (res && res.reason) || t('spinolaNoSlots');
-            els.spinolaNoSlots.style.display = 'block';
-            return;
+      // Render Spinola slots from prefetched data
+      if (!res || !res.ok || !res.slots) {
+        els.spinolaNoSlots.textContent = (res && res.reason) || t('spinolaNoSlots');
+        els.spinolaNoSlots.style.display = 'block';
+      } else {
+        var tz = (state.config && state.config.timezone) || 'Europe/Malta';
+        var now = getNowInTimeZoneParts(tz);
+        var available = res.slots.filter(function(slot) {
+          if (!slot || !slot.start || slot.available !== true) return false;
+          if (_spinolaDateKey === now.dateKey) {
+            if (parseHHMMToMinutes(slot.start) < now.minutes) return false;
           }
+          return true;
+        });
 
-          var tz = (state.config && state.config.timezone) || 'Europe/Malta';
-          var now = getNowInTimeZoneParts(tz);
-
-          var available = res.slots.filter(function(slot) {
-            if (!slot || !slot.start || slot.available !== true) return false;
-            if (dateKey === now.dateKey) {
-              if (parseHHMMToMinutes(slot.start) < now.minutes) return false;
-            }
-            return true;
-          });
-
-          if (!available.length) {
-            els.spinolaNoSlots.textContent = t('spinolaNoSlots');
-            els.spinolaNoSlots.style.display = 'block';
-            return;
-          }
-
+        if (!available.length) {
+          els.spinolaNoSlots.textContent = t('spinolaNoSlots');
+          els.spinolaNoSlots.style.display = 'block';
+        } else {
           available.forEach(function(slot) {
             var b = document.createElement('div');
             b.className = 'timeBtn';
             b.textContent = to12h(slot.start);
             b.addEventListener('click', function() {
-              // Deselect previous
               var prev = els.spinolaSlotsGrid.querySelectorAll('.timeBtn');
               for (var i = 0; i < prev.length; i++) prev[i].classList.remove('selected');
               b.classList.add('selected');
               _spinolaSelectedSlot = slot;
-              _spinolaDateKey = dateKey;
-              els.btnBookSpinola.disabled = false;
-              els.btnBookSpinola.classList.add('active');
-              els.btnBookSpinola.scrollIntoView({ behavior: 'smooth', block: 'end' });
+              _spinolaDateKey = state.selectedDateKey;
+              // Clear any Potter's slot selection
+              state.selectedSlot = null;
+              [...els.timeGrid.querySelectorAll('.timeBtn')].forEach(function(x) { x.classList.remove('selected'); });
+              // Update summary to reflect Spinola
+              var spinolaLoc = (state.config && state.config.spinolaLocation) || 'Spinola Clinic';
+              els.sumTime.textContent = t('timeTemplate', to12h(slot.start), to12h(slot.end));
+              els.sumLoc.textContent = t('locationTemplate', spinolaLoc);
+              hideMsg();
             });
             els.spinolaSlotsGrid.appendChild(b);
           });
-        })
-        .withFailureHandler(function(err) {
-          els.spinolaNoSlots.textContent = String(err && err.message ? err.message : err);
-          els.spinolaNoSlots.style.display = 'block';
-        })
-        .apiGetSpinolaAvailability(dateKey);
+        }
+      }
+
+      // Hide time grid, show inline Spinola offer + Dr Kevin section
+      els.timeGrid.style.display = 'none';
+      els.spinolaInline.classList.add('show');
+      els.kevinNextSection.classList.add('show');
     }
 
-    // "Book at Spinola" button
-    els.btnBookSpinola.addEventListener('click', function() {
-      if (!_spinolaSelectedSlot || !_spinolaDateKey) return;
-
-      // Validate form fields
-      var err = validateForm();
-      // Override the slot/date validation since we're using Spinola slot
-      if (!state.selectedServiceId) {
-        showMsg('bad', t('valService'));
-        return;
-      }
-      var fullName = els.fullName.value.trim();
-      var email = els.email.value.trim();
-      var phone = els.phone.value.trim();
-      if (!fullName || !email || !phone) {
-        showMsg('bad', t('missingFields') || 'Please fill in the required fields first.');
-        return;
-      }
-
-      hideSpinolaInline();
-      showLoading(t('confirmingTitle'), t('confirmingDesc'));
-
-      var payload = {
-        serviceId: state.selectedServiceId,
-        dateKey: _spinolaDateKey,
-        startTime: _spinolaSelectedSlot.start,
-        fullName: els.fullName.value.trim(),
-        email: els.email.value.trim(),
-        phone: getFullPhone(),
-        comments: els.comments.value.trim()
-      };
-
-      google.script.run
-        .withSuccessHandler(function(res) {
-          hideLoading();
-          if (res && res.ok) {
-            var spinolaLoc = (state.config && state.config.spinolaLocation) || 'Spinola Clinic';
-            var dateOpt = (state.dateOptions || []).find(function(o) { return o.dateKey === _spinolaDateKey; });
-            var dateLabel2 = dateOpt ? dateOpt.label : _spinolaDateKey;
-            var text = t('confirmMsg', res.serviceName, dateLabel2, to12h(res.startTime), to12h(res.endTime), res.location);
-            showConfirmModal(text);
-            return;
-          }
-          showMsg('bad', t('couldNotBook'));
-        })
-        .withFailureHandler(function(e) {
-          hideLoading();
-          var msg = (e && e.message) ? e.message : String(e);
-          showMsg('bad', msg);
-        })
-        .apiBookSpinola(payload);
-    });
+    function hideSpinolaInline() {
+      els.spinolaInline.classList.remove('show');
+      els.kevinNextSection.classList.remove('show');
+      els.timeGrid.style.display = '';
+      _spinolaSelectedSlot = null;
+      _spinolaDateKey = null;
+    }
 
     // "See Dr Kevin on another day" button
     els.btnKevinNext.addEventListener('click', function() {
@@ -2802,6 +2700,41 @@ var _HTML_TEMPLATES = {
 
       showLoading(t('confirmingTitle'), t('confirmingDesc'));
       setStatus('good', t('bookingStatus'));
+
+      // Route to Spinola or Potter's based on which slot is selected
+      if (_spinolaSelectedSlot && _spinolaDateKey) {
+        var spinolaPayload = {
+          serviceId: state.selectedServiceId,
+          dateKey: _spinolaDateKey,
+          startTime: _spinolaSelectedSlot.start,
+          fullName: els.fullName.value.trim(),
+          email: els.email.value.trim(),
+          phone: getFullPhone(),
+          comments: els.comments.value.trim()
+        };
+
+        google.script.run
+          .withSuccessHandler(function(res) {
+            hideLoading();
+            if (res && res.ok) {
+              var dateOpt = (state.dateOptions || []).find(function(o) { return o.dateKey === _spinolaDateKey; });
+              var dateLabel2 = dateOpt ? dateOpt.label : _spinolaDateKey;
+              var text = t('confirmMsg', res.serviceName, dateLabel2, to12h(res.startTime), to12h(res.endTime), res.location);
+              showConfirmModal(text);
+              return;
+            }
+            showMsg('bad', t('couldNotBook'));
+            setStatus('bad', t('bookingFailed'));
+          })
+          .withFailureHandler(function(e) {
+            hideLoading();
+            var msg = (e && e.message) ? e.message : String(e);
+            showMsg('bad', msg);
+            setStatus('bad', t('bookingError'));
+          })
+          .apiBookSpinola(spinolaPayload);
+        return;
+      }
 
       const payload = {
         serviceId: state.selectedServiceId,
