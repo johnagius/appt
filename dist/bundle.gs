@@ -9804,7 +9804,8 @@ function sendClientConfirmationEmail_(appt) {
   MailApp.sendEmail({
     to: to,
     subject: subject,
-    htmlBody: html
+    htmlBody: html,
+    name: "Potter's Pharmacy"
   });
 }
 
@@ -9840,7 +9841,8 @@ function sendSpinolaConfirmationEmail_(appt) {
   MailApp.sendEmail({
     to: to,
     subject: subject,
-    htmlBody: html
+    htmlBody: html,
+    name: "Potter's Pharmacy"
   });
 }
 
@@ -9911,7 +9913,8 @@ function sendDoctorBookingEmail_(appt, dayList) {
   MailApp.sendEmail({
     to: doctorEmail,
     subject: subject,
-    htmlBody: html
+    htmlBody: html,
+    name: "Potter's Pharmacy"
   });
 }
 
@@ -9938,7 +9941,8 @@ function sendClientCancelledEmail_(appt, messageText) {
   MailApp.sendEmail({
     to: to,
     subject: subject,
-    htmlBody: html
+    htmlBody: html,
+    name: "Potter's Pharmacy"
   });
 }
 
@@ -9965,7 +9969,8 @@ function sendDoctorCancellationEmail_(appt, messageText) {
   MailApp.sendEmail({
     to: doctorEmail,
     subject: subject,
-    htmlBody: html
+    htmlBody: html,
+    name: "Potter's Pharmacy"
   });
 }
 
@@ -9993,7 +9998,8 @@ function sendRedirectToSpinolaEmail_(appt, spinolaLocation) {
   MailApp.sendEmail({
     to: to,
     subject: subject,
-    htmlBody: html
+    htmlBody: html,
+    name: "Potter's Pharmacy"
   });
 }
 
@@ -10023,7 +10029,8 @@ function sendAppointmentPushedEmail_(appt, newDateKey, newStartTime, newEndTime)
   MailApp.sendEmail({
     to: to,
     subject: subject,
-    htmlBody: html
+    htmlBody: html,
+    name: "Potter's Pharmacy"
   });
 }
 
@@ -10085,7 +10092,8 @@ function sendDailyDoctorSchedule_() {
   MailApp.sendEmail({
     to: doctorEmail,
     subject: subject,
-    htmlBody: html
+    htmlBody: html,
+    name: "Potter's Pharmacy"
   });
 }
 
@@ -10113,7 +10121,8 @@ function sendCustomNotificationEmail_(appt, customMessage) {
   MailApp.sendEmail({
     to: to,
     subject: subject,
-    htmlBody: html
+    htmlBody: html,
+    name: "Potter's Pharmacy"
   });
 }
 
@@ -10198,7 +10207,8 @@ function sendReviewRequestEmail_(appt, location, teamNames) {
   MailApp.sendEmail({
     to: to,
     subject: subject,
-    htmlBody: html
+    htmlBody: html,
+    name: "Potter's Pharmacy"
   });
 }
 
