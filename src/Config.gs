@@ -16,6 +16,16 @@ var DEFAULT_HOURS = {
   SUN: []
 };
 
+var DEFAULT_SPINOLA_HOURS = {
+  MON: [{ start: '09:00', end: '19:00' }],
+  TUE: [{ start: '09:00', end: '19:00' }],
+  WED: [{ start: '09:00', end: '19:00' }],
+  THU: [{ start: '09:00', end: '19:00' }],
+  FRI: [{ start: '09:00', end: '19:00' }],
+  SAT: [{ start: '09:00', end: '19:00' }],
+  SUN: [{ start: '10:00', end: '12:00' }]
+};
+
 function CFG() {
   if (_cfgCache) return _cfgCache;
 
@@ -26,6 +36,12 @@ function CFG() {
   var hoursJson = props.getProperty('WORKING_HOURS');
   if (hoursJson) {
     try { hours = JSON.parse(hoursJson); } catch (e) { hours = DEFAULT_HOURS; }
+  }
+
+  var spinolaHours = DEFAULT_SPINOLA_HOURS;
+  var spinolaHoursJson = props.getProperty('SPINOLA_WORKING_HOURS');
+  if (spinolaHoursJson) {
+    try { spinolaHours = JSON.parse(spinolaHoursJson); } catch (e) { spinolaHours = DEFAULT_SPINOLA_HOURS; }
   }
 
   // Read numeric settings from script properties with defaults
@@ -49,6 +65,8 @@ function CFG() {
     PROP_POTTERS_LOCATION: 'POTTERS_LOCATION',
     PROP_SPINOLA_LOCATION: 'SPINOLA_LOCATION',
     PROP_CALENDAR_ID: 'KEVINAPPTS_CALENDAR_ID',
+    PROP_SPINOLA_CALENDAR_ID: 'SPINOLA_CALENDAR_ID',
+    PROP_SPINOLA_APPTS_SSID: 'SPINOLA_APPOINTMENTS_SPREADSHEET_ID',
     PROP_DOUBLECHECK_CALENDAR: 'DOUBLECHECK_CALENDAR',
     PROP_MAX_ACTIVE_APPTS_PER_PERSON: 'MAX_ACTIVE_APPTS_PER_PERSON',
 
@@ -70,7 +88,10 @@ function CFG() {
     ],
 
     // Working hours (now configurable via admin)
-    HOURS: hours
+    HOURS: hours,
+
+    // Spinola Clinic working hours
+    SPINOLA_HOURS: spinolaHours
   };
   return _cfgCache;
 }

@@ -57,6 +57,42 @@ function sendClientConfirmationEmail_(appt) {
   });
 }
 
+function sendSpinolaConfirmationEmail_(appt) {
+  var to = String(appt.email || '').trim();
+  if (!to) return;
+
+  var cancelUrl = buildCancelLink_(appt.token);
+  var spinolaLocation = appt.location || 'Spinola Clinic';
+
+  var subject = 'Appointment Confirmed - Dr James at ' + spinolaLocation + ' (' + appt.dateKey + ' ' + appt.startTime + ')';
+
+  var html = ''
+    + '<div style="font-family:Arial,sans-serif;line-height:1.4;color:#111827;">'
+    + '<h2 style="margin:0 0 10px 0;">Appointment Confirmed - Spinola Clinic</h2>'
+    + '<p style="margin:0 0 10px 0;">Your appointment with <b>Dr James</b> at <b>' + escapeHtml_(spinolaLocation) + '</b> has been confirmed.</p>'
+    + '<p style="margin:0 0 10px 0;color:#6b7280;font-size:13px;">Location: Near McDonald\'s, Love Statue, near bus stop, in Spinola</p>'
+    + '<table style="border-collapse:collapse;width:100%;max-width:520px;">'
+    + '<tr><td style="padding:6px 0;color:#6b7280;">Service</td><td style="padding:6px 0;"><b>' + escapeHtml_(appt.serviceName) + '</b></td></tr>'
+    + '<tr><td style="padding:6px 0;color:#6b7280;">Doctor</td><td style="padding:6px 0;"><b>Dr James</b></td></tr>'
+    + '<tr><td style="padding:6px 0;color:#6b7280;">Date</td><td style="padding:6px 0;"><b>' + escapeHtml_(appt.dateKey) + '</b></td></tr>'
+    + '<tr><td style="padding:6px 0;color:#6b7280;">Time</td><td style="padding:6px 0;"><b>' + escapeHtml_(appt.startTime) + ' - ' + escapeHtml_(appt.endTime) + '</b></td></tr>'
+    + '<tr><td style="padding:6px 0;color:#6b7280;">Location</td><td style="padding:6px 0;"><b>' + escapeHtml_(spinolaLocation) + '</b></td></tr>'
+    + '</table>'
+    + '<div style="margin-top:14px;padding:12px;border:1px solid #e5e7eb;border-radius:12px;background:#f9fafb;">'
+    + '<p style="margin:0 0 10px 0;color:#111827;"><b>Cancel appointment</b></p>'
+    + '<a href="' + cancelUrl + '" style="display:inline-block;background:#ef4444;color:#fff;text-decoration:none;padding:10px 14px;border-radius:999px;font-weight:700;">Cancel Appointment</a>'
+    + '<p style="margin:10px 0 0 0;color:#6b7280;font-size:12px;">If the button does not work, copy and paste this link into your browser:<br>'
+    + '<span style="word-break:break-all;">' + escapeHtml_(cancelUrl) + '</span></p>'
+    + '</div>'
+    + '</div>';
+
+  MailApp.sendEmail({
+    to: to,
+    subject: subject,
+    htmlBody: html
+  });
+}
+
 function sendDoctorBookingEmail_(appt, dayList) {
   var doctorEmail = String(getScriptProps_().getProperty(CFG().PROP_DOCTOR_EMAIL) || '').trim();
   if (!doctorEmail) return;
