@@ -11985,6 +11985,22 @@ function setSpinolaLocation(text) {
   return { ok: true, spinolaLocation: text.trim() };
 }
 
+/**
+ * Run this from the GAS editor to configure Spinola Clinic.
+ * (The editor Run button can't pass arguments, so IDs are hardcoded here.)
+ */
+function setupSpinola() {
+  var calId = '28e57ccf7bdb512322b38bc751b3903ab95c7a3ad7d9dc17cdeac2f0273ceab5@group.calendar.google.com';
+  var ssId  = '18aCZuV0GAL8yJPXEKblAJwH9DqAUKvZeWeQW8V9ChP4';
+
+  setSpinolaCalendarId(calId);
+  setSpinolaSpreadsheetId(ssId);
+
+  Logger.log('Spinola Calendar ID set: ' + calId);
+  Logger.log('Spinola Spreadsheet ID set: ' + ssId);
+  return { ok: true, calendarId: calId, spreadsheetId: ssId };
+}
+
 function setSpinolaCalendarId(id) {
   if (!id || typeof id !== 'string') throw new Error('Missing calendar ID');
   getScriptProps_().setProperty(CFG().PROP_SPINOLA_CALENDAR_ID, id.trim());
@@ -12482,6 +12498,7 @@ function wipeScriptProperties_(execute) {
     setDoctorEmail: setDoctorEmail,
     setPottersLocation: setPottersLocation,
     setSpinolaLocation: setSpinolaLocation,
+    setupSpinola: setupSpinola,
     setSpinolaCalendarId: setSpinolaCalendarId,
     setSpinolaSpreadsheetId: setSpinolaSpreadsheetId,
     setDoubleCheckCalendar: setDoubleCheckCalendar,

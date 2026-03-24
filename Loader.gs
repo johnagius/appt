@@ -266,6 +266,7 @@ function setWebAppUrl(u)                     { return _getApp().setWebAppUrl(u);
 function setDoctorEmail(e)                   { return _getApp().setDoctorEmail(e); }
 function setPottersLocation(t)               { return _getApp().setPottersLocation(t); }
 function setSpinolaLocation(t)               { return _getApp().setSpinolaLocation(t); }
+function setupSpinola()                      { return _getApp().setupSpinola(); }
 function setSpinolaCalendarId(id)            { return _getApp().setSpinolaCalendarId(id); }
 function setSpinolaSpreadsheetId(id)         { return _getApp().setSpinolaSpreadsheetId(id); }
 function setDoubleCheckCalendar(v)           { return _getApp().setDoubleCheckCalendar(v); }
