@@ -3891,6 +3891,29 @@ var _HTML_TEMPLATES = {
     .legend{display:flex;gap:12px;margin-top:8px;font-size:11px;color:var(--muted);}
     .legend-dot{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:middle;}
 
+    /* Reviews tab */
+    .rev-title{margin:0 0 4px;font-size:16px;font-weight:800;}
+    .rev-subtitle{font-size:13px;color:var(--muted);margin:0 0 16px;}
+    .rev-team{margin-bottom:16px;}
+    .rev-team-label{font-size:13px;font-weight:600;display:block;margin-bottom:6px;}
+    .rev-team-checks{display:flex;gap:16px;flex-wrap:wrap;}
+    .rev-check-label{font-size:13px;cursor:pointer;display:flex;align-items:center;gap:4px;}
+    .rev-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+    @media(max-width:600px){.rev-grid{grid-template-columns:1fr;}}
+    .rev-card{display:flex;flex-direction:column;}
+    .rev-card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+    .rev-card-title{margin:0;font-size:14px;font-weight:700;}
+    .rev-list{flex:1;min-height:48px;}
+    .rev-card-footer{margin-top:12px;}
+    .rev-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);}
+    .rev-row:last-child{border-bottom:none;}
+    .rev-row label{display:flex;align-items:center;gap:10px;flex:1;cursor:pointer;min-width:0;}
+    .rev-row input[type="checkbox"]{flex-shrink:0;margin:0;}
+    .rev-patient-info{min-width:0;flex:1;}
+    .rev-patient-name{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .rev-patient-detail{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .rev-sent-badge{flex-shrink:0;font-size:10px;font-weight:700;padding:2px 8px;border-radius:999px;background:rgba(16,185,129,0.1);color:#065f46;border:1px solid rgba(16,185,129,0.25);}
+
     /* Overlay animation */
     .overlay{opacity:0;transition:opacity 0.2s ease;}
     .overlay.show{opacity:1;}
@@ -4341,55 +4364,45 @@ var _HTML_TEMPLATES = {
   </div>
 
   <div class="msg" id="statsMsg"></div>
-</div>
 
-<!-- Reviews Tab -->
-<div class="tab-content" id="tab-reviews" style="display:none;">
-  <h3 style="margin:0 0 12px;">Request Google Reviews</h3>
-  <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Select today's patients to send a friendly review request email.</p>
+  <!-- Reviews Tab -->
+  <div class="tab-content" id="tab-reviews" style="display:none;">
+    <h3 class="rev-title">Request Google Reviews</h3>
+    <p class="rev-subtitle">Select today's patients to send a friendly review request email.</p>
 
-  <div style="margin-bottom:14px;">
-    <label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px;">Team members present today:</label>
-    <div style="display:flex;gap:14px;flex-wrap:wrap;">
-      <label style="font-size:13px;cursor:pointer;display:flex;align-items:center;gap:4px;">
-        <input type="checkbox" id="teamJohn" checked> John
-      </label>
-      <label style="font-size:13px;cursor:pointer;display:flex;align-items:center;gap:4px;">
-        <input type="checkbox" id="teamLaura"> Laura
-      </label>
-      <label style="font-size:13px;cursor:pointer;display:flex;align-items:center;gap:4px;">
-        <input type="checkbox" id="teamJovana"> Jovana
-      </label>
-    </div>
-  </div>
-
-  <div class="stats-grid">
-    <div class="card">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-        <h3 style="margin:0;">Potter's Pharmacy</h3>
-        <label style="font-size:12px;cursor:pointer;display:flex;align-items:center;gap:4px;">
-          <input type="checkbox" id="revSelectAllPotters" onchange="toggleRevAll('potters',this.checked)"> Select all
-        </label>
+    <div class="rev-team">
+      <label class="rev-team-label">Team members present today:</label>
+      <div class="rev-team-checks">
+        <label class="rev-check-label"><input type="checkbox" id="teamJohn" checked> John</label>
+        <label class="rev-check-label"><input type="checkbox" id="teamLaura"> Laura</label>
+        <label class="rev-check-label"><input type="checkbox" id="teamJovana"> Jovana</label>
       </div>
-      <div id="revPottersList"><div class="empty">Loading...</div></div>
-      <button class="btn btn-sm" style="margin-top:10px;background:#2563eb;color:#fff;" onclick="sendReviewEmails('potters')">
-        Send Review Request
-      </button>
     </div>
-    <div class="card">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-        <h3 style="margin:0;">Spinola Clinic</h3>
-        <label style="font-size:12px;cursor:pointer;display:flex;align-items:center;gap:4px;">
-          <input type="checkbox" id="revSelectAllSpinola" onchange="toggleRevAll('spinola',this.checked)"> Select all
-        </label>
+
+    <div class="rev-grid">
+      <div class="card rev-card">
+        <div class="rev-card-header">
+          <h3 class="rev-card-title">Potter's Pharmacy</h3>
+          <label class="rev-check-label"><input type="checkbox" id="revSelectAllPotters" onchange="toggleRevAll('potters',this.checked)"> Select all</label>
+        </div>
+        <div class="rev-list" id="revPottersList"><div class="empty">Loading...</div></div>
+        <div class="rev-card-footer">
+          <button class="btn btn-sm btn-blue" onclick="sendReviewEmails('potters')">Send Review Request</button>
+        </div>
       </div>
-      <div id="revSpinolaList"><div class="empty">Loading...</div></div>
-      <button class="btn btn-sm" style="margin-top:10px;background:#8b5cf6;color:#fff;" onclick="sendReviewEmails('spinola')">
-        Send Review Request
-      </button>
+      <div class="card rev-card">
+        <div class="rev-card-header">
+          <h3 class="rev-card-title" style="color:#8b5cf6;">Spinola Clinic</h3>
+          <label class="rev-check-label"><input type="checkbox" id="revSelectAllSpinola" onchange="toggleRevAll('spinola',this.checked)"> Select all</label>
+        </div>
+        <div class="rev-list" id="revSpinolaList"><div class="empty">Loading...</div></div>
+        <div class="rev-card-footer">
+          <button class="btn btn-sm" style="background:#8b5cf6;color:#fff;" onclick="sendReviewEmails('spinola')">Send Review Request</button>
+        </div>
+      </div>
     </div>
+    <div class="msg" id="reviewsMsg"></div>
   </div>
-  <div class="msg" id="reviewsMsg"></div>
 </div>
 
 <!-- Patient History modal -->
@@ -6749,14 +6762,16 @@ function renderReviewList(loc, patients) {
   var html = '';
   for (var i = 0; i < patients.length; i++) {
     var p = patients[i];
-    html += '<div class="patient-row">';
-    html += '<label style="display:flex;align-items:center;gap:8px;flex:1;cursor:pointer;">';
-    html += '<input type="checkbox" class="rev-cb-' + loc + '" value="' + esc(p.appointmentId) + '" data-email="' + esc(p.email) + '">';
-    html += '<div>';
-    html += '<div style="font-size:13px;font-weight:600;">' + esc(p.fullName) + '</div>';
-    html += '<div style="font-size:11px;color:var(--muted);">' + esc(p.email) + ' &bull; ' + esc(p.startTime) + ' &bull; ' + esc(p.serviceName) + '</div>';
+    var sent = p.reviewSent;
+    html += '<div class="rev-row">';
+    html += '<label>';
+    html += '<input type="checkbox" class="rev-cb-' + loc + '" value="' + esc(p.appointmentId) + '" data-email="' + esc(p.email) + '"' + (sent ? ' disabled' : '') + '>';
+    html += '<div class="rev-patient-info">';
+    html += '<div class="rev-patient-name">' + esc(p.fullName) + '</div>';
+    html += '<div class="rev-patient-detail">' + esc(p.email) + ' &bull; ' + esc(p.startTime) + ' &bull; ' + esc(p.serviceName) + '</div>';
     html += '</div>';
     html += '</label>';
+    if (sent) html += '<span class="rev-sent-badge">Sent</span>';
     html += '</div>';
   }
   el.innerHTML = html;
@@ -6792,8 +6807,18 @@ function sendReviewEmails(loc) {
     .withSuccessHandler(function(res) {
       if (!res || !res.ok) { showMsg('reviewsMsg', 'bad', res.reason || 'Failed.'); return; }
       showMsg('reviewsMsg', 'good', res.message);
-      // Uncheck sent patients
-      for (var i = 0; i < cbs.length; i++) cbs[i].checked = false;
+      // Mark sent patients in UI
+      for (var i = 0; i < cbs.length; i++) {
+        cbs[i].checked = false;
+        cbs[i].disabled = true;
+        var row = cbs[i].closest('.rev-row');
+        if (row && !row.querySelector('.rev-sent-badge')) {
+          var badge = document.createElement('span');
+          badge.className = 'rev-sent-badge';
+          badge.textContent = 'Sent';
+          row.appendChild(badge);
+        }
+      }
       var selAll = document.getElementById(loc === 'potters' ? 'revSelectAllPotters' : 'revSelectAllSpinola');
       if (selAll) selAll.checked = false;
     })
@@ -11888,10 +11913,30 @@ function apiAdminGetReviewPatients(sig) {
     }
   }
 
+  var pottersFiltered = filterWithEmail(potters);
+  var spinolaFiltered = filterWithEmail(allSpinola);
+
+  // Mark patients who already received a review request today
+  var sentKey = 'REVIEW_SENT_' + dk;
+  var sentJson = PropertiesService.getScriptProperties().getProperty(sentKey);
+  var sentIds = {};
+  if (sentJson) {
+    try {
+      var arr = JSON.parse(sentJson);
+      for (var si = 0; si < arr.length; si++) sentIds[arr[si]] = true;
+    } catch (e) { /* ignore parse errors */ }
+  }
+  for (var pi = 0; pi < pottersFiltered.length; pi++) {
+    pottersFiltered[pi].reviewSent = !!sentIds[pottersFiltered[pi].appointmentId];
+  }
+  for (var qi = 0; qi < spinolaFiltered.length; qi++) {
+    spinolaFiltered[qi].reviewSent = !!sentIds[spinolaFiltered[qi].appointmentId];
+  }
+
   return {
     ok: true,
-    potters: filterWithEmail(potters),
-    spinola: filterWithEmail(allSpinola)
+    potters: pottersFiltered,
+    spinola: spinolaFiltered
   };
 }
 
@@ -11934,6 +11979,18 @@ function apiAdminSendReviewRequests(sig, payload) {
       Logger.log('WARN: Failed to send review email to ' + email + ': ' + e.message);
     }
   }
+
+  // Persist sent appointment IDs for today
+  var sentKey = 'REVIEW_SENT_' + dk;
+  var sentJson = PropertiesService.getScriptProperties().getProperty(sentKey);
+  var existingSent = [];
+  if (sentJson) {
+    try { existingSent = JSON.parse(sentJson); } catch (e) { /* ignore */ }
+  }
+  for (var si = 0; si < appointmentIds.length; si++) {
+    if (existingSent.indexOf(appointmentIds[si]) < 0) existingSent.push(appointmentIds[si]);
+  }
+  PropertiesService.getScriptProperties().setProperty(sentKey, JSON.stringify(existingSent));
 
   return { ok: true, message: 'Review request sent to ' + sent + ' patient(s).', sent: sent };
 }

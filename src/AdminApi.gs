@@ -831,10 +831,30 @@ function apiAdminGetReviewPatients(sig) {
     }
   }
 
+  var pottersFiltered = filterWithEmail(potters);
+  var spinolaFiltered = filterWithEmail(allSpinola);
+
+  // Mark patients who already received a review request today
+  var sentKey = 'REVIEW_SENT_' + dk;
+  var sentJson = PropertiesService.getScriptProperties().getProperty(sentKey);
+  var sentIds = {};
+  if (sentJson) {
+    try {
+      var arr = JSON.parse(sentJson);
+      for (var si = 0; si < arr.length; si++) sentIds[arr[si]] = true;
+    } catch (e) { /* ignore parse errors */ }
+  }
+  for (var pi = 0; pi < pottersFiltered.length; pi++) {
+    pottersFiltered[pi].reviewSent = !!sentIds[pottersFiltered[pi].appointmentId];
+  }
+  for (var qi = 0; qi < spinolaFiltered.length; qi++) {
+    spinolaFiltered[qi].reviewSent = !!sentIds[spinolaFiltered[qi].appointmentId];
+  }
+
   return {
     ok: true,
-    potters: filterWithEmail(potters),
-    spinola: filterWithEmail(allSpinola)
+    potters: pottersFiltered,
+    spinola: spinolaFiltered
   };
 }
 
@@ -877,6 +897,18 @@ function apiAdminSendReviewRequests(sig, payload) {
       Logger.log('WARN: Failed to send review email to ' + email + ': ' + e.message);
     }
   }
+
+  // Persist sent appointment IDs for today
+  var sentKey = 'REVIEW_SENT_' + dk;
+  var sentJson = PropertiesService.getScriptProperties().getProperty(sentKey);
+  var existingSent = [];
+  if (sentJson) {
+    try { existingSent = JSON.parse(sentJson); } catch (e) { /* ignore */ }
+  }
+  for (var si = 0; si < appointmentIds.length; si++) {
+    if (existingSent.indexOf(appointmentIds[si]) < 0) existingSent.push(appointmentIds[si]);
+  }
+  PropertiesService.getScriptProperties().setProperty(sentKey, JSON.stringify(existingSent));
 
   return { ok: true, message: 'Review request sent to ' + sent + ' patient(s).', sent: sent };
 }
