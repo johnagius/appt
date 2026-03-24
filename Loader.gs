@@ -247,6 +247,8 @@ function apiAdminSetDoctorOffDates(s, p)     { return _getApp().apiAdminSetDocto
 function apiAdminRemoveDoctorOff(s, ri)      { return _getApp().apiAdminRemoveDoctorOff(s, ri); }
 function apiAdminRemoveExtraSlots(s, ri)     { return _getApp().apiAdminRemoveExtraSlots(s, ri); }
 function apiAdminNotifyPatients(s, p)        { return _getApp().apiAdminNotifyPatients(s, p); }
+function apiAdminGetReviewPatients(s)        { return _getApp().apiAdminGetReviewPatients(s); }
+function apiAdminSendReviewRequests(s, p)    { return _getApp().apiAdminSendReviewRequests(s, p); }
 function apiAdminGetWeekOverview(s, w)       { return _getApp().apiAdminGetWeekOverview(s, w); }
 function apiAdminSearchAppointments(s, q)    { return _getApp().apiAdminSearchAppointments(s, q); }
 function apiAdminGetSettings(s)              { return _getApp().apiAdminGetSettings(s); }
