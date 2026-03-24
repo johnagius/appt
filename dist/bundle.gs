@@ -3813,7 +3813,10 @@ var _HTML_TEMPLATES = {
     .week-cell.selected .wc-count{color:rgba(255,255,255,0.7);}
     .week-cell .wc-dot{width:6px;height:6px;border-radius:50%;display:inline-block;margin:0 1px;vertical-align:middle;}
     .week-cell.blocked{background:rgba(239,68,68,0.04);}
+    .week-cell.blocked.selected{background:#111827;}
+    .week-cell.blocked.selected.today{background:var(--blue);}
     .week-cell.no-hours{opacity:0.4;}
+    .week-cell.no-hours.selected{opacity:1;}
     @media(max-width:600px){
       .week-cell{padding:6px 2px;border-radius:8px;}
       .week-cell .wc-num{font-size:14px;}
