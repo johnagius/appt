@@ -813,6 +813,18 @@ function getDayRows_(dateKey) {
   return archive[dateKey] || [];
 }
 
+function getSpinolaRows_(dateKey) {
+  try {
+    var ss = getSpinolaSpreadsheet_();
+    if (!ss) return [];
+    var sh = ss.getSheetByName(dateKey);
+    if (!sh) return [];
+    var lr = sh.getLastRow();
+    if (lr < 2) return [];
+    return sh.getRange(2, 1, lr - 1, 18).getValues();
+  } catch(e) { return []; }
+}
+
 /**
  * Archive day sheets older than daysToKeep and delete them.
  * Returns { archivedSheets, archivedRows }.
