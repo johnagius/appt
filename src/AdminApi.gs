@@ -1396,6 +1396,8 @@ function apiAdminGetStatistics(sig) {
 function extractCountryFromPhone_(phone) {
   phone = String(phone || '').replace(/[\s\-\(\)]/g, '');
   if (!phone) return '';
+  // Normalize: ensure phone starts with + for prefix matching
+  if (phone.charAt(0) !== '+' && /^\d/.test(phone)) phone = '+' + phone;
   // Common prefixes (longest match first)
   var prefixes = [
     {p:'+356',c:'Malta'},{p:'+44',c:'UK'},{p:'+39',c:'Italy'},{p:'+33',c:'France'},
@@ -1421,10 +1423,8 @@ function extractCountryFromPhone_(phone) {
   for (var i = 0; i < prefixes.length; i++) {
     if (phone.indexOf(prefixes[i].p) === 0) return prefixes[i].c;
   }
-  // If no + prefix but starts with 356 (local Malta number without +)
-  if (/^356\d{8}/.test(phone)) return 'Malta';
-  // No + and no recognized prefix - assume local Malta
-  if (phone.length <= 8 && /^\d+$/.test(phone)) return 'Malta';
+  // No recognized prefix - assume local Malta for short numbers
+  if (phone.replace(/^\+/, '').length <= 8 && /^\+?\d+$/.test(phone)) return 'Malta';
   return 'Other';
 }
 
