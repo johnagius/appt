@@ -778,8 +778,10 @@ function apiAdminGetReviewPatients(sig) {
   var today = todayLocal_();
   var dk = toDateKey_(today);
 
-  var pottersAppts = listActiveAppointmentsForDate_(dk);
-  var spinolaAppts = listSpinolaAppointmentsForDate_(dk);
+  // Use listAppointmentsForDate_ (not listActive) to include ATTENDED patients
+  var pottersAppts = listAppointmentsForDate_(dk);
+  var spinolaAppts = [];
+  try { spinolaAppts = listSpinolaAppointmentsForDate_(dk); } catch (e) { /* no Spinola sheet */ }
 
   function filterWithEmail(appts) {
     var result = [];
@@ -854,9 +856,11 @@ function apiAdminSendReviewRequests(sig, payload) {
   var dk = toDateKey_(today);
 
   // Gather all appointments from both sheets
-  var allAppts = listActiveAppointmentsForDate_(dk);
-  var spinolaAppts = listSpinolaAppointmentsForDate_(dk);
-  for (var s = 0; s < spinolaAppts.length; s++) allAppts.push(spinolaAppts[s]);
+  var allAppts = listAppointmentsForDate_(dk);
+  try {
+    var spinolaAppts = listSpinolaAppointmentsForDate_(dk);
+    for (var s = 0; s < spinolaAppts.length; s++) allAppts.push(spinolaAppts[s]);
+  } catch (e) { /* no Spinola sheet */ }
 
   var idSet = {};
   for (var i = 0; i < appointmentIds.length; i++) idSet[String(appointmentIds[i])] = true;
