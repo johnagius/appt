@@ -731,6 +731,8 @@ var _HTML_TEMPLATES = {
       flex:0 0 auto;
     }
     @keyframes spin{ to { transform: rotate(360deg); } }
+    @keyframes shake{0%,100%{transform:translateX(0);}20%{transform:translateX(-6px);}40%{transform:translateX(6px);}60%{transform:translateX(-4px);}80%{transform:translateX(4px);}}
+    .shake{animation:shake 0.4s ease-in-out;}
 
     /* Idle overlay */
     .idle-overlay{position:fixed;inset:0;z-index:2000;display:flex;align-items:center;justify-content:center;background:rgba(246,247,251,0.50);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);cursor:pointer;opacity:0;visibility:hidden;pointer-events:none;transition:opacity 0.5s ease,visibility 0.5s ease;}
@@ -2637,6 +2639,10 @@ var _HTML_TEMPLATES = {
 
     function renderSlots(slots) {
       els.timeGrid.innerHTML = '';
+      // Preserve Spinola selection during silent refresh — only clear if user has no active Spinola slot
+      var hadSpinolaSlot = _spinolaSelectedSlot && _spinolaSelectedSlot.start;
+      var savedSpinolaSlot = hadSpinolaSlot ? _spinolaSelectedSlot : null;
+      var savedSpinolaDateKey = hadSpinolaSlot ? _spinolaDateKey : null;
       hideSpinolaInline();
       state.slots = slots || [];
 
@@ -2670,6 +2676,16 @@ var _HTML_TEMPLATES = {
         if (_spinolaPrefetchedSlots && _spinolaPrefetchDateKey === state.selectedDateKey) {
           hideHint(els.timeHint);
           showSpinolaInlineWithData(_spinolaPrefetchedSlots);
+          // Restore previously selected Spinola slot if it's still available
+          if (savedSpinolaSlot && savedSpinolaDateKey === state.selectedDateKey) {
+            var btns = els.spinolaSlotsGrid.querySelectorAll('.timeBtn');
+            for (var ri = 0; ri < btns.length; ri++) {
+              if (btns[ri].textContent === to12h(savedSpinolaSlot.start)) {
+                btns[ri].click();
+                break;
+              }
+            }
+          }
         } else {
           showHint(els.timeHint, 'bad', t('noSlots'));
         }
@@ -2957,6 +2973,9 @@ var _HTML_TEMPLATES = {
       if (err) {
         showMsg('bad', err);
         setStatus('bad', t('missingFields'));
+        // Shake the confirm button to draw attention
+        els.confirmBtn.classList.add('shake');
+        setTimeout(function() { els.confirmBtn.classList.remove('shake'); }, 600);
         return;
       }
 
@@ -4364,9 +4383,10 @@ var _HTML_TEMPLATES = {
   </div>
 
   <div class="msg" id="statsMsg"></div>
+</div>
 
-  <!-- Reviews Tab -->
-  <div class="tab-content" id="tab-reviews" style="display:none;">
+<!-- Reviews Tab -->
+<div class="tab-content" id="tab-reviews" style="display:none;">
     <h3 class="rev-title">Request Google Reviews</h3>
     <p class="rev-subtitle">Select today's patients to send a friendly review request email.</p>
 
@@ -4403,7 +4423,6 @@ var _HTML_TEMPLATES = {
     </div>
     <div class="msg" id="reviewsMsg"></div>
   </div>
-</div>
 
 <!-- Patient History modal -->
 <div class="overlay" id="patientOverlay">
