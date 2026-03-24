@@ -24,6 +24,8 @@
  *        POTTERS_LOCATION
  *        SPINOLA_LOCATION
  *        DOUBLECHECK_CALENDAR
+ *        SPINOLA_CALENDAR_ID
+ *        SPINOLA_APPOINTMENTS_SPREADSHEET_ID
  *   5. Deploy → New deployment → Web app
  *   6. Run setWebAppUrlAuto() from the editor
  *   7. Run repairSheets() to set up new sheets (DoctorExtra, etc.)
@@ -222,6 +224,8 @@ function apiGetDateOptions(m)                { return _getApp().apiGetDateOption
 function apiRefreshDates()                   { return _getApp().apiRefreshDates(); }
 function apiGetAvailability(dk)              { return _getApp().apiGetAvailability(dk); }
 function apiBook(p)                          { return _getApp().apiBook(p); }
+function apiGetSpinolaAvailability(dk)       { return _getApp().apiGetSpinolaAvailability(dk); }
+function apiBookSpinola(p)                   { return _getApp().apiBookSpinola(p); }
 
 // ----- Polling (called from Admin.html via google.script.run) -----
 function apiPoll()                           { return _getApp().apiPoll(); }
@@ -262,6 +266,8 @@ function setWebAppUrl(u)                     { return _getApp().setWebAppUrl(u);
 function setDoctorEmail(e)                   { return _getApp().setDoctorEmail(e); }
 function setPottersLocation(t)               { return _getApp().setPottersLocation(t); }
 function setSpinolaLocation(t)               { return _getApp().setSpinolaLocation(t); }
+function setSpinolaCalendarId(id)            { return _getApp().setSpinolaCalendarId(id); }
+function setSpinolaSpreadsheetId(id)         { return _getApp().setSpinolaSpreadsheetId(id); }
 function setDoubleCheckCalendar(v)           { return _getApp().setDoubleCheckCalendar(v); }
 function setMaxActiveAppointmentsPerPerson(n){ return _getApp().setMaxActiveAppointmentsPerPerson(n); }
 function generateAdminLink()                 { return _getApp().generateAdminLink(); }
