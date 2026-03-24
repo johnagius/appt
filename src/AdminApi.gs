@@ -770,6 +770,114 @@ function apiAdminNotifyPatients(sig, payload) {
 }
 
 /**
+ * Get today's patients with emails for review requests.
+ */
+function apiAdminGetReviewPatients(sig) {
+  if (!verifyAdminSig_(sig)) return { ok: false, reason: 'Access denied.' };
+
+  var today = todayLocal_();
+  var dk = toDateKey_(today);
+
+  var pottersAppts = listActiveAppointmentsForDate_(dk);
+  var spinolaAppts = listSpinolaAppointmentsForDate_(dk);
+
+  function filterWithEmail(appts) {
+    var result = [];
+    for (var i = 0; i < appts.length; i++) {
+      var a = appts[i];
+      var email = String(a.email || '').trim();
+      var status = String(a.status || '');
+      if (!email) continue;
+      if (status === 'CANCELLED_DOCTOR' || status === 'CANCELLED_PATIENT') continue;
+      result.push({
+        appointmentId: a.appointmentId,
+        fullName: a.fullName,
+        email: email,
+        startTime: a.startTime,
+        serviceName: a.serviceName,
+        status: a.status
+      });
+    }
+    result.sort(function(a, b) {
+      return String(a.startTime || '').localeCompare(String(b.startTime || ''));
+    });
+    return result;
+  }
+
+  // Separate Potter's vs Spinola from the Potter's sheet
+  var potters = [];
+  var spinolaFromPotters = [];
+  for (var i = 0; i < pottersAppts.length; i++) {
+    var loc = String(pottersAppts[i].location || '').toLowerCase();
+    if (loc.indexOf('spinola') >= 0 || pottersAppts[i].status === 'RELOCATED_SPINOLA') {
+      spinolaFromPotters.push(pottersAppts[i]);
+    } else {
+      potters.push(pottersAppts[i]);
+    }
+  }
+
+  // Merge Spinola lists (relocated + direct) avoiding duplicates
+  var seenIds = {};
+  var allSpinola = [];
+  for (var j = 0; j < spinolaFromPotters.length; j++) {
+    seenIds[spinolaFromPotters[j].appointmentId] = true;
+    allSpinola.push(spinolaFromPotters[j]);
+  }
+  for (var k = 0; k < spinolaAppts.length; k++) {
+    if (!seenIds[spinolaAppts[k].appointmentId]) {
+      allSpinola.push(spinolaAppts[k]);
+    }
+  }
+
+  return {
+    ok: true,
+    potters: filterWithEmail(potters),
+    spinola: filterWithEmail(allSpinola)
+  };
+}
+
+/**
+ * Send review request emails to selected patients.
+ */
+function apiAdminSendReviewRequests(sig, payload) {
+  if (!verifyAdminSig_(sig)) return { ok: false, reason: 'Access denied.' };
+
+  payload = payload || {};
+  var appointmentIds = payload.appointmentIds || [];
+  var location = String(payload.location || 'potters');
+  var teamNames = payload.teamNames || [];
+
+  if (!appointmentIds.length) return { ok: false, reason: 'No patients selected.' };
+  if (!teamNames.length) return { ok: false, reason: 'No team members selected.' };
+
+  var today = todayLocal_();
+  var dk = toDateKey_(today);
+
+  // Gather all appointments from both sheets
+  var allAppts = listActiveAppointmentsForDate_(dk);
+  var spinolaAppts = listSpinolaAppointmentsForDate_(dk);
+  for (var s = 0; s < spinolaAppts.length; s++) allAppts.push(spinolaAppts[s]);
+
+  var idSet = {};
+  for (var i = 0; i < appointmentIds.length; i++) idSet[String(appointmentIds[i])] = true;
+
+  var sent = 0;
+  for (var j = 0; j < allAppts.length; j++) {
+    if (!idSet[allAppts[j].appointmentId]) continue;
+    var email = String(allAppts[j].email || '').trim();
+    if (!email) continue;
+    try {
+      sendReviewRequestEmail_(allAppts[j], location, teamNames);
+      sent++;
+    } catch (e) {
+      Logger.log('WARN: Failed to send review email to ' + email + ': ' + e.message);
+    }
+  }
+
+  return { ok: true, message: 'Review request sent to ' + sent + ' patient(s).', sent: sent };
+}
+
+/**
  * Get week overview: appointment counts per day for a given week.
  */
 function apiAdminGetWeekOverview(sig, weekStartDate) {

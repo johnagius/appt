@@ -366,6 +366,91 @@ function sendCustomNotificationEmail_(appt, customMessage) {
   });
 }
 
+function sendReviewRequestEmail_(appt, location, teamNames) {
+  var to = String(appt.email || '').trim();
+  if (!to) return;
+
+  var firstName = String(appt.fullName || '').split(' ')[0] || 'there';
+  var isPotters = location === 'potters';
+  var placeName = isPotters ? "Potter's Pharmacy" : 'Spinola Clinic';
+  var reviewUrl = isPotters
+    ? 'https://search.google.com/local/writereview?placeid=ChIJ3dCu7mtFDhMRYBPbRR0pgtE'
+    : 'https://search.google.com/local/writereview?placeid=ChIJ3dCu7mtFDhMRYBPbRR0pgtE';
+
+  var teamLine = '';
+  if (teamNames.length === 1) {
+    teamLine = teamNames[0];
+  } else if (teamNames.length === 2) {
+    teamLine = teamNames[0] + ' &amp; ' + teamNames[1];
+  } else if (teamNames.length >= 3) {
+    teamLine = teamNames.slice(0, -1).join(', ') + ' &amp; ' + teamNames[teamNames.length - 1];
+  }
+
+  var accentColor = isPotters ? '#2563eb' : '#8b5cf6';
+
+  var subject = "We'd love your feedback - " + placeName;
+
+  var html = ''
+    + '<!DOCTYPE html>'
+    + '<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>'
+    + '<body style="margin:0;padding:0;background:#f3f4f6;font-family:Arial,Helvetica,sans-serif;">'
+    + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;">'
+    + '<tr><td align="center" style="padding:32px 16px;">'
+    + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.06);">'
+
+    // Header accent bar
+    + '<tr><td style="height:6px;background:' + accentColor + ';"></td></tr>'
+
+    // Main content
+    + '<tr><td style="padding:36px 32px 24px;">'
+    + '<h1 style="margin:0 0 20px;font-size:22px;font-weight:800;color:#111827;line-height:1.3;">Thank you for visiting ' + escapeHtml_(placeName) + '!</h1>'
+
+    + '<p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#374151;">'
+    + 'Hi ' + escapeHtml_(firstName) + ',</p>'
+
+    + '<p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#374151;">'
+    + 'We hope you had a great experience with us today. If you were happy with the service, we\'d really appreciate it if you could take a moment to leave us a quick Google review.</p>'
+
+    + '<p style="margin:0 0 24px;font-size:15px;line-height:1.6;color:#374151;">'
+    + 'Your feedback helps others discover us and means the world to our team.</p>'
+
+    // CTA Button
+    + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0">'
+    + '<tr><td align="center" style="padding:4px 0 28px;">'
+    + '<a href="' + reviewUrl + '" style="display:inline-block;background:' + accentColor + ';color:#ffffff;text-decoration:none;padding:14px 32px;border-radius:999px;font-size:15px;font-weight:700;letter-spacing:0.3px;">'
+    + '&#9733; Leave a Review'
+    + '</a>'
+    + '</td></tr></table>'
+
+    // Divider
+    + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0">'
+    + '<tr><td style="border-top:1px solid #e5e7eb;padding-top:20px;">'
+    + '<p style="margin:0;font-size:14px;line-height:1.5;color:#6b7280;">Warm regards,</p>'
+    + '<p style="margin:4px 0 0;font-size:15px;font-weight:700;color:#111827;">' + teamLine + '</p>'
+    + '<p style="margin:2px 0 0;font-size:13px;color:#9ca3af;">The Potter\'s Pharmacy Team</p>'
+    + '</td></tr></table>'
+
+    + '</td></tr>'
+
+    // Footer
+    + '<tr><td style="padding:16px 32px 24px;background:#f9fafb;border-top:1px solid #f3f4f6;">'
+    + '<p style="margin:0;font-size:11px;line-height:1.5;color:#9ca3af;text-align:center;">'
+    + 'This email was sent because you visited ' + escapeHtml_(placeName) + ' today.<br>'
+    + 'If you received this by mistake, please disregard it.'
+    + '</p>'
+    + '</td></tr>'
+
+    + '</table>'
+    + '</td></tr></table>'
+    + '</body></html>';
+
+  MailApp.sendEmail({
+    to: to,
+    subject: subject,
+    htmlBody: html
+  });
+}
+
 function escapeHtml_(s) {
   s = String(s === null || s === undefined ? '' : s);
   return s

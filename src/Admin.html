@@ -358,6 +358,7 @@
     <div class="tab" data-tab="availability" onclick="switchTab('availability')">Availability</div>
     <div class="tab" data-tab="actions" onclick="switchTab('actions')">Quick Actions</div>
     <div class="tab" data-tab="statistics" onclick="switchTab('statistics')">Statistics</div>
+    <div class="tab" data-tab="reviews" onclick="switchTab('reviews')">Reviews</div>
     <div class="tab" data-tab="settings" onclick="switchTab('settings')">Settings</div>
   </div>
 
@@ -766,6 +767,55 @@
   <div class="msg" id="statsMsg"></div>
 </div>
 
+<!-- Reviews Tab -->
+<div class="tab-content" id="tab-reviews" style="display:none;">
+  <h3 style="margin:0 0 12px;">Request Google Reviews</h3>
+  <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Select today's patients to send a friendly review request email.</p>
+
+  <div style="margin-bottom:14px;">
+    <label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px;">Team members present today:</label>
+    <div style="display:flex;gap:14px;flex-wrap:wrap;">
+      <label style="font-size:13px;cursor:pointer;display:flex;align-items:center;gap:4px;">
+        <input type="checkbox" id="teamJohn" checked> John
+      </label>
+      <label style="font-size:13px;cursor:pointer;display:flex;align-items:center;gap:4px;">
+        <input type="checkbox" id="teamLaura"> Laura
+      </label>
+      <label style="font-size:13px;cursor:pointer;display:flex;align-items:center;gap:4px;">
+        <input type="checkbox" id="teamJovana"> Jovana
+      </label>
+    </div>
+  </div>
+
+  <div class="stats-grid">
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <h3 style="margin:0;">Potter's Pharmacy</h3>
+        <label style="font-size:12px;cursor:pointer;display:flex;align-items:center;gap:4px;">
+          <input type="checkbox" id="revSelectAllPotters" onchange="toggleRevAll('potters',this.checked)"> Select all
+        </label>
+      </div>
+      <div id="revPottersList"><div class="empty">Loading...</div></div>
+      <button class="btn btn-sm" style="margin-top:10px;background:#2563eb;color:#fff;" onclick="sendReviewEmails('potters')">
+        Send Review Request
+      </button>
+    </div>
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <h3 style="margin:0;">Spinola Clinic</h3>
+        <label style="font-size:12px;cursor:pointer;display:flex;align-items:center;gap:4px;">
+          <input type="checkbox" id="revSelectAllSpinola" onchange="toggleRevAll('spinola',this.checked)"> Select all
+        </label>
+      </div>
+      <div id="revSpinolaList"><div class="empty">Loading...</div></div>
+      <button class="btn btn-sm" style="margin-top:10px;background:#8b5cf6;color:#fff;" onclick="sendReviewEmails('spinola')">
+        Send Review Request
+      </button>
+    </div>
+  </div>
+  <div class="msg" id="reviewsMsg"></div>
+</div>
+
 <!-- Patient History modal -->
 <div class="overlay" id="patientOverlay">
   <div class="patient-modal">
@@ -878,6 +928,7 @@ function switchTab(name) {
   if (name === 'settings') loadSettings();
   if (name === 'statistics') loadStatistics();
   if (name === 'actions') { loadActionAppts(); if (document.getElementById('notifyDate').value) loadNotifyAppts(); }
+  if (name === 'reviews') loadReviewPatients();
 }
 
 function getStatusBadge(status) {
@@ -3090,6 +3141,90 @@ function renderSpCountryBreakdown(countries) {
     html += '</div>';
   }
   el.innerHTML = html;
+}
+
+// ── Reviews Tab ──
+
+var _reviewPotters = [];
+var _reviewSpinola = [];
+
+function loadReviewPatients() {
+  showMsg('reviewsMsg', '', 'Loading today\'s patients...');
+  google.script.run
+    .withSuccessHandler(function(res) {
+      if (!res || !res.ok) { showMsg('reviewsMsg', 'bad', res.reason || 'Failed.'); return; }
+      showMsg('reviewsMsg', '', '');
+      _reviewPotters = res.potters || [];
+      _reviewSpinola = res.spinola || [];
+      renderReviewList('potters', _reviewPotters);
+      renderReviewList('spinola', _reviewSpinola);
+    })
+    .withFailureHandler(function(err) {
+      showMsg('reviewsMsg', 'bad', 'Error: ' + (err && err.message ? err.message : String(err)));
+    })
+    .apiAdminGetReviewPatients(SIG);
+}
+
+function renderReviewList(loc, patients) {
+  var elId = loc === 'potters' ? 'revPottersList' : 'revSpinolaList';
+  var el = document.getElementById(elId);
+  if (!patients.length) { el.innerHTML = '<div class="empty">No patients with email today.</div>'; return; }
+
+  var html = '';
+  for (var i = 0; i < patients.length; i++) {
+    var p = patients[i];
+    html += '<div class="patient-row">';
+    html += '<label style="display:flex;align-items:center;gap:8px;flex:1;cursor:pointer;">';
+    html += '<input type="checkbox" class="rev-cb-' + loc + '" value="' + esc(p.appointmentId) + '" data-email="' + esc(p.email) + '">';
+    html += '<div>';
+    html += '<div style="font-size:13px;font-weight:600;">' + esc(p.fullName) + '</div>';
+    html += '<div style="font-size:11px;color:var(--muted);">' + esc(p.email) + ' &bull; ' + esc(p.startTime) + ' &bull; ' + esc(p.serviceName) + '</div>';
+    html += '</div>';
+    html += '</label>';
+    html += '</div>';
+  }
+  el.innerHTML = html;
+}
+
+function toggleRevAll(loc, checked) {
+  var cbs = document.querySelectorAll('.rev-cb-' + loc);
+  for (var i = 0; i < cbs.length; i++) cbs[i].checked = checked;
+}
+
+function getSelectedTeamNames() {
+  var names = [];
+  if (document.getElementById('teamJohn').checked) names.push('John');
+  if (document.getElementById('teamLaura').checked) names.push('Laura');
+  if (document.getElementById('teamJovana').checked) names.push('Jovana');
+  return names;
+}
+
+function sendReviewEmails(loc) {
+  var cbs = document.querySelectorAll('.rev-cb-' + loc + ':checked');
+  if (!cbs.length) { showMsg('reviewsMsg', 'bad', 'No patients selected.'); return; }
+
+  var ids = [];
+  for (var i = 0; i < cbs.length; i++) ids.push(cbs[i].value);
+
+  var teamNames = getSelectedTeamNames();
+  if (!teamNames.length) { showMsg('reviewsMsg', 'bad', 'Please select at least one team member.'); return; }
+
+  var location = loc === 'potters' ? 'potters' : 'spinola';
+  showMsg('reviewsMsg', '', 'Sending ' + ids.length + ' email(s)...');
+
+  google.script.run
+    .withSuccessHandler(function(res) {
+      if (!res || !res.ok) { showMsg('reviewsMsg', 'bad', res.reason || 'Failed.'); return; }
+      showMsg('reviewsMsg', 'good', res.message);
+      // Uncheck sent patients
+      for (var i = 0; i < cbs.length; i++) cbs[i].checked = false;
+      var selAll = document.getElementById(loc === 'potters' ? 'revSelectAllPotters' : 'revSelectAllSpinola');
+      if (selAll) selAll.checked = false;
+    })
+    .withFailureHandler(function(err) {
+      showMsg('reviewsMsg', 'bad', 'Error: ' + (err && err.message ? err.message : String(err)));
+    })
+    .apiAdminSendReviewRequests(SIG, { appointmentIds: ids, location: location, teamNames: teamNames });
 }
 
 </script>
