@@ -866,8 +866,9 @@
         <textarea id="comments" placeholder="Optional notes…" data-i18n-ph="commentsPh"></textarea>
       </div>
 
-      <div class="row" style="margin-top:10px; justify-content:flex-start;">
+      <div class="row" style="margin-top:10px; justify-content:flex-start; gap:10px;">
         <button class="btn btnAccent" id="confirmBtn" data-i18n="confirmBtn">Confirm</button>
+        <button class="btn btnGhost" id="clearBtn" data-i18n="clearBtn">Clear</button>
       </div>
 
       <!-- Dr Kevin next day option (shown when no Potter's slots) -->
@@ -1061,7 +1062,7 @@
       summary:'Summary',clinicHours:'Clinic hours',services:'Services',selectDate:'Select a date',
       availableDates:'Available dates (next 7 days)',selectTime:'Select a time',yourDetails:'Your details',
       fullNameLabel:'Full name *',phoneLabel:'Phone *',emailLabel:'Email *',commentsLabel:'Comments',
-      confirmBtn:'Confirm',appointmentConfirmed:'Appointment Confirmed',okBtn:'OK',
+      confirmBtn:'Confirm',clearBtn:'Clear',appointmentConfirmed:'Appointment Confirmed',okBtn:'OK',
       clinicMF:'Mon–Fri:',clinicSat:'Sat:',clinicSun:'Sun:',closed:'Closed',
       slotInfo:'Slots are {duration} minutes each.',ready:'Ready',
       fullNamePh:'Full name',emailPh:'you@example.com',commentsPh:'Optional notes…',searchCountryPh:'Search country…',
@@ -1099,7 +1100,7 @@
       summary:'Résumé',clinicHours:'Heures de la clinique',services:'Services',selectDate:'Sélectionner une date',
       availableDates:'Dates disponibles (7 prochains jours)',selectTime:'Sélectionner une heure',yourDetails:'Vos coordonnées',
       fullNameLabel:'Nom complet *',phoneLabel:'Téléphone *',emailLabel:'E-mail *',commentsLabel:'Commentaires',
-      confirmBtn:'Confirmer',appointmentConfirmed:'Rendez-vous confirmé',okBtn:'OK',
+      confirmBtn:'Confirmer',clearBtn:'Effacer',appointmentConfirmed:'Rendez-vous confirmé',okBtn:'OK',
       clinicMF:'Lun–Ven :',clinicSat:'Sam :',clinicSun:'Dim :',closed:'Fermé',
       slotInfo:'Les créneaux sont de {duration} minutes chacun.',ready:'Prêt',
       fullNamePh:'Nom complet',emailPh:'vous@exemple.com',commentsPh:'Notes facultatives…',searchCountryPh:'Rechercher un pays…',
@@ -1137,7 +1138,7 @@
       summary:'Resumen',clinicHours:'Horario de la clínica',services:'Servicios',selectDate:'Seleccionar fecha',
       availableDates:'Fechas disponibles (próximos 7 días)',selectTime:'Seleccionar hora',yourDetails:'Sus datos',
       fullNameLabel:'Nombre completo *',phoneLabel:'Teléfono *',emailLabel:'Correo electrónico *',commentsLabel:'Comentarios',
-      confirmBtn:'Confirmar',appointmentConfirmed:'Cita confirmada',okBtn:'OK',
+      confirmBtn:'Confirmar',clearBtn:'Borrar',appointmentConfirmed:'Cita confirmada',okBtn:'OK',
       clinicMF:'Lun–Vie:',clinicSat:'Sáb:',clinicSun:'Dom:',closed:'Cerrado',
       slotInfo:'Los turnos son de {duration} minutos cada uno.',ready:'Listo',
       fullNamePh:'Nombre completo',emailPh:'tu@ejemplo.com',commentsPh:'Notas opcionales…',searchCountryPh:'Buscar país…',
@@ -1175,7 +1176,7 @@
       summary:'Riepilogo',clinicHours:'Orari della clinica',services:'Servizi',selectDate:'Seleziona una data',
       availableDates:'Date disponibili (prossimi 7 giorni)',selectTime:'Seleziona un orario',yourDetails:'I tuoi dati',
       fullNameLabel:'Nome completo *',phoneLabel:'Telefono *',emailLabel:'Email *',commentsLabel:'Commenti',
-      confirmBtn:'Conferma',appointmentConfirmed:'Appuntamento confermato',okBtn:'OK',
+      confirmBtn:'Conferma',clearBtn:'Cancella',appointmentConfirmed:'Appuntamento confermato',okBtn:'OK',
       clinicMF:'Lun–Ven:',clinicSat:'Sab:',clinicSun:'Dom:',closed:'Chiuso',
       slotInfo:'Gli slot sono di {duration} minuti ciascuno.',ready:'Pronto',
       fullNamePh:'Nome completo',emailPh:'tu@esempio.com',commentsPh:'Note facoltative…',searchCountryPh:'Cerca paese…',
@@ -1213,7 +1214,7 @@
       summary:'摘要',clinicHours:'诊所时间',services:'服务',selectDate:'选择日期',
       availableDates:'可用日期（未来7天）',selectTime:'选择时间',yourDetails:'您的信息',
       fullNameLabel:'全名 *',phoneLabel:'电话 *',emailLabel:'邮箱 *',commentsLabel:'备注',
-      confirmBtn:'确认',appointmentConfirmed:'预约已确认',okBtn:'确定',
+      confirmBtn:'确认',clearBtn:'清除',appointmentConfirmed:'预约已确认',okBtn:'确定',
       clinicMF:'周一至周五：',clinicSat:'周六：',clinicSun:'周日：',closed:'休息',
       slotInfo:'每个时段为{duration}分钟。',ready:'就绪',
       fullNamePh:'全名',emailPh:'you@example.com',commentsPh:'可选备注…',searchCountryPh:'搜索国家…',
@@ -1251,7 +1252,7 @@
       summary:'सारांश',clinicHours:'क्लिनिक समय',services:'सेवाएँ',selectDate:'तारीख चुनें',
       availableDates:'उपलब्ध तारीखें (अगले 7 दिन)',selectTime:'समय चुनें',yourDetails:'आपकी जानकारी',
       fullNameLabel:'पूरा नाम *',phoneLabel:'फ़ोन *',emailLabel:'ईमेल *',commentsLabel:'टिप्पणियाँ',
-      confirmBtn:'पुष्टि करें',appointmentConfirmed:'अपॉइंटमेंट की पुष्टि हो गई',okBtn:'ठीक है',
+      confirmBtn:'पुष्टि करें',clearBtn:'साफ़ करें',appointmentConfirmed:'अपॉइंटमेंट की पुष्टि हो गई',okBtn:'ठीक है',
       clinicMF:'सोम–शुक्र:',clinicSat:'शनि:',clinicSun:'रवि:',closed:'बंद',
       slotInfo:'प्रत्येक स्लॉट {duration} मिनट का है।',ready:'तैयार',
       fullNamePh:'पूरा नाम',emailPh:'you@example.com',commentsPh:'वैकल्पिक नोट्स…',searchCountryPh:'देश खोजें…',
@@ -1289,7 +1290,7 @@
       summary:'Resumo',clinicHours:'Horário da clínica',services:'Serviços',selectDate:'Selecionar data',
       availableDates:'Datas disponíveis (próximos 7 dias)',selectTime:'Selecionar horário',yourDetails:'Seus dados',
       fullNameLabel:'Nome completo *',phoneLabel:'Telefone *',emailLabel:'E-mail *',commentsLabel:'Comentários',
-      confirmBtn:'Confirmar',appointmentConfirmed:'Consulta confirmada',okBtn:'OK',
+      confirmBtn:'Confirmar',clearBtn:'Limpar',appointmentConfirmed:'Consulta confirmada',okBtn:'OK',
       clinicMF:'Seg–Sex:',clinicSat:'Sáb:',clinicSun:'Dom:',closed:'Fechado',
       slotInfo:'Os horários são de {duration} minutos cada.',ready:'Pronto',
       fullNamePh:'Nome completo',emailPh:'voce@exemplo.com',commentsPh:'Notas opcionais…',searchCountryPh:'Pesquisar país…',
@@ -1327,7 +1328,7 @@
       summary:'Сводка',clinicHours:'Часы работы клиники',services:'Услуги',selectDate:'Выберите дату',
       availableDates:'Доступные даты (ближайшие 7 дней)',selectTime:'Выберите время',yourDetails:'Ваши данные',
       fullNameLabel:'ФИО *',phoneLabel:'Телефон *',emailLabel:'Эл. почта *',commentsLabel:'Комментарии',
-      confirmBtn:'Подтвердить',appointmentConfirmed:'Запись подтверждена',okBtn:'ОК',
+      confirmBtn:'Подтвердить',clearBtn:'Очистить',appointmentConfirmed:'Запись подтверждена',okBtn:'ОК',
       clinicMF:'Пн–Пт:',clinicSat:'Сб:',clinicSun:'Вс:',closed:'Закрыто',
       slotInfo:'Каждый слот — {duration} минут.',ready:'Готово',
       fullNamePh:'ФИО',emailPh:'you@example.com',commentsPh:'Необязательные заметки…',searchCountryPh:'Поиск страны…',
@@ -1366,7 +1367,7 @@
       summary:'概要',clinicHours:'診療時間',services:'サービス',selectDate:'日付を選択',
       availableDates:'予約可能な日付（7日間）',selectTime:'時間を選択',yourDetails:'お客様情報',
       fullNameLabel:'氏名 *',phoneLabel:'電話番号 *',emailLabel:'メール *',commentsLabel:'コメント',
-      confirmBtn:'確認',appointmentConfirmed:'予約が確定しました',okBtn:'OK',
+      confirmBtn:'確認',clearBtn:'クリア',appointmentConfirmed:'予約が確定しました',okBtn:'OK',
       clinicMF:'月〜金：',clinicSat:'土：',clinicSun:'日：',closed:'休診',
       slotInfo:'各スロットは{duration}分間です。',ready:'準備完了',
       fullNamePh:'氏名',emailPh:'you@example.com',commentsPh:'メモ（任意）…',searchCountryPh:'国を検索…',
@@ -1404,7 +1405,7 @@
       summary:'ਸਾਰ',clinicHours:'ਕਲੀਨਿਕ ਦੇ ਸਮੇਂ',services:'ਸੇਵਾਵਾਂ',selectDate:'ਤਾਰੀਖ ਚੁਣੋ',
       availableDates:'ਉਪਲਬਧ ਤਾਰੀਖਾਂ (ਅਗਲੇ 7 ਦਿਨ)',selectTime:'ਸਮਾਂ ਚੁਣੋ',yourDetails:'ਤੁਹਾਡੀ ਜਾਣਕਾਰੀ',
       fullNameLabel:'ਪੂਰਾ ਨਾਮ *',phoneLabel:'ਫ਼ੋਨ *',emailLabel:'ਈਮੇਲ *',commentsLabel:'ਟਿੱਪਣੀਆਂ',
-      confirmBtn:'ਪੁਸ਼ਟੀ ਕਰੋ',appointmentConfirmed:'ਅਪੌਇੰਟਮੈਂਟ ਦੀ ਪੁਸ਼ਟੀ ਹੋ ਗਈ',okBtn:'ਠੀਕ ਹੈ',
+      confirmBtn:'ਪੁਸ਼ਟੀ ਕਰੋ',clearBtn:'ਸਾਫ਼ ਕਰੋ',appointmentConfirmed:'ਅਪੌਇੰਟਮੈਂਟ ਦੀ ਪੁਸ਼ਟੀ ਹੋ ਗਈ',okBtn:'ਠੀਕ ਹੈ',
       clinicMF:'ਸੋਮ–ਸ਼ੁੱਕਰ:',clinicSat:'ਸ਼ਨੀ:',clinicSun:'ਐਤ:',closed:'ਬੰਦ',
       slotInfo:'ਹਰ ਸਲਾਟ {duration} ਮਿੰਟ ਦਾ ਹੈ।',ready:'ਤਿਆਰ',
       fullNamePh:'ਪੂਰਾ ਨਾਮ',emailPh:'you@example.com',commentsPh:'ਵਿਕਲਪਿਕ ਨੋਟਸ…',searchCountryPh:'ਦੇਸ਼ ਖੋਜੋ…',
@@ -1442,7 +1443,7 @@
       summary:'Özet',clinicHours:'Klinik saatleri',services:'Hizmetler',selectDate:'Tarih seçin',
       availableDates:'Müsait tarihler (önümüzdeki 7 gün)',selectTime:'Saat seçin',yourDetails:'Bilgileriniz',
       fullNameLabel:'Ad Soyad *',phoneLabel:'Telefon *',emailLabel:'E-posta *',commentsLabel:'Yorumlar',
-      confirmBtn:'Onayla',appointmentConfirmed:'Randevu onaylandı',okBtn:'Tamam',
+      confirmBtn:'Onayla',clearBtn:'Temizle',appointmentConfirmed:'Randevu onaylandı',okBtn:'Tamam',
       clinicMF:'Pzt–Cum:',clinicSat:'Cmt:',clinicSun:'Paz:',closed:'Kapalı',
       slotInfo:'Her slot {duration} dakikadır.',ready:'Hazır',
       fullNamePh:'Ad Soyad',emailPh:'siz@ornek.com',commentsPh:'İsteğe bağlı notlar…',searchCountryPh:'Ülke ara…',
@@ -1480,7 +1481,7 @@
       summary:'الملخص',clinicHours:'ساعات العيادة',services:'الخدمات',selectDate:'اختر تاريخًا',
       availableDates:'التواريخ المتاحة (7 أيام القادمة)',selectTime:'اختر وقتًا',yourDetails:'بياناتك',
       fullNameLabel:'الاسم الكامل *',phoneLabel:'الهاتف *',emailLabel:'البريد الإلكتروني *',commentsLabel:'ملاحظات',
-      confirmBtn:'تأكيد',appointmentConfirmed:'تم تأكيد الموعد',okBtn:'موافق',
+      confirmBtn:'تأكيد',clearBtn:'مسح',appointmentConfirmed:'تم تأكيد الموعد',okBtn:'موافق',
       clinicMF:'الإثنين–الجمعة:',clinicSat:'السبت:',clinicSun:'الأحد:',closed:'مغلق',
       slotInfo:'كل فترة {duration} دقائق.',ready:'جاهز',
       fullNamePh:'الاسم الكامل',emailPh:'you@example.com',commentsPh:'ملاحظات اختيارية…',searchCountryPh:'البحث عن بلد…',
@@ -1518,7 +1519,7 @@
       summary:'Podsumowanie',clinicHours:'Godziny pracy kliniki',services:'Usługi',selectDate:'Wybierz datę',
       availableDates:'Dostępne daty (najbliższe 7 dni)',selectTime:'Wybierz godzinę',yourDetails:'Twoje dane',
       fullNameLabel:'Imię i nazwisko *',phoneLabel:'Telefon *',emailLabel:'E-mail *',commentsLabel:'Komentarze',
-      confirmBtn:'Potwierdź',appointmentConfirmed:'Wizyta potwierdzona',okBtn:'OK',
+      confirmBtn:'Potwierdź',clearBtn:'Wyczyść',appointmentConfirmed:'Wizyta potwierdzona',okBtn:'OK',
       clinicMF:'Pon–Pt:',clinicSat:'Sob:',clinicSun:'Niedz:',closed:'Zamknięte',
       slotInfo:'Każdy slot trwa {duration} minut.',ready:'Gotowe',
       fullNamePh:'Imię i nazwisko',emailPh:'ty@przyklad.pl',commentsPh:'Opcjonalne notatki…',searchCountryPh:'Szukaj kraju…',
@@ -1556,7 +1557,7 @@
       summary:'Rezime',clinicHours:'Radno vreme klinike',services:'Usluge',selectDate:'Izaberite datum',
       availableDates:'Dostupni datumi (narednih 7 dana)',selectTime:'Izaberite vreme',yourDetails:'Vaši podaci',
       fullNameLabel:'Ime i prezime *',phoneLabel:'Telefon *',emailLabel:'E-mail *',commentsLabel:'Komentari',
-      confirmBtn:'Potvrdi',appointmentConfirmed:'Termin je potvrđen',okBtn:'OK',
+      confirmBtn:'Potvrdi',clearBtn:'Obriši',appointmentConfirmed:'Termin je potvrđen',okBtn:'OK',
       clinicMF:'Pon–Pet:',clinicSat:'Sub:',clinicSun:'Ned:',closed:'Zatvoreno',
       slotInfo:'Svaki termin traje {duration} minuta.',ready:'Spremno',
       fullNamePh:'Ime i prezime',emailPh:'vi@primer.com',commentsPh:'Opcione napomene…',searchCountryPh:'Pretraži državu…',
@@ -1594,7 +1595,7 @@
       summary:'Sažetak',clinicHours:'Radno vrijeme klinike',services:'Usluge',selectDate:'Odaberite datum',
       availableDates:'Dostupni datumi (sljedećih 7 dana)',selectTime:'Odaberite vrijeme',yourDetails:'Vaši podaci',
       fullNameLabel:'Ime i prezime *',phoneLabel:'Telefon *',emailLabel:'E-mail *',commentsLabel:'Komentari',
-      confirmBtn:'Potvrdi',appointmentConfirmed:'Termin je potvrđen',okBtn:'OK',
+      confirmBtn:'Potvrdi',clearBtn:'Obriši',appointmentConfirmed:'Termin je potvrđen',okBtn:'OK',
       clinicMF:'Pon–Pet:',clinicSat:'Sub:',clinicSun:'Ned:',closed:'Zatvoreno',
       slotInfo:'Svaki termin traje {duration} minuta.',ready:'Spremno',
       fullNamePh:'Ime i prezime',emailPh:'vi@primjer.com',commentsPh:'Neobavezne napomene…',searchCountryPh:'Pretraži državu…',
@@ -1632,7 +1633,7 @@
       summary:'Sažetak',clinicHours:'Radno vrijeme klinike',services:'Usluge',selectDate:'Odaberite datum',
       availableDates:'Dostupni datumi (narednih 7 dana)',selectTime:'Odaberite vrijeme',yourDetails:'Vaši podaci',
       fullNameLabel:'Ime i prezime *',phoneLabel:'Telefon *',emailLabel:'E-mail *',commentsLabel:'Komentari',
-      confirmBtn:'Potvrdi',appointmentConfirmed:'Termin je potvrđen',okBtn:'OK',
+      confirmBtn:'Potvrdi',clearBtn:'Obriši',appointmentConfirmed:'Termin je potvrđen',okBtn:'OK',
       clinicMF:'Pon–Pet:',clinicSat:'Sub:',clinicSun:'Ned:',closed:'Zatvoreno',
       slotInfo:'Svaki termin traje {duration} minuta.',ready:'Spremno',
       fullNamePh:'Ime i prezime',emailPh:'vi@primjer.com',commentsPh:'Neobavezne napomene…',searchCountryPh:'Pretraži državu…',
@@ -1670,7 +1671,7 @@
       summary:'Підсумок',clinicHours:'Години роботи клініки',services:'Послуги',selectDate:'Оберіть дату',
       availableDates:'Доступні дати (наступні 7 днів)',selectTime:'Оберіть час',yourDetails:'Ваші дані',
       fullNameLabel:'Повне ім\'я *',phoneLabel:'Телефон *',emailLabel:'Ел. пошта *',commentsLabel:'Коментарі',
-      confirmBtn:'Підтвердити',appointmentConfirmed:'Запис підтверджено',okBtn:'OK',
+      confirmBtn:'Підтвердити',clearBtn:'Очистити',appointmentConfirmed:'Запис підтверджено',okBtn:'OK',
       clinicMF:'Пн–Пт:',clinicSat:'Сб:',clinicSun:'Нд:',closed:'Зачинено',
       slotInfo:'Кожен слот — {duration} хвилин.',ready:'Готово',
       fullNamePh:'Повне ім\'я',emailPh:'you@example.com',commentsPh:'Необов\'язкові нотатки…',searchCountryPh:'Пошук країни…',
@@ -1708,7 +1709,7 @@
       summary:'Buod',clinicHours:'Oras ng klinika',services:'Mga Serbisyo',selectDate:'Pumili ng petsa',
       availableDates:'Mga available na petsa (susunod na 7 araw)',selectTime:'Pumili ng oras',yourDetails:'Iyong impormasyon',
       fullNameLabel:'Buong pangalan *',phoneLabel:'Telepono *',emailLabel:'Email *',commentsLabel:'Mga komento',
-      confirmBtn:'Kumpirmahin',appointmentConfirmed:'Nakumpirma ang appointment',okBtn:'OK',
+      confirmBtn:'Kumpirmahin',clearBtn:'I-clear',appointmentConfirmed:'Nakumpirma ang appointment',okBtn:'OK',
       clinicMF:'Lun–Biy:',clinicSat:'Sab:',clinicSun:'Lin:',closed:'Sarado',
       slotInfo:'Ang bawat slot ay {duration} minuto.',ready:'Handa na',
       fullNamePh:'Buong pangalan',emailPh:'you@example.com',commentsPh:'Opsyonal na tala…',searchCountryPh:'Maghanap ng bansa…',
@@ -1746,7 +1747,7 @@
       summary:'Обобщение',clinicHours:'Работно време на клиниката',services:'Услуги',selectDate:'Изберете дата',
       availableDates:'Налични дати (следващите 7 дни)',selectTime:'Изберете час',yourDetails:'Вашите данни',
       fullNameLabel:'Пълно име *',phoneLabel:'Телефон *',emailLabel:'Имейл *',commentsLabel:'Коментари',
-      confirmBtn:'Потвърди',appointmentConfirmed:'Часът е потвърден',okBtn:'OK',
+      confirmBtn:'Потвърди',clearBtn:'Изчисти',appointmentConfirmed:'Часът е потвърден',okBtn:'OK',
       clinicMF:'Пон–Пет:',clinicSat:'Съб:',clinicSun:'Нед:',closed:'Затворено',
       slotInfo:'Всеки час е по {duration} минути.',ready:'Готово',
       fullNamePh:'Пълно име',emailPh:'you@example.com',commentsPh:'Незадължителни бележки…',searchCountryPh:'Търсене на държава…',
@@ -1784,7 +1785,7 @@
       summary:'Rezumat',clinicHours:'Programul clinicii',services:'Servicii',selectDate:'Selectați o dată',
       availableDates:'Date disponibile (următoarele 7 zile)',selectTime:'Selectați o oră',yourDetails:'Datele dumneavoastră',
       fullNameLabel:'Nume complet *',phoneLabel:'Telefon *',emailLabel:'E-mail *',commentsLabel:'Comentarii',
-      confirmBtn:'Confirmă',appointmentConfirmed:'Programare confirmată',okBtn:'OK',
+      confirmBtn:'Confirmă',clearBtn:'Șterge',appointmentConfirmed:'Programare confirmată',okBtn:'OK',
       clinicMF:'Lun–Vin:',clinicSat:'Sâm:',clinicSun:'Dum:',closed:'Închis',
       slotInfo:'Fiecare slot are {duration} minute.',ready:'Pregătit',
       fullNamePh:'Nume complet',emailPh:'dvs@exemplu.com',commentsPh:'Note opționale…',searchCountryPh:'Caută țara…',
@@ -1822,7 +1823,7 @@
       summary:'Santrauka',clinicHours:'Klinikos darbo laikas',services:'Paslaugos',selectDate:'Pasirinkite datą',
       availableDates:'Galimos datos (artimiausios 7 dienos)',selectTime:'Pasirinkite laiką',yourDetails:'Jūsų duomenys',
       fullNameLabel:'Vardas ir pavardė *',phoneLabel:'Telefonas *',emailLabel:'El. paštas *',commentsLabel:'Komentarai',
-      confirmBtn:'Patvirtinti',appointmentConfirmed:'Vizitas patvirtintas',okBtn:'Gerai',
+      confirmBtn:'Patvirtinti',clearBtn:'Išvalyti',appointmentConfirmed:'Vizitas patvirtintas',okBtn:'Gerai',
       clinicMF:'Pr–Pn:',clinicSat:'Šešt:',clinicSun:'Sekm:',closed:'Uždaryta',
       slotInfo:'Kiekvienas vizitas trunka {duration} minučių.',ready:'Paruošta',
       fullNamePh:'Vardas ir pavardė',emailPh:'jusu@pastas.lt',commentsPh:'Papildomos pastabos…',searchCountryPh:'Ieškoti šalies…',
@@ -1860,7 +1861,7 @@
       summary:'Sommarju',clinicHours:'Sigħat tal-klinika',services:'Servizzi',selectDate:'Agħżel data',
       availableDates:'Dati disponibbli (7 ijiem li ġejjin)',selectTime:'Agħżel ħin',yourDetails:'Id-dettalji tiegħek',
       fullNameLabel:'Isem sħiħ *',phoneLabel:'Telefon *',emailLabel:'Email *',commentsLabel:'Kummenti',
-      confirmBtn:'Ikkonferma',appointmentConfirmed:'L-appuntament ġie kkonfermat',okBtn:'OK',
+      confirmBtn:'Ikkonferma',clearBtn:'Neħħi',appointmentConfirmed:'L-appuntament ġie kkonfermat',okBtn:'OK',
       clinicMF:'Tne–Ġim:',clinicSat:'Sib:',clinicSun:'Ħad:',closed:'Magħluq',
       slotInfo:'Kull slot huwa ta\' {duration} minuti.',ready:'Lest',
       fullNamePh:'Isem sħiħ',emailPh:'int@eżempju.com',commentsPh:'Noti mhux obbligatorji…',searchCountryPh:'Fittex pajjiż…',
@@ -2033,6 +2034,7 @@
       dateSelect: document.getElementById('dateSelect'),
       timeGrid: document.getElementById('timeGrid'),
       confirmBtn: document.getElementById('confirmBtn'),
+      clearBtn: document.getElementById('clearBtn'),
       resultMsg: document.getElementById('resultMsg'),
 
       docName: document.getElementById('docName'),
@@ -2370,8 +2372,7 @@
 
     const EXEC_URL_AFTER_BOOKING = '<?= WEBAPP_URL ?>';
 
-    function goToExecAfterBooking_(){
-      // Reset form in-place (no redirect/reload — GAS sandboxed iframe doesn't support it)
+    function clearForm(){
       state.selectedSlot = null;
       state.selectedServiceId = '';
       state.selectedServiceName = '';
@@ -2381,7 +2382,14 @@
       els.comments.value = '';
       els.sumTime.textContent = t('timeTemplate', t('timeDash'), '').replace(' - ', '');
       els.timeGrid.innerHTML = '';
+      clearFieldErrors();
       hideMsg();
+      hideSpinolaInline();
+      applyLanguage('en');
+    }
+
+    function goToExecAfterBooking_(){
+      clearForm();
       // Re-fetch fresh data (dates, slots)
       init();
     }
@@ -3044,6 +3052,21 @@
         .apiBook(payload);
     });
 
+    els.clearBtn.addEventListener('click', function() {
+      clearForm();
+      // Re-select first available date and reload slots
+      if (state.dateOptions && state.dateOptions.length) {
+        var first = state.dateOptions.find(function(o) { return !o.disabled; });
+        if (first) {
+          els.dateSelect.value = first.dateKey;
+          state.selectedDateKey = first.dateKey;
+          state.selectedDateLabel = localDate(first.dateKey);
+          els.sumDate.textContent = t('dateTemplate', state.selectedDateLabel);
+          loadAvailability(false);
+        }
+      }
+    });
+
     function refreshDateOptions() {
       google.script.run
         .withSuccessHandler(function(dateOptions) {
@@ -3071,7 +3094,9 @@
       _autoRefreshInstalled = true;
 
       var _idlePaused = false;
-      var IDLE_MS = 5 * 60 * 1000 + 10 * 1000; // 5 minutes 10 seconds
+      var CLEAR_MS = 4 * 60 * 1000; // 4 minutes — clear form for privacy
+      var IDLE_MS = 5 * 60 * 1000 + 10 * 1000; // 5 minutes 10 seconds — show idle overlay
+      var _formCleared = false;
       var _lastActivity = Date.now();
       var _slotTimerId = null;
       var _dateTimerId = null;
@@ -3109,13 +3134,21 @@
 
       // ── Activity tracking ──
       ['pointerdown', 'keydown', 'scroll', 'touchstart'].forEach(function(evt) {
-        document.addEventListener(evt, function() { _lastActivity = Date.now(); }, { passive: true });
+        document.addEventListener(evt, function() {
+          _lastActivity = Date.now();
+          _formCleared = false;
+        }, { passive: true });
       });
 
       // ── Idle check (every 1s) ──
       _idleCheckId = setInterval(function() {
         if (_idlePaused) return;
         var elapsed = Date.now() - _lastActivity;
+        // Clear personal details after 4 min of inactivity (privacy)
+        if (!_formCleared && elapsed >= CLEAR_MS) {
+          _formCleared = true;
+          clearForm();
+        }
         if (elapsed >= IDLE_MS) {
           _idlePaused = true;
           _idleOverlay.classList.add('show');
