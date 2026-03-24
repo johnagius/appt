@@ -1020,6 +1020,14 @@ function apiAdminGetStatistics(sig) {
   var cancellerMap = {}; // email/phone -> { name, count }
   var busiestDay = { dateKey: '', count: 0, dayName: '' };
 
+  // Spinola-specific accumulators
+  var spBooked = 0, spCancelled = 0, spAttended = 0, spNoShow = 0;
+  var spCancelByDoctor = 0, spCancelByPatient = 0;
+  var spPatientMap = {};
+  var spCountryMap = {};
+  var spHourCounts = []; for (var sh = 0; sh < 24; sh++) spHourCounts.push(0);
+  var spWeekBuckets = {};
+
   // Weekly trend: bucket by week (Mon-Sun)
   var weekBuckets = {}; // mondayKey -> { booked, cancelled, label }
 
@@ -1067,6 +1075,8 @@ function apiAdminGetStatistics(sig) {
     var vals = getDayRows_(dk);
     var dayBooked = 0;
     var dayCancelled = 0;
+    var spDayBooked = 0;
+    var spDayCancelled = 0;
     if (vals.length) {
         for (var r = 0; r < vals.length; r++) {
           var status = String(vals[r][10] || '');
@@ -1084,9 +1094,21 @@ function apiAdminGetStatistics(sig) {
 
             // Location
             var loc = String(vals[r][11] || '').toLowerCase();
-            if (loc.indexOf('spinola') >= 0) locationSpinola++;
+            var isSpinola = loc.indexOf('spinola') >= 0;
+            if (isSpinola) locationSpinola++;
             else locationPotters++;
             if (status === 'RELOCATED_SPINOLA') relocatedSpinola++;
+
+            // Spinola-specific tracking
+            if (isSpinola) {
+              spBooked++;
+              spDayBooked++;
+              if (startTime) {
+                var sphr = Math.floor(parseTimeToMinutes_(startTime) / 60);
+                if (sphr >= 0 && sphr < 24) spHourCounts[sphr]++;
+              }
+              if (status === 'ATTENDED') spAttended++;
+            }
 
             // DOW booked count
             dowBooked[dow]++;
@@ -1100,6 +1122,10 @@ function apiAdminGetStatistics(sig) {
                 patientMap[pKey] = { name: String(vals[r][6] || ''), count: 0 };
               }
               patientMap[pKey].count++;
+              if (isSpinola) {
+                if (!spPatientMap[pKey]) spPatientMap[pKey] = { name: String(vals[r][6] || ''), count: 0 };
+                spPatientMap[pKey].count++;
+              }
             }
 
             // Country tracking from phone prefix
@@ -1108,6 +1134,10 @@ function apiAdminGetStatistics(sig) {
               if (cc) {
                 if (!countryMap[cc]) countryMap[cc] = 0;
                 countryMap[cc]++;
+                if (isSpinola) {
+                  if (!spCountryMap[cc]) spCountryMap[cc] = 0;
+                  spCountryMap[cc]++;
+                }
               }
             }
 
@@ -1126,11 +1156,19 @@ function apiAdminGetStatistics(sig) {
             dayBooked++; // Count in booked totals for capacity purposes
             totalBooked++;
             dowBooked[dow]++;
+            var nLoc = String(vals[r][11] || '').toLowerCase();
+            if (nLoc.indexOf('spinola') >= 0) { spNoShow++; spBooked++; spDayBooked++; }
           } else if (status.indexOf('CANCELLED') >= 0) {
             totalCancelled++;
             dayCancelled++;
             if (status === 'CANCELLED_DOCTOR') cancelByDoctor++;
             else cancelByPatient++;
+            var cLoc = String(vals[r][11] || '').toLowerCase();
+            if (cLoc.indexOf('spinola') >= 0) {
+              spCancelled++; spDayCancelled++;
+              if (status === 'CANCELLED_DOCTOR') spCancelByDoctor++;
+              else spCancelByPatient++;
+            }
 
             // Same-day cancellation check
             var cancelledAt = String(vals[r][16] || '');
@@ -1169,9 +1207,11 @@ function apiAdminGetStatistics(sig) {
           totalBooked++;
           dayBooked++;
           locationSpinola++;
+          spBooked++;
+          spDayBooked++;
           if (sStartTime) {
             var shr = Math.floor(parseTimeToMinutes_(sStartTime) / 60);
-            if (shr >= 0 && shr < 24) hourCounts[shr]++;
+            if (shr >= 0 && shr < 24) { hourCounts[shr]++; spHourCounts[shr]++; }
           }
           dowBooked[dow]++;
 
@@ -1181,6 +1221,8 @@ function apiAdminGetStatistics(sig) {
           if (sPKey) {
             if (!patientMap[sPKey]) patientMap[sPKey] = { name: String(spinolaVals[sr][6] || ''), count: 0 };
             patientMap[sPKey].count++;
+            if (!spPatientMap[sPKey]) spPatientMap[sPKey] = { name: String(spinolaVals[sr][6] || ''), count: 0 };
+            spPatientMap[sPKey].count++;
           }
 
           // Country tracking from phone prefix
@@ -1189,6 +1231,8 @@ function apiAdminGetStatistics(sig) {
             if (scc) {
               if (!countryMap[scc]) countryMap[scc] = 0;
               countryMap[scc]++;
+              if (!spCountryMap[scc]) spCountryMap[scc] = 0;
+              spCountryMap[scc]++;
             }
           }
 
@@ -1198,18 +1242,23 @@ function apiAdminGetStatistics(sig) {
             if (sLeadDays >= 0) leadTimes.push(sLeadDays);
           }
 
-          if (sStatus === 'ATTENDED') totalAttended++;
+          if (sStatus === 'ATTENDED') { totalAttended++; spAttended++; }
         } else if (sStatus === 'NO_SHOW') {
           totalNoShow++;
           dayBooked++;
           totalBooked++;
           dowBooked[dow]++;
           locationSpinola++;
+          spNoShow++;
+          spBooked++;
+          spDayBooked++;
         } else if (sStatus.indexOf('CANCELLED') >= 0) {
           totalCancelled++;
           dayCancelled++;
-          if (sStatus === 'CANCELLED_DOCTOR') cancelByDoctor++;
-          else cancelByPatient++;
+          spCancelled++;
+          spDayCancelled++;
+          if (sStatus === 'CANCELLED_DOCTOR') { cancelByDoctor++; spCancelByDoctor++; }
+          else { cancelByPatient++; spCancelByPatient++; }
 
           var sCancelledAt = String(spinolaVals[sr][16] || '');
           if (sCancelledAt && sCancelledAt.length >= 10 && sCancelledAt.substring(0, 10) === dk) {
@@ -1253,6 +1302,16 @@ function apiAdminGetStatistics(sig) {
     }
     weekBuckets[mondayKey].booked += dayBooked;
     weekBuckets[mondayKey].cancelled += dayCancelled;
+
+    // Spinola weekly trend bucketing
+    if (spDayBooked > 0 || spDayCancelled > 0) {
+      if (!spWeekBuckets[mondayKey]) {
+        var spMonthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        spWeekBuckets[mondayKey] = { booked: 0, cancelled: 0, label: spMonthNames[monday.getMonth()] + ' ' + monday.getDate() };
+      }
+      spWeekBuckets[mondayKey].booked += spDayBooked;
+      spWeekBuckets[mondayKey].cancelled += spDayCancelled;
+    }
 
     // Upcoming load (future days including today)
     if (i >= 0 && i <= FUTURE_DAYS) {
@@ -1360,6 +1419,35 @@ function apiAdminGetStatistics(sig) {
   cancellerList.sort(function(a, b) { return b.count - a.count; });
   var topCancellers = cancellerList.slice(0, 5).map(function(c) { return { name: c.name, count: c.count }; });
 
+  // Spinola derived metrics
+  var spTotalAll = spBooked + spCancelled;
+  var spCancelRate = spTotalAll > 0 ? Math.round(spCancelled / spTotalAll * 1000) / 10 : 0;
+  var spAttTotal = spAttended + spNoShow;
+  var spNoShowRate = spAttTotal > 0 ? Math.round(spNoShow / spAttTotal * 1000) / 10 : 0;
+
+  var spPatientKeys = Object.keys(spPatientMap);
+  var spUniquePatients = spPatientKeys.length;
+  var spPatientList = [];
+  for (var spi = 0; spi < spPatientKeys.length; spi++) {
+    spPatientList.push(spPatientMap[spPatientKeys[spi]]);
+  }
+  spPatientList.sort(function(a, b) { return b.count - a.count; });
+  var spTopPatients = spPatientList.slice(0, 5).map(function(p) { return { name: p.name, count: p.count }; });
+
+  var spCountryList = [];
+  var spCKeys = Object.keys(spCountryMap);
+  for (var sci = 0; sci < spCKeys.length; sci++) {
+    spCountryList.push({ country: spCKeys[sci], count: spCountryMap[spCKeys[sci]] });
+  }
+  spCountryList.sort(function(a, b) { return b.count - a.count; });
+
+  var spWeekKeys = Object.keys(spWeekBuckets).sort();
+  var spWeeklyTrend = [];
+  for (var swi = 0; swi < spWeekKeys.length; swi++) {
+    spWeeklyTrend.push(spWeekBuckets[spWeekKeys[swi]]);
+  }
+  if (spWeeklyTrend.length > 4) spWeeklyTrend = spWeeklyTrend.slice(spWeeklyTrend.length - 4);
+
   return {
     ok: true,
     generated: Utilities.formatDate(new Date(), getTimeZone_(), "yyyy-MM-dd HH:mm"),
@@ -1389,7 +1477,22 @@ function apiAdminGetStatistics(sig) {
     pushedNextDay: pushedNextDay,
     pushedSameDay: pushedSameDay,
     countryBreakdown: countryList,
-    topCancellers: topCancellers
+    topCancellers: topCancellers,
+    spinola: {
+      totalBooked: spBooked,
+      totalCancelled: spCancelled,
+      cancelRate: spCancelRate,
+      totalAttended: spAttended,
+      totalNoShow: spNoShow,
+      noShowRate: spNoShowRate,
+      uniquePatients: spUniquePatients,
+      topPatients: spTopPatients,
+      countryBreakdown: spCountryList,
+      peakHours: spHourCounts,
+      directBookings: Math.max(0, spBooked - relocatedSpinola),
+      relocatedBookings: relocatedSpinola,
+      weeklyTrend: spWeeklyTrend
+    }
   };
 }
 
