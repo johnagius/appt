@@ -2188,6 +2188,7 @@
       if (type === 'good') els.resultMsg.classList.add('good');
       if (type === 'bad') els.resultMsg.classList.add('bad');
       els.resultMsg.textContent = text;
+      els.resultMsg.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
     function hideMsg() {
       els.resultMsg.style.display = 'none';
