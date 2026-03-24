@@ -2655,6 +2655,7 @@ var _HTML_TEMPLATES = {
       }
 
       if (!filtered.length) {
+        _pottersSlotsEmpty = true;
         // Use prefetched Spinola data if available for this date
         if (_spinolaPrefetchedSlots && _spinolaPrefetchDateKey === state.selectedDateKey) {
           hideHint(els.timeHint);
@@ -2664,6 +2665,7 @@ var _HTML_TEMPLATES = {
         }
         return;
       }
+      _pottersSlotsEmpty = false;
       hideSpinolaInline();
       hideHint(els.timeHint);
 
@@ -2744,8 +2746,16 @@ var _HTML_TEMPLATES = {
       // Prefetch Spinola slots in parallel
       _spinolaPrefetchedSlots = null;
       _spinolaPrefetchDateKey = state.selectedDateKey;
+      _pottersSlotsEmpty = false;
       google.script.run
-        .withSuccessHandler(function(res) { _spinolaPrefetchedSlots = res; })
+        .withSuccessHandler(function(res) {
+          _spinolaPrefetchedSlots = res;
+          // If Potter's already returned empty, show Spinola now
+          if (_pottersSlotsEmpty && _spinolaPrefetchDateKey === state.selectedDateKey) {
+            hideHint(els.timeHint);
+            showSpinolaInlineWithData(res);
+          }
+        })
         .withFailureHandler(function() { _spinolaPrefetchedSlots = null; })
         .apiGetSpinolaAvailability(state.selectedDateKey);
 
@@ -2829,6 +2839,7 @@ var _HTML_TEMPLATES = {
     });
 
     /* ===== Spinola Inline Offer Logic ===== */
+    var _pottersSlotsEmpty = false;
 
     var _spinolaSelectedSlot = null;
     var _spinolaDateKey = null;
