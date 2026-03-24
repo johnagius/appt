@@ -624,28 +624,20 @@ var _HTML_TEMPLATES = {
       gap:10px;
     }
 
-    /* Spinola offer modal */
-    .spinola-modal{
-      width: min(720px, 100%);
-      background:#fff;
-      border-radius:18px;
-      padding:24px 20px;
-      border:1px solid var(--line);
-      box-shadow: var(--shadow);
-      transform: translateY(10px) scale(0.98);
-      transition: transform 0.2s ease;
-      max-height:90vh;
-      overflow-y:auto;
+    /* Spinola inline offer (replaces time grid when no Potter's slots) */
+    .spinola-inline{
+      display:none;
+      margin-top:8px;
     }
-    .overlay.show .spinola-modal{
-      transform: translateY(0) scale(1);
+    .spinola-inline.show{
+      display:block;
     }
-    .spinola-modal h3{
+    .spinola-inline h3{
       margin:0 0 6px 0;
       font-size:16px;
       font-weight:900;
     }
-    .spinola-modal .spinola-subtitle{
+    .spinola-inline .spinola-subtitle{
       margin:0 0 16px 0;
       font-size:13px;
       color:var(--muted);
@@ -703,9 +695,6 @@ var _HTML_TEMPLATES = {
       gap:10px;
       margin-top:14px;
     }
-    .spinola-actions .btn{
-      flex:1;
-    }
     .btnSpinola{
       background:var(--good);
       color:#fff;
@@ -739,17 +728,6 @@ var _HTML_TEMPLATES = {
     }
     .btnKevinNext:hover{
       filter:brightness(1.08);
-    }
-    .btnSpinolaDismiss{
-      background:transparent;
-      color:var(--muted);
-      border:1px solid var(--line);
-      padding:8px 14px;
-      border-radius:999px;
-      font-size:12px;
-      cursor:pointer;
-      margin-top:6px;
-      width:100%;
     }
 
     .loadingBox{
@@ -865,6 +843,31 @@ var _HTML_TEMPLATES = {
       <div id="timeGrid" class="timeGrid"></div>
       <div id="timeHint" class="msg"></div>
 
+      <!-- Spinola inline offer (shown when no Potter's slots & Spinola is open) -->
+      <div class="spinola-inline" id="spinolaInline">
+        <h3 id="spinolaTitle">No slots available at Potter's Clinic</h3>
+        <p class="spinola-subtitle" id="spinolaSubtitle">Would you like to see another doctor or try another day?</p>
+
+        <div class="spinola-option-card" id="spinolaOptionCard">
+          <h4 id="spinolaDrLabel">See Dr James at Spinola Clinic</h4>
+          <p class="spinola-loc-details" id="spinolaLocDetails">Near McDonald's, Love Statue, near bus stop, in Spinola</p>
+          <p class="spinola-date-label" id="spinolaDateLabel"></p>
+          <div class="spinola-slots-grid" id="spinolaSlotsGrid"></div>
+          <div class="spinola-no-slots" id="spinolaNoSlots" style="display:none">No slots available at Spinola for this date.</div>
+          <div class="spinola-actions">
+            <button class="btnSpinola" id="btnBookSpinola" disabled>Book at Spinola Clinic</button>
+          </div>
+        </div>
+
+        <div class="spinola-divider">&mdash; or &mdash;</div>
+
+        <div class="spinola-option-card">
+          <h4 id="spinolaKevinLabel">See Dr Kevin on another day</h4>
+          <p class="spinola-loc-details" id="spinolaKevinDesc">We'll find the next available day for Dr Kevin at Potter's Clinic.</p>
+          <button class="btnKevinNext" id="btnKevinNext">Next available Dr Kevin day</button>
+        </div>
+      </div>
+
       <div class="sectionTitle" style="margin-top:12px;" data-i18n="yourDetails">Your details</div>
 
       <div class="row">
@@ -931,35 +934,6 @@ var _HTML_TEMPLATES = {
       <div class="modalActions">
         <button class="btn btnAccent" id="confirmOk" data-i18n="okBtn">OK</button>
       </div>
-    </div>
-  </div>
-
-  <!-- Spinola offer modal -->
-  <div class="overlay" id="spinolaOverlay" role="dialog" aria-modal="true">
-    <div class="spinola-modal">
-      <h3 id="spinolaTitle">No slots available at Potter's Clinic</h3>
-      <p class="spinola-subtitle" id="spinolaSubtitle">Would you like to see another doctor or try another day?</p>
-
-      <div class="spinola-option-card" id="spinolaOptionCard">
-        <h4 id="spinolaDrLabel">See Dr James at Spinola Clinic</h4>
-        <p class="spinola-loc-details" id="spinolaLocDetails">Near McDonald's, Love Statue, near bus stop, in Spinola</p>
-        <p class="spinola-date-label" id="spinolaDateLabel"></p>
-        <div class="spinola-slots-grid" id="spinolaSlotsGrid"></div>
-        <div class="spinola-no-slots" id="spinolaNoSlots" style="display:none">No slots available at Spinola for this date.</div>
-        <div class="spinola-actions">
-          <button class="btnSpinola" id="btnBookSpinola" disabled>Book at Spinola Clinic</button>
-        </div>
-      </div>
-
-      <div class="spinola-divider">&mdash; or &mdash;</div>
-
-      <div class="spinola-option-card">
-        <h4 id="spinolaKevinLabel">See Dr Kevin on another day</h4>
-        <p class="spinola-loc-details" id="spinolaKevinDesc">We'll find the next available day for Dr Kevin at Potter's Clinic.</p>
-        <button class="btnKevinNext" id="btnKevinNext">Next available Dr Kevin day</button>
-      </div>
-
-      <button class="btnSpinolaDismiss" id="btnSpinolaDismiss">Cancel</button>
     </div>
   </div>
 
@@ -1877,14 +1851,13 @@ var _HTML_TEMPLATES = {
       dialCode: document.getElementById('dialCode'),
       comments: document.getElementById('comments'),
 
-      spinolaOverlay: document.getElementById('spinolaOverlay'),
+      spinolaInline: document.getElementById('spinolaInline'),
       spinolaTitle: document.getElementById('spinolaTitle'),
       spinolaDateLabel: document.getElementById('spinolaDateLabel'),
       spinolaSlotsGrid: document.getElementById('spinolaSlotsGrid'),
       spinolaNoSlots: document.getElementById('spinolaNoSlots'),
       btnBookSpinola: document.getElementById('btnBookSpinola'),
-      btnKevinNext: document.getElementById('btnKevinNext'),
-      btnSpinolaDismiss: document.getElementById('btnSpinolaDismiss')
+      btnKevinNext: document.getElementById('btnKevinNext')
     };
 
     // --- Country code picker (193 UN member states, Malta default) ---
@@ -2441,6 +2414,7 @@ var _HTML_TEMPLATES = {
 
     function renderSlots(slots) {
       els.timeGrid.innerHTML = '';
+      hideSpinolaInline();
       state.slots = slots || [];
 
       // Only show available + not past (for today in Europe/Malta)
@@ -2469,9 +2443,33 @@ var _HTML_TEMPLATES = {
 
       if (!filtered.length) {
         showHint(els.timeHint, 'bad', t('noSlots'));
-        showSpinolaOfferModal();
+        // Check if Spinola is open for this date before showing the offer
+        google.script.run
+          .withSuccessHandler(function(res) {
+            if (res && res.ok && res.slots) {
+              var tz2 = (state.config && state.config.timezone) || 'Europe/Malta';
+              var now2 = getNowInTimeZoneParts(tz2);
+              var avail = res.slots.filter(function(s) {
+                if (!s || !s.start || s.available !== true) return false;
+                if (state.selectedDateKey === now2.dateKey) {
+                  if (parseHHMMToMinutes(s.start) < now2.minutes) return false;
+                }
+                return true;
+              });
+              if (avail.length) {
+                showSpinolaInline();
+                return;
+              }
+            }
+            // Spinola also has no slots — just show the no-slots message
+          })
+          .withFailureHandler(function() {
+            // Spinola not configured or error — just show no-slots message
+          })
+          .apiGetSpinolaAvailability(state.selectedDateKey);
         return;
       }
+      hideSpinolaInline();
       hideHint(els.timeHint);
 
       filtered.forEach(slot => {
@@ -2625,12 +2623,12 @@ var _HTML_TEMPLATES = {
       });
     });
 
-    /* ===== Spinola Offer Modal Logic ===== */
+    /* ===== Spinola Inline Offer Logic ===== */
 
     var _spinolaSelectedSlot = null;
     var _spinolaDateKey = null;
 
-    function showSpinolaOfferModal() {
+    function showSpinolaInline() {
       _spinolaSelectedSlot = null;
       _spinolaDateKey = state.selectedDateKey;
 
@@ -2657,12 +2655,16 @@ var _HTML_TEMPLATES = {
 
       els.btnKevinNext.textContent = t('spinolaKevinNextBtn');
 
-      showOverlay(els.spinolaOverlay);
+      // Hide time grid, show inline Spinola offer
+      els.timeGrid.style.display = 'none';
+      els.spinolaInline.classList.add('show');
+
       loadSpinolaSlots(_spinolaDateKey);
     }
 
-    function hideSpinolaModal() {
-      hideOverlay(els.spinolaOverlay);
+    function hideSpinolaInline() {
+      els.spinolaInline.classList.remove('show');
+      els.timeGrid.style.display = '';
       _spinolaSelectedSlot = null;
       _spinolaDateKey = null;
     }
@@ -2741,12 +2743,11 @@ var _HTML_TEMPLATES = {
       var email = els.email.value.trim();
       var phone = els.phone.value.trim();
       if (!fullName || !email || !phone) {
-        hideSpinolaModal();
         showMsg('bad', t('missingFields') || 'Please fill in the required fields first.');
         return;
       }
 
-      hideSpinolaModal();
+      hideSpinolaInline();
       showLoading(t('confirmingTitle'), t('confirmingDesc'));
 
       var payload = {
@@ -2782,17 +2783,12 @@ var _HTML_TEMPLATES = {
 
     // "See Dr Kevin on another day" button
     els.btnKevinNext.addEventListener('click', function() {
-      hideSpinolaModal();
+      hideSpinolaInline();
       if (advanceToNextEnabledDate()) {
         loadAvailability(false, true);
       } else {
         showMsg('bad', t('noDates'));
       }
-    });
-
-    // Cancel/dismiss button
-    els.btnSpinolaDismiss.addEventListener('click', function() {
-      hideSpinolaModal();
     });
 
     els.confirmBtn.addEventListener('click', () => {
