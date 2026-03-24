@@ -66,7 +66,9 @@ function updateCalendarEventLocation_(eventId, newLocation, newTitleOptional, ne
 function getSpinolaCalendar_() {
   var calId = getScriptProps_().getProperty(CFG().PROP_SPINOLA_CALENDAR_ID);
   if (!calId) throw new Error('Spinola Calendar ID missing. Run setSpinolaCalendarId().');
-  return CalendarApp.getCalendarById(calId);
+  var cal = CalendarApp.getCalendarById(calId);
+  if (!cal) throw new Error('Cannot access Spinola calendar (' + calId + '). Make sure the calendar is shared with this script owner\'s Google account with "Make changes to events" permission.');
+  return cal;
 }
 
 function createSpinolaCalendarEvent_(appt) {

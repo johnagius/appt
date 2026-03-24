@@ -635,12 +635,8 @@ function apiBookSpinola(payload) {
     };
 
     // Create event on Spinola calendar
-    try {
-      var eventId = createSpinolaCalendarEvent_(apptObj);
-      apptObj.calendarEventId = eventId;
-    } catch (e) {
-      Logger.log('WARN: Failed to create Spinola calendar event: ' + e.message);
-    }
+    var eventId = createSpinolaCalendarEvent_(apptObj);
+    apptObj.calendarEventId = eventId;
 
     // Append to Spinola spreadsheet
     appendSpinolaAppointment_(dateKey, apptObj);
