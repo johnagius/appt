@@ -525,11 +525,35 @@ function findAppointmentByToken_(token) {
     }
   }
 
+  // Also search Spinola spreadsheet if token not found in Potter's
+  try {
+    var spinolaSs = getSpinolaSpreadsheet_();
+    for (var j = -pastDays; j <= futureDays; j++) {
+      var d2 = addMinutes_(today, j * 24 * 60);
+      var dk2 = toDateKey_(d2);
+
+      var sh2 = spinolaSs.getSheetByName(dk2);
+      if (sh2) {
+        var lastRow2 = sh2.getLastRow();
+        if (lastRow2 >= 2) {
+          var vals2 = sh2.getRange(2, 1, lastRow2 - 1, 18).getValues();
+          for (var r2 = 0; r2 < vals2.length; r2++) {
+            if (String(vals2[r2][14] || '') === token) {
+              return { sheetName: dk2, rowIndex: r2 + 2, appointment: appointmentRowToObj_(vals2[r2]), spinola: true };
+            }
+          }
+        }
+      }
+    }
+  } catch (e) {
+    // Spinola spreadsheet not configured — skip
+  }
+
   return null;
 }
 
-function updateAppointmentStatus_(sheetName, rowIndex, updates) {
-  var ss = getAppointmentsSpreadsheet_();
+function updateAppointmentStatus_(sheetName, rowIndex, updates, isSpinola) {
+  var ss = isSpinola ? getSpinolaSpreadsheet_() : getAppointmentsSpreadsheet_();
   var sh = ss.getSheetByName(sheetName);
   if (!sh) throw new Error('Sheet not found: ' + sheetName);
 

@@ -8614,11 +8614,35 @@ function findAppointmentByToken_(token) {
     }
   }
 
+  // Also search Spinola spreadsheet if token not found in Potter's
+  try {
+    var spinolaSs = getSpinolaSpreadsheet_();
+    for (var j = -pastDays; j <= futureDays; j++) {
+      var d2 = addMinutes_(today, j * 24 * 60);
+      var dk2 = toDateKey_(d2);
+
+      var sh2 = spinolaSs.getSheetByName(dk2);
+      if (sh2) {
+        var lastRow2 = sh2.getLastRow();
+        if (lastRow2 >= 2) {
+          var vals2 = sh2.getRange(2, 1, lastRow2 - 1, 18).getValues();
+          for (var r2 = 0; r2 < vals2.length; r2++) {
+            if (String(vals2[r2][14] || '') === token) {
+              return { sheetName: dk2, rowIndex: r2 + 2, appointment: appointmentRowToObj_(vals2[r2]), spinola: true };
+            }
+          }
+        }
+      }
+    }
+  } catch (e) {
+    // Spinola spreadsheet not configured — skip
+  }
+
   return null;
 }
 
-function updateAppointmentStatus_(sheetName, rowIndex, updates) {
-  var ss = getAppointmentsSpreadsheet_();
+function updateAppointmentStatus_(sheetName, rowIndex, updates, isSpinola) {
+  var ss = isSpinola ? getSpinolaSpreadsheet_() : getAppointmentsSpreadsheet_();
   var sh = ss.getSheetByName(sheetName);
   if (!sh) throw new Error('Sheet not found: ' + sheetName);
 
@@ -9916,8 +9940,9 @@ function apiGetSpinolaAvailability(dateKey) {
     return { ok: false, reason: 'Outside booking window', dateKey: dateKey, slots: [] };
   }
 
+  // Spinola has its own hours (including Sundays) — only block fixed public holidays, not Sundays
   var holiday = isHolidayOrClosed_(d);
-  if (holiday.closed) {
+  if (holiday.closed && !isSunday_(d)) {
     return { ok: false, reason: holiday.reason, dateKey: dateKey, slots: [] };
   }
 
@@ -10001,8 +10026,9 @@ function apiBookSpinola(payload) {
     if (d.getTime() < today.getTime()) throw new Error('You cannot book a past date.');
     if (!inAdvanceWindow_(d)) throw new Error('You can only book up to 7 days in advance.');
 
+    // Spinola is open on Sundays — only block fixed public holidays
     var holiday = isHolidayOrClosed_(d);
-    if (holiday.closed) throw new Error('Closed: ' + holiday.reason);
+    if (holiday.closed && !isSunday_(d)) throw new Error('Closed: ' + holiday.reason);
 
     if (dateKey === todayKey) {
       var nowMin = nowMinutesLocal_();
@@ -10032,19 +10058,20 @@ function apiBookSpinola(payload) {
     }
 
     // Also check Spinola calendar
-    try {
-      var cancelledSlotsBook = {};
-      for (var c = 0; c < appts.length; c++) {
-        if (!apptIsActive_(appts[c])) {
-          cancelledSlotsBook[String(appts[c].startTime || '').trim()] = true;
-        }
+    var cancelledSlotsBook = {};
+    for (var c = 0; c < appts.length; c++) {
+      if (!apptIsActive_(appts[c])) {
+        cancelledSlotsBook[String(appts[c].startTime || '').trim()] = true;
       }
+    }
+    try {
       var calTaken = listSpinolaCalendarTakenSlots_(dateKey);
       if (calTaken[startTime] && !cancelledSlotsBook[startTime]) {
         throw new Error('That slot was just taken. Please pick another.');
       }
     } catch (e) {
-      // Spinola calendar check failed — proceed with spreadsheet as source of truth
+      // Re-throw business logic errors, only swallow calendar connection failures
+      if (e.message && e.message.indexOf('just taken') >= 0) throw e;
     }
 
     var now = new Date();
@@ -10179,7 +10206,7 @@ function apiCancelAppointment(token, sig) {
       cancelledAt: nowStr,
       cancelReason: 'Cancelled by client via email link',
       calendarEventId: ''
-    });
+    }, !!found.spinola);
     bumpVersion_();
 
     try { sendClientCancelledEmail_(appt, 'Your appointment has been cancelled.'); } catch (e1) {}
@@ -10236,7 +10263,7 @@ function apiDoctorAction(token, act, sig) {
         cancelledAt: nowStr,
         cancelReason: 'Cancelled by doctor',
         calendarEventId: ''
-      });
+      }, !!found.spinola);
       bumpVersion_();
 
       try { sendClientCancelledEmail_(appt, 'Your appointment has been cancelled by the clinic. Please rebook if needed.'); } catch (e1) {}
@@ -10251,7 +10278,7 @@ function apiDoctorAction(token, act, sig) {
       updateAppointmentStatus_(found.sheetName, found.rowIndex, {
         status: 'RELOCATED_SPINOLA',
         location: spinolaLocation
-      });
+      }, !!found.spinola);
       bumpVersion_();
 
       var calEventId = String(appt.calendarEventId || '').trim();
