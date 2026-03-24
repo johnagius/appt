@@ -13579,6 +13579,8 @@ function wipeScriptProperties_(execute) {
     apiAdminRemoveDoctorOff: apiAdminRemoveDoctorOff,
     apiAdminRemoveExtraSlots: apiAdminRemoveExtraSlots,
     apiAdminNotifyPatients: apiAdminNotifyPatients,
+    apiAdminGetReviewPatients: apiAdminGetReviewPatients,
+    apiAdminSendReviewRequests: apiAdminSendReviewRequests,
     apiAdminGetWeekOverview: apiAdminGetWeekOverview,
     apiAdminSearchAppointments: apiAdminSearchAppointments,
     apiAdminGetSettings: apiAdminGetSettings,
