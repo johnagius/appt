@@ -2195,6 +2195,7 @@ var _HTML_TEMPLATES = {
       if (type === 'good') els.resultMsg.classList.add('good');
       if (type === 'bad') els.resultMsg.classList.add('bad');
       els.resultMsg.textContent = text;
+      els.resultMsg.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
     function hideMsg() {
       els.resultMsg.style.display = 'none';
@@ -10043,8 +10044,12 @@ function apiBookSpinola(payload) {
     };
 
     // Create event on Spinola calendar
-    var eventId = createSpinolaCalendarEvent_(apptObj);
-    apptObj.calendarEventId = eventId;
+    try {
+      var eventId = createSpinolaCalendarEvent_(apptObj);
+      apptObj.calendarEventId = eventId;
+    } catch (e) {
+      Logger.log('WARN: Failed to create Spinola calendar event: ' + e.message);
+    }
 
     // Append to Spinola spreadsheet
     appendSpinolaAppointment_(dateKey, apptObj);
