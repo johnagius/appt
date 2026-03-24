@@ -226,7 +226,9 @@
     .week-cell.today{border-color:var(--blue);box-shadow:0 0 0 2px rgba(37,99,235,0.15);}
     .week-cell.today .wc-num{color:var(--blue);}
     .week-cell.selected{background:#111827;color:#fff;border-color:#111827;}
-    .week-cell.selected.today .wc-num{color:#fff;}
+    .week-cell.selected .wc-num{color:#fff;}
+    .week-cell.selected.today{background:var(--blue);border-color:var(--blue);}
+    .week-cell.selected.today:hover{background:#1d4ed8;}
     .week-cell.selected:hover{background:#1f2937;}
     .week-cell .wc-day{font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;}
     .week-cell.selected .wc-day{color:rgba(255,255,255,0.7);}
@@ -678,6 +680,24 @@
     <div class="card">
       <h3>Attendance</h3>
       <div id="attendanceChart"></div>
+    </div>
+  </div>
+
+  <div class="stats-grid" style="margin-top:12px;">
+    <div class="card">
+      <h3>Doctor Actions</h3>
+      <div id="doctorActionsChart"></div>
+    </div>
+    <div class="card">
+      <h3>Bookings by Country</h3>
+      <div id="countryChart"></div>
+    </div>
+  </div>
+
+  <div class="stats-grid" style="margin-top:12px;">
+    <div class="card">
+      <h3>Top Cancellers</h3>
+      <div id="topCancellersChart"></div>
     </div>
   </div>
 
@@ -2585,6 +2605,9 @@ function renderAllStats(s) {
   renderBusiestDay(s.busiestDay);
   renderLeadTime(s);
   renderAttendance(s);
+  renderDoctorActions(s);
+  renderCountryBreakdown(s.countryBreakdown);
+  renderTopCancellers(s.topCancellers);
 }
 
 function renderLeadTime(s) {
@@ -2806,6 +2829,75 @@ function renderBusiestDay(day) {
     + '<div style="font-size:14px;font-weight:700;margin-top:4px;">' + day.dayName + ', ' + day.dateKey + '</div>'
     + '<div style="font-size:12px;color:var(--muted);margin-top:2px;">Most appointments in a single day</div>'
     + '</div>';
+}
+
+function renderDoctorActions(s) {
+  var el = document.getElementById('doctorActionsChart');
+  var cb = s.cancelBreakdown || {};
+  var html = '';
+
+  var items = [
+    { label: 'Cancelled by doctor', count: cb.byDoctor || 0, color: '#f59e0b' },
+    { label: 'Cancelled by patient', count: cb.byPatient || 0, color: '#ef4444' },
+    { label: 'Redirected to Spinola', count: s.relocatedSpinola || 0, color: '#8b5cf6' },
+    { label: 'Pushed to next day', count: s.pushedNextDay || 0, color: '#2563eb' },
+    { label: 'Pushed to next time', count: s.pushedSameDay || 0, color: '#06b6d4' }
+  ];
+
+  var maxCount = 1;
+  for (var i = 0; i < items.length; i++) {
+    if (items[i].count > maxCount) maxCount = items[i].count;
+  }
+
+  for (var i = 0; i < items.length; i++) {
+    var it = items[i];
+    var pct = maxCount > 0 ? Math.round(it.count / maxCount * 100) : 0;
+    html += '<div class="h-bar-row">';
+    html += '<div class="h-bar-label" style="width:140px;font-size:12px;">' + it.label + '</div>';
+    html += '<div class="h-bar-track"><div class="h-bar-fill" style="width:' + pct + '%;background:' + it.color + ';"></div></div>';
+    html += '<div class="h-bar-pct">' + it.count + '</div>';
+    html += '</div>';
+  }
+
+  if (!html) html = '<div class="empty">No data yet.</div>';
+  el.innerHTML = html;
+}
+
+function renderCountryBreakdown(countries) {
+  var el = document.getElementById('countryChart');
+  if (!countries || !countries.length) { el.innerHTML = '<div class="empty">No country data yet.</div>'; return; }
+
+  var maxCount = countries[0].count || 1;
+  var colors = ['#2563eb','#8b5cf6','#06b6d4','#10b981','#f59e0b','#ef4444','#ec4899','#6366f1','#14b8a6','#f97316'];
+
+  var html = '';
+  for (var i = 0; i < countries.length; i++) {
+    var c = countries[i];
+    var pct = Math.round(c.count / maxCount * 100);
+    var color = colors[i % colors.length];
+    html += '<div class="h-bar-row">';
+    html += '<div class="h-bar-label" style="width:90px;font-size:12px;">' + esc(c.country) + '</div>';
+    html += '<div class="h-bar-track"><div class="h-bar-fill" style="width:' + pct + '%;background:' + color + ';"></div></div>';
+    html += '<div class="h-bar-pct">' + c.count + '</div>';
+    html += '</div>';
+  }
+  el.innerHTML = html;
+}
+
+function renderTopCancellers(cancellers) {
+  var el = document.getElementById('topCancellersChart');
+  if (!cancellers || !cancellers.length) { el.innerHTML = '<div class="empty">No cancellation data yet.</div>'; return; }
+
+  var html = '';
+  for (var i = 0; i < cancellers.length; i++) {
+    var c = cancellers[i];
+    html += '<div class="patient-row">';
+    html += '<div class="patient-rank" style="background:rgba(239,68,68,0.1);color:#ef4444;">' + (i + 1) + '</div>';
+    html += '<div class="patient-name">' + esc(c.name) + '</div>';
+    html += '<div class="patient-count" style="color:#ef4444;">' + c.count + ' cancelled</div>';
+    html += '</div>';
+  }
+  el.innerHTML = html;
 }
 
 </script>

@@ -3781,7 +3781,9 @@ var _HTML_TEMPLATES = {
     .week-cell.today{border-color:var(--blue);box-shadow:0 0 0 2px rgba(37,99,235,0.15);}
     .week-cell.today .wc-num{color:var(--blue);}
     .week-cell.selected{background:#111827;color:#fff;border-color:#111827;}
-    .week-cell.selected.today .wc-num{color:#fff;}
+    .week-cell.selected .wc-num{color:#fff;}
+    .week-cell.selected.today{background:var(--blue);border-color:var(--blue);}
+    .week-cell.selected.today:hover{background:#1d4ed8;}
     .week-cell.selected:hover{background:#1f2937;}
     .week-cell .wc-day{font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;}
     .week-cell.selected .wc-day{color:rgba(255,255,255,0.7);}
@@ -4233,6 +4235,24 @@ var _HTML_TEMPLATES = {
     <div class="card">
       <h3>Attendance</h3>
       <div id="attendanceChart"></div>
+    </div>
+  </div>
+
+  <div class="stats-grid" style="margin-top:12px;">
+    <div class="card">
+      <h3>Doctor Actions</h3>
+      <div id="doctorActionsChart"></div>
+    </div>
+    <div class="card">
+      <h3>Bookings by Country</h3>
+      <div id="countryChart"></div>
+    </div>
+  </div>
+
+  <div class="stats-grid" style="margin-top:12px;">
+    <div class="card">
+      <h3>Top Cancellers</h3>
+      <div id="topCancellersChart"></div>
     </div>
   </div>
 
@@ -6140,6 +6160,9 @@ function renderAllStats(s) {
   renderBusiestDay(s.busiestDay);
   renderLeadTime(s);
   renderAttendance(s);
+  renderDoctorActions(s);
+  renderCountryBreakdown(s.countryBreakdown);
+  renderTopCancellers(s.topCancellers);
 }
 
 function renderLeadTime(s) {
@@ -6361,6 +6384,75 @@ function renderBusiestDay(day) {
     + '<div style="font-size:14px;font-weight:700;margin-top:4px;">' + day.dayName + ', ' + day.dateKey + '</div>'
     + '<div style="font-size:12px;color:var(--muted);margin-top:2px;">Most appointments in a single day</div>'
     + '</div>';
+}
+
+function renderDoctorActions(s) {
+  var el = document.getElementById('doctorActionsChart');
+  var cb = s.cancelBreakdown || {};
+  var html = '';
+
+  var items = [
+    { label: 'Cancelled by doctor', count: cb.byDoctor || 0, color: '#f59e0b' },
+    { label: 'Cancelled by patient', count: cb.byPatient || 0, color: '#ef4444' },
+    { label: 'Redirected to Spinola', count: s.relocatedSpinola || 0, color: '#8b5cf6' },
+    { label: 'Pushed to next day', count: s.pushedNextDay || 0, color: '#2563eb' },
+    { label: 'Pushed to next time', count: s.pushedSameDay || 0, color: '#06b6d4' }
+  ];
+
+  var maxCount = 1;
+  for (var i = 0; i < items.length; i++) {
+    if (items[i].count > maxCount) maxCount = items[i].count;
+  }
+
+  for (var i = 0; i < items.length; i++) {
+    var it = items[i];
+    var pct = maxCount > 0 ? Math.round(it.count / maxCount * 100) : 0;
+    html += '<div class="h-bar-row">';
+    html += '<div class="h-bar-label" style="width:140px;font-size:12px;">' + it.label + '</div>';
+    html += '<div class="h-bar-track"><div class="h-bar-fill" style="width:' + pct + '%;background:' + it.color + ';"></div></div>';
+    html += '<div class="h-bar-pct">' + it.count + '</div>';
+    html += '</div>';
+  }
+
+  if (!html) html = '<div class="empty">No data yet.</div>';
+  el.innerHTML = html;
+}
+
+function renderCountryBreakdown(countries) {
+  var el = document.getElementById('countryChart');
+  if (!countries || !countries.length) { el.innerHTML = '<div class="empty">No country data yet.</div>'; return; }
+
+  var maxCount = countries[0].count || 1;
+  var colors = ['#2563eb','#8b5cf6','#06b6d4','#10b981','#f59e0b','#ef4444','#ec4899','#6366f1','#14b8a6','#f97316'];
+
+  var html = '';
+  for (var i = 0; i < countries.length; i++) {
+    var c = countries[i];
+    var pct = Math.round(c.count / maxCount * 100);
+    var color = colors[i % colors.length];
+    html += '<div class="h-bar-row">';
+    html += '<div class="h-bar-label" style="width:90px;font-size:12px;">' + esc(c.country) + '</div>';
+    html += '<div class="h-bar-track"><div class="h-bar-fill" style="width:' + pct + '%;background:' + color + ';"></div></div>';
+    html += '<div class="h-bar-pct">' + c.count + '</div>';
+    html += '</div>';
+  }
+  el.innerHTML = html;
+}
+
+function renderTopCancellers(cancellers) {
+  var el = document.getElementById('topCancellersChart');
+  if (!cancellers || !cancellers.length) { el.innerHTML = '<div class="empty">No cancellation data yet.</div>'; return; }
+
+  var html = '';
+  for (var i = 0; i < cancellers.length; i++) {
+    var c = cancellers[i];
+    html += '<div class="patient-row">';
+    html += '<div class="patient-rank" style="background:rgba(239,68,68,0.1);color:#ef4444;">' + (i + 1) + '</div>';
+    html += '<div class="patient-name">' + esc(c.name) + '</div>';
+    html += '<div class="patient-count" style="color:#ef4444;">' + c.count + ' cancelled</div>';
+    html += '</div>';
+  }
+  el.innerHTML = html;
 }
 
 </script>
@@ -9076,6 +9168,18 @@ function getDayRows_(dateKey) {
   return archive[dateKey] || [];
 }
 
+function getSpinolaRows_(dateKey) {
+  try {
+    var ss = getSpinolaSpreadsheet_();
+    if (!ss) return [];
+    var sh = ss.getSheetByName(dateKey);
+    if (!sh) return [];
+    var lr = sh.getLastRow();
+    if (lr < 2) return [];
+    return sh.getRange(2, 1, lr - 1, 18).getValues();
+  } catch(e) { return []; }
+}
+
 /**
  * Archive day sheets older than daysToKeep and delete them.
  * Returns { archivedSheets, archivedRows }.
@@ -11533,6 +11637,11 @@ function apiAdminGetStatistics(sig) {
   var dowBooked = { MON:0, TUE:0, WED:0, THU:0, FRI:0, SAT:0, SUN:0 };
   var dowSlots = { MON:0, TUE:0, WED:0, THU:0, FRI:0, SAT:0, SUN:0 };
   var patientMap = {}; // email/phone -> { name, count }
+  var relocatedSpinola = 0;
+  var pushedNextDay = 0;
+  var pushedSameDay = 0;
+  var countryMap = {};  // country code -> count
+  var cancellerMap = {}; // email/phone -> { name, count }
   var busiestDay = { dateKey: '', count: 0, dayName: '' };
 
   // Weekly trend: bucket by week (Mon-Sun)
@@ -11601,6 +11710,7 @@ function apiAdminGetStatistics(sig) {
             var loc = String(vals[r][11] || '').toLowerCase();
             if (loc.indexOf('spinola') >= 0) locationSpinola++;
             else locationPotters++;
+            if (status === 'RELOCATED_SPINOLA') relocatedSpinola++;
 
             // DOW booked count
             dowBooked[dow]++;
@@ -11614,6 +11724,15 @@ function apiAdminGetStatistics(sig) {
                 patientMap[pKey] = { name: String(vals[r][6] || ''), count: 0 };
               }
               patientMap[pKey].count++;
+            }
+
+            // Country tracking from phone prefix
+            if (phone) {
+              var cc = extractCountryFromPhone_(phone);
+              if (cc) {
+                if (!countryMap[cc]) countryMap[cc] = 0;
+                countryMap[cc]++;
+              }
             }
 
             // Lead time (days between booking creation and appointment date)
@@ -11642,8 +11761,100 @@ function apiAdminGetStatistics(sig) {
             if (cancelledAt && cancelledAt.length >= 10 && cancelledAt.substring(0, 10) === dk) {
               sameDayCancels++;
             }
+
+            var cancelReason = String(vals[r][17] || '');
+            if (cancelReason.indexOf('Pushed to') >= 0) {
+              if (cancelReason.indexOf(dk) >= 0) pushedSameDay++;
+              else pushedNextDay++;
+            }
+
+            var cEmail = String(vals[r][7] || '').trim().toLowerCase();
+            var cPhone = String(vals[r][8] || '').trim();
+            var cKey = cEmail || cPhone;
+            if (cKey) {
+              if (!cancellerMap[cKey]) cancellerMap[cKey] = { name: String(vals[r][6] || ''), count: 0 };
+              cancellerMap[cKey].count++;
+            }
           }
         }
+    }
+
+    // Also read Spinola appointments for this day
+    var spinolaVals = getSpinolaRows_(dk);
+    if (spinolaVals.length) {
+      for (var sr = 0; sr < spinolaVals.length; sr++) {
+        var sStatus = String(spinolaVals[sr][10] || '');
+        var sStartTime = normalizeTimeCell_(spinolaVals[sr][2]);
+
+        // Skip RELOCATED_SPINOLA entries that already exist in Potter's data
+        if (sStatus === 'RELOCATED_SPINOLA') continue;
+
+        if (sStatus === 'BOOKED' || sStatus === 'ATTENDED') {
+          totalBooked++;
+          dayBooked++;
+          locationSpinola++;
+          if (sStartTime) {
+            var shr = Math.floor(parseTimeToMinutes_(sStartTime) / 60);
+            if (shr >= 0 && shr < 24) hourCounts[shr]++;
+          }
+          dowBooked[dow]++;
+
+          var sEmail = String(spinolaVals[sr][7] || '').trim().toLowerCase();
+          var sPhone = String(spinolaVals[sr][8] || '').trim();
+          var sPKey = sEmail || sPhone;
+          if (sPKey) {
+            if (!patientMap[sPKey]) patientMap[sPKey] = { name: String(spinolaVals[sr][6] || ''), count: 0 };
+            patientMap[sPKey].count++;
+          }
+
+          // Country tracking from phone prefix
+          if (sPhone) {
+            var scc = extractCountryFromPhone_(sPhone);
+            if (scc) {
+              if (!countryMap[scc]) countryMap[scc] = 0;
+              countryMap[scc]++;
+            }
+          }
+
+          var sCreatedAt = String(spinolaVals[sr][12] || '');
+          if (sCreatedAt && sCreatedAt.length >= 10) {
+            var sLeadDays = daysBetween_(sCreatedAt.substring(0, 10), dk);
+            if (sLeadDays >= 0) leadTimes.push(sLeadDays);
+          }
+
+          if (sStatus === 'ATTENDED') totalAttended++;
+        } else if (sStatus === 'NO_SHOW') {
+          totalNoShow++;
+          dayBooked++;
+          totalBooked++;
+          dowBooked[dow]++;
+          locationSpinola++;
+        } else if (sStatus.indexOf('CANCELLED') >= 0) {
+          totalCancelled++;
+          dayCancelled++;
+          if (sStatus === 'CANCELLED_DOCTOR') cancelByDoctor++;
+          else cancelByPatient++;
+
+          var sCancelledAt = String(spinolaVals[sr][16] || '');
+          if (sCancelledAt && sCancelledAt.length >= 10 && sCancelledAt.substring(0, 10) === dk) {
+            sameDayCancels++;
+          }
+
+          var sCancelReason = String(spinolaVals[sr][17] || '');
+          if (sCancelReason.indexOf('Pushed to') >= 0) {
+            if (sCancelReason.indexOf(dk) >= 0) pushedSameDay++;
+            else pushedNextDay++;
+          }
+
+          var scEmail = String(spinolaVals[sr][7] || '').trim().toLowerCase();
+          var scPhone = String(spinolaVals[sr][8] || '').trim();
+          var scKey = scEmail || scPhone;
+          if (scKey) {
+            if (!cancellerMap[scKey]) cancellerMap[scKey] = { name: String(spinolaVals[sr][6] || ''), count: 0 };
+            cancellerMap[scKey].count++;
+          }
+        }
+      }
     }
 
     // Period comparison (recent 14 days vs previous 14 days)
@@ -11756,6 +11967,23 @@ function apiAdminGetStatistics(sig) {
   var trendDirection = recentBooked > prevBooked ? 'up' : recentBooked < prevBooked ? 'down' : 'flat';
   var trendPct = prevBooked > 0 ? Math.round(Math.abs(recentBooked - prevBooked) / prevBooked * 100) : 0;
 
+  // Country breakdown - sort by count descending
+  var countryList = [];
+  var countryKeys = Object.keys(countryMap);
+  for (var ci = 0; ci < countryKeys.length; ci++) {
+    countryList.push({ country: countryKeys[ci], count: countryMap[countryKeys[ci]] });
+  }
+  countryList.sort(function(a, b) { return b.count - a.count; });
+
+  // Top cancellers - sort by count descending, take top 5
+  var cancellerKeys = Object.keys(cancellerMap);
+  var cancellerList = [];
+  for (var xi = 0; xi < cancellerKeys.length; xi++) {
+    cancellerList.push(cancellerMap[cancellerKeys[xi]]);
+  }
+  cancellerList.sort(function(a, b) { return b.count - a.count; });
+  var topCancellers = cancellerList.slice(0, 5).map(function(c) { return { name: c.name, count: c.count }; });
+
   return {
     ok: true,
     generated: Utilities.formatDate(new Date(), getTimeZone_(), "yyyy-MM-dd HH:mm"),
@@ -11780,8 +12008,48 @@ function apiAdminGetStatistics(sig) {
     noShowRate: noShowRate,
     sameDayCancels: sameDayCancels,
     trendDirection: trendDirection,
-    trendPct: trendPct
+    trendPct: trendPct,
+    relocatedSpinola: relocatedSpinola,
+    pushedNextDay: pushedNextDay,
+    pushedSameDay: pushedSameDay,
+    countryBreakdown: countryList,
+    topCancellers: topCancellers
   };
+}
+
+function extractCountryFromPhone_(phone) {
+  phone = String(phone || '').replace(/[\s\-\(\)]/g, '');
+  if (!phone) return '';
+  // Common prefixes (longest match first)
+  var prefixes = [
+    {p:'+356',c:'Malta'},{p:'+44',c:'UK'},{p:'+39',c:'Italy'},{p:'+33',c:'France'},
+    {p:'+49',c:'Germany'},{p:'+34',c:'Spain'},{p:'+1',c:'USA/Canada'},{p:'+61',c:'Australia'},
+    {p:'+91',c:'India'},{p:'+86',c:'China'},{p:'+81',c:'Japan'},{p:'+7',c:'Russia'},
+    {p:'+31',c:'Netherlands'},{p:'+32',c:'Belgium'},{p:'+41',c:'Switzerland'},
+    {p:'+43',c:'Austria'},{p:'+45',c:'Denmark'},{p:'+46',c:'Sweden'},{p:'+47',c:'Norway'},
+    {p:'+48',c:'Poland'},{p:'+351',c:'Portugal'},{p:'+353',c:'Ireland'},{p:'+358',c:'Finland'},
+    {p:'+30',c:'Greece'},{p:'+36',c:'Hungary'},{p:'+40',c:'Romania'},{p:'+359',c:'Bulgaria'},
+    {p:'+370',c:'Lithuania'},{p:'+371',c:'Latvia'},{p:'+372',c:'Estonia'},{p:'+380',c:'Ukraine'},
+    {p:'+381',c:'Serbia'},{p:'+385',c:'Croatia'},{p:'+386',c:'Slovenia'},{p:'+387',c:'Bosnia'},
+    {p:'+420',c:'Czech Republic'},{p:'+421',c:'Slovakia'},{p:'+90',c:'Turkey'},
+    {p:'+971',c:'UAE'},{p:'+966',c:'Saudi Arabia'},{p:'+20',c:'Egypt'},{p:'+212',c:'Morocco'},
+    {p:'+216',c:'Tunisia'},{p:'+218',c:'Libya'},{p:'+962',c:'Jordan'},{p:'+961',c:'Lebanon'},
+    {p:'+55',c:'Brazil'},{p:'+52',c:'Mexico'},{p:'+27',c:'South Africa'},
+    {p:'+63',c:'Philippines'},{p:'+82',c:'South Korea'},{p:'+65',c:'Singapore'},
+    {p:'+60',c:'Malaysia'},{p:'+62',c:'Indonesia'},{p:'+66',c:'Thailand'},
+    {p:'+357',c:'Cyprus'},{p:'+352',c:'Luxembourg'},{p:'+354',c:'Iceland'},
+    {p:'+375',c:'Belarus'},{p:'+373',c:'Moldova'}
+  ];
+  // Sort by prefix length descending for longest match
+  prefixes.sort(function(a, b) { return b.p.length - a.p.length; });
+  for (var i = 0; i < prefixes.length; i++) {
+    if (phone.indexOf(prefixes[i].p) === 0) return prefixes[i].c;
+  }
+  // If no + prefix but starts with 356 (local Malta number without +)
+  if (/^356\d{8}/.test(phone)) return 'Malta';
+  // No + and no recognized prefix - assume local Malta
+  if (phone.length <= 8 && /^\d+$/.test(phone)) return 'Malta';
+  return 'Other';
 }
 
 /**
