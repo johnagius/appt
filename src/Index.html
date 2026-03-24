@@ -1955,6 +1955,16 @@
       if (state.config && state.config.pottersLocation) {
         els.sumLoc.textContent = t('locationTemplate', state.config.pottersLocation);
       }
+      // Re-apply Spinola dynamic text if section is visible
+      if (els.spinolaInline && els.spinolaInline.classList.contains('show') && _spinolaDateKey) {
+        els.spinolaDateLabel.textContent = t('spinolaDateSlots') + ' ' + localDate(_spinolaDateKey);
+      }
+      // Update Spinola summary if a Spinola slot is selected
+      if (_spinolaSelectedSlot) {
+        var spinolaLoc = (state.config && state.config.spinolaLocation) || 'Spinola Clinic';
+        els.sumTime.textContent = t('timeTemplate', to12h(_spinolaSelectedSlot.start), to12h(_spinolaSelectedSlot.end));
+        els.sumLoc.textContent = t('locationTemplate', spinolaLoc);
+      }
     }
 
     // ─── Language picker logic ───
