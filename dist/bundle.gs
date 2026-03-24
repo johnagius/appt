@@ -3911,27 +3911,30 @@ var _HTML_TEMPLATES = {
     .legend-dot{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:middle;}
 
     /* Reviews tab */
-    .rev-title{margin:0 0 4px;font-size:16px;font-weight:800;}
-    .rev-subtitle{font-size:13px;color:var(--muted);margin:0 0 16px;}
-    .rev-team{margin-bottom:16px;}
-    .rev-team-label{font-size:13px;font-weight:600;display:block;margin-bottom:6px;}
-    .rev-team-checks{display:flex;gap:16px;flex-wrap:wrap;}
-    .rev-check-label{font-size:13px;cursor:pointer;display:flex;align-items:center;gap:4px;}
-    .rev-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+    .rev-wrap{max-width:900px;margin:0 auto;padding:0 14px;}
+    .rev-title{margin:0 0 4px;font-size:18px;font-weight:800;color:var(--text);}
+    .rev-subtitle{font-size:13px;color:var(--muted);margin:0 0 20px;line-height:1.5;}
+    .rev-team{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);border:1px solid rgba(229,231,235,0.9);padding:14px 18px;margin-bottom:16px;}
+    .rev-team-label{font-size:13px;font-weight:700;display:block;margin-bottom:8px;color:var(--text);}
+    .rev-team-checks{display:flex;gap:20px;flex-wrap:wrap;}
+    .rev-check-label{font-size:13px;cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap;}
+    .rev-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
     @media(max-width:600px){.rev-grid{grid-template-columns:1fr;}}
-    .rev-card{display:flex;flex-direction:column;}
-    .rev-card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
-    .rev-card-title{margin:0;font-size:14px;font-weight:700;}
-    .rev-list{flex:1;min-height:48px;}
-    .rev-card-footer{margin-top:12px;}
-    .rev-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);}
+    .rev-card{display:flex;flex-direction:column;overflow:hidden;}
+    .rev-card-header{display:flex;align-items:center;justify-content:space-between;padding-bottom:10px;border-bottom:1px solid var(--line);margin-bottom:4px;gap:12px;}
+    .rev-card-title{margin:0;font-size:15px;font-weight:700;}
+    .rev-list{flex:1;min-height:48px;max-height:340px;overflow-y:auto;}
+    .rev-card-footer{padding-top:12px;border-top:1px solid var(--line);margin-top:4px;}
+    .rev-row{display:flex;align-items:center;gap:10px;padding:10px 4px;border-bottom:1px solid rgba(229,231,235,0.5);transition:background 0.15s;}
     .rev-row:last-child{border-bottom:none;}
+    .rev-row:hover{background:rgba(37,99,235,0.03);border-radius:8px;}
     .rev-row label{display:flex;align-items:center;gap:10px;flex:1;cursor:pointer;min-width:0;}
-    .rev-row input[type="checkbox"]{flex-shrink:0;margin:0;}
+    .rev-row input[type="checkbox"]{flex-shrink:0;margin:0;width:16px;height:16px;accent-color:var(--blue);}
     .rev-patient-info{min-width:0;flex:1;}
-    .rev-patient-name{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-    .rev-patient-detail{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-    .rev-sent-badge{flex-shrink:0;font-size:10px;font-weight:700;padding:2px 8px;border-radius:999px;background:rgba(16,185,129,0.1);color:#065f46;border:1px solid rgba(16,185,129,0.25);}
+    .rev-patient-name{font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .rev-patient-detail{font-size:11px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .rev-sent-badge{flex-shrink:0;font-size:10px;font-weight:700;padding:3px 10px;border-radius:999px;background:rgba(16,185,129,0.1);color:#065f46;border:1px solid rgba(16,185,129,0.25);}
+    .rev-msg{margin-top:14px;}
 
     /* Overlay animation */
     .overlay{opacity:0;transition:opacity 0.2s ease;}
@@ -4387,6 +4390,7 @@ var _HTML_TEMPLATES = {
 
 <!-- Reviews Tab -->
 <div class="tab-content" id="tab-reviews" style="display:none;">
+  <div class="rev-wrap">
     <h3 class="rev-title">Request Google Reviews</h3>
     <p class="rev-subtitle">Select today's patients to send a friendly review request email.</p>
 
@@ -4421,8 +4425,9 @@ var _HTML_TEMPLATES = {
         </div>
       </div>
     </div>
-    <div class="msg" id="reviewsMsg"></div>
+    <div class="msg rev-msg" id="reviewsMsg"></div>
   </div>
+</div>
 
 <!-- Patient History modal -->
 <div class="overlay" id="patientOverlay">
@@ -6782,12 +6787,14 @@ function renderReviewList(loc, patients) {
   for (var i = 0; i < patients.length; i++) {
     var p = patients[i];
     var sent = p.reviewSent;
+    var name = p.fullName || 'Unknown patient';
+    var detail = [p.email, p.startTime, p.serviceName].filter(Boolean).join(' \\u00b7 ') || 'No details';
     html += '<div class="rev-row">';
     html += '<label>';
     html += '<input type="checkbox" class="rev-cb-' + loc + '" value="' + esc(p.appointmentId) + '" data-email="' + esc(p.email) + '"' + (sent ? ' disabled' : '') + '>';
     html += '<div class="rev-patient-info">';
-    html += '<div class="rev-patient-name">' + esc(p.fullName) + '</div>';
-    html += '<div class="rev-patient-detail">' + esc(p.email) + ' &bull; ' + esc(p.startTime) + ' &bull; ' + esc(p.serviceName) + '</div>';
+    html += '<div class="rev-patient-name">' + esc(name) + '</div>';
+    html += '<div class="rev-patient-detail">' + esc(detail) + '</div>';
     html += '</div>';
     html += '</label>';
     if (sent) html += '<span class="rev-sent-badge">Sent</span>';
