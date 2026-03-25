@@ -2604,7 +2604,7 @@
       state.dateOptions.forEach(opt => {
         const o = document.createElement('option');
         o.value = opt.dateKey;
-        o.textContent = localDate(opt.dateKey) + (opt.disabled ? ` — ${opt.reason}` : '');
+        o.textContent = localDate(opt.dateKey) + (opt.spinolaOnly ? ' — Spinola Clinic' : '') + (opt.disabled ? ` — ${opt.reason}` : '');
         o.disabled = !!opt.disabled;
         els.dateSelect.appendChild(o);
       });
