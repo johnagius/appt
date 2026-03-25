@@ -2808,7 +2808,8 @@ var _HTML_TEMPLATES = {
           // Check if there are any actually available slots (not taken, not past)
           var hasAvailable = hasAvailableSlots(res.slots || []);
 
-          if (!hasAvailable && autoAdvance) {
+          // Don't auto-advance past spinola-only days (doctor off but Spinola open)
+          if (!hasAvailable && autoAdvance && !res.doctorOff) {
             // No available slots for this day — try the next enabled date
             if (advanceToNextEnabledDate()) {
               loadAvailability(false, true);
