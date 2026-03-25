@@ -6929,6 +6929,10 @@ function sendReviewEmails(loc) {
   .stack{display:flex;flex-direction:column;gap:14px;}
   .date-label{font-size:15px;font-weight:800;color:var(--text);padding:4px 2px 0;}
   .day-nav{display:flex;align-items:center;gap:10px;}
+  .day-nav-main{flex:1;min-width:0;}
+  .debug-btn{margin-left:auto;border:1px solid var(--line);background:#fff;color:var(--muted);padding:8px 12px;border-radius:999px;font-size:12px;font-weight:800;cursor:pointer;display:none;}
+  .debug-btn.show{display:inline-flex;align-items:center;gap:6px;}
+  .debug-btn:active{transform:scale(.98);}
   .day-nav-arrow{width:38px;height:38px;border-radius:50%;border:1px solid var(--line);background:#fff;font-size:18px;font-weight:900;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--text);transition:background .15s,opacity .15s;flex-shrink:0;}
   .day-nav-arrow:hover{background:#f0f4ff;}
   .day-nav-arrow:disabled{opacity:.25;cursor:default;background:#fff;}
@@ -7078,13 +7082,14 @@ function sendReviewEmails(loc) {
   <div class="stack">
     <div class="day-nav">
       <button class="day-nav-arrow" id="dayPrev" onclick="navigateDay(-1)">&larr;</button>
-      <div>
+      <div class="day-nav-main">
         <div id="dateLabel" class="date-label"></div>
         <div id="notTodayBanner" class="not-today-banner" style="display:none;">
           You are viewing a future date &mdash; <a href="#" onclick="navigateToToday();return false;">back to today</a>
         </div>
       </div>
       <button class="day-nav-arrow" id="dayNext" onclick="navigateDay(1)">&rarr;</button>
+      <button class="debug-btn" id="debugCopyBtn" onclick="copyDebugSnapshot()">Copy Debug Data</button>
     </div>
 
     <section class="card" id="morningCard">
@@ -7294,6 +7299,85 @@ var _autoRefreshTimerId = null;
 var _idleCheckTimerId = null;
 var _refreshInFlight = false;
 var _idleOverlay = document.getElementById('idleOverlay');
+var _debugEvents = [];
+var DEBUG_MAX_EVENTS = 120;
+
+function logDebugEvent(type, detail) {
+  var payload = detail || {};
+  _debugEvents.push({
+    ts: new Date().toISOString(),
+    type: String(type || 'event'),
+    detail: payload
+  });
+  if (_debugEvents.length > DEBUG_MAX_EVENTS) _debugEvents.shift();
+}
+function isLikelyInAppWebView() {
+  var ua = (navigator.userAgent || '').toLowerCase();
+  return ua.indexOf('; wv') !== -1 || ua.indexOf('version/') !== -1 && ua.indexOf('mobile') !== -1 && ua.indexOf('safari') === -1;
+}
+function wireDebugCollection() {
+  window.addEventListener('error', function(ev) {
+    logDebugEvent('window_error', { message: ev.message || '', source: ev.filename || '', line: ev.lineno || 0 });
+  });
+  window.addEventListener('unhandledrejection', function(ev) {
+    var msg = '';
+    if (ev && ev.reason) msg = (ev.reason.message || String(ev.reason));
+    logDebugEvent('unhandled_rejection', { reason: msg });
+  });
+  document.addEventListener('click', function(ev) {
+    var el = ev.target && ev.target.closest ? ev.target.closest('button,a') : null;
+    if (!el) return;
+    var label = ((el.textContent || '').trim() || el.id || el.className || '').slice(0, 80);
+    var href = el.getAttribute ? (el.getAttribute('href') || '') : '';
+    logDebugEvent('click', { label: label, tag: el.tagName, href: href });
+    if (el.tagName === 'A' && href && href !== '#' && /download/i.test(label)) {
+      logDebugEvent('download_click_observed', { href: href, label: label });
+    }
+  }, true);
+}
+function buildDebugSnapshot() {
+  return {
+    capturedAt: new Date().toISOString(),
+    userAgent: navigator.userAgent,
+    url: location.href,
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || '',
+    selectedDateKey: _selectedDateKey || '',
+    events: _debugEvents.slice(-80)
+  };
+}
+function copyDebugSnapshot() {
+  var payload = JSON.stringify(buildDebugSnapshot(), null, 2);
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(payload).then(function() {
+      showMsg('calendarMsg', 'good', 'Debug data copied. Send it to support so we can inspect app issues.');
+      logDebugEvent('debug_exported', { method: 'clipboard' });
+    }, function(err) {
+      logDebugEvent('debug_export_failed', { method: 'clipboard', reason: String(err && err.message || err || '') });
+      fallbackCopyDebug(payload);
+    });
+  } else {
+    fallbackCopyDebug(payload);
+  }
+}
+function fallbackCopyDebug(payload) {
+  var ta = document.createElement('textarea');
+  ta.value = payload;
+  ta.setAttribute('readonly', 'readonly');
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.focus();
+  ta.select();
+  try {
+    document.execCommand('copy');
+    showMsg('calendarMsg', 'good', 'Debug data copied. Send it to support so we can inspect app issues.');
+    logDebugEvent('debug_exported', { method: 'execCommand' });
+  } catch (e) {
+    showMsg('calendarMsg', 'bad', 'Could not copy automatically. Please update the app and try again.');
+    logDebugEvent('debug_export_failed', { method: 'execCommand', reason: String(e && e.message || e || '') });
+  }
+  document.body.removeChild(ta);
+}
 
 function showLoading(msg) {
   document.getElementById('loadingText').textContent = msg || 'Loading…';
@@ -8327,6 +8411,8 @@ _idleOverlay.addEventListener('click', function() {
 
 (async function init() {
   try {
+    wireDebugCollection();
+    if (isLikelyInAppWebView()) document.getElementById('debugCopyBtn').classList.add('show');
     showLoading('Loading schedule…');
     await reloadAll();
     startAutoRefresh();
