@@ -2611,7 +2611,7 @@ var _HTML_TEMPLATES = {
       state.dateOptions.forEach(opt => {
         const o = document.createElement('option');
         o.value = opt.dateKey;
-        o.textContent = localDate(opt.dateKey) + (opt.disabled ? \` — \${opt.reason}\` : '');
+        o.textContent = localDate(opt.dateKey) + (opt.spinolaOnly ? ' — Spinola Clinic' : '') + (opt.disabled ? \` — \${opt.reason}\` : '');
         o.disabled = !!opt.disabled;
         els.dateSelect.appendChild(o);
       });
@@ -10406,6 +10406,7 @@ function apiGetDateOptions(extraMap) {
     var disabled = false;
 
     var offEntry = getDoctorOffEntryForDate_(offMap, dk);
+    var spinolaOnly = false;
 
     if (!inAdvanceWindow_(d)) {
       disabled = true;
@@ -10414,8 +10415,26 @@ function apiGetDateOptions(extraMap) {
       disabled = true;
       reason = holiday.reason;
     } else if (offEntry && offEntry.allDay) {
-      disabled = true;
-      reason = doctorOffReason_(offEntry);
+      // Dr Kevin is off all day — check if Spinola can serve patients
+      var spinolaSlots = buildSlotsForDate_(d, null, CFG().SPINOLA_HOURS);
+      var spinolaHasRemaining = false;
+      if (spinolaSlots.length > 0) {
+        if (dk === todayKey) {
+          // Only enable if Spinola still has future slots today
+          for (var sp = 0; sp < spinolaSlots.length; sp++) {
+            if (parseTimeToMinutes_(spinolaSlots[sp].end) > nowMin) { spinolaHasRemaining = true; break; }
+          }
+        } else {
+          spinolaHasRemaining = true;
+        }
+      }
+      if (spinolaHasRemaining) {
+        disabled = false;
+        spinolaOnly = true;
+      } else {
+        disabled = true;
+        reason = doctorOffReason_(offEntry);
+      }
     } else {
       var extras = extraMap[dk] || null;
       var slots = buildSlotsForDate_(d, extras);
@@ -10452,7 +10471,8 @@ function apiGetDateOptions(extraMap) {
       dateKey: dk,
       label: Utilities.formatDate(d, getTimeZone_(), 'EEE dd MMM yyyy'),
       disabled: disabled,
-      reason: reason
+      reason: reason,
+      spinolaOnly: spinolaOnly
     });
   }
 
@@ -10488,7 +10508,8 @@ function apiGetAvailability(dateKey) {
   var offEntry = getDoctorOffEntryForDate_(offMap, dateKey);
 
   if (offEntry && offEntry.allDay) {
-    return { ok: false, reason: doctorOffReason_(offEntry), dateKey: dateKey, slots: [] };
+    // Return ok:true with empty slots so frontend can show Spinola as alternative
+    return { ok: true, reason: doctorOffReason_(offEntry), dateKey: dateKey, slots: [], doctorOff: true };
   }
 
   var extraMap = getDoctorExtraSlots_();
