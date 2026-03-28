@@ -267,14 +267,14 @@ function apiAdminProcessAppointments(sig, payload) {
         if (!found) continue;
 
         var eventId = String(appt.calendarEventId || '').trim();
-        if (eventId) { try { deleteCalendarEvent_(eventId); } catch (e) {} }
+        if (eventId) { try { (found.spinola ? deleteSpinolaCalendarEvent_ : deleteCalendarEvent_)(eventId); } catch (e) {} }
 
         updateAppointmentStatus_(found.sheetName, found.rowIndex, {
           status: 'CANCELLED_DOCTOR',
           cancelledAt: nowStr,
           cancelReason: customMessage || 'Doctor unavailable',
           calendarEventId: ''
-        });
+        }, !!found.spinola);
 
         var msg = customMessage || 'We apologise, the doctor is unavailable on ' + dateKey + '. Your appointment has been cancelled. Please rebook at your convenience.';
         try { sendClientCancelledEmail_(appt, msg); } catch (e1) {}
@@ -401,14 +401,14 @@ function apiAdminProcessAppointments(sig, payload) {
         if (!newStartTime) {
           // No slot available — cancel instead
           var evId = String(appt3.calendarEventId || '').trim();
-          if (evId) { try { deleteCalendarEvent_(evId); } catch (e4) {} }
+          if (evId) { try { (found3.spinola ? deleteSpinolaCalendarEvent_ : deleteCalendarEvent_)(evId); } catch (e4) {} }
 
           updateAppointmentStatus_(found3.sheetName, found3.rowIndex, {
             status: 'CANCELLED_DOCTOR',
             cancelledAt: nowStr,
             cancelReason: 'No available slot on ' + nextDay,
             calendarEventId: ''
-          });
+          }, !!found3.spinola);
 
           try { sendClientCancelledEmail_(appt3, 'Your appointment could not be rescheduled as no slots were available. Please rebook at your convenience.'); } catch (e5) {}
           results.push({ appointmentId: appt3.appointmentId, action: 'cancelled_no_slot', patient: appt3.fullName });
@@ -417,7 +417,7 @@ function apiAdminProcessAppointments(sig, payload) {
 
         // Cancel old calendar event
         var oldEvId = String(appt3.calendarEventId || '').trim();
-        if (oldEvId) { try { deleteCalendarEvent_(oldEvId); } catch (e6) {} }
+        if (oldEvId) { try { (found3.spinola ? deleteSpinolaCalendarEvent_ : deleteCalendarEvent_)(oldEvId); } catch (e6) {} }
 
         // Cancel old appointment
         updateAppointmentStatus_(found3.sheetName, found3.rowIndex, {
@@ -425,7 +425,7 @@ function apiAdminProcessAppointments(sig, payload) {
           cancelledAt: nowStr,
           cancelReason: 'Pushed to ' + nextDay + ' ' + newStartTime,
           calendarEventId: ''
-        });
+        }, !!found3.spinola);
 
         // Create new appointment on next day
         var newToken = Utilities.getUuid();
@@ -529,13 +529,13 @@ function apiAdminProcessAppointments(sig, payload) {
         if (!newSlot) {
           // Fallback: cancel if somehow still no slot
           var evId4 = String(appt4.calendarEventId || '').trim();
-          if (evId4) { try { deleteCalendarEvent_(evId4); } catch (e9) {} }
+          if (evId4) { try { (found4.spinola ? deleteSpinolaCalendarEvent_ : deleteCalendarEvent_)(evId4); } catch (e9) {} }
           updateAppointmentStatus_(found4.sheetName, found4.rowIndex, {
             status: 'CANCELLED_DOCTOR',
             cancelledAt: nowStr,
             cancelReason: 'No available slot on same day',
             calendarEventId: ''
-          });
+          }, !!found4.spinola);
           try { sendClientCancelledEmail_(appt4, 'Your appointment could not be rescheduled. Please rebook at your convenience.'); } catch (e10) {}
           results.push({ appointmentId: appt4.appointmentId, action: 'cancelled_no_slot', patient: appt4.fullName });
           continue;
@@ -543,7 +543,7 @@ function apiAdminProcessAppointments(sig, payload) {
 
         // Cancel old calendar event
         var oldEvId4 = String(appt4.calendarEventId || '').trim();
-        if (oldEvId4) { try { deleteCalendarEvent_(oldEvId4); } catch (e11) {} }
+        if (oldEvId4) { try { (found4.spinola ? deleteSpinolaCalendarEvent_ : deleteCalendarEvent_)(oldEvId4); } catch (e11) {} }
 
         // Cancel old appointment
         updateAppointmentStatus_(found4.sheetName, found4.rowIndex, {
@@ -551,7 +551,7 @@ function apiAdminProcessAppointments(sig, payload) {
           cancelledAt: nowStr,
           cancelReason: 'Pushed to later today ' + newSlot.start,
           calendarEventId: ''
-        });
+        }, !!found4.spinola);
 
         // Create new appointment on same day at new slot
         var newToken4 = Utilities.getUuid();
