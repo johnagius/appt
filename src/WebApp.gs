@@ -743,7 +743,11 @@ function apiCancelAppointment(token, sig) {
 
     var eventId = String(appt.calendarEventId || '').trim();
     if (eventId) {
-      deleteCalendarEvent_(eventId);
+      if (found.spinola) {
+        deleteSpinolaCalendarEvent_(eventId);
+      } else {
+        deleteCalendarEvent_(eventId);
+      }
     }
 
     var now = new Date();
@@ -803,7 +807,11 @@ function apiDoctorAction(token, act, sig) {
     if (act === 'cancel') {
       var eventId = String(appt.calendarEventId || '').trim();
       if (eventId) {
-        deleteCalendarEvent_(eventId);
+        if (found.spinola) {
+          deleteSpinolaCalendarEvent_(eventId);
+        } else {
+          deleteCalendarEvent_(eventId);
+        }
       }
 
       updateAppointmentStatus_(found.sheetName, found.rowIndex, {

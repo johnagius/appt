@@ -35,12 +35,23 @@ function createCalendarEvent_(appt) {
 
 function deleteCalendarEvent_(eventId) {
   if (!eventId) return;
-  var cal = getKevinCalendar_();
   try {
+    var cal = getKevinCalendar_();
     var ev = cal.getEventById(eventId);
     if (ev) ev.deleteEvent();
   } catch (e) {
     Logger.log('WARN: Failed to delete calendar event ' + eventId + ': ' + e.message);
+  }
+}
+
+function deleteSpinolaCalendarEvent_(eventId) {
+  if (!eventId) return;
+  try {
+    var cal = getSpinolaCalendar_();
+    var ev = cal.getEventById(eventId);
+    if (ev) ev.deleteEvent();
+  } catch (e) {
+    Logger.log('WARN: Failed to delete Spinola calendar event ' + eventId + ': ' + e.message);
   }
 }
 
