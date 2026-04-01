@@ -3106,9 +3106,11 @@
 
       function isIdle() { return _idlePaused; }
 
-      // ── Slot refresh (30s) ──
+      // ── Slot refresh (30s) — skip if user picked a slot AND is still active ──
       _slotTimerId = setInterval(function() {
         if (isIdle() || document.hidden || !state.selectedDateKey) return;
+        // Skip refresh while user is actively filling in details (has slot + recent activity)
+        if ((state.selectedSlot || _spinolaSelectedSlot) && (Date.now() - _lastActivity < CLEAR_MS)) return;
         loadAvailability(true);
       }, 30000);
 
@@ -3166,8 +3168,29 @@
       });
     }
 
+    // ── Screen Wake Lock — prevent iPad/tablet from sleeping ──
+    var _wakeLock = null;
+    function releaseWakeLock() {
+      if (_wakeLock) { try { _wakeLock.release(); } catch(e) {} _wakeLock = null; }
+    }
+    function requestWakeLock() {
+      if ('wakeLock' in navigator) {
+        navigator.wakeLock.request('screen').then(function(lock) {
+          _wakeLock = lock;
+          _wakeLock.addEventListener('release', function() { _wakeLock = null; });
+        }).catch(function() {});
+      }
+    }
+    // Request on load + re-acquire when page becomes visible again
+    requestWakeLock();
+    document.addEventListener('visibilitychange', function() {
+      if (!document.hidden && !_wakeLock) requestWakeLock();
+    });
+
     function init() {
-      showLoading(t('loadingBookingTitle'), t('loadingBookingDesc'));
+      // Show inline loading in time grid instead of full-screen overlay
+      els.timeGrid.innerHTML = '<div style="text-align:center;padding:24px 0;color:var(--muted);font-size:13px;"><div class="spinner" style="margin:0 auto 10px;width:28px;height:28px;"></div>Loading available times...</div>';
+      setStatus('good', t('loadingSlots'));
 
       google.script.run
         .withSuccessHandler((data) => {
@@ -3194,30 +3217,27 @@
               var hasAvailable = hasAvailableSlots(res.slots || []);
               if (!hasAvailable && !res.doctorOff) {
                 // No slots for first date — fall through to loadAvailability with autoAdvance
-                loadAvailability(false, true, true);
+                loadAvailability(false, true);
               } else {
-                hideLoading();
                 renderSlots(res.slots || []);
                 setStatus('good', t('slotsLoaded'));
               }
             } else {
-              hideLoading();
               renderSlots([]);
               showHint(els.timeHint, 'bad', (res && res.reason) ? res.reason : t('noAvailability'));
               setStatus('bad', t('unavailable'));
             }
           } else if (state.selectedDateKey) {
             setStatus('good', t('loadingSlots'));
-            loadAvailability(false, true, true);
+            loadAvailability(false, true);
           } else {
-            hideLoading();
             setStatus('bad', t('noDatesAvailable'));
           }
 
           installAutoRefresh();
         })
         .withFailureHandler((e) => {
-          hideLoading();
+          els.timeGrid.innerHTML = '';
           showMsg('bad', t('errorLoadingApp') + (e && e.message ? e.message : e));
           setStatus('bad', t('loadError'));
         })
