@@ -48,7 +48,7 @@
  ***********************************************************************/
 
 // ===== Configuration =====
-var BUNDLE_CACHE_TTL = 3600;  // seconds (1 hour). Max 21600 (6 hours).
+var BUNDLE_CACHE_TTL = 21600;  // seconds (6 hours). Max 21600. Run clearBundleCache() after deploying changes.
 var BUNDLE_PATH = 'dist/bundle.gs';
 var CHUNK_SIZE = 90000;  // CacheService limit is 100KB per key; leave margin
 
