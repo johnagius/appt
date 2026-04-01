@@ -1,8 +1,8 @@
 /***********************************************************************
  * Loader.gs — THE ONLY FILE IN YOUR GOOGLE APPS SCRIPT PROJECT
  *
- * Everything else is stored in Script Properties (permanent) and
- * refreshed from GitHub only when you run clearBundleCache().
+ * Everything else is fetched from GitHub and cached for 6 hours.
+ * With GITHUB_TOKEN set, you get 5,000 requests/hour — no rate limits.
  *
  * SETUP (one-time):
  *   1. Create a new Apps Script project
@@ -11,8 +11,7 @@
  *        GITHUB_OWNER   = johnagius
  *        GITHUB_REPO    = appt
  *        GITHUB_BRANCH  = main
- *      (optional, if repo is private):
- *        GITHUB_TOKEN   = ghp_your_personal_access_token
+ *        GITHUB_TOKEN   = github_pat_your_token_here
  *   4. Also copy these Script Properties from your OLD project:
  *        CONFIG_SPREADSHEET_ID
  *        APPOINTMENTS_SPREADSHEET_ID
@@ -32,27 +31,24 @@
  *   9. Run generateDoctorLink() for the simplified doctor schedule page URL
  *
  * HOW IT WORKS:
- *   - The bundle is stored permanently in Script Properties (never expires)
- *   - A fast CacheService layer avoids reassembling chunks on every call
- *   - GitHub is ONLY contacted when you run clearBundleCache()
- *   - Zero GitHub API calls during normal operation = no rate limits
+ *   - On first call, fetches dist/bundle.gs from GitHub
+ *   - The bundle is cached in CacheService for 6 hours
+ *   - With GITHUB_TOKEN set, rate limits are 5,000/hour (effectively unlimited)
+ *   - Each public function below is a thin proxy to the bundle
+ *   - To force-refresh: run clearBundleCache() from the editor
  *
  * TO UPDATE CODE:
  *   - Edit files in src/ on GitHub
  *   - Run build.py to regenerate dist/bundle.gs
  *   - Push to GitHub
- *   - Run clearBundleCache() from the editor (fetches once, stores permanently)
- *   - NO other changes needed!
+ *   - Run clearBundleCache() for immediate refresh (or wait up to 6 hours)
+ *   - NO changes needed in this file or the GAS editor!
  ***********************************************************************/
 
 // ===== Configuration =====
-var CACHE_TTL = 21600;  // CacheService TTL in seconds (6 hours max). Just a fast read layer.
+var BUNDLE_CACHE_TTL = 21600;  // seconds (6 hours). Max 21600.
 var BUNDLE_PATH = 'dist/bundle.gs';
 var CHUNK_SIZE = 90000;  // CacheService limit is 100KB per key; leave margin
-
-// ===== Persistent storage in Script Properties =====
-var SP_CHUNK_SIZE = 8000;  // Script Properties limit is 9KB per key; leave margin
-var SP_PREFIX = '_SB';
 
 // ===== Bundle loading =====
 var _app = null;
@@ -60,7 +56,7 @@ var _htmlTemplates = null;
 
 function _getApp() {
   if (_app) return _app;
-  var code = _loadBundle();
+  var code = _fetchBundle();
   // eval the bundle - it sets global _BUNDLE and _HTML_TEMPLATES
   eval(code);
   _app = _BUNDLE;
@@ -68,9 +64,10 @@ function _getApp() {
   return _app;
 }
 
-function _loadBundle() {
-  // Layer 1: CacheService (fast, but expires)
+function _fetchBundle() {
   var cache = CacheService.getScriptCache();
+
+  // Try reading from chunked cache
   var chunks = [];
   for (var i = 0; i < 20; i++) {
     var chunk = cache.get('_B' + i);
@@ -79,33 +76,21 @@ function _loadBundle() {
   }
   if (chunks.length > 0) return chunks.join('');
 
-  // Layer 2: Script Properties (permanent, survives everything)
-  var props = PropertiesService.getScriptProperties();
-  var code = _readStoredBundle(props);
+  // Cache miss — fetch from GitHub
+  var code = _fetchFromGitHub();
 
-  if (code) {
-    // Repopulate CacheService for fast reads
-    _writeCache(cache, code);
-    return code;
-  }
-
-  // Layer 3: First-time setup — fetch from GitHub and store permanently
-  code = _fetchFromGitHub(props);
-  _writeStoredBundle(props, code);
-  _writeCache(cache, code);
-  return code;
-}
-
-function _writeCache(cache, code) {
+  // Cache in chunks (CacheService has 100KB per-key limit)
   var cacheObj = {};
   for (var i = 0; i * CHUNK_SIZE < code.length; i++) {
     cacheObj['_B' + i] = code.substr(i * CHUNK_SIZE, CHUNK_SIZE);
   }
-  cache.putAll(cacheObj, CACHE_TTL);
+  cache.putAll(cacheObj, BUNDLE_CACHE_TTL);
+
+  return code;
 }
 
-function _fetchFromGitHub(props) {
-  if (!props) props = PropertiesService.getScriptProperties();
+function _fetchFromGitHub() {
+  var props = PropertiesService.getScriptProperties();
   var owner = props.getProperty('GITHUB_OWNER') || '';
   var repo = props.getProperty('GITHUB_REPO') || '';
   var branch = props.getProperty('GITHUB_BRANCH') || 'main';
@@ -136,37 +121,8 @@ function _fetchFromGitHub(props) {
   return response.getContentText();
 }
 
-function _writeStoredBundle(props, code) {
-  var obj = {};
-  var numChunks = Math.ceil(code.length / SP_CHUNK_SIZE);
-  for (var i = 0; i < numChunks; i++) {
-    obj[SP_PREFIX + i] = code.substr(i * SP_CHUNK_SIZE, SP_CHUNK_SIZE);
-  }
-  obj[SP_PREFIX + '_N'] = String(numChunks);
-  // Clear any old extra chunks
-  for (var j = numChunks; j < 200; j++) {
-    var old = props.getProperty(SP_PREFIX + j);
-    if (old === null) break;
-    props.deleteProperty(SP_PREFIX + j);
-  }
-  props.setProperties(obj);
-}
-
-function _readStoredBundle(props) {
-  var n = parseInt(props.getProperty(SP_PREFIX + '_N') || '0', 10);
-  if (!n) return null;
-  var chunks = [];
-  for (var i = 0; i < n; i++) {
-    var chunk = props.getProperty(SP_PREFIX + i);
-    if (chunk === null) return null;
-    chunks.push(chunk);
-  }
-  return chunks.join('');
-}
-
 /**
- * Run this after pushing code changes to GitHub.
- * Fetches fresh bundle from GitHub, stores it permanently, and refreshes the cache.
+ * Run this to force-refresh the code from GitHub immediately.
  */
 function clearBundleCache() {
   var cache = CacheService.getScriptCache();
@@ -175,13 +131,9 @@ function clearBundleCache() {
   cache.removeAll(keys);
   _app = null;
   _htmlTemplates = null;
-
-  var props = PropertiesService.getScriptProperties();
-  var code = _fetchFromGitHub(props);
-  _writeStoredBundle(props, code);
-  _writeCache(cache, code);
-
-  return { ok: true, message: 'Bundle updated (' + (code.length / 1024).toFixed(1) + ' KB). Changes are now live.' };
+  // Fetch fresh and cache it now
+  var code = _fetchBundle();
+  return { ok: true, message: 'Bundle refreshed (' + (code.length / 1024).toFixed(1) + ' KB). Changes are now live.' };
 }
 
 /**
@@ -205,21 +157,12 @@ function testGitHubConnection() {
 function diagnoseBundleIssues() {
   var results = [];
 
-  // 1. Check script properties
   var props = PropertiesService.getScriptProperties();
-  var owner = props.getProperty('GITHUB_OWNER') || '(not set)';
-  var repo = props.getProperty('GITHUB_REPO') || '(not set)';
-  var branch = props.getProperty('GITHUB_BRANCH') || 'main (default)';
-  results.push('GITHUB_OWNER: ' + owner);
-  results.push('GITHUB_REPO: ' + repo);
-  results.push('GITHUB_BRANCH: ' + branch);
+  results.push('GITHUB_OWNER: ' + (props.getProperty('GITHUB_OWNER') || '(not set)'));
+  results.push('GITHUB_REPO: ' + (props.getProperty('GITHUB_REPO') || '(not set)'));
+  results.push('GITHUB_BRANCH: ' + (props.getProperty('GITHUB_BRANCH') || 'main (default)'));
+  results.push('GITHUB_TOKEN: ' + (props.getProperty('GITHUB_TOKEN') ? 'SET' : 'NOT SET'));
 
-  // 2. Check stored bundle
-  var stored = _readStoredBundle(props);
-  var storedN = parseInt(props.getProperty(SP_PREFIX + '_N') || '0', 10);
-  results.push('Stored bundle: ' + (stored ? (stored.length / 1024).toFixed(1) + ' KB in ' + storedN + ' chunks' : 'NOT STORED'));
-
-  // 3. Check cache state
   var cache = CacheService.getScriptCache();
   var cachedChunks = 0;
   var cachedSize = 0;
@@ -231,11 +174,10 @@ function diagnoseBundleIssues() {
   }
   results.push('Cache: ' + cachedChunks + ' chunks (' + (cachedSize/1024).toFixed(1) + ' KB)');
 
-  // 4. Try fresh fetch from GitHub
   results.push('--- Fetching fresh from GitHub ---');
   try {
-    var freshCode = _fetchFromGitHub(props);
-    results.push('Fresh fetch: ' + (freshCode.length/1024).toFixed(1) + ' KB');
+    var freshCode = _fetchFromGitHub();
+    results.push('Fresh fetch: ' + (freshCode.length/1024).toFixed(1) + ' KB — OK');
   } catch(e) {
     results.push('FETCH ERROR: ' + e.message);
   }
