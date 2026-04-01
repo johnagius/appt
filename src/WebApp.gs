@@ -84,6 +84,21 @@ function apiPoll() {
 
 function apiInit() {
   var extraMap = getDoctorExtraSlots_();
+  var dateOptions = apiGetDateOptions(extraMap);
+
+  // Find first enabled date and prefetch its availability (saves a round trip)
+  var firstDateKey = null;
+  for (var i = 0; i < dateOptions.length; i++) {
+    if (!dateOptions[i].disabled) { firstDateKey = dateOptions[i].dateKey; break; }
+  }
+
+  var initialSlots = null;
+  var initialSpinola = null;
+  if (firstDateKey) {
+    try { initialSlots = apiGetAvailability(firstDateKey); } catch (e) { initialSlots = null; }
+    try { initialSpinola = apiGetSpinolaAvailability(firstDateKey); } catch (e) { initialSpinola = null; }
+  }
+
   return {
     config: {
       doctorName: 'Dr Kevin Navarro Gera',
@@ -99,7 +114,9 @@ function apiInit() {
       workingHours: CFG().HOURS,
       spinolaHours: CFG().SPINOLA_HOURS
     },
-    dateOptions: apiGetDateOptions(extraMap),
+    dateOptions: dateOptions,
+    initialSlots: initialSlots,
+    initialSpinola: initialSpinola,
     _v: getDataVersion_()
   };
 }

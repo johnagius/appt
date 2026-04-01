@@ -3191,7 +3191,29 @@ var _HTML_TEMPLATES = {
           renderServices();
           renderDates();
 
-          if (state.selectedDateKey) {
+          if (state.selectedDateKey && data.initialSlots) {
+            // Use prefetched slots from apiInit — no extra round trip
+            _spinolaPrefetchedSlots = data.initialSpinola || null;
+            _spinolaPrefetchDateKey = state.selectedDateKey;
+
+            var res = data.initialSlots;
+            if (res && res.ok) {
+              var hasAvailable = hasAvailableSlots(res.slots || []);
+              if (!hasAvailable && !res.doctorOff) {
+                // No slots for first date — fall through to loadAvailability with autoAdvance
+                loadAvailability(false, true, true);
+              } else {
+                hideLoading();
+                renderSlots(res.slots || []);
+                setStatus('good', t('slotsLoaded'));
+              }
+            } else {
+              hideLoading();
+              renderSlots([]);
+              showHint(els.timeHint, 'bad', (res && res.reason) ? res.reason : t('noAvailability'));
+              setStatus('bad', t('unavailable'));
+            }
+          } else if (state.selectedDateKey) {
             setStatus('good', t('loadingSlots'));
             loadAvailability(false, true, true);
           } else {
@@ -10380,6 +10402,21 @@ function apiPoll() {
 
 function apiInit() {
   var extraMap = getDoctorExtraSlots_();
+  var dateOptions = apiGetDateOptions(extraMap);
+
+  // Find first enabled date and prefetch its availability (saves a round trip)
+  var firstDateKey = null;
+  for (var i = 0; i < dateOptions.length; i++) {
+    if (!dateOptions[i].disabled) { firstDateKey = dateOptions[i].dateKey; break; }
+  }
+
+  var initialSlots = null;
+  var initialSpinola = null;
+  if (firstDateKey) {
+    try { initialSlots = apiGetAvailability(firstDateKey); } catch (e) { initialSlots = null; }
+    try { initialSpinola = apiGetSpinolaAvailability(firstDateKey); } catch (e) { initialSpinola = null; }
+  }
+
   return {
     config: {
       doctorName: 'Dr Kevin Navarro Gera',
@@ -10395,7 +10432,9 @@ function apiInit() {
       workingHours: CFG().HOURS,
       spinolaHours: CFG().SPINOLA_HOURS
     },
-    dateOptions: apiGetDateOptions(extraMap),
+    dateOptions: dateOptions,
+    initialSlots: initialSlots,
+    initialSpinola: initialSpinola,
     _v: getDataVersion_()
   };
 }
