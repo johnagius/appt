@@ -1,9 +1,8 @@
 /***********************************************************************
  * Loader.gs — THE ONLY FILE IN YOUR GOOGLE APPS SCRIPT PROJECT
  *
- * Everything else is fetched live from GitHub at runtime.
- * When you push changes to GitHub, they go live automatically
- * (after the cache expires, default 1 hour).
+ * Everything else is stored in Script Properties (permanent) and
+ * refreshed from GitHub only when you run clearBundleCache().
  *
  * SETUP (one-time):
  *   1. Create a new Apps Script project
@@ -33,24 +32,27 @@
  *   9. Run generateDoctorLink() for the simplified doctor schedule page URL
  *
  * HOW IT WORKS:
- *   - On first call per execution, fetches dist/bundle.gs from GitHub
- *   - bundle.gs contains all .gs code + HTML templates in one file
- *   - The bundle is cached in CacheService for 1 hour (saves GitHub calls)
- *   - Each public function below is a thin proxy to the bundle
- *   - To force-refresh: run clearBundleCache() from the editor
+ *   - The bundle is stored permanently in Script Properties (never expires)
+ *   - A fast CacheService layer avoids reassembling chunks on every call
+ *   - GitHub is ONLY contacted when you run clearBundleCache()
+ *   - Zero GitHub API calls during normal operation = no rate limits
  *
  * TO UPDATE CODE:
  *   - Edit files in src/ on GitHub
  *   - Run build.py to regenerate dist/bundle.gs
  *   - Push to GitHub
- *   - Wait up to 1 hour (or run clearBundleCache() for immediate refresh)
- *   - NO changes needed in this file or the GAS editor!
+ *   - Run clearBundleCache() from the editor (fetches once, stores permanently)
+ *   - NO other changes needed!
  ***********************************************************************/
 
 // ===== Configuration =====
-var BUNDLE_CACHE_TTL = 3600;  // seconds (1 hour). Max 21600 (6 hours).
+var CACHE_TTL = 21600;  // CacheService TTL in seconds (6 hours max). Just a fast read layer.
 var BUNDLE_PATH = 'dist/bundle.gs';
 var CHUNK_SIZE = 90000;  // CacheService limit is 100KB per key; leave margin
+
+// ===== Persistent storage in Script Properties =====
+var SP_CHUNK_SIZE = 8000;  // Script Properties limit is 9KB per key; leave margin
+var SP_PREFIX = '_SB';
 
 // ===== Bundle loading =====
 var _app = null;
@@ -58,7 +60,7 @@ var _htmlTemplates = null;
 
 function _getApp() {
   if (_app) return _app;
-  var code = _fetchBundle();
+  var code = _loadBundle();
   // eval the bundle - it sets global _BUNDLE and _HTML_TEMPLATES
   eval(code);
   _app = _BUNDLE;
@@ -66,10 +68,9 @@ function _getApp() {
   return _app;
 }
 
-function _fetchBundle() {
+function _loadBundle() {
+  // Layer 1: CacheService (fast, but expires)
   var cache = CacheService.getScriptCache();
-
-  // Try reading from chunked cache
   var chunks = [];
   for (var i = 0; i < 20; i++) {
     var chunk = cache.get('_B' + i);
@@ -78,8 +79,33 @@ function _fetchBundle() {
   }
   if (chunks.length > 0) return chunks.join('');
 
-  // Fetch from GitHub
+  // Layer 2: Script Properties (permanent, survives everything)
   var props = PropertiesService.getScriptProperties();
+  var code = _readStoredBundle(props);
+
+  if (code) {
+    // Repopulate CacheService for fast reads
+    _writeCache(cache, code);
+    return code;
+  }
+
+  // Layer 3: First-time setup — fetch from GitHub and store permanently
+  code = _fetchFromGitHub(props);
+  _writeStoredBundle(props, code);
+  _writeCache(cache, code);
+  return code;
+}
+
+function _writeCache(cache, code) {
+  var cacheObj = {};
+  for (var i = 0; i * CHUNK_SIZE < code.length; i++) {
+    cacheObj['_B' + i] = code.substr(i * CHUNK_SIZE, CHUNK_SIZE);
+  }
+  cache.putAll(cacheObj, CACHE_TTL);
+}
+
+function _fetchFromGitHub(props) {
+  if (!props) props = PropertiesService.getScriptProperties();
   var owner = props.getProperty('GITHUB_OWNER') || '';
   var repo = props.getProperty('GITHUB_REPO') || '';
   var branch = props.getProperty('GITHUB_BRANCH') || 'main';
@@ -92,7 +118,6 @@ function _fetchBundle() {
     );
   }
 
-  // Use GitHub API (more reliable, no CDN caching issues like raw.githubusercontent.com)
   var url = 'https://api.github.com/repos/' + owner + '/' + repo + '/contents/' + BUNDLE_PATH + '?ref=' + branch;
 
   var options = { muteHttpExceptions: true, headers: { 'Accept': 'application/vnd.github.v3.raw', 'User-Agent': 'GAS-Loader' } };
@@ -108,20 +133,40 @@ function _fetchBundle() {
     );
   }
 
-  var code = response.getContentText();
+  return response.getContentText();
+}
 
-  // Cache in chunks (CacheService has 100KB per-key limit)
-  var cacheObj = {};
-  for (var i = 0; i * CHUNK_SIZE < code.length; i++) {
-    cacheObj['_B' + i] = code.substr(i * CHUNK_SIZE, CHUNK_SIZE);
+function _writeStoredBundle(props, code) {
+  var obj = {};
+  var numChunks = Math.ceil(code.length / SP_CHUNK_SIZE);
+  for (var i = 0; i < numChunks; i++) {
+    obj[SP_PREFIX + i] = code.substr(i * SP_CHUNK_SIZE, SP_CHUNK_SIZE);
   }
-  cache.putAll(cacheObj, BUNDLE_CACHE_TTL);
+  obj[SP_PREFIX + '_N'] = String(numChunks);
+  // Clear any old extra chunks
+  for (var j = numChunks; j < 200; j++) {
+    var old = props.getProperty(SP_PREFIX + j);
+    if (old === null) break;
+    props.deleteProperty(SP_PREFIX + j);
+  }
+  props.setProperties(obj);
+}
 
-  return code;
+function _readStoredBundle(props) {
+  var n = parseInt(props.getProperty(SP_PREFIX + '_N') || '0', 10);
+  if (!n) return null;
+  var chunks = [];
+  for (var i = 0; i < n; i++) {
+    var chunk = props.getProperty(SP_PREFIX + i);
+    if (chunk === null) return null;
+    chunks.push(chunk);
+  }
+  return chunks.join('');
 }
 
 /**
- * Run this to force-refresh the code from GitHub immediately.
+ * Run this after pushing code changes to GitHub.
+ * Fetches fresh bundle from GitHub, stores it permanently, and refreshes the cache.
  */
 function clearBundleCache() {
   var cache = CacheService.getScriptCache();
@@ -130,7 +175,13 @@ function clearBundleCache() {
   cache.removeAll(keys);
   _app = null;
   _htmlTemplates = null;
-  return { ok: true, message: 'Bundle cache cleared. Next call will fetch fresh code from GitHub.' };
+
+  var props = PropertiesService.getScriptProperties();
+  var code = _fetchFromGitHub(props);
+  _writeStoredBundle(props, code);
+  _writeCache(cache, code);
+
+  return { ok: true, message: 'Bundle updated (' + (code.length / 1024).toFixed(1) + ' KB). Changes are now live.' };
 }
 
 /**
@@ -138,7 +189,7 @@ function clearBundleCache() {
  */
 function testGitHubConnection() {
   try {
-    var code = _fetchBundle();
+    var code = _fetchFromGitHub();
     return {
       ok: true,
       message: 'Connected! Bundle fetched (' + (code.length / 1024).toFixed(1) + ' KB).'
@@ -163,7 +214,12 @@ function diagnoseBundleIssues() {
   results.push('GITHUB_REPO: ' + repo);
   results.push('GITHUB_BRANCH: ' + branch);
 
-  // 2. Check cache state
+  // 2. Check stored bundle
+  var stored = _readStoredBundle(props);
+  var storedN = parseInt(props.getProperty(SP_PREFIX + '_N') || '0', 10);
+  results.push('Stored bundle: ' + (stored ? (stored.length / 1024).toFixed(1) + ' KB in ' + storedN + ' chunks' : 'NOT STORED'));
+
+  // 3. Check cache state
   var cache = CacheService.getScriptCache();
   var cachedChunks = 0;
   var cachedSize = 0;
@@ -173,33 +229,13 @@ function diagnoseBundleIssues() {
     cachedChunks++;
     cachedSize += chunk.length;
   }
-  results.push('Cached chunks: ' + cachedChunks + ' (' + (cachedSize/1024).toFixed(1) + ' KB)');
+  results.push('Cache: ' + cachedChunks + ' chunks (' + (cachedSize/1024).toFixed(1) + ' KB)');
 
-  // 3. Check if cached bundle has key features
-  if (cachedSize > 0) {
-    var cached = [];
-    for (var j = 0; j < cachedChunks; j++) cached.push(cache.get('_B' + j));
-    var cachedCode = cached.join('');
-    results.push('Cached bundle has ccBtn (country selector): ' + (cachedCode.indexOf('ccBtn') > -1));
-    results.push('Cached bundle has langQuickFlags (language flags): ' + (cachedCode.indexOf('langQuickFlags') > -1));
-    results.push('Cached bundle has POPULAR_LANGS: ' + (cachedCode.indexOf('POPULAR_LANGS') > -1));
-    results.push('Cached bundle has Lietuvių (Lithuanian): ' + (cachedCode.indexOf('Lietuvių') > -1));
-  }
-
-  // 4. Force fresh fetch from GitHub
+  // 4. Try fresh fetch from GitHub
   results.push('--- Fetching fresh from GitHub ---');
   try {
-    // Clear cache first
-    var keys = [];
-    for (var k = 0; k < 20; k++) keys.push('_B' + k);
-    cache.removeAll(keys);
-
-    var freshCode = _fetchBundle();
-    results.push('Fresh fetch size: ' + (freshCode.length/1024).toFixed(1) + ' KB');
-    results.push('Fresh bundle has ccBtn (country selector): ' + (freshCode.indexOf('ccBtn') > -1));
-    results.push('Fresh bundle has langQuickFlags (language flags): ' + (freshCode.indexOf('langQuickFlags') > -1));
-    results.push('Fresh bundle has POPULAR_LANGS: ' + (freshCode.indexOf('POPULAR_LANGS') > -1));
-    results.push('Fresh bundle has Lietuvių (Lithuanian): ' + (freshCode.indexOf('Lietuvių') > -1));
+    var freshCode = _fetchFromGitHub(props);
+    results.push('Fresh fetch: ' + (freshCode.length/1024).toFixed(1) + ' KB');
   } catch(e) {
     results.push('FETCH ERROR: ' + e.message);
   }
