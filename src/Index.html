@@ -3184,7 +3184,29 @@
           renderServices();
           renderDates();
 
-          if (state.selectedDateKey) {
+          if (state.selectedDateKey && data.initialSlots) {
+            // Use prefetched slots from apiInit — no extra round trip
+            _spinolaPrefetchedSlots = data.initialSpinola || null;
+            _spinolaPrefetchDateKey = state.selectedDateKey;
+
+            var res = data.initialSlots;
+            if (res && res.ok) {
+              var hasAvailable = hasAvailableSlots(res.slots || []);
+              if (!hasAvailable && !res.doctorOff) {
+                // No slots for first date — fall through to loadAvailability with autoAdvance
+                loadAvailability(false, true, true);
+              } else {
+                hideLoading();
+                renderSlots(res.slots || []);
+                setStatus('good', t('slotsLoaded'));
+              }
+            } else {
+              hideLoading();
+              renderSlots([]);
+              showHint(els.timeHint, 'bad', (res && res.reason) ? res.reason : t('noAvailability'));
+              setStatus('bad', t('unavailable'));
+            }
+          } else if (state.selectedDateKey) {
             setStatus('good', t('loadingSlots'));
             loadAvailability(false, true, true);
           } else {
