@@ -3167,7 +3167,9 @@
     }
 
     function init() {
-      showLoading(t('loadingBookingTitle'), t('loadingBookingDesc'));
+      // Show inline loading in time grid instead of full-screen overlay
+      els.timeGrid.innerHTML = '<div style="text-align:center;padding:24px 0;color:var(--muted);font-size:13px;"><div class="spinner" style="margin:0 auto 10px;width:28px;height:28px;"></div>Loading available times...</div>';
+      setStatus('good', t('loadingSlots'));
 
       google.script.run
         .withSuccessHandler((data) => {
@@ -3194,30 +3196,27 @@
               var hasAvailable = hasAvailableSlots(res.slots || []);
               if (!hasAvailable && !res.doctorOff) {
                 // No slots for first date — fall through to loadAvailability with autoAdvance
-                loadAvailability(false, true, true);
+                loadAvailability(false, true);
               } else {
-                hideLoading();
                 renderSlots(res.slots || []);
                 setStatus('good', t('slotsLoaded'));
               }
             } else {
-              hideLoading();
               renderSlots([]);
               showHint(els.timeHint, 'bad', (res && res.reason) ? res.reason : t('noAvailability'));
               setStatus('bad', t('unavailable'));
             }
           } else if (state.selectedDateKey) {
             setStatus('good', t('loadingSlots'));
-            loadAvailability(false, true, true);
+            loadAvailability(false, true);
           } else {
-            hideLoading();
             setStatus('bad', t('noDatesAvailable'));
           }
 
           installAutoRefresh();
         })
         .withFailureHandler((e) => {
-          hideLoading();
+          els.timeGrid.innerHTML = '';
           showMsg('bad', t('errorLoadingApp') + (e && e.message ? e.message : e));
           setStatus('bad', t('loadError'));
         })
