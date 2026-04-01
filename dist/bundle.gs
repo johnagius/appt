@@ -3162,7 +3162,6 @@ var _HTML_TEMPLATES = {
         if (elapsed >= IDLE_MS) {
           _idlePaused = true;
           _idleOverlay.classList.add('show');
-          releaseWakeLock();
         }
       }, 1000);
 
@@ -3171,7 +3170,6 @@ var _HTML_TEMPLATES = {
         _idlePaused = false;
         _lastActivity = Date.now();
         _idleOverlay.classList.remove('show');
-        requestWakeLock();
         // Full fresh reload of data
         goToExecAfterBooking_();
       });
