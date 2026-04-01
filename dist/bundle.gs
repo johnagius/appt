@@ -3113,10 +3113,11 @@ var _HTML_TEMPLATES = {
 
       function isIdle() { return _idlePaused; }
 
-      // ── Slot refresh (30s) — skip if user already picked a slot (they're filling in details) ──
+      // ── Slot refresh (30s) — skip if user picked a slot AND is still active ──
       _slotTimerId = setInterval(function() {
         if (isIdle() || document.hidden || !state.selectedDateKey) return;
-        if (state.selectedSlot || _spinolaSelectedSlot) return;
+        // Skip refresh while user is actively filling in details (has slot + recent activity)
+        if ((state.selectedSlot || _spinolaSelectedSlot) && (Date.now() - _lastActivity < CLEAR_MS)) return;
         loadAvailability(true);
       }, 30000);
 
@@ -3173,6 +3174,22 @@ var _HTML_TEMPLATES = {
         goToExecAfterBooking_();
       });
     }
+
+    // ── Screen Wake Lock — prevent iPad/tablet from sleeping ──
+    var _wakeLock = null;
+    function requestWakeLock() {
+      if ('wakeLock' in navigator) {
+        navigator.wakeLock.request('screen').then(function(lock) {
+          _wakeLock = lock;
+          _wakeLock.addEventListener('release', function() { _wakeLock = null; });
+        }).catch(function() {});
+      }
+    }
+    // Request on load + re-acquire when page becomes visible again
+    requestWakeLock();
+    document.addEventListener('visibilitychange', function() {
+      if (!document.hidden && !_wakeLock) requestWakeLock();
+    });
 
     function init() {
       // Show inline loading in time grid instead of full-screen overlay
