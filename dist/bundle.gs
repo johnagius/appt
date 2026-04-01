@@ -3162,6 +3162,7 @@ var _HTML_TEMPLATES = {
         if (elapsed >= IDLE_MS) {
           _idlePaused = true;
           _idleOverlay.classList.add('show');
+          releaseWakeLock();
         }
       }, 1000);
 
@@ -3170,6 +3171,7 @@ var _HTML_TEMPLATES = {
         _idlePaused = false;
         _lastActivity = Date.now();
         _idleOverlay.classList.remove('show');
+        requestWakeLock();
         // Full fresh reload of data
         goToExecAfterBooking_();
       });
@@ -3177,6 +3179,9 @@ var _HTML_TEMPLATES = {
 
     // ── Screen Wake Lock — prevent iPad/tablet from sleeping ──
     var _wakeLock = null;
+    function releaseWakeLock() {
+      if (_wakeLock) { try { _wakeLock.release(); } catch(e) {} _wakeLock = null; }
+    }
     function requestWakeLock() {
       if ('wakeLock' in navigator) {
         navigator.wakeLock.request('screen').then(function(lock) {
