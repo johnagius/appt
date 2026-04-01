@@ -3113,9 +3113,10 @@ var _HTML_TEMPLATES = {
 
       function isIdle() { return _idlePaused; }
 
-      // ── Slot refresh (30s) ──
+      // ── Slot refresh (30s) — skip if user already picked a slot (they're filling in details) ──
       _slotTimerId = setInterval(function() {
         if (isIdle() || document.hidden || !state.selectedDateKey) return;
+        if (state.selectedSlot || _spinolaSelectedSlot) return;
         loadAvailability(true);
       }, 30000);
 
