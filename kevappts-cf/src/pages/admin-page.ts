@@ -923,7 +923,7 @@ function gasCall(method, args) {
     'apiAdminRemoveExtraSlots': { ep: 'extra-slots/', del: true },
     'apiAdminNotifyPatients': { ep: 'notify', post: true },
     'apiAdminMarkAttendance': { ep: 'attendance', post: true },
-    'apiAdminGetWeekOverview': { ep: 'week-overview?startDate=' },
+    'apiAdminGetWeekOverview': { ep: 'week-overview?week=' },
     'apiAdminSearchAppointments': { ep: 'search?q=' },
     'apiAdminGetStatistics': { ep: 'stats' },
     'apiAdminGetSettings': { ep: 'settings' },
@@ -1005,6 +1005,28 @@ function transformResponse(method, res) {
   // Reviews
   if (res.potters) res.potters = res.potters.map(transformAppt);
   if (res.spinola) res.spinola = res.spinola.map(transformAppt);
+  // Statistics: flatten res.stats to top level for old code compatibility
+  if (method === 'apiAdminGetStatistics' && res.stats && !res.totalBooked) {
+    var st = res.stats;
+    for (var k in st) res[k] = st[k];
+    // Map field names the old code expects
+    res.totalBooked = st.total || 0;
+    res.totalUniquePatients = st.uniquePatients || 0;
+    res.utilization = st.utilization || 0;
+    res.repeatPatients = st.repeatPatients || 0;
+    res.trendDirection = st.trendDirection || '';
+    res.trendPct = st.trendPct || 0;
+    res.weeklyTrend = st.weeklyTrend || [];
+    res.hourlyDistribution = st.hourlyDistribution || [];
+    res.utilizationByDay = st.utilizationByDay || st.byDay || {};
+    res.locationSplit = st.locationSplit || { potters: st.pottersCount || 0, spinola: st.spinolaCount || 0 };
+    res.busiestDay = st.busiestDay || null;
+    res.upcomingLoad = st.upcomingLoad || [];
+    res.countryBreakdown = st.countryBreakdown || [];
+    res.cancelBreakdown = st.cancelBreakdown || { byDoctor: st.cancelledDoctor || 0, byPatient: st.cancelledClient || 0 };
+    res.period = st.period || { from: '', to: '' };
+    res.generated = st.generated || '';
+  }
   return res;
 }
 
@@ -2393,7 +2415,7 @@ if (document.readyState === 'complete' || document.readyState === 'interactive')
 // Instead of fetching the full dashboard every 60s (~11 sheet reads),
 // we poll a lightweight version counter (1 PropertiesService read).
 // Full dashboard is only fetched when the version actually changed.
-var POLL_INTERVAL_SEC = 10;
+var POLL_INTERVAL_SEC = 999999; // Polling disabled — WebSocket handles real-time updates
 var _lastRefreshTime = Date.now();
 var _pollTimerId = null;
 var _isRefreshing = false;
