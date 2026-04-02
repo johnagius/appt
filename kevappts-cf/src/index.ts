@@ -122,6 +122,30 @@ export default {
         if (adminPath === 'test-booking' && method === 'POST') return apiAdminCreateTestBooking(request, env);
         if (adminPath === 'purge-test-data' && method === 'POST') return apiAdminPurgeTestData(request, env);
 
+        // Test broadcast — manually trigger a WebSocket notification
+        if (adminPath === 'test-broadcast' && method === 'POST') {
+          const tSig = new URL(request.url).searchParams.get('sig') || '';
+          if (!tSig || !await verifyAdminSig(tSig, env.ADMIN_SECRET)) {
+            return new Response(JSON.stringify({ ok: false, reason: 'Access denied' }), { status: 403, headers: { 'Content-Type': 'application/json' } });
+          }
+          try {
+            const doId = env.REALTIME.idFromName('global');
+            const stub = env.REALTIME.get(doId);
+            const res = await stub.fetch('http://internal/broadcast', {
+              method: 'POST',
+              body: JSON.stringify({ type: 'slots_updated', dateKey: '2026-04-02' }),
+            });
+            const result = await res.json();
+            return new Response(JSON.stringify({ ok: true, broadcast: result }), {
+              headers: { 'Content-Type': 'application/json' },
+            });
+          } catch (e: any) {
+            return new Response(JSON.stringify({ ok: false, error: e.message }), {
+              headers: { 'Content-Type': 'application/json' },
+            });
+          }
+        }
+
         // Delete routes with ID in path
         if (adminPath.startsWith('doctor-off/') && method === 'DELETE') {
           return apiAdminRemoveDoctorOff(request, env);
@@ -264,6 +288,7 @@ function testPage(sig: string): string {
   <h2>Purge Test Data</h2>
   <p style="font-size:13px;color:#666;margin-bottom:12px">Deletes ALL appointments with TEST- prefix. Real bookings are never affected.</p>
   <button class="btn btn-purge" onclick="purgeAll()">Purge All Test Bookings</button>
+  <button class="btn btn-quick" onclick="testBroadcast()" style="margin-top:8px;background:#f59e0b">Test WebSocket Broadcast</button>
 </div>
 
 <div class="card">
@@ -338,6 +363,15 @@ async function purgeAll() {
     var res = await api('purge-test-data', {});
     if (res.ok) log('OK: ' + res.deleted + ' test records deleted.');
     else log('ERROR: ' + (res.reason || 'Unknown error'));
+  } catch(e) { log('FAILED: ' + e.message); }
+}
+
+async function testBroadcast() {
+  log('Sending test broadcast...');
+  try {
+    var res = await api('test-broadcast', {});
+    log('Broadcast result: ' + JSON.stringify(res));
+    log('If admin page is open, it should have received a [WS] message and pinged.');
   } catch(e) { log('FAILED: ' + e.message); }
 }
 </script>
