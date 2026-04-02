@@ -1,0 +1,40 @@
+name = "kevappts"
+main = "src/index.ts"
+compatibility_date = "2024-12-01"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+TIMEZONE = "Europe/Malta"
+DOCTOR_NAME = "Dr Kevin Navarro Gera"
+CLINIC_NAME = "Potter's Pharmacy Clinic"
+SPINOLA_LOCATION = "Spinola Clinic"
+SPINOLA_DOCTOR_NAME = "Dr James"
+SPINOLA_LOCATION_DETAILS = "Near McDonald's, Love Statue, near bus stop, in Spinola"
+
+# Secrets (set via `wrangler secret put`):
+# SIGNING_SECRET
+# ADMIN_SECRET
+# RESEND_API_KEY
+# GOOGLE_SERVICE_ACCOUNT_JSON
+# GOOGLE_CALENDAR_ID
+# GOOGLE_SPINOLA_CALENDAR_ID
+# DOCTOR_EMAIL
+
+[[d1_databases]]
+binding = "DB"
+database_name = "kevappts-db"
+database_id = "placeholder-replace-after-creation"
+
+# Durable Objects for real-time SSE
+[durable_objects]
+bindings = [
+  { name = "REALTIME", class_name = "RealtimeHub" }
+]
+
+[[migrations]]
+tag = "v1"
+new_classes = ["RealtimeHub"]
+
+# Daily schedule email at 7am Malta time (6am UTC in winter, 5am UTC in summer)
+[triggers]
+crons = ["0 5 * * *"]
