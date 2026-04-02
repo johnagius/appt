@@ -89,13 +89,7 @@ export async function apiCancelAppointment(req: Request, env: Env): Promise<Resp
   const ctx = (globalThis as any).__ctx;
   if (ctx?.waitUntil) {
     ctx.waitUntil((async () => {
-      // Delete Google Calendar event
-      if (appt.calendar_event_id) {
-        try { await deleteCalendarEvent(env, appt.calendar_event_id, appt.clinic as any); } catch {}
-      }
-      try { await sendClientCancelledEmail(env, appt, 'Your appointment has been cancelled.'); } catch {}
-      try { await sendDoctorCancellationEmail(env, appt, 'Client cancelled via email link.'); } catch {}
-      // Push slot freed notification — clients watching this date get instant update
+      // Broadcast FIRST for instant admin/doctor page update
       try {
         const doId = env.REALTIME.idFromName('global');
         const stub = env.REALTIME.get(doId);
@@ -104,6 +98,12 @@ export async function apiCancelAppointment(req: Request, env: Env): Promise<Resp
           body: JSON.stringify({ type: 'slots_updated', dateKey: appt.date_key }),
         });
       } catch {}
+      // Delete Google Calendar event
+      if (appt.calendar_event_id) {
+        try { await deleteCalendarEvent(env, appt.calendar_event_id, appt.clinic as any); } catch {}
+      }
+      try { await sendClientCancelledEmail(env, appt, 'Your appointment has been cancelled.'); } catch {}
+      try { await sendDoctorCancellationEmail(env, appt, 'Client cancelled via email link.'); } catch {}
     })());
   }
 
