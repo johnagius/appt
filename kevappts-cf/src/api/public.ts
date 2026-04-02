@@ -301,6 +301,11 @@ async function doBook(req: Request, env: Env, clinic: 'potters' | 'spinola'): Pr
           method: 'POST',
           body: JSON.stringify({ type: 'slots_data', dateKey, data: slotsData }),
         });
+        // Also send simple broadcast for admin pages
+        await stub.fetch('http://internal/broadcast', {
+          method: 'POST',
+          body: JSON.stringify({ type: 'slots_updated', dateKey }),
+        });
       } catch {}
     })());
   }
