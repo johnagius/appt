@@ -5,7 +5,9 @@ export interface Env {
   ADMIN_SECRET: string;
   RESEND_API_KEY: string;
   DOCTOR_EMAIL: string;
-  GOOGLE_SERVICE_ACCOUNT_JSON: string;
+  GOOGLE_CLIENT_ID: string;
+  GOOGLE_CLIENT_SECRET: string;
+  GOOGLE_REFRESH_TOKEN: string;
   GOOGLE_CALENDAR_ID: string;
   GOOGLE_SPINOLA_CALENDAR_ID: string;
   TIMEZONE: string;
@@ -132,7 +134,6 @@ export interface AppConfig {
   apptDurationMin: number;
   advanceDays: number;
   maxActiveApptsPerPerson: number;
-  doublecheckCalendar: boolean;
   workingHours: WorkingHours;
   spinolaHours: WorkingHours;
   pottersLocation: string;

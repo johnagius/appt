@@ -1,8 +1,10 @@
 # Copy this to .dev.vars and fill in your values
-SIGNING_SECRET=your-signing-secret-here
-ADMIN_SECRET=your-admin-secret-here
+SIGNING_SECRET=your-signing-secret-from-gas
+ADMIN_SECRET=your-admin-secret-from-gas
 RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxx
-DOCTOR_EMAIL=doctor@example.com
-GOOGLE_SERVICE_ACCOUNT_JSON={"client_email":"...","private_key":"...","token_uri":"https://oauth2.googleapis.com/token"}
-GOOGLE_CALENDAR_ID=primary
-GOOGLE_SPINOLA_CALENDAR_ID=spinola-calendar-id
+DOCTOR_EMAIL=info@spinola.clinic
+GOOGLE_CLIENT_ID=xxxx.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=GOCSPX-xxxx
+GOOGLE_REFRESH_TOKEN=1//xxxx
+GOOGLE_CALENDAR_ID=xxxx@group.calendar.google.com
+GOOGLE_SPINOLA_CALENDAR_ID=xxxx@group.calendar.google.com
