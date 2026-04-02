@@ -14,7 +14,7 @@ async function sendEmail(env: Env, to: string, subject: string, html: string): P
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      from: "Potter's Pharmacy <noreply@potterspharmacy.com>",
+      from: "Potter's Pharmacy <noreply@swiftdataautomation.com>",
       to: [to],
       subject,
       html,
