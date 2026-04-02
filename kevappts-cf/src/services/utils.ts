@@ -119,16 +119,16 @@ export function goodFriday(year: number): Date {
   return new Date(easter.getTime() - 2 * 86400000);
 }
 
-export function isHolidayOrClosed(d: Date): { closed: boolean; reason: string } {
-  if (isSunday(d)) return { closed: true, reason: 'Sunday (Closed)' };
+export function isHolidayOrClosed(d: Date): { closed: boolean; reason: string; isPublicHoliday: boolean } {
+  if (isSunday(d)) return { closed: true, reason: 'Sunday (Closed)', isPublicHoliday: false };
 
   const mmdd = pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
-  if (FIXED_HOLIDAYS.includes(mmdd)) return { closed: true, reason: 'Public holiday' };
+  if (FIXED_HOLIDAYS.includes(mmdd)) return { closed: true, reason: 'Public holiday', isPublicHoliday: true };
 
   const gf = goodFriday(d.getFullYear());
-  if (toDateKey(gf) === toDateKey(d)) return { closed: true, reason: 'Good Friday' };
+  if (toDateKey(gf) === toDateKey(d)) return { closed: true, reason: 'Good Friday', isPublicHoliday: true };
 
-  return { closed: false, reason: '' };
+  return { closed: false, reason: '', isPublicHoliday: false };
 }
 
 export function inAdvanceWindow(d: Date, today: Date, advanceDays: number): boolean {
