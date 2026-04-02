@@ -3495,22 +3495,33 @@ function connectWS() {
   try { _ws = new WebSocket(proto + '//' + location.host + '/api/ws'); } catch(e) { return; }
   _ws.onopen = function() {
     try { _ws.send(JSON.stringify({ subscribe: 'admin' })); } catch(e) {}
+    console.log('[WS] Connected and subscribed to admin channel');
     var dot = document.getElementById('sseDot');
     if (dot) dot.className = 'sseDot connected';
+    // Update the status bar dot to green
+    var refreshDot = document.querySelector('.refresh-dot');
+    if (refreshDot) refreshDot.style.background = '#10b981';
   };
   _ws.onmessage = function(ev) {
     try {
+      if (ev.data === 'pong' || ev.data === 'ping') return;
       var msg = JSON.parse(ev.data);
-      if (msg.type === 'slots_updated' || msg.type === 'slots_data' || msg.type === 'dashboard_data') {
+      console.log('[WS] Message received:', msg.type);
+      if (msg.type === 'slots_updated' || msg.type === 'slots_data' || msg.type === 'dashboard_data' || msg.type === 'appointment_changed') {
         // Silent refresh — no loading overlay
         _silentRefresh = true;
         if (typeof loadDashboard === 'function') loadDashboard();
+        // Update status bar
+        var lastEl = document.getElementById('refreshLastText');
+        if (lastEl) lastEl.textContent = 'Live update received';
+        _lastRefreshTime = Date.now();
         // Play notification sound
         try { _notifSound.play(); } catch(e2) {}
       }
-    } catch(e) {}
+    } catch(e) { console.log('[WS] Parse error:', e); }
   };
   _ws.onclose = function() {
+    console.log('[WS] Disconnected, reconnecting in 2s...');
     var dot = document.getElementById('sseDot');
     if (dot) dot.className = 'sseDot';
     setTimeout(connectWS, 2000);
