@@ -42,20 +42,15 @@ async function requireAdmin(req: Request, env: Env): Promise<Response | null> {
   return json({ ok: false, reason: 'Access denied.' }, 403);
 }
 
-function broadcast(env: Env, dateKey: string) {
-  const ctx = (globalThis as any).__ctx;
-  if (ctx?.waitUntil) {
-    ctx.waitUntil((async () => {
-      try {
-        const id = env.REALTIME.idFromName('global');
-        const stub = env.REALTIME.get(id);
-        await stub.fetch('http://internal/broadcast', {
-          method: 'POST',
-          body: JSON.stringify({ type: 'slots_updated', dateKey }),
-        });
-      } catch {}
-    })());
-  }
+async function broadcast(env: Env, dateKey: string) {
+  try {
+    const id = env.REALTIME.idFromName('global');
+    const stub = env.REALTIME.get(id);
+    await stub.fetch('http://internal/broadcast', {
+      method: 'POST',
+      body: JSON.stringify({ type: 'slots_updated', dateKey }),
+    });
+  } catch (e) { console.error('Broadcast error:', e); }
 }
 
 // ─── Dashboard ─────────────────────────────────────────────
@@ -180,7 +175,7 @@ export async function apiAdminMarkDoctorOff(req: Request, env: Env): Promise<Res
     d = addDays(d, 1);
   }
 
-  broadcast(env, startDate);
+  await broadcast(env, startDate);
   return json({ ok: true, message: 'Doctor marked as unavailable.', affectedAppointments: affected });
 }
 
@@ -221,7 +216,7 @@ export async function apiAdminAddExtraSlots(req: Request, env: Env): Promise<Res
   const slotsPerDay = Math.floor((enMin - stMin) / cfg.apptDurationMin);
   const totalSlots = slotsPerDay * daysAdded;
 
-  broadcast(env, date);
+  await broadcast(env, date);
   return json({ ok: true, message: `Added extra time: ${startTime} - ${endTime} (${totalSlots} slots across ${daysAdded} day(s)).` });
 }
 
@@ -238,7 +233,7 @@ export async function apiAdminRemoveDoctorOff(req: Request, env: Env): Promise<R
 
   await deleteDoctorOff(env.DB, id);
   await bumpVersion(env.DB);
-  broadcast(env, '');
+  await broadcast(env, '');
   return json({ ok: true, message: 'Doctor-off entry removed.' });
 }
 
@@ -253,7 +248,7 @@ export async function apiAdminRemoveExtraSlots(req: Request, env: Env): Promise<
 
   await deleteDoctorExtra(env.DB, id);
   await bumpVersion(env.DB);
-  broadcast(env, '');
+  await broadcast(env, '');
   return json({ ok: true, message: 'Extra slots entry removed.' });
 }
 
@@ -497,7 +492,7 @@ export async function apiAdminProcessAppointments(req: Request, env: Env): Promi
   }
 
   if (results.length > 0) await bumpVersion(env.DB);
-  broadcast(env, dateKey);
+  await broadcast(env, dateKey);
 
   return json({ ok: true, message: `Processed ${results.length} appointment(s).`, processed: results.length, results });
 }
@@ -678,7 +673,7 @@ export async function apiAdminSaveSettings(req: Request, env: Env): Promise<Resp
   if (payload.spinolaLocation !== undefined) await setConfigValue(env.DB, 'SPINOLA_LOCATION', payload.spinolaLocation);
 
   await bumpVersion(env.DB);
-  broadcast(env, '');
+  await broadcast(env, '');
 
   return json({ ok: true, message: 'Settings saved.' });
 }
@@ -1007,7 +1002,7 @@ export async function apiAdminDoctorOffDates(req: Request, env: Env): Promise<Re
   }
 
   await bumpVersion(env.DB);
-  if (dateKeys.length > 0) broadcast(env, dateKeys[0]);
+  if (dateKeys.length > 0) await broadcast(env, dateKeys[0]);
 
   return json({ ok: true });
 }
@@ -1070,7 +1065,7 @@ export async function apiAdminCreateTestBooking(req: Request, env: Env): Promise
 
   await insertAppointment(env.DB, appt);
   await bumpVersion(env.DB);
-  broadcast(env, dateKey);
+  await broadcast(env, dateKey);
 
   // Create Google Calendar event
   try {
@@ -1098,6 +1093,16 @@ export async function apiAdminPurgeTestData(req: Request, env: Env): Promise<Res
   // Also delete test clients
   await env.DB.prepare("DELETE FROM clients WHERE email = 'test@example.com'").run();
   await bumpVersion(env.DB);
+
+  // Broadcast to all WebSocket clients (booking page + admin + doctor)
+  try {
+    const doId = env.REALTIME.idFromName('global');
+    const stub = env.REALTIME.get(doId);
+    await stub.fetch('http://internal/broadcast', {
+      method: 'POST',
+      body: JSON.stringify({ type: 'slots_updated', dateKey: '' }),
+    });
+  } catch {}
 
   return json({ ok: true, deleted: result.meta?.changes || 0, message: 'All test data purged.' });
 }
