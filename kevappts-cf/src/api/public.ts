@@ -263,13 +263,16 @@ async function doBook(req: Request, env: Env, clinic: 'potters' | 'spinola'): Pr
 
   // Broadcast SYNCHRONOUSLY before returning response — ensures admin pages update
   try {
+    console.log('[BOOKING] Broadcasting slots_updated for', dateKey);
     const doId = env.REALTIME.idFromName('global');
     const stub = env.REALTIME.get(doId);
-    await stub.fetch('http://internal/broadcast', {
+    const bRes = await stub.fetch('http://internal/broadcast', {
       method: 'POST',
       body: JSON.stringify({ type: 'slots_updated', dateKey }),
     });
-  } catch (e) { console.error('Broadcast error:', e); }
+    const bData = await bRes.json();
+    console.log('[BOOKING] Broadcast result:', JSON.stringify(bData));
+  } catch (e) { console.error('[BOOKING] Broadcast error:', e); }
 
   // Fire-and-forget: emails + calendar + push updated slots via WebSocket
   const ctx = (globalThis as any).__ctx;
