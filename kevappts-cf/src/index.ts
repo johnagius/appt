@@ -20,9 +20,9 @@ import {
   apiAdminProcessAppointments, apiAdminNotifyPatients, apiAdminGetReviewPatients,
   apiAdminSendReviewRequests, apiAdminGetWeekOverview, apiAdminSearchAppointments,
   apiAdminGetSettings, apiAdminSaveSettings, apiAdminGetStatistics,
-  apiAdminMarkAttendance, apiAdminGetPatientHistory,
+  apiAdminMarkAttendance, apiAdminGetPatientHistory, apiAdminDoctorOffDates,
 } from './api/admin';
-import { verifyAdminSig } from './services/crypto';
+import { verifyAdminSig, computeAdminSig } from './services/crypto';
 import { todayKeyLocal } from './services/utils';
 import { getActiveAppointmentsByDate } from './db/queries';
 import { sendDailyDoctorSchedule } from './services/email';
@@ -79,6 +79,25 @@ export default {
       if (path === '/api/cancel' && method === 'POST') return apiCancelAppointment(request, env);
       if (path === '/api/doctor-action' && method === 'POST') return apiDoctorAction(request, env);
 
+      // ─── Admin Login ─────────────────────────────────
+      if (path === '/admin/login' && method === 'POST') {
+        const form = await request.formData();
+        const password = (form.get('password') as string || '').trim();
+        const redirect = (form.get('redirect') as string) || '/admin';
+        const sig = await computeAdminSig(env.ADMIN_SECRET);
+        // Compare password against ADMIN_SECRET
+        if (password === env.ADMIN_PASSWORD || password === env.ADMIN_SECRET) {
+          return new Response(null, {
+            status: 302,
+            headers: {
+              'Location': redirect,
+              'Set-Cookie': `admin_sig=${sig}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=31536000`,
+            },
+          });
+        }
+        return html(loginPage(redirect, 'Wrong password. Try again.'));
+      }
+
       // ─── Admin API ─────────────────────────────────
       if (path.startsWith('/api/admin/')) {
         const adminPath = path.replace('/api/admin/', '');
@@ -98,6 +117,7 @@ export default {
         if (adminPath === 'stats' && method === 'GET') return apiAdminGetStatistics(request, env);
         if (adminPath === 'attendance' && method === 'POST') return apiAdminMarkAttendance(request, env);
         if (adminPath === 'patient-history' && method === 'GET') return apiAdminGetPatientHistory(request, env);
+        if (adminPath === 'doctor-off-dates' && method === 'POST') return apiAdminDoctorOffDates(request, env);
 
         // Delete routes with ID in path
         if (adminPath.startsWith('doctor-off/') && method === 'DELETE') {
@@ -113,19 +133,25 @@ export default {
         if (path === '/' || path === '/book') return html(indexPage(env));
         if (path === '/cancel') return html(cancelPage());
         if (path === '/action') return html(docActionPage());
-        if (path === '/admin') {
-          const sig = url.searchParams.get('sig') || '';
-          if (!await verifyAdminSig(sig, env.ADMIN_SECRET)) {
-            return html('<h2>Access Denied</h2><p>Invalid or missing admin signature.</p>', 403);
+        if (path === '/admin' || path === '/doctor') {
+          // Check sig from query string or cookie
+          let sig = url.searchParams.get('sig') || '';
+          if (!sig) {
+            const cookie = request.headers.get('Cookie') || '';
+            const m = cookie.match(/(?:^|;\s*)admin_sig=([^\s;]+)/);
+            if (m) sig = m[1];
           }
-          return html(adminPage(sig));
-        }
-        if (path === '/doctor') {
-          const sig = url.searchParams.get('sig') || '';
-          if (!await verifyAdminSig(sig, env.ADMIN_SECRET)) {
-            return html('<h2>Access Denied</h2><p>Invalid or missing signature.</p>', 403);
+          if (sig && await verifyAdminSig(sig, env.ADMIN_SECRET)) {
+            // Set cookie so future visits don't need ?sig=
+            const headers: Record<string, string> = {
+              'Content-Type': 'text/html;charset=UTF-8',
+              'Set-Cookie': `admin_sig=${sig}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=31536000`,
+            };
+            const page = path === '/admin' ? adminPage(sig) : doctorPage(sig);
+            return new Response(page, { headers });
           }
-          return html(doctorPage(sig));
+          // No valid auth — show login form
+          return html(loginPage(path));
         }
       }
 
@@ -151,6 +177,31 @@ export default {
     }
   },
 };
+
+function loginPage(redirect: string, error?: string): string {
+  const errHtml = error ? '<div class="err">' + error + '</div>' : '';
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Admin Login</title>
+<style>
+  body{font-family:-apple-system,sans-serif;display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0;background:#f5f5f5}
+  .box{background:#fff;padding:32px;border-radius:12px;box-shadow:0 2px 12px rgba(0,0,0,.1);width:320px;text-align:center}
+  h2{margin:0 0 20px;color:#333}
+  input[type=password]{width:100%;padding:12px;border:1px solid #ddd;border-radius:8px;font-size:16px;box-sizing:border-box;margin-bottom:16px}
+  button{width:100%;padding:12px;background:#1a73e8;color:#fff;border:none;border-radius:8px;font-size:16px;cursor:pointer}
+  button:hover{background:#1557b0}
+  .err{color:#d32f2f;font-size:14px;margin-bottom:12px}
+</style></head><body>
+<div class="box">
+  <h2>Admin Login</h2>
+  ${errHtml}
+  <form method="POST" action="/admin/login">
+    <input type="hidden" name="redirect" value="${redirect}">
+    <input type="password" name="password" placeholder="Enter admin password" autofocus>
+    <button type="submit">Login</button>
+  </form>
+</div>
+</body></html>`;
+}
 
 function html(body: string, status = 200): Response {
   return new Response(body, {

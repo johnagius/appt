@@ -3,6 +3,7 @@ export interface Env {
   REALTIME: DurableObjectNamespace;
   SIGNING_SECRET: string;
   ADMIN_SECRET: string;
+  ADMIN_PASSWORD: string;
   RESEND_API_KEY: string;
   DOCTOR_EMAIL: string;
   GOOGLE_CLIENT_ID: string;

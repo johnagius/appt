@@ -31,11 +31,14 @@ function json(data: any, status = 200): Response {
 
 async function requireAdmin(req: Request, env: Env): Promise<Response | null> {
   const url = new URL(req.url);
+  // Check query string sig
   const sig = (url.searchParams.get('sig') || '').trim();
-  if (!await verifyAdminSig(sig, env.ADMIN_SECRET)) {
-    return json({ ok: false, reason: 'Access denied.' }, 403);
-  }
-  return null;
+  if (sig && await verifyAdminSig(sig, env.ADMIN_SECRET)) return null;
+  // Check cookie
+  const cookie = req.headers.get('Cookie') || '';
+  const match = cookie.match(/(?:^|;\s*)admin_sig=([^\s;]+)/);
+  if (match && await verifyAdminSig(match[1], env.ADMIN_SECRET)) return null;
+  return json({ ok: false, reason: 'Access denied.' }, 403);
 }
 
 function broadcast(env: Env, dateKey: string) {
@@ -791,6 +794,61 @@ export async function apiAdminMarkAttendance(req: Request, env: Env): Promise<Re
   await bumpVersion(env.DB);
 
   return json({ ok: true, message: attended ? 'Marked as attended.' : 'Marked as no-show.' });
+}
+
+// ─── Bulk Doctor Off Dates ─────────────────────────────────
+
+export async function apiAdminDoctorOffDates(req: Request, env: Env): Promise<Response> {
+  const denied = await requireAdmin(req, env);
+  if (denied) return denied;
+
+  const payload: any = await req.json();
+  const mode = (payload.mode || '').trim();
+  const dateKeys: string[] = payload.dateKeys || [];
+
+  if (!mode || !['cancel', 'reactivate'].includes(mode)) {
+    return json({ ok: false, reason: 'Invalid mode. Must be "cancel" or "reactivate".' }, 400);
+  }
+  if (!dateKeys.length) {
+    return json({ ok: false, reason: 'No dates provided.' }, 400);
+  }
+
+  // Validate all date keys
+  for (const dk of dateKeys) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dk)) {
+      return json({ ok: false, reason: `Invalid date format: ${dk}` }, 400);
+    }
+  }
+
+  if (mode === 'cancel') {
+    // Create all-day doctor_off entries for each date
+    for (const dk of dateKeys) {
+      await addDoctorOff(env.DB, {
+        start_date: dk,
+        end_date: dk,
+        start_time: '',
+        end_time: '',
+        reason: 'Doctor not available',
+      });
+    }
+  } else {
+    // Reactivate: delete all-day doctor_off entries for each date
+    const offRows = await getDoctorOffRows(env.DB);
+    for (const dk of dateKeys) {
+      // Find all-day off entries that cover this specific date
+      const matching = offRows.filter(r =>
+        r.start_date === dk && r.end_date === dk && !r.start_time && !r.end_time
+      );
+      for (const row of matching) {
+        await deleteDoctorOff(env.DB, row.id);
+      }
+    }
+  }
+
+  await bumpVersion(env.DB);
+  if (dateKeys.length > 0) broadcast(env, dateKeys[0]);
+
+  return json({ ok: true });
 }
 
 // ─── Patient History ───────────────────────────────────────
