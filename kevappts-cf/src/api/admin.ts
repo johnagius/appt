@@ -1020,7 +1020,24 @@ export async function apiAdminGetPatientHistory(req: Request, env: Env): Promise
   if (!email && !phone) return json({ ok: false, reason: 'Missing email or phone.' }, 400);
 
   const history = await getPatientHistory(env.DB, email, phone, 100);
-  return json({ ok: true, history });
+
+  // Compute summary stats
+  const name = history.length > 0 ? history[0].full_name : '';
+  const totalVisits = history.filter(a => !a.status.includes('CANCELLED')).length;
+  const cancelCount = history.filter(a => a.status.includes('CANCELLED')).length;
+  const noShowCount = history.filter(a => a.status === 'NO_SHOW').length;
+  const firstSeen = history.length > 0 ? history[history.length - 1].date_key : '';
+
+  return json({
+    ok: true,
+    patient: { name, email, phone },
+    totalVisits,
+    cancelCount,
+    noShowCount,
+    firstSeen,
+    appointments: history,
+    history,
+  });
 }
 
 // ─── Test Mode: Create test bookings & purge ──────────────────
