@@ -866,3 +866,63 @@ export async function apiAdminGetPatientHistory(req: Request, env: Env): Promise
   const history = await getPatientHistory(env.DB, email, phone, 100);
   return json({ ok: true, history });
 }
+
+// ─── Test Mode: Create test bookings & purge ──────────────────
+
+export async function apiAdminCreateTestBooking(req: Request, env: Env): Promise<Response> {
+  const deny = await requireAdmin(req, env);
+  if (deny) return deny;
+
+  const body: any = await req.json();
+  const cfg = await getConfig(env.DB);
+  const tz = env.TIMEZONE;
+  const today = toDateKey(todayLocal(tz));
+  const dateKey = body.dateKey || today;
+  const clinic = body.clinic || 'potters';
+  const startTime = body.startTime || '10:00';
+  const endMin = parseTimeToMinutes(startTime) + cfg.apptDurationMin;
+  const endTime = minutesToTime(endMin);
+
+  const id = 'TEST-' + generateId();
+  const token = generateId();
+  const appt: Appointment = {
+    id,
+    date_key: dateKey,
+    start_time: startTime,
+    end_time: endTime,
+    service_id: 'clinic',
+    service_name: 'Clinic Consultation',
+    full_name: body.name || 'Test Patient ' + Math.floor(Math.random() * 1000),
+    email: body.email || 'test@example.com',
+    phone: body.phone || '35699999999',
+    comments: 'TEST BOOKING — safe to delete',
+    status: 'BOOKED',
+    location: clinic === 'spinola' ? (cfg as any).spinolaLocation || 'Spinola Clinic' : (cfg as any).pottersLocation || "Potter's Pharmacy Clinic",
+    clinic,
+    created_at: nowIso(tz),
+    updated_at: nowIso(tz),
+    token,
+    calendar_event_id: '',
+    cancelled_at: '',
+    cancel_reason: '',
+  };
+
+  await insertAppointment(env.DB, appt);
+  await bumpVersion(env.DB);
+  broadcast(env, dateKey);
+
+  return json({ ok: true, appointment: appt, message: 'Test booking created: ' + id });
+}
+
+export async function apiAdminPurgeTestData(req: Request, env: Env): Promise<Response> {
+  const deny = await requireAdmin(req, env);
+  if (deny) return deny;
+
+  // Delete all appointments with ID starting with 'TEST-'
+  const result = await env.DB.prepare("DELETE FROM appointments WHERE id LIKE 'TEST-%'").run();
+  // Also delete test clients
+  await env.DB.prepare("DELETE FROM clients WHERE email = 'test@example.com'").run();
+  await bumpVersion(env.DB);
+
+  return json({ ok: true, deleted: result.meta?.changes || 0, message: 'All test data purged.' });
+}

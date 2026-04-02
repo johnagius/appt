@@ -21,6 +21,7 @@ import {
   apiAdminSendReviewRequests, apiAdminGetWeekOverview, apiAdminSearchAppointments,
   apiAdminGetSettings, apiAdminSaveSettings, apiAdminGetStatistics,
   apiAdminMarkAttendance, apiAdminGetPatientHistory, apiAdminDoctorOffDates,
+  apiAdminCreateTestBooking, apiAdminPurgeTestData,
 } from './api/admin';
 import { verifyAdminSig, computeAdminSig } from './services/crypto';
 import { todayKeyLocal } from './services/utils';
@@ -118,6 +119,8 @@ export default {
         if (adminPath === 'attendance' && method === 'POST') return apiAdminMarkAttendance(request, env);
         if (adminPath === 'patient-history' && method === 'GET') return apiAdminGetPatientHistory(request, env);
         if (adminPath === 'doctor-off-dates' && method === 'POST') return apiAdminDoctorOffDates(request, env);
+        if (adminPath === 'test-booking' && method === 'POST') return apiAdminCreateTestBooking(request, env);
+        if (adminPath === 'purge-test-data' && method === 'POST') return apiAdminPurgeTestData(request, env);
 
         // Delete routes with ID in path
         if (adminPath.startsWith('doctor-off/') && method === 'DELETE') {
