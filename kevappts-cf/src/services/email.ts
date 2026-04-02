@@ -85,8 +85,7 @@ export async function sendClientConfirmationEmail(env: Env, appt: Appointment): 
   <div style="margin-top:14px;padding:12px;border:1px solid #e5e7eb;border-radius:12px;background:#f9fafb;">
     <p style="margin:0 0 10px 0;color:#111827;"><b>Cancel appointment</b></p>
     <a href="${cancelUrl}" style="display:inline-block;background:#ef4444;color:#fff;text-decoration:none;padding:10px 14px;border-radius:999px;font-weight:700;">Cancel Appointment</a>
-    <p style="margin:10px 0 0 0;color:#6b7280;font-size:12px;">If the button does not work, copy and paste this link into your browser:<br>
-    <span style="word-break:break-all;">${escapeHtml(cancelUrl)}</span></p>
+    <p style="margin:10px 0 0 0;color:#6b7280;font-size:12px;">If the button does not work, please reply to this email to request cancellation.</p>
   </div>
 </div>`;
 
@@ -117,8 +116,7 @@ export async function sendSpinolaConfirmationEmail(env: Env, appt: Appointment):
   <div style="margin-top:14px;padding:12px;border:1px solid #e5e7eb;border-radius:12px;background:#f9fafb;">
     <p style="margin:0 0 10px 0;color:#111827;"><b>Cancel appointment</b></p>
     <a href="${cancelUrl}" style="display:inline-block;background:#ef4444;color:#fff;text-decoration:none;padding:10px 14px;border-radius:999px;font-weight:700;">Cancel Appointment</a>
-    <p style="margin:10px 0 0 0;color:#6b7280;font-size:12px;">If the button does not work, copy and paste this link:<br>
-    <span style="word-break:break-all;">${escapeHtml(cancelUrl)}</span></p>
+    <p style="margin:10px 0 0 0;color:#6b7280;font-size:12px;">If the button does not work, please reply to this email to request cancellation.</p>
   </div>
 </div>`;
 
