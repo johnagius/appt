@@ -894,6 +894,29 @@ export function adminPage(sig: string): string {
 
 <script>
 var SIG = ${JSON.stringify(sig)};
+var _silentRefresh = false;
+
+// Notification sound (short ping tone generated via Web Audio API)
+var _notifSound = (function() {
+  return {
+    play: function() {
+      try {
+        var ctx = new (window.AudioContext || window.webkitAudioContext)();
+        var osc = ctx.createOscillator();
+        var gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880, ctx.currentTime);
+        osc.frequency.setValueAtTime(1174, ctx.currentTime + 0.1);
+        gain.gain.setValueAtTime(0.3, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 0.4);
+      } catch(e) {}
+    }
+  };
+})();
 
 // ── API Layer (fetch instead of google.script.run) ──
 async function apiCall(endpoint, opts) {
@@ -1300,9 +1323,10 @@ function getMondayOf(dateStr) {
 // ========== Load Dashboard ==========
 
 function loadDashboard() {
-  showLoading('Loading dashboard...', 'Fetching appointment data.');
+  if (!_silentRefresh) showLoading('Loading dashboard...', 'Fetching appointment data.');
   google.script.run
     .withSuccessHandler(function(res) {
+      _silentRefresh = false;
       hideLoading();
       if (!res || !res.ok) { showMsg('globalMsg', 'bad', 'Failed to load dashboard.'); return; }
 
@@ -1346,6 +1370,7 @@ function loadDashboard() {
       _pollTimerId = setInterval(doPollAndRefresh, POLL_INTERVAL_SEC * 1000);
     })
     .withFailureHandler(function(err) {
+      _silentRefresh = false;
       hideLoading();
       showMsg('globalMsg', 'bad', 'Error: ' + (err && err.message ? err.message : String(err)));
     })
@@ -3477,7 +3502,11 @@ function connectWS() {
     try {
       var msg = JSON.parse(ev.data);
       if (msg.type === 'slots_updated' || msg.type === 'slots_data' || msg.type === 'dashboard_data') {
+        // Silent refresh — no loading overlay
+        _silentRefresh = true;
         if (typeof loadDashboard === 'function') loadDashboard();
+        // Play notification sound
+        try { _notifSound.play(); } catch(e2) {}
       }
     } catch(e) {}
   };
