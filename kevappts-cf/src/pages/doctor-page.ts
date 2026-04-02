@@ -1,121 +1,1468 @@
 /**
- * Doctor schedule view — simplified daily schedule.
+ * Doctor dashboard — full interactive page with session management,
+ * break/shift controls, calendar, and conflict resolution.
+ * Ported from GAS DoctorAdmin.html to Cloudflare Workers.
  */
 export function doctorPage(sig: string): string {
   return `<!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Dr Kevin - Schedule</title>
-  <style>
-    :root{--bg:#f6f7fb;--card:#fff;--muted:#6b7280;--text:#111827;--accent:#f5b301;--line:#e5e7eb;--good:#10b981;--bad:#ef4444;--shadow:0 10px 30px rgba(17,24,39,0.08);--radius:16px;}
-    *{box-sizing:border-box;}
-    body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial;background:var(--bg);color:var(--text);}
-    .wrap{max-width:800px;margin:0 auto;padding:12px;}
-    .card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);border:1px solid rgba(229,231,235,0.95);padding:16px;margin-bottom:12px;}
-    h2{margin:0 0 12px 0;font-size:18px;font-weight:900;}
-    h3{margin:0 0 8px 0;font-size:14px;font-weight:800;}
-    table{width:100%;border-collapse:collapse;font-size:13px;}
-    th{text-align:left;padding:10px;border-bottom:2px solid var(--line);font-weight:800;font-size:11px;text-transform:uppercase;color:var(--muted);}
-    td{padding:10px;border-bottom:1px solid var(--line);}
-    .empty{text-align:center;padding:24px;color:var(--muted);font-size:14px;}
-    .badge{display:inline-block;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:700;}
-    .badge.booked{background:#dbeafe;color:#1d4ed8;}
-    .badge.attended{background:#d1fae5;color:#065f46;}
-    .badge.noshow{background:#fef3c7;color:#92400e;}
-    .badge.relocated{background:#ede9fe;color:#5b21b6;}
-    .sseStatus{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);}
-    .sseDot{width:8px;height:8px;border-radius:50%;}
-    .sseDot.connected{background:var(--good);}
-    .sseDot.disconnected{background:var(--bad);}
-    .statBar{display:flex;gap:16px;margin-bottom:12px;}
-    .statItem{text-align:center;}
-    .statItem .num{font-size:24px;font-weight:900;}
-    .statItem .label{font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;}
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;}
+  :root{
+    --bg:#f5f7fb;
+    --card:#ffffff;
+    --text:#111827;
+    --muted:#6b7280;
+    --line:#e5e7eb;
+    --good:#10b981;
+    --good-dark:#047857;
+    --bad:#ef4444;
+    --bad-dark:#b91c1c;
+    --blue:#2563eb;
+    --blue-dark:#1d4ed8;
+    --amber:#f59e0b;
+    --amber-soft:#fffbeb;
+    --shadow:0 14px 40px rgba(15,23,42,0.10);
+    --radius:22px;
+  }
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+    background:var(--bg);
+    color:var(--text);
+    max-width:680px;
+    margin:0 auto;
+    padding:14px 14px 28px;
+  }
+  button,input{font:inherit;}
+  .stack{display:flex;flex-direction:column;gap:14px;}
+  .date-label{font-size:15px;font-weight:800;color:var(--text);padding:4px 2px 0;}
+  .day-nav{display:flex;align-items:center;gap:10px;}
+  .day-nav-arrow{width:38px;height:38px;border-radius:50%;border:1px solid var(--line);background:#fff;font-size:18px;font-weight:900;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--text);transition:background .15s,opacity .15s;flex-shrink:0;}
+  .day-nav-arrow:hover{background:#f0f4ff;}
+  .day-nav-arrow:disabled{opacity:.25;cursor:default;background:#fff;}
+  .not-today-banner{font-size:12px;color:#b45309;font-weight:700;margin-top:2px;}
+  .not-today-banner a{color:#1d4ed8;text-decoration:underline;}
+  .viewing-future .card{border-left:3px solid #f59e0b;}
+  .card{background:var(--card);border-radius:var(--radius);padding:18px;box-shadow:var(--shadow);}
+  .session-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:10px;}
+  .session-title{font-size:20px;font-weight:900;line-height:1.1;}
+  .status-pill{display:inline-flex;align-items:center;gap:8px;border-radius:999px;padding:7px 12px;font-size:12px;font-weight:800;margin-top:8px;}
+  .status-pill.coming{background:#d1fae5;color:var(--good-dark);}
+  .status-pill.not-coming{background:#fee2e2;color:var(--bad-dark);}
+  .dot{width:8px;height:8px;border-radius:50%;background:currentColor;}
+  .work-summary{display:flex;flex-direction:column;gap:6px;margin-bottom:14px;}
+  .work-summary .label{font-size:12px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;}
+  .work-summary .value{font-size:17px;font-weight:900;line-height:1.25;}
+  .work-summary .hint{font-size:12px;color:var(--muted);line-height:1.4;}
+  .session-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;}
+  .btn{border:none;border-radius:18px;padding:14px 16px;font-weight:900;cursor:pointer;transition:transform .12s ease,opacity .12s ease,background .12s ease;}
+  .btn:active{transform:scale(.98);}
+  .btn-primary{background:var(--good);color:#fff;}
+  .btn-danger{background:var(--bad);color:#fff;}
+  .btn-secondary{background:#eff6ff;color:var(--blue-dark);}
+  .btn-ghost{background:#f3f4f6;color:var(--text);}
+  .btn:disabled{opacity:.45;cursor:not-allowed;transform:none;}
+  .patient-list{display:flex;flex-direction:column;gap:10px;}
+  .patient-card{border:1px solid var(--line);border-radius:18px;padding:12px 14px;display:flex;align-items:center;gap:12px;background:#fff;}
+  .patient-card.relocated{opacity:.55;}
+  .patient-card.relocated .patient-name,
+  .patient-card.relocated .patient-meta,
+  .patient-card.relocated .patient-time{text-decoration:line-through;text-decoration-color:var(--muted);}
+  .patient-badge{display:inline-block;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;padding:2px 8px;border-radius:8px;margin-top:4px;text-decoration:none;}
+  .patient-badge.spinola{background:#fef3c7;color:#92400e;}
+  .patient-main{flex:1;min-width:0;}
+  .patient-name{font-size:15px;font-weight:800;line-height:1.25;}
+  .patient-meta{font-size:12px;color:var(--muted);line-height:1.45;margin-top:3px;word-break:break-word;}
+  .patient-time{font-size:14px;font-weight:900;color:var(--blue-dark);text-align:right;white-space:nowrap;}
+  .empty{padding:14px;border-radius:16px;background:#f9fafb;border:1px dashed var(--line);font-size:13px;color:var(--muted);text-align:center;}
+
+  .calendar-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px;}
+  .calendar-title{font-size:18px;font-weight:900;}
+  .calendar-subtitle{font-size:13px;color:var(--muted);line-height:1.4;margin-bottom:14px;}
+  .calendar-nav{display:flex;align-items:center;gap:8px;}
+  .icon-btn{width:40px;height:40px;border:none;border-radius:14px;background:#eef2ff;color:var(--blue-dark);font-size:18px;font-weight:900;cursor:pointer;}
+  .calendar-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;}
+  .dow{font-size:11px;color:var(--muted);font-weight:800;text-align:center;padding-bottom:2px;}
+  .day-btn{position:relative;min-height:62px;border:none;border-radius:18px;background:#f8fafc;color:var(--text);padding:9px 6px 8px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:4px;border:1px solid transparent;}
+  .day-btn.disabled{opacity:.32;cursor:not-allowed;}
+  .day-btn.selected{border-color:var(--blue);background:#dbeafe;}
+  .day-btn.cancelled{background:#fee2e2;border-color:#fca5a5;color:var(--bad-dark);}
+  .day-btn.cancelled.selected{background:#fecaca;}
+  .day-num{font-size:16px;font-weight:900;line-height:1;}
+  .day-mark{font-size:11px;font-weight:900;line-height:1.2;min-height:13px;}
+  .day-x{position:absolute;top:7px;right:7px;font-size:16px;font-weight:900;color:var(--bad-dark);}
+  .calendar-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;}
+  .selection-summary{margin-top:10px;font-size:12px;color:var(--muted);line-height:1.5;}
+
+  .modal-overlay{position:fixed;inset:0;background:rgba(15,23,42,.48);display:none;align-items:flex-end;justify-content:center;padding:16px;z-index:1001;}
+  .modal-overlay.show{display:flex;}
+  .modal-card{width:100%;max-width:680px;background:#fff;border-radius:26px 26px 22px 22px;box-shadow:0 18px 50px rgba(15,23,42,.24);padding:18px 18px 20px;max-height:min(88vh,780px);overflow:auto;}
+  .modal-handle{width:52px;height:5px;border-radius:999px;background:#d1d5db;margin:0 auto 12px;}
+  .modal-title{font-size:20px;font-weight:900;margin-bottom:6px;}
+  .modal-text{font-size:13px;color:var(--muted);line-height:1.45;margin-bottom:14px;}
+  .range-block{padding:12px 0;border-top:1px solid var(--line);}
+  .range-block:first-of-type{border-top:none;padding-top:0;}
+  .range-top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:8px;}
+  .range-label{font-size:13px;font-weight:900;}
+  .range-value{font-size:14px;font-weight:900;color:var(--blue-dark);text-align:right;}
+  .range-hint{font-size:12px;color:var(--muted);line-height:1.35;margin-top:4px;}
+  input[type=range]{width:100%;height:34px;background:transparent;-webkit-appearance:none;appearance:none;}
+  input[type=range]::-webkit-slider-runnable-track{height:8px;border-radius:999px;background:#dbeafe;}
+  input[type=range]::-moz-range-track{height:8px;border-radius:999px;background:#dbeafe;}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:28px;height:28px;border-radius:50%;background:var(--blue);margin-top:-10px;border:none;box-shadow:0 4px 10px rgba(37,99,235,.35);}
+  input[type=range]::-moz-range-thumb{width:28px;height:28px;border-radius:50%;background:var(--blue);border:none;box-shadow:0 4px 10px rgba(37,99,235,.35);}
+  .switch-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-top:1px solid var(--line);}
+  .switch-copy{flex:1;}
+  .switch-copy strong{display:block;font-size:14px;margin-bottom:4px;}
+  .switch-copy span{font-size:12px;color:var(--muted);line-height:1.4;}
+  .switch{position:relative;display:inline-block;width:58px;height:32px;flex:0 0 auto;}
+  .switch input{opacity:0;width:0;height:0;}
+  .switch-slider{position:absolute;cursor:pointer;inset:0;background:#d1d5db;border-radius:999px;transition:.2s;}
+  .switch-slider:before{content:'';position:absolute;height:24px;width:24px;left:4px;top:4px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 2px 6px rgba(0,0,0,.2);}
+  .switch input:checked + .switch-slider{background:var(--blue);}
+  .switch input:checked + .switch-slider:before{transform:translateX(26px);}
+  .modal-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px;}
+
+  .action-summary{padding:12px 14px;border-radius:16px;background:var(--amber-soft);border:1px solid #fcd34d;color:#92400e;font-size:13px;line-height:1.5;margin-bottom:14px;}
+  .affected-list{display:flex;flex-direction:column;gap:10px;max-height:32vh;overflow:auto;margin-bottom:14px;}
+  .affected-card{border:1px solid var(--line);border-radius:16px;padding:12px;background:#fff;}
+  .affected-date{font-size:12px;font-weight:900;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;}
+  .affected-name{font-size:15px;font-weight:900;}
+  .affected-meta{font-size:12px;color:var(--muted);line-height:1.4;margin-top:2px;}
+  .action-grid{display:grid;gap:10px;}
+
+  .break-options{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px;}
+  .break-opt{border:2px solid var(--line);border-radius:16px;padding:14px 8px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s;background:#fff;}
+  .break-opt.selected{border-color:var(--blue);background:#eff6ff;}
+  .break-opt-mins{font-size:22px;font-weight:900;line-height:1.2;}
+  .break-opt-label{font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.03em;}
+  .break-summary{font-size:13px;color:var(--muted);line-height:1.45;padding:10px 0;}
+
+  .msg{display:none;margin-top:12px;padding:11px 13px;border-radius:14px;font-size:13px;font-weight:800;line-height:1.4;}
+  .msg.good{display:block;background:#d1fae5;color:#065f46;}
+  .msg.bad{display:block;background:#fee2e2;color:#991b1b;}
+
+  .loading-overlay{position:fixed;inset:0;background:rgba(255,255,255,.86);display:none;align-items:center;justify-content:center;z-index:1100;flex-direction:column;gap:10px;}
+  .loading-overlay.show{display:flex;}
+  .loading-spinner{width:38px;height:38px;border:4px solid #dbeafe;border-top-color:var(--blue);border-radius:50%;animation:spin .8s linear infinite;}
+  .loading-text{font-size:14px;font-weight:900;}
+  .idle-overlay{position:fixed;inset:0;z-index:1200;display:flex;align-items:center;justify-content:center;background:rgba(245,247,251,0.72);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);cursor:pointer;opacity:0;visibility:hidden;pointer-events:none;transition:opacity .35s ease,visibility .35s ease;}
+  .idle-overlay.show{opacity:1;visibility:visible;pointer-events:auto;}
+  .idle-card{text-align:center;padding:40px 28px;max-width:360px;animation:idle-float 3s ease-in-out infinite;}
+  .idle-icon{font-size:54px;margin-bottom:16px;animation:idle-pulse-icon 2.5s ease-in-out infinite;}
+  .idle-title{font-size:24px;font-weight:900;margin-bottom:8px;}
+  .idle-sub{font-size:14px;color:var(--muted);line-height:1.5;margin-bottom:22px;}
+  .idle-cta{display:inline-flex;align-items:center;gap:8px;padding:12px 24px;border-radius:999px;background:var(--blue);color:#fff;font-size:15px;font-weight:900;box-shadow:0 8px 24px rgba(37,99,235,.28);}
+  .idle-arrow{display:inline-block;transition:transform .2s ease;}
+  .idle-overlay:hover .idle-arrow{transform:translateX(4px);}
+  .contact-link{color:inherit;text-decoration:none;font-weight:800;}
+  .contact-link:hover{text-decoration:underline;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  @keyframes idle-float{0%,100%{transform:translateY(0);}50%{transform:translateY(-8px);}}
+  @keyframes idle-pulse-icon{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.75;transform:scale(.95);}}
+
+  @media (max-width:420px){
+    .session-actions,.calendar-actions,.modal-actions{grid-template-columns:1fr;}
+    .session-title{font-size:18px;}
+    .patient-card{align-items:flex-start;}
+  }
+</style>
+</style>
 </head>
 <body>
-<div class="wrap">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-    <h2>Dr Kevin - Today's Schedule</h2>
-    <div class="sseStatus"><div class="sseDot disconnected" id="sseDot"></div><span id="sseLabel">Connecting...</span></div>
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="loading-spinner"></div>
+    <div class="loading-text" id="loadingText">Loading…</div>
   </div>
 
-  <div class="card">
-    <div class="statBar" id="stats"></div>
-    <div id="dateLabel" style="font-weight:700;margin-bottom:10px;"></div>
-    <div id="schedule"><div class="empty">Loading...</div></div>
+  <div class="idle-overlay" id="idleOverlay">
+    <div class="idle-card">
+      <div class="idle-icon">🩺</div>
+      <div class="idle-title">Doctor Dashboard Paused</div>
+      <div class="idle-sub">Automatic updates are paused to save resources. Tap anywhere to resume live updates.</div>
+      <div class="idle-cta">Resume Dashboard <span class="idle-arrow">→</span></div>
+    </div>
   </div>
 
-  <div class="card">
-    <h3>Tomorrow</h3>
-    <div id="tomorrow"><div class="empty">Loading...</div></div>
+  <div class="stack">
+    <div class="day-nav">
+      <button class="day-nav-arrow" id="dayPrev" onclick="navigateDay(-1)">&larr;</button>
+      <div>
+        <div id="dateLabel" class="date-label"></div>
+        <div id="notTodayBanner" class="not-today-banner" style="display:none;">
+          You are viewing a future date &mdash; <a href="#" onclick="navigateToToday();return false;">back to today</a>
+        </div>
+      </div>
+      <button class="day-nav-arrow" id="dayNext" onclick="navigateDay(1)">&rarr;</button>
+    </div>
+
+    <section class="card" id="morningCard">
+      <div class="session-head">
+        <div>
+          <div class="session-title">Morning</div>
+          <div class="status-pill coming" id="morningPill"><span class="dot"></span><span id="morningPillText">Coming to Work</span></div>
+        </div>
+      </div>
+      <div class="work-summary">
+        <div class="label">Working times</div>
+        <div class="value" id="morningTimes">—</div>
+        <div class="hint" id="morningHint"></div>
+      </div>
+      <div class="session-actions" style="grid-template-columns:1fr 1fr 1fr;">
+        <button class="btn btn-danger" id="morningToggleBtn" onclick="toggleSession('morning')">Not Coming to Work</button>
+        <button class="btn btn-secondary" onclick="openAdjustModal('morning')">Adjust Shift</button>
+        <button class="btn btn-ghost" onclick="openBreakModal('morning')">Take a Break</button>
+      </div>
+      <div class="patient-list" id="morningPatients"></div>
+      <div class="msg" id="morningMsg"></div>
+    </section>
+
+    <section class="card" id="eveningCard">
+      <div class="session-head">
+        <div>
+          <div class="session-title">Evening</div>
+          <div class="status-pill coming" id="eveningPill"><span class="dot"></span><span id="eveningPillText">Coming to Work</span></div>
+        </div>
+      </div>
+      <div class="work-summary">
+        <div class="label">Working times</div>
+        <div class="value" id="eveningTimes">—</div>
+        <div class="hint" id="eveningHint"></div>
+      </div>
+      <div class="session-actions" style="grid-template-columns:1fr 1fr 1fr;">
+        <button class="btn btn-danger" id="eveningToggleBtn" onclick="toggleSession('evening')">Not Coming to Work</button>
+        <button class="btn btn-secondary" onclick="openAdjustModal('evening')">Adjust Shift</button>
+        <button class="btn btn-ghost" onclick="openBreakModal('evening')">Take a Break</button>
+      </div>
+      <div class="patient-list" id="eveningPatients"></div>
+      <div class="msg" id="eveningMsg"></div>
+    </section>
+
+    <section class="card">
+      <div class="calendar-head">
+        <div class="calendar-title">Cancel or Reactivate Dates</div>
+        <div class="calendar-nav">
+          <button class="icon-btn" onclick="changeCalendarMonth(-1)">‹</button>
+          <button class="icon-btn" onclick="changeCalendarMonth(1)">›</button>
+        </div>
+      </div>
+      <div class="calendar-subtitle">Tap one or more future days. Cancelled days are marked with an X. Tap them again to reactivate.</div>
+      <div class="date-label" id="calendarMonthLabel" style="padding:0 0 10px;"></div>
+      <div class="calendar-grid" id="calendarGrid"></div>
+      <div class="calendar-actions">
+        <button class="btn btn-danger" id="cancelDaysBtn" onclick="startCancelSelectedDays()">Cancel Selected Days</button>
+        <button class="btn btn-secondary" id="reactivateDaysBtn" onclick="reactivateSelectedDays()">Reactivate Selected Days</button>
+      </div>
+      <div class="selection-summary" id="calendarSelectionSummary">No days selected.</div>
+      <div class="msg" id="calendarMsg"></div>
+    </section>
   </div>
-</div>
+
+  <div class="modal-overlay" id="adjustModal">
+    <div class="modal-card">
+      <div class="modal-handle"></div>
+      <div class="modal-title" id="adjustTitle">Adjust shift</div>
+      <div class="modal-text" id="adjustText"></div>
+
+      <div class="range-block">
+        <div class="range-top">
+          <div>
+            <div class="range-label">Shift starts</div>
+            <div class="range-hint">Slide to choose when work starts.</div>
+          </div>
+          <div class="range-value" id="adjustStartValue">—</div>
+        </div>
+        <input type="range" id="adjustStartRange" min="0" max="0" step="1" oninput="syncAdjustModal()">
+      </div>
+
+      <div class="range-block">
+        <div class="range-top">
+          <div>
+            <div class="range-label">Shift ends</div>
+            <div class="range-hint">Slide to choose when work ends.</div>
+          </div>
+          <div class="range-value" id="adjustEndValue">—</div>
+        </div>
+        <input type="range" id="adjustEndRange" min="0" max="0" step="1" oninput="syncAdjustModal()">
+      </div>
+
+      <div class="switch-row">
+        <div class="switch-copy">
+          <strong>Insert a block</strong>
+          <span>Add a gap inside the shift where patients cannot book.</span>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="gapEnabled" onchange="syncAdjustModal()">
+          <span class="switch-slider"></span>
+        </label>
+      </div>
+
+      <div id="gapControls" style="display:none;">
+        <div class="range-block">
+          <div class="range-top">
+            <div>
+              <div class="range-label">Block starts</div>
+              <div class="range-hint">Choose when the gap begins.</div>
+            </div>
+            <div class="range-value" id="gapStartValue">—</div>
+          </div>
+          <input type="range" id="gapStartRange" min="0" max="0" step="1" oninput="syncAdjustModal()">
+        </div>
+        <div class="range-block">
+          <div class="range-top">
+            <div>
+              <div class="range-label">Block ends</div>
+              <div class="range-hint">Choose when the gap finishes.</div>
+            </div>
+            <div class="range-value" id="gapEndValue">—</div>
+          </div>
+          <input type="range" id="gapEndRange" min="0" max="0" step="1" oninput="syncAdjustModal()">
+        </div>
+      </div>
+
+      <div class="action-summary" id="adjustSummary"></div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" onclick="closeAdjustModal()">Close</button>
+        <button class="btn btn-primary" onclick="saveAdjustModal()">Save Shift</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="breakModal">
+    <div class="modal-card">
+      <div class="modal-handle"></div>
+      <div class="modal-title">Take a Break</div>
+      <div class="modal-text">How long do you need? The break starts now.</div>
+      <div class="break-options">
+        <div class="break-opt" onclick="selectBreakDuration(20)" id="breakOpt20">
+          <div class="break-opt-mins">20</div>
+          <div class="break-opt-label">minutes</div>
+        </div>
+        <div class="break-opt" onclick="selectBreakDuration(30)" id="breakOpt30">
+          <div class="break-opt-mins">30</div>
+          <div class="break-opt-label">minutes</div>
+        </div>
+        <div class="break-opt" onclick="selectBreakDuration(40)" id="breakOpt40">
+          <div class="break-opt-mins">40</div>
+          <div class="break-opt-label">minutes</div>
+        </div>
+      </div>
+      <div class="break-summary" id="breakSummary"></div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" onclick="closeBreakModal()">Cancel</button>
+        <button class="btn btn-primary" id="breakConfirmBtn" onclick="confirmBreak()" disabled>Start Break</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="actionModal">
+    <div class="modal-card">
+      <div class="modal-handle"></div>
+      <div class="modal-title" id="actionTitle">Appointments must be handled first</div>
+      <div class="modal-text" id="actionText"></div>
+      <div class="action-summary" id="actionSummary"></div>
+      <div class="affected-list" id="affectedList"></div>
+      <div class="action-grid">
+        <button class="btn btn-secondary" onclick="handlePendingAction('redirect_spinola')">Send to Spinola</button>
+        <button class="btn btn-primary" id="actionPushSameDay" style="display:none;" onclick="handlePendingAction('push_same_day')">Push to Later Today</button>
+        <button class="btn btn-primary" onclick="handlePendingAction('push_next_day')">Push to Next Day</button>
+        <button class="btn btn-danger" onclick="handlePendingAction('cancel')">Cancel Appointments</button>
+        <button class="btn btn-ghost" onclick="closeActionModal()">Back</button>
+      </div>
+    </div>
+  </div>
 
 <script>
-const SIG = ${JSON.stringify(sig)};
-
-// WebSocket
-let ws = null;
-function connectWS() {
-  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-  ws = new WebSocket(proto + '//' + location.host + '/api/ws');
-  ws.onopen = () => {
-    document.getElementById('sseDot').className = 'sseDot connected';
-    document.getElementById('sseLabel').textContent = 'Live';
-    ws.send(JSON.stringify({ subscribe: 'admin' }));
-  };
-  ws.onmessage = (e) => {
-    try { const d = JSON.parse(e.data); if (d.type === 'slots_updated' || d.type === 'slots_data') loadSchedule(); } catch {}
-  };
-  ws.onclose = () => {
-    document.getElementById('sseDot').className = 'sseDot disconnected';
-    document.getElementById('sseLabel').textContent = 'Reconnecting...';
-    setTimeout(connectWS, 2000);
-  };
-  ws.onerror = () => { ws.close(); };
+var SIG = ${JSON.stringify(sig)};
+var _todayKey = '';
+var _selectedDateKey = '';
+var _workingHours = null;
+var _offEntries = [];
+var _extraEntries = [];
+var _sessionState = { morning: null, evening: null };
+var _appointmentsBySession = { morning: [], evening: [] };
+var _calendarMonth = null;
+var _selectedDates = {};
+var _cachedDateAppointments = {};
+var _adjustContext = null;
+var _pendingFlow = null;
+var SLOT_MINUTES = 15;
+var AUTO_REFRESH_MS = 20 * 1000;
+var IDLE_TIMEOUT_MS = 2 * 60 * 1000;
+var GAS_TIMEOUT_MS = 30 * 1000;
+function withTimeout(promise, ms) {
+  ms = ms || GAS_TIMEOUT_MS;
+  return new Promise(function(resolve, reject) {
+    var timer = setTimeout(function() { reject(new Error('Server took too long. Please try again.')); }, ms);
+    promise.then(function(v) { clearTimeout(timer); resolve(v); }, function(e) { clearTimeout(timer); reject(e); });
+  });
 }
-connectWS();
-setInterval(() => { if (ws && ws.readyState === 1) ws.send(JSON.stringify({type:'ping'})); }, 30000);
+var _idlePaused = false;
+var _lastActivityAt = Date.now();
+var _autoRefreshTimerId = null;
+var _idleCheckTimerId = null;
+var _refreshInFlight = false;
+var _idleOverlay = document.getElementById('idleOverlay');
 
-function statusBadge(s) {
-  const m = { BOOKED:'booked', ATTENDED:'attended', NO_SHOW:'noshow', RELOCATED_SPINOLA:'relocated' };
-  return '<span class="badge ' + (m[s]||'') + '">' + s + '</span>';
+function showLoading(msg) {
+  document.getElementById('loadingText').textContent = msg || 'Loading…';
+  document.getElementById('loadingOverlay').classList.add('show');
+}
+function hideLoading() {
+  document.getElementById('loadingOverlay').classList.remove('show');
+}
+function showMsg(id, type, msg) {
+  var el = document.getElementById(id);
+  el.className = 'msg ' + type;
+  el.textContent = msg;
+  setTimeout(function() { el.className = 'msg'; }, 6000);
+}
+function esc(s) {
+  var d = document.createElement('div');
+  d.textContent = s == null ? '' : String(s);
+  return d.innerHTML;
+}
+function timeToMin(t) {
+  if (!t) return 0;
+  var p = String(t).split(':');
+  return Number(p[0] || 0) * 60 + Number(p[1] || 0);
+}
+function minToTime(m) {
+  var hours = Math.floor(m / 60);
+  var mins = m % 60;
+  return String(hours).padStart(2, '0') + ':' + String(mins).padStart(2, '0');
+}
+function addDays(dateKey, days) {
+  var d = new Date(dateKey + 'T00:00:00');
+  d.setDate(d.getDate() + days);
+  return d;
 }
 
-function renderTable(containerId, appts) {
-  if (!appts.length) { document.getElementById(containerId).innerHTML = '<div class="empty">No appointments</div>'; return; }
-  let html = '<table><thead><tr><th>Time</th><th>Service</th><th>Patient</th><th>Phone</th><th>Location</th><th>Status</th></tr></thead><tbody>';
-  for (const a of appts) {
-    html += '<tr><td><b>' + a.start_time + '</b> - ' + a.end_time + '</td><td>' + a.service_name + '</td><td>' + a.full_name + '</td><td>' + a.phone + '</td><td>' + a.location + '</td><td>' + statusBadge(a.status) + '</td></tr>';
+// ── API Layer (fetch instead of google.script.run) ──
+async function apiCall(endpoint, opts) {
+  opts = opts || {};
+  var sep = endpoint.includes('?') ? '&' : '?';
+  var url = '/api/admin/' + endpoint + sep + 'sig=' + encodeURIComponent(SIG);
+  var fetchOpts = { credentials: 'same-origin' };
+  if (opts.method) fetchOpts.method = opts.method;
+  if (opts.body) {
+    fetchOpts.method = fetchOpts.method || 'POST';
+    fetchOpts.headers = { 'Content-Type': 'application/json' };
+    fetchOpts.body = JSON.stringify(opts.body);
   }
-  html += '</tbody></table>';
-  document.getElementById(containerId).innerHTML = html;
+  var res = await fetch(url, fetchOpts);
+  return res.json();
 }
 
-async function loadSchedule() {
+function fetchDashboard() {
+  return apiCall('dashboard').then(function(res) {
+    if (!res || !res.ok) throw new Error((res && res.reason) || 'Failed to load dashboard.');
+    return res;
+  });
+}
+
+function fetchDateAppointments(dateKey) {
+  if (_cachedDateAppointments[dateKey]) return Promise.resolve(_cachedDateAppointments[dateKey]);
+  return apiCall('appointments?date=' + dateKey).then(function(res) {
+    if (res && res.ok) {
+      _cachedDateAppointments[dateKey] = res.appointments || [];
+      return _cachedDateAppointments[dateKey];
+    }
+    throw new Error((res && res.reason) || 'Failed to load appointments.');
+  });
+}
+
+function processAppointments(dateKey, action, ids, extra) {
+  var payload = { dateKey: dateKey, action: action, appointmentIds: ids || [] };
+  if (extra) { for (var k in extra) payload[k] = extra[k]; }
+  return apiCall('process', { body: payload }).then(function(res) {
+    if (res && res.ok) return res;
+    throw new Error((res && res.reason) || 'Failed to process appointments.');
+  });
+}
+
+function markDoctorOff(payload) {
+  return apiCall('doctor-off', { body: payload }).then(function(res) {
+    if (res && res.ok) return res;
+    throw new Error((res && res.reason) || 'Failed to block time.');
+  });
+}
+
+function removeDoctorOff(id) {
+  return apiCall('doctor-off/' + id, { method: 'DELETE' }).then(function(res) {
+    if (res && res.ok) return res;
+    throw new Error((res && res.reason) || 'Failed to reactivate time.');
+  });
+}
+
+function addExtraSlots(payload) {
+  return apiCall('extra-slots', { body: payload }).then(function(res) {
+    if (res && res.ok) return res;
+    throw new Error((res && res.reason) || 'Failed to add extra slots.');
+  });
+}
+
+function removeExtraSlots(id) {
+  return apiCall('extra-slots/' + id, { method: 'DELETE' }).then(function(res) {
+    if (res && res.ok) return res;
+    throw new Error((res && res.reason) || 'Failed to remove extra slots.');
+  });
+}
+
+function setDoctorOffDates(mode, dateKeys) {
+  return apiCall('doctor-off-dates', { body: { mode: mode, dateKeys: dateKeys } }).then(function(res) {
+    if (res && res.ok) return res;
+    throw new Error((res && res.reason) || 'Failed to update dates.');
+  });
+}
+
+function toDateKey(dateObj) {
+  var y = dateObj.getFullYear();
+  var m = String(dateObj.getMonth() + 1).padStart(2, '0');
+  var d = String(dateObj.getDate()).padStart(2, '0');
+  return y + '-' + m + '-' + d;
+}
+function dateLabel(dateKey) {
+  var d = new Date(dateKey + 'T12:00:00');
+  return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+}
+function getTomorrowKey() {
+  return toDateKey(addDays(_todayKey, 1));
+}
+function sortTimeRanges(ranges) {
+  return ranges.slice().sort(function(a, b) { return timeToMin(a.start) - timeToMin(b.start); });
+}
+function mergeRanges(ranges) {
+  if (!ranges.length) return [];
+  var sorted = ranges.slice().sort(function(a, b) { return a.startMin - b.startMin; });
+  var merged = [sorted[0]];
+  for (var i = 1; i < sorted.length; i++) {
+    var prev = merged[merged.length - 1];
+    var cur = sorted[i];
+    if (cur.startMin <= prev.endMin) {
+      prev.endMin = Math.max(prev.endMin, cur.endMin);
+    } else {
+      merged.push({ startMin: cur.startMin, endMin: cur.endMin });
+    }
+  }
+  return merged;
+}
+function subtractBlocks(base, blocks) {
+  if (!base) return [];
+  if (!blocks.length) return [{ start: base.start, end: base.end }];
+  var cursor = timeToMin(base.start);
+  var end = timeToMin(base.end);
+  var merged = mergeRanges(blocks);
+  var result = [];
+  for (var i = 0; i < merged.length; i++) {
+    var block = merged[i];
+    if (block.startMin > cursor) result.push({ start: minToTime(cursor), end: minToTime(block.startMin) });
+    cursor = Math.max(cursor, block.endMin);
+  }
+  if (cursor < end) result.push({ start: minToTime(cursor), end: minToTime(end) });
+  return result.filter(function(seg) { return timeToMin(seg.end) > timeToMin(seg.start); });
+}
+function blocksFromSegments(base, segments) {
+  var blocks = [];
+  var cursor = timeToMin(base.start);
+  var end = timeToMin(base.end);
+  var ordered = sortTimeRanges(segments);
+  for (var i = 0; i < ordered.length; i++) {
+    var segStart = timeToMin(ordered[i].start);
+    var segEnd = timeToMin(ordered[i].end);
+    if (segStart > cursor) blocks.push({ start: minToTime(cursor), end: minToTime(segStart) });
+    cursor = Math.max(cursor, segEnd);
+  }
+  if (cursor < end) blocks.push({ start: minToTime(cursor), end: minToTime(end) });
+  return blocks.filter(function(block) { return timeToMin(block.end) > timeToMin(block.start); });
+}
+function isWithinAnySegment(startTime, endTime, segments) {
+  var start = timeToMin(startTime);
+  var end = timeToMin(endTime);
+  for (var i = 0; i < segments.length; i++) {
+    if (start >= timeToMin(segments[i].start) && end <= timeToMin(segments[i].end)) return true;
+  }
+  return false;
+}
+function isSessionAvailable(session) {
+  return !!(_sessionState[session] && _sessionState[session].segments.length);
+}
+function getDayWindows(dateKey) {
+  var d = new Date(dateKey + 'T12:00:00');
+  var dowKeys = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
+  return (_workingHours && _workingHours[dowKeys[d.getDay()]]) || [];
+}
+function classifyBaseWindow(session) {
+  var windows = getDayWindows(_selectedDateKey);
+  for (var i = 0; i < windows.length; i++) {
+    var startHour = parseInt(String(windows[i].start || '00:00').split(':')[0], 10);
+    if (session === 'morning' && startHour < 13) return windows[i];
+    if (session === 'evening' && startHour >= 13) return windows[i];
+  }
+  return null;
+}
+function buildSessionState(session) {
+  var base = classifyBaseWindow(session);
+  if (!base) return null;
+  var baseStart = timeToMin(base.start);
+  var baseEnd = timeToMin(base.end);
+  var blocks = [];
+  var offIds = [];
+  for (var i = 0; i < _offEntries.length; i++) {
+    var off = _offEntries[i];
+    if (_selectedDateKey < off.start_date || _selectedDateKey > (off.end_date || off.start_date)) continue;
+    var blockStart = off.start_time ? timeToMin(off.start_time) : 0;
+    var blockEnd = off.end_time ? timeToMin(off.end_time) : 1440;
+    if (!off.start_time && !off.end_time) {
+      blockStart = 0;
+      blockEnd = 1440;
+    }
+    var startMin = Math.max(baseStart, blockStart);
+    var endMin = Math.min(baseEnd, blockEnd);
+    if (endMin <= startMin) continue;
+    blocks.push({ startMin: startMin, endMin: endMin, offId: off.id });
+    offIds.push(off.id);
+  }
+  var baseSegments = subtractBlocks(base, blocks);
+
+  // Find extra entries for today in this session
+  var extraIds = [];
+  var extraSegments = [];
+  for (var e = 0; e < _extraEntries.length; e++) {
+    var ex = _extraEntries[e];
+    if (ex.date_key !== _selectedDateKey) continue;
+    var exStart = timeToMin(ex.start_time);
+    // Classify: morning if start < 13:00, evening otherwise
+    if ((session === 'morning' && exStart >= 780) || (session === 'evening' && exStart < 780)) continue;
+    extraSegments.push({ start: ex.start_time, end: ex.end_time });
+    extraIds.push(ex.id);
+  }
+
+  // Merge base segments with extras, sort and merge overlapping
+  var allSegments = baseSegments.concat(extraSegments);
+  allSegments.sort(function(a, b) { return timeToMin(a.start) - timeToMin(b.start); });
+  var merged = [];
+  for (var m = 0; m < allSegments.length; m++) {
+    var seg = allSegments[m];
+    if (merged.length && timeToMin(seg.start) <= timeToMin(merged[merged.length - 1].end)) {
+      merged[merged.length - 1].end = minToTime(Math.max(timeToMin(merged[merged.length - 1].end), timeToMin(seg.end)));
+    } else {
+      merged.push({ start: seg.start, end: seg.end });
+    }
+  }
+
+  var uniqueRowIndices = [];
+  var seen = {};
+  for (var j = 0; j < offIds.length; j++) {
+    if (!seen[offIds[j]]) {
+      seen[offIds[j]] = true;
+      uniqueRowIndices.push(offIds[j]);
+    }
+  }
+  return {
+    session: session,
+    base: base,
+    blocks: blocksFromSegments(base, baseSegments),
+    segments: merged,
+    offIds: uniqueRowIndices,
+    extraIds: extraIds
+  };
+}
+function renderSession(session) {
+  var state = _sessionState[session];
+  var card = document.getElementById(session + 'Card');
+  if (!state) {
+    card.style.display = 'none';
+    return;
+  }
+  card.style.display = '';
+
+  var available = state.segments.length > 0;
+  var pill = document.getElementById(session + 'Pill');
+  var pillText = document.getElementById(session + 'PillText');
+  pill.className = 'status-pill ' + (available ? 'coming' : 'not-coming');
+  pillText.textContent = available ? 'Coming to Work' : 'Not Coming to Work';
+  document.getElementById(session + 'ToggleBtn').textContent = available ? 'Not Coming to Work' : 'Coming to Work';
+  document.getElementById(session + 'ToggleBtn').className = 'btn ' + (available ? 'btn-danger' : 'btn-primary');
+
+  document.getElementById(session + 'Times').textContent = available
+    ? state.segments.map(function(seg) { return seg.start + ' - ' + seg.end; }).join(' • ')
+    : 'Not coming to work for this session';
+  document.getElementById(session + 'Hint').textContent = 'Normal hours: ' + state.base.start + ' - ' + state.base.end + '.';
+
+  renderPatientList(session);
+}
+function renderPatientList(session) {
+  var appts = _appointmentsBySession[session] || [];
+  var el = document.getElementById(session + 'Patients');
+  if (!appts.length) {
+    el.innerHTML = '<div class="empty">No patients booked for this ' + session + '.</div>';
+    return;
+  }
+  var html = '';
+  for (var i = 0; i < appts.length; i++) {
+    var a = appts[i];
+    var phoneText = formatPhoneDisplay(a.phone);
+    var phoneHref = buildPhoneHref(a.phone);
+    var emailText = String(a.email || '').trim();
+    var isSpinola = (a.status === 'RELOCATED_SPINOLA');
+    html += '<div class="patient-card' + (isSpinola ? ' relocated' : '') + '">';
+    html += '<div class="patient-main">';
+    html += '<div class="patient-name">' + esc(a.full_name || 'Patient') + '</div>';
+    html += '<div class="patient-meta">';
+    if (phoneText) {
+      if (phoneHref) html += '<a class="contact-link" href="' + esc(phoneHref) + '">' + esc(phoneText) + '</a>';
+      else html += esc(phoneText);
+    }
+    if (phoneText && emailText) html += ' • ';
+    if (emailText) html += '<a class="contact-link" href="mailto:' + esc(emailText) + '">' + esc(emailText) + '</a>';
+    html += '</div>';
+    if (isSpinola) html += '<div class="patient-badge spinola">Sent to Spinola</div>';
+    html += '</div>';
+    html += '<div class="patient-time">' + esc(a.start_time || '') + '</div>';
+    html += '</div>';
+  }
+  el.innerHTML = html;
+}
+function formatPhoneDisplay(phone) {
+  var raw = String(phone || '').trim();
+  if (!raw) return '';
+  return raw.charAt(0) === '+' ? raw : '+' + raw;
+}
+function buildPhoneHref(phone) {
+  var display = formatPhoneDisplay(phone);
+  if (!display) return '';
+  var normalized = display.replace(/[^\d+]/g, '');
+  return normalized ? 'tel:' + normalized : '';
+}
+function markUserActivity() {
+  _lastActivityAt = Date.now();
+}
+function stopAutoRefresh() {
+  if (_autoRefreshTimerId) {
+    clearInterval(_autoRefreshTimerId);
+    _autoRefreshTimerId = null;
+  }
+}
+function startAutoRefresh() {
+  stopAutoRefresh();
+  _autoRefreshTimerId = setInterval(function() {
+    if (_idlePaused || document.hidden || _refreshInFlight) return;
+    _refreshInFlight = true;
+    reloadAll()
+      .catch(function() {})
+      .finally(function() { _refreshInFlight = false; });
+  }, AUTO_REFRESH_MS);
+}
+function pauseDashboardForIdle() {
+  if (_idlePaused) return;
+  _idlePaused = true;
+  stopAutoRefresh();
+  _idleOverlay.classList.add('show');
+}
+function resumeDashboardFromIdle() {
+  _idlePaused = false;
+  markUserActivity();
+  _idleOverlay.classList.remove('show');
+  startAutoRefresh();
+  _refreshInFlight = true;
+  reloadAll()
+    .catch(function(err) {
+      showMsg('calendarMsg', 'bad', String(err && err.message ? err.message : err));
+    })
+    .finally(function() { _refreshInFlight = false; });
+}
+function navigateDay(delta) {
+  var d = addDays(_selectedDateKey, delta);
+  var newKey = toDateKey(d);
+  if (newKey < _todayKey) return;
+  var maxDate = toDateKey(addDays(_todayKey, 7));
+  if (newKey > maxDate) return;
+  _selectedDateKey = newKey;
+  _cachedDateAppointments = {};
+  showLoading('Loading ' + newKey + '…');
+  loadTodayAppointments().then(function() {
+    showDateLabel();
+    updateDayNavButtons();
+    buildAllSessionState();
+    hideLoading();
+  }).catch(function(err) {
+    hideLoading();
+    showMsg('morningMsg', 'bad', String(err && err.message ? err.message : err));
+  });
+}
+
+function navigateToToday() {
+  _selectedDateKey = _todayKey;
+  _cachedDateAppointments = {};
+  showLoading('Loading today…');
+  loadTodayAppointments().then(function() {
+    showDateLabel();
+    updateDayNavButtons();
+    buildAllSessionState();
+    hideLoading();
+  }).catch(function(err) {
+    hideLoading();
+  });
+}
+
+function updateDayNavButtons() {
+  var prevBtn = document.getElementById('dayPrev');
+  var nextBtn = document.getElementById('dayNext');
+  prevBtn.disabled = _selectedDateKey <= _todayKey;
+  var maxDate = toDateKey(addDays(_todayKey, 7));
+  nextBtn.disabled = _selectedDateKey >= maxDate;
+}
+
+function showDateLabel() {
+  var d = new Date(_selectedDateKey + 'T12:00:00');
+  var label = d.toLocaleDateString('en-GB', {
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+  });
+  if (_selectedDateKey === _todayKey) label += ' (Today)';
+  document.getElementById('dateLabel').textContent = label;
+  var isToday = _selectedDateKey === _todayKey;
+  document.getElementById('notTodayBanner').style.display = isToday ? 'none' : '';
+  document.querySelector('.stack').classList.toggle('viewing-future', !isToday);
+}
+async function reloadAll() {
+  _cachedDateAppointments = {};
+  var res = await fetchDashboard();
+  if (!res || !res.ok) throw new Error('Could not load dashboard.');
+  _todayKey = res.todayKey;
+  if (!_selectedDateKey) _selectedDateKey = _todayKey;
+  _workingHours = res.workingHours || {};
+  _offEntries = res.doctorOffEntries || [];
+  _extraEntries = res.extraSlotEntries || [];
+  if (!_calendarMonth) {
+    var tomorrow = addDays(_todayKey, 1);
+    _calendarMonth = new Date(tomorrow.getFullYear(), tomorrow.getMonth(), 1);
+  }
+  showDateLabel();
+  updateDayNavButtons();
+  await loadTodayAppointments();
+  buildAllSessionState();
+  renderCalendar();
+}
+async function loadTodayAppointments() {
+  var appts = await fetchDateAppointments(_selectedDateKey);
+  _appointmentsBySession.morning = [];
+  _appointmentsBySession.evening = [];
+  for (var i = 0; i < appts.length; i++) {
+    var a = appts[i];
+    var mins = timeToMin(a.start_time || '00:00');
+    var morningBase = classifyBaseWindow('morning');
+    var eveningBase = classifyBaseWindow('evening');
+    if (morningBase && mins < timeToMin(morningBase.end)) _appointmentsBySession.morning.push(a);
+    else if (eveningBase) _appointmentsBySession.evening.push(a);
+  }
+}
+function buildAllSessionState() {
+  _sessionState.morning = buildSessionState('morning');
+  _sessionState.evening = buildSessionState('evening');
+  renderSession('morning');
+  renderSession('evening');
+}
+function getSessionAffectedAppointments(session, segments) {
+  var all = _appointmentsBySession[session] || [];
+  return all.filter(function(appt) {
+    if (appt.status === 'RELOCATED_SPINOLA' || appt.status === 'CANCELLED_DOCTOR' || appt.status === 'CANCELLED_CLIENT') return false;
+    return !isWithinAnySegment(appt.start_time, appt.end_time, segments);
+  });
+}
+async function toggleSession(session) {
+  var state = _sessionState[session];
+  if (!state) return;
+  var currentlyAvailable = state.segments.length > 0;
+  var newSegments = currentlyAvailable ? [] : [{ start: state.base.start, end: state.base.end }];
+  var affected = getSessionAffectedAppointments(session, newSegments);
+  var blocks = blocksFromSegments(state.base, newSegments);
+
+  if (affected.length) {
+    openActionModal({
+      title: session === 'morning' ? 'Morning patients must be handled first' : 'Evening patients must be handled first',
+      text: 'Before changing this session, every affected patient must be sent to Spinola, pushed to the next day, or cancelled.',
+      summary: 'Selected patients affected: ' + affected.length + '.',
+      appointments: affected.map(function(appt) { appt.dateKey = _selectedDateKey; return appt; }),
+      apply: function() { return applySessionChanges(session, blocks, []); },
+      successMsgId: session + 'Msg',
+      successMessage: 'Session updated.'
+    });
+    return;
+  }
+
   try {
-    const res = await fetch('/api/admin/dashboard?sig=' + encodeURIComponent(SIG), { credentials: 'same-origin' });
-    const data = await res.json();
-    if (!data.ok) return;
+    showLoading('Updating ' + session + '…');
+    await applySessionChanges(session, blocks, []);
+    showMsg(session + 'Msg', 'good', currentlyAvailable ? 'Session marked as not coming to work.' : 'Session reactivated.');
+  } catch (err) {
+    showMsg(session + 'Msg', 'bad', String(err && err.message ? err.message : err));
+  } finally {
+    hideLoading();
+  }
+}
+async function applySessionChanges(session, blocks, extras) {
+  var state = _sessionState[session];
+  if (!state) return;
+  // Remove old extra entries first (descending row order to avoid index shifts)
+  var extraRows = (state.extraIds || []).slice().sort(function(a, b) { return b - a; });
+  for (var e = 0; e < extraRows.length; e++) {
+    try { await removeExtraSlots(extraRows[e]); } catch (ex) { /* row may already be gone */ }
+  }
+  // Remove old off blocks (descending row order)
+  var offRows = state.offIds.slice().sort(function(a, b) { return b - a; });
+  for (var i = 0; i < offRows.length; i++) {
+    try { await removeDoctorOff(offRows[i]); } catch (ex) { /* row may already be gone */ }
+  }
+  // Add new off blocks
+  for (var j = 0; j < blocks.length; j++) {
+    await markDoctorOff({
+      startDate: _selectedDateKey,
+      endDate: _selectedDateKey,
+      startTime: blocks[j].start,
+      endTime: blocks[j].end,
+      reason: 'Doctor adjusted shift'
+    });
+  }
+  // Add new extra entries
+  for (var k = 0; k < (extras || []).length; k++) {
+    await addExtraSlots({
+      date: _selectedDateKey,
+      startTime: extras[k].start,
+      endTime: extras[k].end,
+      reason: 'Doctor adjusted shift'
+    });
+  }
+  await reloadAll();
+}
+// ===== Break modal =====
+var _breakContext = null;
 
-    document.getElementById('dateLabel').textContent = 'Today: ' + data.todayKey;
-    document.getElementById('stats').innerHTML =
-      '<div class="statItem"><div class="num">' + data.todayAppointments.length + '</div><div class="label">Today</div></div>' +
-      '<div class="statItem"><div class="num">' + data.tomorrowAppointments.length + '</div><div class="label">Tomorrow</div></div>' +
-      '<div class="statItem"><div class="num">' + data.stats.weekBooked + '</div><div class="label">This Week</div></div>';
+function getNowTime() {
+  var now = new Date();
+  var h = String(now.getHours()).padStart(2, '0');
+  var m = String(now.getMinutes()).padStart(2, '0');
+  return h + ':' + m;
+}
 
-    renderTable('schedule', data.todayAppointments);
-    renderTable('tomorrow', data.tomorrowAppointments);
-  } catch(e) {
-    document.getElementById('schedule').innerHTML = '<div class="empty">Error loading schedule</div>';
+function roundUpToSlot(timeStr) {
+  var mins = timeToMin(timeStr);
+  var rem = mins % SLOT_MINUTES;
+  if (rem > 0) mins += (SLOT_MINUTES - rem);
+  return mins;
+}
+
+function openBreakModal(session) {
+  var state = _sessionState[session];
+  if (!state || !state.segments.length) {
+    showMsg(session + 'Msg', 'bad', 'Cannot take a break — session is set to "Not Coming to Work".');
+    return;
+  }
+  var isToday = _selectedDateKey === _todayKey;
+  var breakLabel = isToday ? 'The break starts now.' : 'Choose the break duration for this day.';
+  document.querySelector('#breakModal .modal-text').textContent = 'How long do you need? ' + breakLabel;
+  _breakContext = { session: session, duration: null, isToday: isToday };
+  document.getElementById('breakSummary').textContent = '';
+  document.getElementById('breakConfirmBtn').disabled = true;
+  [20, 30, 40].forEach(function(d) {
+    document.getElementById('breakOpt' + d).classList.remove('selected');
+  });
+  document.getElementById('breakModal').classList.add('show');
+}
+
+function closeBreakModal() {
+  document.getElementById('breakModal').classList.remove('show');
+  _breakContext = null;
+}
+
+function selectBreakDuration(mins) {
+  if (!_breakContext) return;
+  _breakContext.duration = mins;
+  [20, 30, 40].forEach(function(d) {
+    document.getElementById('breakOpt' + d).classList.toggle('selected', d === mins);
+  });
+  var breakStart;
+  if (_breakContext.isToday) {
+    breakStart = roundUpToSlot(getNowTime());
+  } else {
+    // For future dates, break starts at the session's first segment
+    var state = _sessionState[_breakContext.session];
+    breakStart = state && state.segments.length ? timeToMin(state.segments[0].start) : 0;
+  }
+  var breakEnd = breakStart + mins;
+  _breakContext.breakStartMin = breakStart;
+  _breakContext.breakEndMin = breakEnd;
+  document.getElementById('breakSummary').textContent =
+    'Break from ' + minToTime(breakStart) + ' to ' + minToTime(breakEnd) + ' (' + mins + ' min).';
+  document.getElementById('breakConfirmBtn').disabled = false;
+}
+
+async function confirmBreak() {
+  if (!_breakContext || !_breakContext.duration) return;
+  var session = _breakContext.session;
+  var breakStartMin = _breakContext.breakStartMin;
+  var breakEndMin = _breakContext.breakEndMin;
+  var breakStart = minToTime(breakStartMin);
+  var breakEnd = minToTime(breakEndMin);
+
+  // Find affected appointments during the break
+  var allAppts = (_appointmentsBySession[session] || []).filter(function(a) {
+    if (a.status === 'RELOCATED_SPINOLA' || a.status === 'CANCELLED_DOCTOR' || a.status === 'CANCELLED_CLIENT') return false;
+    var aStart = timeToMin(a.start_time);
+    var aEnd = timeToMin(a.end_time);
+    return aStart < breakEndMin && aEnd > breakStartMin;
+  });
+
+  closeBreakModal();
+
+  if (allAppts.length) {
+    openActionModal({
+      title: 'Patients booked during your break',
+      text: 'These patients have appointments during your break time. Choose what should happen first.',
+      summary: allAppts.length + ' affected patient(s) during ' + breakStart + ' – ' + breakEnd + '.',
+      appointments: allAppts.map(function(appt) { appt.dateKey = _selectedDateKey; return appt; }),
+      allowPushSameDay: true,
+      breakEndTime: breakEnd,
+      apply: function() {
+        return markDoctorOff({
+          startDate: _selectedDateKey,
+          endDate: _selectedDateKey,
+          startTime: breakStart,
+          endTime: breakEnd,
+          reason: 'Doctor break'
+        }).then(function() { return reloadAll(); });
+      },
+      successMsgId: session + 'Msg',
+      successMessage: 'Break set: ' + breakStart + ' – ' + breakEnd + '.'
+    });
+    return;
+  }
+
+  // No affected appointments — just block the time
+  try {
+    showLoading('Setting break…');
+    await markDoctorOff({
+      startDate: _selectedDateKey,
+      endDate: _selectedDateKey,
+      startTime: breakStart,
+      endTime: breakEnd,
+      reason: 'Doctor break'
+    });
+    await reloadAll();
+    showMsg(session + 'Msg', 'good', 'Break set: ' + breakStart + ' – ' + breakEnd + '.');
+  } catch (err) {
+    showMsg(session + 'Msg', 'bad', String(err && err.message ? err.message : err));
+  } finally {
+    hideLoading();
   }
 }
 
-loadSchedule();
+function closeAdjustModal() {
+  document.getElementById('adjustModal').classList.remove('show');
+  _adjustContext = null;
+}
+function openAdjustModal(session) {
+  var state = _sessionState[session];
+  if (!state) return;
+  var baseStart = timeToMin(state.base.start);
+  var baseEnd = timeToMin(state.base.end);
+  // Allow wider range: morning 7:30-13:00, afternoon 13:00-22:00
+  var rangeStart, rangeEnd;
+  if (session === 'morning') {
+    rangeStart = Math.min(baseStart, 450);  // 07:30
+    rangeEnd = Math.max(baseEnd, 780);      // 13:00
+  } else {
+    rangeStart = Math.min(baseStart, 780);  // 13:00
+    rangeEnd = Math.max(baseEnd, 1320);     // 22:00
+  }
+  var points = [];
+  for (var min = rangeStart; min <= rangeEnd; min += SLOT_MINUTES) points.push(min);
+  if (points[points.length - 1] !== rangeEnd) points.push(rangeEnd);
+
+  var firstSeg = state.segments[0] || { start: state.base.start, end: state.base.end };
+  var lastSeg = state.segments[state.segments.length - 1] || { start: state.base.start, end: state.base.end };
+  var gapSeg = state.segments.length > 1 ? { start: state.segments[0].end, end: state.segments[1].start } : null;
+
+  _adjustContext = { session: session, points: points };
+  document.getElementById('adjustTitle').textContent = (session === 'morning' ? 'Morning' : 'Evening') + ' shift time';
+  document.getElementById('adjustText').textContent = 'Use the sliders to choose the start time, end time, and an optional block inside the shift.';
+
+  setRange('adjustStartRange', points, timeToMin(firstSeg.start));
+  setRange('adjustEndRange', points, timeToMin(lastSeg.end));
+  setRange('gapStartRange', points, gapSeg ? timeToMin(gapSeg.start) : timeToMin(firstSeg.start));
+  setRange('gapEndRange', points, gapSeg ? timeToMin(gapSeg.end) : timeToMin(lastSeg.end));
+  document.getElementById('gapEnabled').checked = !!gapSeg;
+  syncAdjustModal();
+  document.getElementById('adjustModal').classList.add('show');
+}
+function setRange(id, points, value) {
+  var input = document.getElementById(id);
+  input.min = 0;
+  input.max = points.length - 1;
+  var idx = 0;
+  for (var i = 0; i < points.length; i++) {
+    if (points[i] === value) { idx = i; break; }
+    if (points[i] <= value) idx = i;
+  }
+  input.value = idx;
+}
+function currentRangeValue(id) {
+  var input = document.getElementById(id);
+  return _adjustContext.points[Number(input.value)];
+}
+function syncAdjustModal() {
+  if (!_adjustContext) return;
+  var startMin = currentRangeValue('adjustStartRange');
+  var endMin = currentRangeValue('adjustEndRange');
+  if (startMin >= endMin) {
+    var endRange = document.getElementById('adjustEndRange');
+    var startRange = document.getElementById('adjustStartRange');
+    if (document.activeElement === endRange) {
+      startRange.value = Math.max(0, Number(endRange.value) - 1);
+      startMin = currentRangeValue('adjustStartRange');
+    } else {
+      endRange.value = Math.min(_adjustContext.points.length - 1, Number(startRange.value) + 1);
+      endMin = currentRangeValue('adjustEndRange');
+    }
+  }
+
+  document.getElementById('gapControls').style.display = document.getElementById('gapEnabled').checked ? '' : 'none';
+
+  var gapStartMin = currentRangeValue('gapStartRange');
+  var gapEndMin = currentRangeValue('gapEndRange');
+  if (gapStartMin < startMin) {
+    setRange('gapStartRange', _adjustContext.points, startMin);
+    gapStartMin = currentRangeValue('gapStartRange');
+  }
+  if (gapEndMin > endMin) {
+    setRange('gapEndRange', _adjustContext.points, endMin);
+    gapEndMin = currentRangeValue('gapEndRange');
+  }
+  if (gapStartMin >= gapEndMin) {
+    var gapStartRange = document.getElementById('gapStartRange');
+    var gapEndRange = document.getElementById('gapEndRange');
+    if (document.activeElement === gapEndRange) {
+      gapStartRange.value = Math.max(Number(document.getElementById('adjustStartRange').value), Number(gapEndRange.value) - 1);
+    } else {
+      gapEndRange.value = Math.min(Number(document.getElementById('adjustEndRange').value), Number(gapStartRange.value) + 1);
+    }
+    gapStartMin = currentRangeValue('gapStartRange');
+    gapEndMin = currentRangeValue('gapEndRange');
+  }
+
+  document.getElementById('adjustStartValue').textContent = minToTime(startMin);
+  document.getElementById('adjustEndValue').textContent = minToTime(endMin);
+  document.getElementById('gapStartValue').textContent = minToTime(gapStartMin);
+  document.getElementById('gapEndValue').textContent = minToTime(gapEndMin);
+
+  var summary = minToTime(startMin) + ' - ' + minToTime(endMin);
+  if (document.getElementById('gapEnabled').checked) summary += ' with a block from ' + minToTime(gapStartMin) + ' - ' + minToTime(gapEndMin);
+  document.getElementById('adjustSummary').textContent = 'New working times: ' + summary + '.';
+}
+async function saveAdjustModal() {
+  if (!_adjustContext) return;
+  var session = _adjustContext.session;
+  var state = _sessionState[session];
+  var startMin = currentRangeValue('adjustStartRange');
+  var endMin = currentRangeValue('adjustEndRange');
+  var segments = [{ start: minToTime(startMin), end: minToTime(endMin) }];
+
+  if (document.getElementById('gapEnabled').checked) {
+    var gapStartMin = currentRangeValue('gapStartRange');
+    var gapEndMin = currentRangeValue('gapEndRange');
+    segments = [];
+    if (gapStartMin > startMin) segments.push({ start: minToTime(startMin), end: minToTime(gapStartMin) });
+    if (gapEndMin < endMin) segments.push({ start: minToTime(gapEndMin), end: minToTime(endMin) });
+  }
+
+  // Compute extras (time outside base) and blocks (gaps within base)
+  var baseStart = timeToMin(state.base.start);
+  var baseEnd = timeToMin(state.base.end);
+  var extras = [];
+  for (var s = 0; s < segments.length; s++) {
+    var sStart = timeToMin(segments[s].start);
+    var sEnd = timeToMin(segments[s].end);
+    if (sStart < baseStart) extras.push({ start: minToTime(sStart), end: minToTime(Math.min(sEnd, baseStart)) });
+    if (sEnd > baseEnd) extras.push({ start: minToTime(Math.max(sStart, baseEnd)), end: minToTime(sEnd) });
+  }
+  var clippedSegments = segments.map(function(seg) {
+    return { start: minToTime(Math.max(timeToMin(seg.start), baseStart)), end: minToTime(Math.min(timeToMin(seg.end), baseEnd)) };
+  }).filter(function(seg) { return timeToMin(seg.end) > timeToMin(seg.start); });
+  var blocks = blocksFromSegments(state.base, clippedSegments);
+  var affected = getSessionAffectedAppointments(session, segments);
+
+  if (affected.length) {
+    closeAdjustModal();
+    openActionModal({
+      title: 'Appointments must be handled before saving',
+      text: 'These patients are outside the updated working times. Choose what should happen first.',
+      summary: 'Affected patients: ' + affected.length + '.',
+      appointments: affected.map(function(appt) { appt.dateKey = _selectedDateKey; return appt; }),
+      apply: function() { return applySessionChanges(session, blocks, extras); },
+      successMsgId: session + 'Msg',
+      successMessage: 'Shift updated.'
+    });
+    return;
+  }
+
+  try {
+    showLoading('Saving shift…');
+    await applySessionChanges(session, blocks, extras);
+    closeAdjustModal();
+    showMsg(session + 'Msg', 'good', 'Shift updated.');
+  } catch (err) {
+    showMsg(session + 'Msg', 'bad', String(err && err.message ? err.message : err));
+  } finally {
+    hideLoading();
+  }
+}
+function isDateAllDayOff(dateKey) {
+  for (var i = 0; i < _offEntries.length; i++) {
+    var off = _offEntries[i];
+    if (off.start_time || off.end_time) continue;
+    if (dateKey >= off.start_date && dateKey <= (off.end_date || off.start_date)) return true;
+  }
+  return false;
+}
+function changeCalendarMonth(delta) {
+  var target = new Date(_calendarMonth.getFullYear(), _calendarMonth.getMonth() + delta, 1);
+  var tomorrow = new Date(getTomorrowKey() + 'T00:00:00');
+  if (target < new Date(tomorrow.getFullYear(), tomorrow.getMonth(), 1)) return;
+  _calendarMonth = target;
+  renderCalendar();
+}
+function toggleDateSelection(dateKey) {
+  if (dateKey < getTomorrowKey()) return;
+  if (_selectedDates[dateKey]) delete _selectedDates[dateKey];
+  else _selectedDates[dateKey] = true;
+  renderCalendar();
+}
+function renderCalendar() {
+  var grid = document.getElementById('calendarGrid');
+  var monthLabel = document.getElementById('calendarMonthLabel');
+  monthLabel.textContent = _calendarMonth.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+  var daysHtml = ['<div class="dow">Mon</div>','<div class="dow">Tue</div>','<div class="dow">Wed</div>','<div class="dow">Thu</div>','<div class="dow">Fri</div>','<div class="dow">Sat</div>','<div class="dow">Sun</div>'];
+  var first = new Date(_calendarMonth.getFullYear(), _calendarMonth.getMonth(), 1);
+  var last = new Date(_calendarMonth.getFullYear(), _calendarMonth.getMonth() + 1, 0);
+  var startPad = (first.getDay() + 6) % 7;
+  for (var p = 0; p < startPad; p++) daysHtml.push('<div></div>');
+  for (var day = 1; day <= last.getDate(); day++) {
+    var dateObj = new Date(_calendarMonth.getFullYear(), _calendarMonth.getMonth(), day);
+    var dateKey = toDateKey(dateObj);
+    var disabled = dateKey < getTomorrowKey();
+    var cancelled = isDateAllDayOff(dateKey);
+    var selected = !!_selectedDates[dateKey];
+    var cls = 'day-btn';
+    if (disabled) cls += ' disabled';
+    if (cancelled) cls += ' cancelled';
+    if (selected) cls += ' selected';
+    daysHtml.push('<button class="' + cls + '"' + (disabled ? ' disabled' : ' onclick="toggleDateSelection(\'' + dateKey + '\')"') + '>'
+      + (cancelled ? '<span class="day-x">×</span>' : '')
+      + '<span class="day-num">' + day + '</span>'
+      + '<span class="day-mark">' + (cancelled ? 'Cancelled' : (selected ? 'Selected' : '&nbsp;')) + '</span>'
+      + '</button>');
+  }
+  grid.innerHTML = daysHtml.join('');
+  renderCalendarSelectionSummary();
+}
+function selectedDateBuckets() {
+  var active = [];
+  var cancelled = [];
+  Object.keys(_selectedDates).sort().forEach(function(dateKey) {
+    if (isDateAllDayOff(dateKey)) cancelled.push(dateKey);
+    else active.push(dateKey);
+  });
+  return { active: active, cancelled: cancelled };
+}
+function renderCalendarSelectionSummary() {
+  var buckets = selectedDateBuckets();
+  document.getElementById('cancelDaysBtn').disabled = buckets.active.length === 0;
+  document.getElementById('reactivateDaysBtn').disabled = buckets.cancelled.length === 0;
+  var parts = [];
+  if (buckets.active.length) parts.push(buckets.active.length + ' active day(s) selected to cancel');
+  if (buckets.cancelled.length) parts.push(buckets.cancelled.length + ' cancelled day(s) selected to reactivate');
+  document.getElementById('calendarSelectionSummary').textContent = parts.length ? parts.join(' • ') : 'No days selected.';
+}
+async function gatherAppointmentsForDates(dateKeys) {
+  var all = [];
+  for (var i = 0; i < dateKeys.length; i++) {
+    var appts = await fetchDateAppointments(dateKeys[i]);
+    for (var j = 0; j < appts.length; j++) {
+      var copy = {};
+      for (var key in appts[j]) copy[key] = appts[j][key];
+      copy.dateKey = dateKeys[i];
+      all.push(copy);
+    }
+  }
+  return all;
+}
+async function startCancelSelectedDays() {
+  var buckets = selectedDateBuckets();
+  if (!buckets.active.length) return;
+  try {
+    showLoading('Checking selected days…');
+    var affected = await gatherAppointmentsForDates(buckets.active);
+    hideLoading();
+    if (affected.length) {
+      openActionModal({
+        title: 'Appointments must be handled before cancelling these days',
+        text: 'Every patient on the selected days must be sent to Spinola, pushed to the next day, or cancelled before those dates can be marked off.',
+        summary: 'Affected appointments across ' + buckets.active.length + ' date(s): ' + affected.length + '.',
+        appointments: affected,
+        apply: function() { return cancelSelectedDays(buckets.active); },
+        successMsgId: 'calendarMsg',
+        successMessage: 'Selected dates cancelled.'
+      });
+      return;
+    }
+    showLoading('Cancelling selected days…');
+    await cancelSelectedDays(buckets.active);
+    showMsg('calendarMsg', 'good', 'Selected dates cancelled.');
+  } catch (err) {
+    showMsg('calendarMsg', 'bad', String(err && err.message ? err.message : err));
+  } finally {
+    hideLoading();
+  }
+}
+async function cancelSelectedDays(dateKeys) {
+  await setDoctorOffDates('cancel', dateKeys);
+  for (var i = 0; i < dateKeys.length; i++) delete _selectedDates[dateKeys[i]];
+  await reloadAll();
+}
+async function reactivateSelectedDays() {
+  var buckets = selectedDateBuckets();
+  if (!buckets.cancelled.length) return;
+  try {
+    showLoading('Reactivating selected days…');
+    await setDoctorOffDates('reactivate', buckets.cancelled);
+    for (var i = 0; i < buckets.cancelled.length; i++) delete _selectedDates[buckets.cancelled[i]];
+    await reloadAll();
+    showMsg('calendarMsg', 'good', 'Selected days reactivated.');
+  } catch (err) {
+    showMsg('calendarMsg', 'bad', String(err && err.message ? err.message : err));
+  } finally {
+    hideLoading();
+  }
+}
+function openActionModal(flow) {
+  _pendingFlow = flow;
+  document.getElementById('actionTitle').textContent = flow.title;
+  document.getElementById('actionText').textContent = flow.text;
+  document.getElementById('actionSummary').textContent = flow.summary;
+  document.getElementById('actionPushSameDay').style.display = flow.allowPushSameDay ? '' : 'none';
+  var html = '';
+  for (var i = 0; i < flow.appointments.length; i++) {
+    var appt = flow.appointments[i];
+    html += '<div class="affected-card">';
+    html += '<div class="affected-date">' + esc(dateLabel(appt.dateKey)) + '</div>';
+    html += '<div class="affected-name">' + esc(appt.full_name || 'Patient') + '</div>';
+    html += '<div class="affected-meta">' + esc(appt.start_time || '') + ' • ' + esc(appt.phone || '') + '</div>';
+    html += '</div>';
+  }
+  document.getElementById('affectedList').innerHTML = html;
+  document.getElementById('actionModal').classList.add('show');
+}
+function closeActionModal() {
+  document.getElementById('actionModal').classList.remove('show');
+  _pendingFlow = null;
+}
+async function handlePendingAction(action) {
+  if (!_pendingFlow) return;
+  var flow = _pendingFlow;
+  try {
+    showLoading('Processing appointments…');
+    var grouped = {};
+    for (var i = 0; i < flow.appointments.length; i++) {
+      var appt = flow.appointments[i];
+      if (!grouped[appt.dateKey]) grouped[appt.dateKey] = [];
+      grouped[appt.dateKey].push(appt.id);
+    }
+    var extra = {};
+    if (action === 'push_same_day' && flow.breakEndTime) {
+      extra.breakEndTime = flow.breakEndTime;
+    }
+    var dates = Object.keys(grouped).sort();
+    for (var d = 0; d < dates.length; d++) {
+      await processAppointments(dates[d], action, grouped[dates[d]], extra);
+    }
+    await flow.apply();
+    closeActionModal();
+    showMsg(flow.successMsgId, 'good', flow.successMessage);
+  } catch (err) {
+    showMsg((flow && flow.successMsgId) || 'calendarMsg', 'bad', String(err && err.message ? err.message : err));
+  } finally {
+    hideLoading();
+  }
+}
+
+document.getElementById('adjustModal').addEventListener('click', function(e) {
+  if (e.target === this) closeAdjustModal();
+});
+document.getElementById('breakModal').addEventListener('click', function(e) {
+  if (e.target === this) closeBreakModal();
+});
+document.getElementById('actionModal').addEventListener('click', function(e) {
+  if (e.target === this) closeActionModal();
+});
+
+// ── WebSocket for real-time updates ──
+var _ws = null;
+function connectWS() {
+  var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  try { _ws = new WebSocket(proto + '//' + location.host + '/api/ws'); } catch(e) { return; }
+  _ws.onopen = function() {
+    try { _ws.send(JSON.stringify({ subscribe: 'admin' })); } catch(e) {}
+  };
+  _ws.onmessage = function(ev) {
+    try {
+      var msg = JSON.parse(ev.data);
+      if (msg.type === 'slots_updated' || msg.type === 'slots_data' || msg.type === 'dashboard_data') {
+        if (!_idlePaused && !_refreshInFlight) {
+          _refreshInFlight = true;
+          _cachedDateAppointments = {};
+          reloadAll().catch(function(){}).finally(function(){ _refreshInFlight = false; });
+        }
+      }
+    } catch(e) {}
+  };
+  _ws.onclose = function() { setTimeout(connectWS, 2000); };
+  _ws.onerror = function() { try { _ws.close(); } catch(e) {} };
+}
+setInterval(function() { if (_ws && _ws.readyState === 1) try { _ws.send('ping'); } catch(e) {} }, 30000);
+
+['pointerdown', 'keydown', 'scroll', 'touchstart', 'mousemove'].forEach(function(evt) {
+  document.addEventListener(evt, function() {
+    if (_idlePaused) return;
+    markUserActivity();
+  }, { passive: true });
+});
+document.addEventListener('visibilitychange', function() {
+  if (document.hidden) pauseDashboardForIdle();
+});
+_idleCheckTimerId = setInterval(function() {
+  if (_idlePaused) return;
+  if (Date.now() - _lastActivityAt >= IDLE_TIMEOUT_MS) pauseDashboardForIdle();
+}, 1000);
+_idleOverlay.addEventListener('click', function() {
+  resumeDashboardFromIdle();
+});
+
+(async function init() {
+  try {
+    showLoading('Loading schedule…');
+    await reloadAll();
+    connectWS();
+  } catch (err) {
+    showMsg('calendarMsg', 'bad', String(err && err.message ? err.message : err));
+  } finally {
+    hideLoading();
+  }
+})();
 </script>
 </body>
-</html>`;
+</html>
+`;
 }
