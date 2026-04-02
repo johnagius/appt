@@ -165,7 +165,8 @@ async function doBook(req: Request, env: Env, clinic: 'potters' | 'spinola'): Pr
   // Holiday checks
   const holiday = isHolidayOrClosed(d);
   if (clinic === 'potters' && holiday.closed) return json({ ok: false, reason: 'Closed: ' + holiday.reason }, 400);
-  if (clinic === 'spinola' && holiday.closed && !isSunday(d)) return json({ ok: false, reason: 'Closed: ' + holiday.reason }, 400);
+  // Spinola is open every day including Sundays and public holidays (10am-12pm)
+  // Only skip Spinola closure check — Spinola is never closed
 
   // Doctor off (potters only)
   if (clinic === 'potters') {
@@ -361,8 +362,9 @@ function buildDateOptions(
       disabled = true;
       reason = 'Outside booking window';
     } else if (holiday.closed) {
-      disabled = true;
-      reason = holiday.reason;
+      // Potter's closed, but Spinola is open on Sundays and public holidays
+      spinolaOnly = true;
+      reason = holiday.reason + ' (Spinola open 10:00-12:00)';
     } else if (offEntry?.allDay) {
       // Dr Kevin off — check Spinola
       const spinolaSlots = buildSlotsForDate(d, cfg.apptDurationMin, null, cfg.spinolaHours);
@@ -454,11 +456,14 @@ async function buildAvailabilityResponse(
     return { ok: true, dateKey, slots: outSlots };
   }
 
-  // Spinola
+  // Spinola is open every day: weekdays use normal spinolaHours,
+  // Sundays and public holidays use 10:00-12:00
   const holiday = isHolidayOrClosed(d);
-  if (holiday.closed && !isSunday(d)) return { ok: false, reason: holiday.reason, dateKey, slots: [] };
-
-  const baseSlots = buildSlotsForDate(d, cfg.apptDurationMin, null, cfg.spinolaHours);
+  const isSpinolaSpecialDay = holiday.isPublicHoliday || isSunday(d);
+  const spinolaHours = isSpinolaSpecialDay
+    ? { ...cfg.spinolaHours, [dayOfWeekKey(d)]: [{ start: '10:00', end: '12:00' }] }
+    : cfg.spinolaHours;
+  const baseSlots = buildSlotsForDate(d, cfg.apptDurationMin, null, spinolaHours);
   if (!baseSlots.length) return { ok: false, reason: 'Spinola Clinic closed', dateKey, slots: [] };
 
   const taken = await getTakenSlots(env.DB, dateKey, 'spinola');
