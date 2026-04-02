@@ -85,19 +85,20 @@ export async function apiCancelAppointment(req: Request, env: Env): Promise<Resp
   }, now);
   await bumpVersion(env.DB);
 
-  // Fire-and-forget emails + push updated slots via WebSocket
+  // Broadcast SYNCHRONOUSLY before returning response
+  try {
+    const doId = env.REALTIME.idFromName('global');
+    const stub = env.REALTIME.get(doId);
+    await stub.fetch('http://internal/broadcast', {
+      method: 'POST',
+      body: JSON.stringify({ type: 'slots_updated', dateKey: appt.date_key }),
+    });
+  } catch {}
+
+  // Fire-and-forget emails + calendar
   const ctx = (globalThis as any).__ctx;
   if (ctx?.waitUntil) {
     ctx.waitUntil((async () => {
-      // Broadcast FIRST for instant admin/doctor page update
-      try {
-        const doId = env.REALTIME.idFromName('global');
-        const stub = env.REALTIME.get(doId);
-        await stub.fetch('http://internal/broadcast', {
-          method: 'POST',
-          body: JSON.stringify({ type: 'slots_updated', dateKey: appt.date_key }),
-        });
-      } catch {}
       // Delete Google Calendar event
       if (appt.calendar_event_id) {
         try { await deleteCalendarEvent(env, appt.calendar_event_id, appt.clinic as any); } catch {}

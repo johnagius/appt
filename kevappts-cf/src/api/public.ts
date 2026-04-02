@@ -261,20 +261,20 @@ async function doBook(req: Request, env: Env, clinic: 'potters' | 'spinola'): Pr
   await insertAppointment(env.DB, appt);
   await bumpVersion(env.DB);
 
+  // Broadcast SYNCHRONOUSLY before returning response — ensures admin pages update
+  try {
+    const doId = env.REALTIME.idFromName('global');
+    const stub = env.REALTIME.get(doId);
+    await stub.fetch('http://internal/broadcast', {
+      method: 'POST',
+      body: JSON.stringify({ type: 'slots_updated', dateKey }),
+    });
+  } catch (e) { console.error('Broadcast error:', e); }
+
   // Fire-and-forget: emails + calendar + push updated slots via WebSocket
   const ctx = (globalThis as any).__ctx;
   if (ctx?.waitUntil) {
     ctx.waitUntil((async () => {
-      // Broadcast to WebSocket clients FIRST (instant notification)
-      try {
-        const doId = env.REALTIME.idFromName('global');
-        const stub = env.REALTIME.get(doId);
-        await stub.fetch('http://internal/broadcast', {
-          method: 'POST',
-          body: JSON.stringify({ type: 'slots_updated', dateKey }),
-        });
-      } catch (e) { console.error('Broadcast error:', e); }
-
       // Create Google Calendar event (write-only, D1 is source of truth)
       try {
         const eventId = await createCalendarEvent(env, appt);
