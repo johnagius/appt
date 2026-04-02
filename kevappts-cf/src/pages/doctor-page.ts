@@ -57,25 +57,28 @@ export function doctorPage(sig: string): string {
 <script>
 const SIG = ${JSON.stringify(sig)};
 
-// SSE
-let evtSource = null;
-function connectSSE() {
-  evtSource = new EventSource('/api/stream');
-  evtSource.onopen = () => {
+// WebSocket
+let ws = null;
+function connectWS() {
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  ws = new WebSocket(proto + '//' + location.host + '/api/ws');
+  ws.onopen = () => {
     document.getElementById('sseDot').className = 'sseDot connected';
     document.getElementById('sseLabel').textContent = 'Live';
+    ws.send(JSON.stringify({ subscribe: 'admin' }));
   };
-  evtSource.onmessage = (e) => {
-    try { const d = JSON.parse(e.data); if (d.type === 'slots_updated') loadSchedule(); } catch {}
+  ws.onmessage = (e) => {
+    try { const d = JSON.parse(e.data); if (d.type === 'slots_updated' || d.type === 'slots_data') loadSchedule(); } catch {}
   };
-  evtSource.onerror = () => {
+  ws.onclose = () => {
     document.getElementById('sseDot').className = 'sseDot disconnected';
     document.getElementById('sseLabel').textContent = 'Reconnecting...';
-    evtSource.close();
-    setTimeout(connectSSE, 3000);
+    setTimeout(connectWS, 2000);
   };
+  ws.onerror = () => { ws.close(); };
 }
-connectSSE();
+connectWS();
+setInterval(() => { if (ws && ws.readyState === 1) ws.send(JSON.stringify({type:'ping'})); }, 30000);
 
 function statusBadge(s) {
   const m = { BOOKED:'booked', ATTENDED:'attended', NO_SHOW:'noshow', RELOCATED_SPINOLA:'relocated' };

@@ -84,15 +84,16 @@ export async function apiCancelAppointment(req: Request, env: Env): Promise<Resp
   }, now);
   await bumpVersion(env.DB);
 
-  // Fire-and-forget emails + SSE broadcast
+  // Fire-and-forget emails + push updated slots via WebSocket
   const ctx = (globalThis as any).__ctx;
   if (ctx?.waitUntil) {
     ctx.waitUntil((async () => {
       try { await sendClientCancelledEmail(env, appt, 'Your appointment has been cancelled.'); } catch {}
       try { await sendDoctorCancellationEmail(env, appt, 'Client cancelled via email link.'); } catch {}
+      // Push slot freed notification — clients watching this date get instant update
       try {
-        const id = env.REALTIME.idFromName('global');
-        const stub = env.REALTIME.get(id);
+        const doId = env.REALTIME.idFromName('global');
+        const stub = env.REALTIME.get(doId);
         await stub.fetch('http://internal/broadcast', {
           method: 'POST',
           body: JSON.stringify({ type: 'slots_updated', dateKey: appt.date_key }),
@@ -141,8 +142,8 @@ export async function apiDoctorAction(req: Request, env: Env): Promise<Response>
         try { await sendClientCancelledEmail(env, appt, 'Your appointment has been cancelled by the clinic. Please rebook if needed.'); } catch {}
         try { await sendDoctorCancellationEmail(env, appt, 'You cancelled this appointment.'); } catch {}
         try {
-          const id = env.REALTIME.idFromName('global');
-          const stub = env.REALTIME.get(id);
+          const doId = env.REALTIME.idFromName('global');
+          const stub = env.REALTIME.get(doId);
           await stub.fetch('http://internal/broadcast', {
             method: 'POST',
             body: JSON.stringify({ type: 'slots_updated', dateKey: appt.date_key }),
@@ -198,8 +199,8 @@ export async function apiDoctorAction(req: Request, env: Env): Promise<Response>
         try { await sendRedirectToSpinolaEmail(env, appt, spinolaLocation); } catch {}
         try { await sendDoctorCancellationEmail(env, appt, 'Appointment redirected to ' + spinolaLocation + '.'); } catch {}
         try {
-          const id = env.REALTIME.idFromName('global');
-          const stub = env.REALTIME.get(id);
+          const doId = env.REALTIME.idFromName('global');
+          const stub = env.REALTIME.get(doId);
           await stub.fetch('http://internal/broadcast', {
             method: 'POST',
             body: JSON.stringify({ type: 'slots_updated', dateKey: appt.date_key }),

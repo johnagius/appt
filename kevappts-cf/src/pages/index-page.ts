@@ -2553,6 +2553,9 @@ export function indexPage(env: Env): string {
 
       state.selectedDateLabel = localDate(dateKey);
 
+      // Update WebSocket subscription — only get pushes for this date
+      wsSubscribeDate(dateKey);
+
       state.selectedSlot = null;
       els.sumDate.textContent = t('dateTemplate', state.selectedDateLabel);
       els.sumTime.textContent = t('timeTemplate', t('timeDash'), '').replace(' - ', '');
@@ -3103,31 +3106,58 @@ export function indexPage(env: Env): string {
     });
 
 
-    // ── SSE: Real-time slot updates ──
-    var _evtSource = null;
-    var _sseConnected = false;
-    function connectSSE() {
+    // ── WebSocket: Real-time slot updates (zero polling) ──
+    var _ws = null;
+    var _wsConnected = false;
+    var _wsSubscribedDate = null;
+    function connectWS() {
       try {
-        _evtSource = new EventSource('/api/stream');
-        _evtSource.onopen = function() { _sseConnected = true; };
-        _evtSource.onmessage = function(event) {
+        var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+        _ws = new WebSocket(proto + '//' + location.host + '/api/ws');
+        _ws.onopen = function() {
+          _wsConnected = true;
+          // Subscribe to the date we're currently viewing
+          if (state.selectedDateKey) {
+            _ws.send(JSON.stringify({ subscribe: 'date', dateKey: state.selectedDateKey }));
+            _wsSubscribedDate = state.selectedDateKey;
+          }
+        };
+        _ws.onmessage = function(event) {
           try {
             var data = JSON.parse(event.data);
+            // Server pushed fresh slot data — render directly, ZERO API calls
+            if (data.type === 'slots_data' && data.dateKey === state.selectedDateKey && data.data) {
+              var res = data.data;
+              if (res && res.ok) {
+                renderSlots(res.slots || []);
+                setStatus('good', t('slotsLoaded'));
+              }
+              return;
+            }
+            // Fallback notification (no data payload) — one lightweight fetch
             if (data.type === 'slots_updated') {
-              // Refresh slots if we're looking at the affected date
               if (data.dateKey === state.selectedDateKey || !data.dateKey) {
                 loadAvailability(true);
               }
-              refreshDateOptions();
             }
           } catch(e) {}
         };
-        _evtSource.onerror = function() {
-          _sseConnected = false;
-          _evtSource.close();
-          setTimeout(connectSSE, 3000);
+        _ws.onclose = function() {
+          _wsConnected = false;
+          setTimeout(connectWS, 2000);
         };
-      } catch(e) { _sseConnected = false; }
+        _ws.onerror = function() { try { _ws.close(); } catch(e) {} };
+      } catch(e) { _wsConnected = false; }
+    }
+    // Keepalive ping
+    setInterval(function() { if (_ws && _ws.readyState === 1) _ws.send(JSON.stringify({type:'ping'})); }, 30000);
+
+    // When user picks a different date, update WebSocket subscription
+    function wsSubscribeDate(dateKey) {
+      if (!_ws || _ws.readyState !== 1) return;
+      if (_wsSubscribedDate) _ws.send(JSON.stringify({ unsubscribe: 'date', dateKey: _wsSubscribedDate }));
+      _ws.send(JSON.stringify({ subscribe: 'date', dateKey: dateKey }));
+      _wsSubscribedDate = dateKey;
     }
 
     function init() {
@@ -3179,8 +3209,8 @@ export function indexPage(env: Env): string {
           }
 
           installAutoRefresh();
-          // Connect SSE for real-time updates
-          connectSSE();
+          // Connect WebSocket for real-time push updates (zero polling)
+          connectWS();
         })
         .catch(function(e) {
           els.timeGrid.innerHTML = '';

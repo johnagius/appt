@@ -258,7 +258,7 @@ async function doBook(req: Request, env: Env, clinic: 'potters' | 'spinola'): Pr
   await insertAppointment(env.DB, appt);
   await bumpVersion(env.DB);
 
-  // Fire-and-forget: emails + calendar + SSE broadcast
+  // Fire-and-forget: emails + calendar + push updated slots via WebSocket
   const ctx = (globalThis as any).__ctx;
   if (ctx?.waitUntil) {
     ctx.waitUntil((async () => {
@@ -274,13 +274,20 @@ async function doBook(req: Request, env: Env, clinic: 'potters' | 'spinola'): Pr
         console.error('Email send error:', e);
       }
 
-      // Broadcast to SSE clients
+      // Push updated slot data directly to WebSocket clients
+      // They receive the new availability WITHOUT making any API call
       try {
-        const id = env.REALTIME.idFromName('global');
-        const stub = env.REALTIME.get(id);
-        await stub.fetch('http://internal/broadcast', {
+        const freshCfg = await getConfig(env.DB);
+        const [freshOff, freshExtra] = await Promise.all([getDoctorOffRows(env.DB), getDoctorExtraRows(env.DB)]);
+        const freshOffMap = buildDoctorOffMap(freshOff);
+        const freshExtraMap = buildExtraMap(freshExtra);
+        const slotsData = await buildAvailabilityResponse(dateKey, freshCfg, freshOffMap, freshExtraMap, env.TIMEZONE, clinic, env);
+
+        const doId = env.REALTIME.idFromName('global');
+        const stub = env.REALTIME.get(doId);
+        await stub.fetch('http://internal/push-data', {
           method: 'POST',
-          body: JSON.stringify({ type: 'slots_updated', dateKey }),
+          body: JSON.stringify({ type: 'slots_data', dateKey, data: slotsData }),
         });
       } catch {}
     })());

@@ -7,7 +7,7 @@
  *         POST /api/book  POST /api/book-spinola  GET /api/poll
  * Cancel: GET /api/cancel-info  POST /api/cancel  POST /api/doctor-action
  * Admin:  All /api/admin/* routes
- * SSE:    GET /api/stream
+ * WS:     GET /api/ws (WebSocket upgrade)
  * Cron:   Daily schedule email
  */
 import type { Env } from './types';
@@ -56,11 +56,13 @@ export default {
     }
 
     try {
-      // ─── SSE Stream ────────────────────────────────
-      if (path === '/api/stream' && method === 'GET') {
+      // ─── WebSocket ────────────────────────────────
+      if (path === '/api/ws') {
         const id = env.REALTIME.idFromName('global');
         const stub = env.REALTIME.get(id);
-        return stub.fetch(new Request('http://internal/connect', { signal: request.signal }));
+        return stub.fetch(new Request('http://internal/ws', {
+          headers: request.headers,
+        }));
       }
 
       // ─── Public API ────────────────────────────────

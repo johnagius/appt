@@ -150,28 +150,35 @@ export function adminPage(sig: string): string {
 const SIG = ${JSON.stringify(sig)};
 const API = '/api/admin/';
 
-// ─── SSE Connection ────────────────────────────────────
-let evtSource = null;
-function connectSSE() {
-  evtSource = new EventSource('/api/stream');
-  evtSource.onopen = () => {
+// ─── WebSocket Connection ──────────────────────────────
+let ws = null;
+function connectWS() {
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  ws = new WebSocket(proto + '//' + location.host + '/api/ws');
+  ws.onopen = () => {
     document.getElementById('sseDot').className = 'sseDot connected';
     document.getElementById('sseLabel').textContent = 'Live';
+    // Subscribe to admin channel — get ALL updates pushed
+    ws.send(JSON.stringify({ subscribe: 'admin' }));
   };
-  evtSource.onmessage = (e) => {
+  ws.onmessage = (e) => {
     try {
       const data = JSON.parse(e.data);
-      if (data.type === 'slots_updated') loadDashboard();
+      if (data.type === 'slots_updated' || data.type === 'slots_data' || data.type === 'dashboard_data') {
+        loadDashboard();
+      }
     } catch {}
   };
-  evtSource.onerror = () => {
+  ws.onclose = () => {
     document.getElementById('sseDot').className = 'sseDot disconnected';
     document.getElementById('sseLabel').textContent = 'Reconnecting...';
-    evtSource.close();
-    setTimeout(connectSSE, 3000);
+    setTimeout(connectWS, 2000);
   };
+  ws.onerror = () => { ws.close(); };
 }
-connectSSE();
+connectWS();
+// Keepalive ping every 30s
+setInterval(() => { if (ws && ws.readyState === 1) ws.send(JSON.stringify({type:'ping'})); }, 30000);
 
 // ─── Tab Navigation ────────────────────────────────────
 document.querySelectorAll('.tab').forEach(tab => {
