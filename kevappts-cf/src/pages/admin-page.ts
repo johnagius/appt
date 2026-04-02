@@ -1141,27 +1141,27 @@ function renderApptTable(appts, containerId, withCheckboxes, showDate) {
     return;
   }
   var html = '<div class="table-wrap"><table><thead><tr>';
-  if (withCheckboxes) html += '<th><input type="checkbox" onchange="toggleAll(this, \'' + containerId + '\')"></th>';
+  if (withCheckboxes) html += '<th><input type="checkbox" onchange="toggleAll(this, \\'' + containerId + '\\')"></th>';
   if (showDate) html += '<th>Date</th>';
   html += '<th>Time</th><th>Patient</th><th>Phone</th><th>Service</th><th>Location</th><th>Status</th><th></th></tr></thead><tbody>';
   for (var i = 0; i < appts.length; i++) {
     var a = appts[i];
     var badge = getStatusBadge(a.status);
-    html += '<tr' + (showDate ? ' style="cursor:pointer" onclick="goToDate(\'' + esc(a.dateKey) + '\')"' : '') + '>';
+    html += '<tr' + (showDate ? ' style="cursor:pointer" onclick="goToDate(\\'' + esc(a.dateKey) + '\\')"' : '') + '>';
     if (withCheckboxes) html += '<td><input type="checkbox" class="appt-cb" value="' + esc(a.appointmentId) + '"></td>';
     if (showDate) html += '<td><b>' + esc(a.dateKey) + '</b></td>';
     html += '<td><b>' + esc(a.startTime) + ' - ' + esc(a.endTime) + '</b></td>';
-    html += '<td><a class="patient-link" href="#" onclick="event.stopPropagation();event.preventDefault();showPatientHistory(\'' + esc(a.email) + '\',\'' + esc(a.phone) + '\')">' + esc(a.fullName) + '</a></td>';
+    html += '<td><a class="patient-link" href="#" onclick="event.stopPropagation();event.preventDefault();showPatientHistory(\\'' + esc(a.email) + '\\',\\'' + esc(a.phone) + '\\')">' + esc(a.fullName) + '</a></td>';
     html += '<td>' + esc(a.phone) + '</td>';
     html += '<td>' + esc(a.serviceName) + '</td>';
     html += '<td>' + esc(a.location) + '</td>';
     html += '<td><span class="badge ' + badge.cls + '">' + badge.text + '</span></td>';
     html += '<td>';
     if (a.status === 'BOOKED' || a.status === 'RELOCATED_SPINOLA') {
-      html += '<button class="btn btn-sm btn-danger" onclick="event.stopPropagation();cancelSingleAppt(\'' + esc(a.appointmentId) + '\', \'' + containerId + '\')">Cancel</button>';
+      html += '<button class="btn btn-sm btn-danger" onclick="event.stopPropagation();cancelSingleAppt(\\'' + esc(a.appointmentId) + '\\', \\'' + containerId + '\\')">Cancel</button>';
       html += '<span class="att-btns">';
-      html += '<button class="btn btn-sm btn-good" onclick="event.stopPropagation();markAttendance(\'' + esc(a.appointmentId) + '\',\'' + esc(a.dateKey) + '\',true,\'' + containerId + '\')">Attended</button>';
-      html += '<button class="btn btn-sm btn-warn" onclick="event.stopPropagation();markAttendance(\'' + esc(a.appointmentId) + '\',\'' + esc(a.dateKey) + '\',false,\'' + containerId + '\')">No-Show</button>';
+      html += '<button class="btn btn-sm btn-good" onclick="event.stopPropagation();markAttendance(\\'' + esc(a.appointmentId) + '\\',\\'' + esc(a.dateKey) + '\\',true,\\'' + containerId + '\\')">Attended</button>';
+      html += '<button class="btn btn-sm btn-warn" onclick="event.stopPropagation();markAttendance(\\'' + esc(a.appointmentId) + '\\',\\'' + esc(a.dateKey) + '\\',false,\\'' + containerId + '\\')">No-Show</button>';
       html += '</span>';
     }
     html += '</td>';
@@ -1213,7 +1213,7 @@ function renderOverrides(offEntries, extraEntries) {
     html += ' <span class="ov-detail">' + esc(it.timeLabel) + '</span>';
     if (it.reason) html += ' <span class="ov-reason"> &middot; ' + esc(it.reason) + '</span>';
     html += '</div>';
-    html += '<button class="ov-remove" onclick="removeOverride(\'' + it.type + '\',' + it.rowIndex + ')" title="Remove">&times;</button>';
+    html += '<button class="ov-remove" onclick="removeOverride(\\'' + it.type + '\\',' + it.rowIndex + ')" title="Remove">&times;</button>';
     html += '</div>';
   }
   el.innerHTML = html;
@@ -1385,7 +1385,7 @@ function loadWeekOverview() {
   for (var i = 0; i < 7; i++) {
     var dk = addDaysStr(_weekStart, i);
     var num = parseInt(dk.split('-')[2], 10);
-    html += '<div class="week-cell' + (dk === todayStr() ? ' today' : '') + (dk === _schedDate ? ' selected' : '') + '" onclick="goToDate(\'' + dk + '\')">';
+    html += '<div class="week-cell' + (dk === todayStr() ? ' today' : '') + (dk === _schedDate ? ' selected' : '') + '" onclick="goToDate(\\'' + dk + '\\')">';
     html += '<div class="wc-day">' + days[i] + '</div>';
     html += '<div class="wc-num">' + num + '</div>';
     html += '<div class="wc-count" id="wc-' + dk + '">...</div>';
@@ -1466,10 +1466,10 @@ function doSearch(query) {
       for (var i = 0; i < res.results.length; i++) {
         var r = res.results[i];
         var badge = getStatusBadge(r.status);
-        html += '<tr style="cursor:pointer" onclick="goToDate(\'' + esc(r.dateKey) + '\')">';
+        html += '<tr style="cursor:pointer" onclick="goToDate(\\'' + esc(r.dateKey) + '\\')">';
         html += '<td><b>' + esc(r.dateKey) + '</b></td>';
         html += '<td>' + esc(r.startTime) + ' - ' + esc(r.endTime) + '</td>';
-        html += '<td><a class="patient-link" href="#" onclick="event.stopPropagation();event.preventDefault();showPatientHistory(\'' + esc(r.email) + '\',\'' + esc(r.phone) + '\')">' + esc(r.fullName) + '</a></td>';
+        html += '<td><a class="patient-link" href="#" onclick="event.stopPropagation();event.preventDefault();showPatientHistory(\\'' + esc(r.email) + '\\',\\'' + esc(r.phone) + '\\')">' + esc(r.fullName) + '</a></td>';
         html += '<td>' + esc(r.phone) + '</td>';
         html += '<td>' + esc(r.serviceName) + '</td>';
         html += '<td>' + esc(r.location) + '</td>';
@@ -2597,7 +2597,7 @@ function renderHoursEditor(hours) {
     html += '<div class="day-row" data-day="' + day + '">';
     html += '<div class="day-row-header">';
     html += '<span class="day-name">' + dayNames[day] + '</span>';
-    html += '<label class="day-toggle"><input type="checkbox" ' + (enabled ? 'checked' : '') + ' onchange="toggleDay(\'' + day + '\', this.checked)"><span class="slider"></span></label>';
+    html += '<label class="day-toggle"><input type="checkbox" ' + (enabled ? 'checked' : '') + ' onchange="toggleDay(\\'' + day + '\\', this.checked)"><span class="slider"></span></label>';
     html += '</div>';
     html += '<div class="day-blocks" id="blocks-' + day + '">';
 
@@ -2608,7 +2608,7 @@ function renderHoursEditor(hours) {
     }
 
     html += '</div>';
-    html += '<button type="button" class="add-block-btn" onclick="addTimeBlock(\'' + day + '\')" ' + (enabled ? '' : 'style="display:none"') + ' id="addBtn-' + day + '">+ Add time block</button>';
+    html += '<button type="button" class="add-block-btn" onclick="addTimeBlock(\\'' + day + '\\')" ' + (enabled ? '' : 'style="display:none"') + ' id="addBtn-' + day + '">+ Add time block</button>';
     html += '</div>';
   }
 
@@ -2956,7 +2956,7 @@ function renderAttendance(s) {
     html += '<div class="h-bar-track"><div class="h-bar-fill" style="width:' + pctN + '%;background:#f59e0b;"></div></div>';
     html += '<div class="h-bar-pct">' + noShow + '</div></div>';
   } else {
-    html += '<div class="empty">No attendance data yet.<br><span style="font-size:11px;">Use the &#x2713; and &#x2717; buttons on today\'s appointments to track attendance.</span></div>';
+    html += '<div class="empty">No attendance data yet.<br><span style="font-size:11px;">Use the &#x2713; and &#x2717; buttons on today\\'s appointments to track attendance.</span></div>';
   }
   html += '</div>';
   el.innerHTML = html;
@@ -3078,7 +3078,7 @@ function renderLocationSplit(split) {
   var pctS = 100 - pctP;
 
   var html = '';
-  html += '<div class="h-bar-row"><div class="h-bar-label" style="width:60px;">Potter\'s</div>';
+  html += '<div class="h-bar-row"><div class="h-bar-label" style="width:60px;">Potter\\'s</div>';
   html += '<div class="h-bar-track"><div class="h-bar-fill" style="width:' + pctP + '%;background:#2563eb;"></div></div>';
   html += '<div class="h-bar-pct">' + split.potters + '</div></div>';
   html += '<div class="h-bar-row"><div class="h-bar-label" style="width:60px;">Spinola</div>';
@@ -3245,7 +3245,7 @@ function renderSpDirectSplit(sp) {
   html += '<div class="h-bar-row"><div class="h-bar-label" style="width:80px;">Redirected</div>';
   html += '<div class="h-bar-track"><div class="h-bar-fill" style="width:' + pctR + '%;background:#2563eb;"></div></div>';
   html += '<div class="h-bar-pct">' + redir + '</div></div>';
-  html += '<div style="margin-top:8px;font-size:11px;color:var(--muted);">Direct = booked via system &bull; Redirected = moved from Potter\'s</div>';
+  html += '<div style="margin-top:8px;font-size:11px;color:var(--muted);">Direct = booked via system &bull; Redirected = moved from Potter\\'s</div>';
   el.innerHTML = html;
 }
 
@@ -3344,7 +3344,7 @@ var _reviewPotters = [];
 var _reviewSpinola = [];
 
 function loadReviewPatients() {
-  showMsg('reviewsMsg', '', 'Loading today\'s patients...');
+  showMsg('reviewsMsg', '', 'Loading today\\'s patients...');
   google.script.run
     .withSuccessHandler(function(res) {
       if (!res || !res.ok) { showMsg('reviewsMsg', 'bad', res.reason || 'Failed.'); return; }
