@@ -1026,6 +1026,10 @@ function transformResponse(method, res) {
     res.cancelBreakdown = st.cancelBreakdown || { byDoctor: st.cancelledDoctor || 0, byPatient: st.cancelledClient || 0 };
     res.period = st.period || { from: '', to: '' };
     res.generated = st.generated || '';
+    // Spinola sub-object: alias hourlyDistribution -> peakHours for old rendering code
+    if (res.spinola) {
+      res.spinola.peakHours = res.spinola.hourlyDistribution || res.spinola.peakHours || [];
+    }
   }
   return res;
 }
