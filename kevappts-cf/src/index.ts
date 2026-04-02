@@ -20,7 +20,7 @@ import {
   apiAdminProcessAppointments, apiAdminNotifyPatients, apiAdminGetReviewPatients,
   apiAdminSendReviewRequests, apiAdminGetWeekOverview, apiAdminSearchAppointments,
   apiAdminGetSettings, apiAdminSaveSettings, apiAdminGetStatistics,
-  apiAdminMarkAttendance, apiAdminGetPatientHistory,
+  apiAdminMarkAttendance, apiAdminGetPatientHistory, apiAdminDoctorOffDates,
 } from './api/admin';
 import { verifyAdminSig, computeAdminSig } from './services/crypto';
 import { todayKeyLocal } from './services/utils';
@@ -117,6 +117,7 @@ export default {
         if (adminPath === 'stats' && method === 'GET') return apiAdminGetStatistics(request, env);
         if (adminPath === 'attendance' && method === 'POST') return apiAdminMarkAttendance(request, env);
         if (adminPath === 'patient-history' && method === 'GET') return apiAdminGetPatientHistory(request, env);
+        if (adminPath === 'doctor-off-dates' && method === 'POST') return apiAdminDoctorOffDates(request, env);
 
         // Delete routes with ID in path
         if (adminPath.startsWith('doctor-off/') && method === 'DELETE') {
