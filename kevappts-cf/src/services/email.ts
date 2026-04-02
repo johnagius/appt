@@ -26,9 +26,27 @@ async function sendEmail(env: Env, to: string, subject: string, html: string): P
   }
 }
 
+function getMapUrl(location: string): string {
+  if (location.toLowerCase().includes('spinola')) {
+    return 'https://www.google.com/maps/search/?api=1&query=Spinola+Clinic+St+Julians+Malta';
+  }
+  return 'https://www.google.com/maps/search/?api=1&query=Potters+Pharmacy+St+Julians+Malta';
+}
+
+function getMapHtml(location: string): string {
+  const mapUrl = getMapUrl(location);
+  const label = location.toLowerCase().includes('spinola') ? 'Spinola Clinic, St Julians, Malta' : "Potter's Pharmacy, St Julians, Malta";
+  return `<div style="margin-top:14px;padding:12px;border:1px solid #e5e7eb;border-radius:12px;background:#f0f9ff;">
+    <p style="margin:0 0 8px 0;font-weight:700;color:#111827;">Directions</p>
+    <a href="${mapUrl}" style="display:inline-flex;align-items:center;gap:6px;background:#1a73e8;color:#fff;text-decoration:none;padding:10px 16px;border-radius:999px;font-weight:700;font-size:14px;">
+      Open in Google Maps
+    </a>
+    <p style="margin:8px 0 0 0;color:#6b7280;font-size:13px;">${label}</p>
+  </div>`;
+}
+
 function getBaseUrl(env: Env): string {
-  // In production this would be the Workers URL
-  return 'https://kevappts.potterspharmacy.com';
+  return 'https://kevappts.labrint.workers.dev';
 }
 
 async function buildCancelLink(env: Env, token: string): Promise<string> {
@@ -63,6 +81,7 @@ export async function sendClientConfirmationEmail(env: Env, appt: Appointment): 
     <tr><td style="padding:6px 0;color:#6b7280;">Time</td><td style="padding:6px 0;"><b>${escapeHtml(appt.start_time)} - ${escapeHtml(appt.end_time)}</b></td></tr>
     <tr><td style="padding:6px 0;color:#6b7280;">Location</td><td style="padding:6px 0;"><b>${escapeHtml(appt.location)}</b></td></tr>
   </table>
+  ${getMapHtml(appt.location)}
   <div style="margin-top:14px;padding:12px;border:1px solid #e5e7eb;border-radius:12px;background:#f9fafb;">
     <p style="margin:0 0 10px 0;color:#111827;"><b>Cancel appointment</b></p>
     <a href="${cancelUrl}" style="display:inline-block;background:#ef4444;color:#fff;text-decoration:none;padding:10px 14px;border-radius:999px;font-weight:700;">Cancel Appointment</a>
@@ -94,6 +113,7 @@ export async function sendSpinolaConfirmationEmail(env: Env, appt: Appointment):
     <tr><td style="padding:6px 0;color:#6b7280;">Time</td><td style="padding:6px 0;"><b>${escapeHtml(appt.start_time)} - ${escapeHtml(appt.end_time)}</b></td></tr>
     <tr><td style="padding:6px 0;color:#6b7280;">Location</td><td style="padding:6px 0;"><b>${escapeHtml(spinolaLocation)}</b></td></tr>
   </table>
+  ${getMapHtml(spinolaLocation)}
   <div style="margin-top:14px;padding:12px;border:1px solid #e5e7eb;border-radius:12px;background:#f9fafb;">
     <p style="margin:0 0 10px 0;color:#111827;"><b>Cancel appointment</b></p>
     <a href="${cancelUrl}" style="display:inline-block;background:#ef4444;color:#fff;text-decoration:none;padding:10px 14px;border-radius:999px;font-weight:700;">Cancel Appointment</a>
