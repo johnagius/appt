@@ -375,9 +375,29 @@ export function doctorPage(sig: string): string {
     </div>
   </div>
 
+<div id="liveToast" style="display:none;position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:9999;background:#111827;color:#fff;padding:12px 24px;border-radius:12px;font-size:14px;font-weight:700;box-shadow:0 8px 24px rgba(0,0,0,0.3);transition:opacity 0.3s;pointer-events:none;">
+  <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#10b981;margin-right:8px;animation:pulse-dot 1s ease-in-out;"></span>
+  <span id="liveToastText">Schedule updated</span>
+</div>
+<style>@keyframes pulse-dot{0%,100%{opacity:1}50%{opacity:0.4}}</style>
+
 <script>
 var SIG = ${JSON.stringify(sig)};
-var _notifSound = { play: function() { try { var ctx = new (window.AudioContext || window.webkitAudioContext)(); var osc = ctx.createOscillator(); var gain = ctx.createGain(); osc.connect(gain); gain.connect(ctx.destination); osc.type = 'sine'; osc.frequency.setValueAtTime(880, ctx.currentTime); osc.frequency.setValueAtTime(1174, ctx.currentTime + 0.1); gain.gain.setValueAtTime(0.3, ctx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4); osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.4); } catch(e) {} } };
+var _audioCtx = null;
+document.addEventListener('click', function() { if (!_audioCtx) try { _audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e) {} }, { once: false });
+function playNotifSound() {
+  if (!_audioCtx) try { _audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e) { return; }
+  try {
+    if (_audioCtx.state === 'suspended') _audioCtx.resume();
+    var osc = _audioCtx.createOscillator(); var gain = _audioCtx.createGain();
+    osc.connect(gain); gain.connect(_audioCtx.destination); osc.type = 'sine';
+    osc.frequency.setValueAtTime(880, _audioCtx.currentTime);
+    osc.frequency.setValueAtTime(1174, _audioCtx.currentTime + 0.1);
+    gain.gain.setValueAtTime(0.3, _audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, _audioCtx.currentTime + 0.4);
+    osc.start(_audioCtx.currentTime); osc.stop(_audioCtx.currentTime + 0.4);
+  } catch(e) {}
+}
 var _todayKey = '';
 var _selectedDateKey = '';
 var _workingHours = null;
@@ -1421,7 +1441,15 @@ function connectWS() {
     try {
       var msg = JSON.parse(ev.data);
       if (msg.type === 'slots_updated' || msg.type === 'slots_data' || msg.type === 'dashboard_data') {
-        try { _notifSound.play(); } catch(e2) {}
+        // Toast notification
+        var toast = document.getElementById('liveToast');
+        var toastTxt = document.getElementById('liveToastText');
+        if (toast && toastTxt) {
+          toastTxt.textContent = 'Schedule updated — new booking or change';
+          toast.style.display = 'block'; toast.style.opacity = '1';
+          setTimeout(function(){ toast.style.opacity = '0'; setTimeout(function(){ toast.style.display = 'none'; }, 300); }, 4000);
+        }
+        playNotifSound();
         if (!_idlePaused && !_refreshInFlight) {
           _refreshInFlight = true;
           _cachedDateAppointments = {};
