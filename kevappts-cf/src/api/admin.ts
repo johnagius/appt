@@ -1088,13 +1088,13 @@ export async function apiAdminPurgeTestData(req: Request, env: Env): Promise<Res
   if (deny) return deny;
 
   // Delete calendar events for test appointments first
-  const testAppts = await env.DB.prepare("SELECT id, calendar_event_id, clinic FROM appointments WHERE id LIKE 'TEST-%' AND calendar_event_id != ''").all();
+  const testAppts = await env.DB.prepare("SELECT id, calendar_event_id, clinic FROM appointments WHERE (id LIKE 'TEST-%' OR full_name LIKE 'Test %' OR full_name LIKE 'TEST %') AND calendar_event_id != ''").all();
   for (const row of (testAppts.results || [])) {
     try { await deleteCalendarEvent(env, row.calendar_event_id as string, (row.clinic as string || 'potters') as any); } catch {}
   }
 
-  // Delete all appointments with ID starting with 'TEST-'
-  const result = await env.DB.prepare("DELETE FROM appointments WHERE id LIKE 'TEST-%'").run();
+  // Delete all test appointments (by ID prefix OR name starting with Test/TEST)
+  const result = await env.DB.prepare("DELETE FROM appointments WHERE id LIKE 'TEST-%' OR full_name LIKE 'Test %' OR full_name LIKE 'TEST %'").run();
   // Also delete test clients
   await env.DB.prepare("DELETE FROM clients WHERE email = 'test@example.com'").run();
   await bumpVersion(env.DB);
