@@ -789,6 +789,17 @@ export function adminPage(sig: string): string {
 
     <div class="stats-grid" style="margin-top:12px;">
       <div class="card">
+        <h3>Cancellations</h3>
+        <div id="spCancelChart"></div>
+      </div>
+      <div class="card">
+        <h3>Top Cancellers</h3>
+        <div id="spCancellersChart"></div>
+      </div>
+    </div>
+
+    <div class="stats-grid" style="margin-top:12px;">
+      <div class="card">
         <h3>Bookings by Country</h3>
         <div id="spCountryChart"></div>
       </div>
@@ -1067,8 +1078,9 @@ function transformResponse(method, res) {
     var st = res.stats;
     for (var k in st) res[k] = st[k];
     // Map field names the old code expects
-    res.totalBooked = st.total || 0;
-    res.totalUniquePatients = st.uniquePatients || 0;
+    res.totalBooked = st.totalBooked || st.total - st.cancelled || 0;
+    res.totalCancelled = st.cancelled || 0;
+    res.totalUniquePatients = st.totalUniquePatients || st.uniquePatients || 0;
     res.utilization = st.utilization || 0;
     res.repeatPatients = st.repeatPatients || 0;
     res.trendDirection = st.trendDirection || '';
@@ -3315,6 +3327,8 @@ function renderSpinolaStats(sp) {
   renderSpWeeklyTrend(sp.weeklyTrend);
   renderSpPeakHours(sp.peakHours);
   renderSpTopPatients(sp.topPatients);
+  renderSpCancelBreakdown(sp);
+  renderSpTopCancellers(sp.topCancellers);
   renderSpCountryBreakdown(sp.countryBreakdown);
 }
 
@@ -3402,6 +3416,42 @@ function renderSpTopPatients(patients) {
     html += '<div class="patient-name">' + esc(p.name) + '</div>';
     html += '<div class="patient-count">' + p.count + ' visits</div>';
     html += '</div>';
+  }
+  el.innerHTML = html;
+}
+
+function renderSpCancelBreakdown(sp) {
+  var el = document.getElementById('spCancelChart');
+  if (!el) return;
+  var cb = sp.cancelBreakdown || { byDoctor: 0, byPatient: 0 };
+  var total = cb.byDoctor + cb.byPatient;
+  var html = '<div style="margin-bottom:12px;">';
+  html += '<div style="font-size:36px;font-weight:900;color:' + (sp.cancelRate < 10 ? 'var(--good)' : sp.cancelRate < 20 ? '#f59e0b' : 'var(--bad)') + ';">' + sp.cancelRate + '%</div>';
+  html += '<div style="font-size:12px;color:var(--muted);">Cancel rate</div></div>';
+  if (total > 0) {
+    var pctD = Math.round(cb.byDoctor / total * 100);
+    var pctP = 100 - pctD;
+    html += '<div class="h-bar-row"><div class="h-bar-label" style="width:70px;">By Doctor</div>';
+    html += '<div class="h-bar-track"><div class="h-bar-fill" style="width:' + pctD + '%;background:#f59e0b;"></div></div>';
+    html += '<div class="h-bar-pct">' + cb.byDoctor + '</div></div>';
+    html += '<div class="h-bar-row"><div class="h-bar-label" style="width:70px;">By Patient</div>';
+    html += '<div class="h-bar-track"><div class="h-bar-fill" style="width:' + pctP + '%;background:#ef4444;"></div></div>';
+    html += '<div class="h-bar-pct">' + cb.byPatient + '</div></div>';
+  } else { html += '<div class="empty">No cancellations yet.</div>'; }
+  el.innerHTML = html;
+}
+
+function renderSpTopCancellers(cancellers) {
+  var el = document.getElementById('spCancellersChart');
+  if (!el) return;
+  if (!cancellers || !cancellers.length) { el.innerHTML = '<div class="empty">No cancellers yet.</div>'; return; }
+  var html = '';
+  for (var i = 0; i < cancellers.length; i++) {
+    var c = cancellers[i];
+    html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line);">';
+    html += '<div><span style="display:inline-block;width:22px;height:22px;border-radius:50%;background:#ef4444;color:#fff;text-align:center;line-height:22px;font-size:11px;font-weight:900;margin-right:8px;">' + (i+1) + '</span>';
+    html += '<span style="font-weight:700;">' + esc(c.name) + '</span></div>';
+    html += '<span style="color:#ef4444;font-weight:700;font-size:13px;">' + c.count + ' cancelled</span></div>';
   }
   el.innerHTML = html;
 }
