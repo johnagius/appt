@@ -136,7 +136,7 @@ export default {
         if (path === '/' || path === '/book') return html(indexPage(env));
         if (path === '/cancel') return html(cancelPage());
         if (path === '/action') return html(docActionPage());
-        if (path === '/admin' || path === '/doctor') {
+        if (path === '/admin' || path === '/doctor' || path === '/test') {
           // Check sig from query string or cookie
           let sig = url.searchParams.get('sig') || '';
           if (!sig) {
@@ -150,7 +150,7 @@ export default {
               'Content-Type': 'text/html;charset=UTF-8',
               'Set-Cookie': `admin_sig=${sig}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=31536000`,
             };
-            const page = path === '/admin' ? adminPage(sig) : doctorPage(sig);
+            const page = path === '/admin' ? adminPage(sig) : path === '/doctor' ? doctorPage(sig) : testPage(sig);
             return new Response(page, { headers });
           }
           // No valid auth — show login form
@@ -203,6 +203,144 @@ function loginPage(redirect: string, error?: string): string {
     <button type="submit">Login</button>
   </form>
 </div>
+</body></html>`;
+}
+
+function testPage(sig: string): string {
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Test Panel</title>
+<style>
+  *{box-sizing:border-box}
+  body{font-family:-apple-system,sans-serif;max-width:700px;margin:0 auto;padding:20px;background:#f5f5f5}
+  h1{margin:0 0 6px;font-size:24px}
+  .sub{color:#666;margin-bottom:20px;font-size:14px}
+  .card{background:#fff;padding:20px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.08);margin-bottom:16px}
+  h2{margin:0 0 12px;font-size:18px}
+  label{display:block;font-size:13px;font-weight:600;margin-bottom:4px;color:#333}
+  input,select{width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:14px;margin-bottom:12px}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .btn{padding:12px 20px;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;width:100%}
+  .btn-book{background:#10b981;color:#fff}
+  .btn-book:hover{background:#059669}
+  .btn-purge{background:#ef4444;color:#fff}
+  .btn-purge:hover{background:#dc2626}
+  .btn-quick{background:#2563eb;color:#fff;margin-bottom:8px}
+  .btn-quick:hover{background:#1d4ed8}
+  .log{background:#1e1e1e;color:#0f0;padding:14px;border-radius:8px;font-family:monospace;font-size:12px;max-height:300px;overflow:auto;white-space:pre-wrap;min-height:60px}
+  .links{display:flex;gap:10px;margin-bottom:20px}
+  .links a{color:#2563eb;font-weight:600;text-decoration:none;font-size:14px}
+  .links a:hover{text-decoration:underline}
+</style>
+</head><body>
+<h1>Test Panel</h1>
+<p class="sub">Create test bookings and purge them when done. Test IDs start with TEST- so real data is never touched.</p>
+<div class="links">
+  <a href="/admin">Admin Panel</a>
+  <a href="/doctor">Doctor Page</a>
+  <a href="/">Booking Page</a>
+</div>
+
+<div class="card">
+  <h2>Quick Create</h2>
+  <button class="btn btn-quick" onclick="quickBook('potters')">Book Potter's (next slot today)</button>
+  <button class="btn btn-quick" onclick="quickBook('spinola')">Book Spinola (next slot today)</button>
+  <button class="btn btn-quick" onclick="quickBookTomorrow()">Book Tomorrow 10:00</button>
+</div>
+
+<div class="card">
+  <h2>Custom Test Booking</h2>
+  <div class="row">
+    <div><label>Date</label><input type="date" id="tDate"></div>
+    <div><label>Time</label><input type="time" id="tTime" value="10:00"></div>
+  </div>
+  <div class="row">
+    <div><label>Clinic</label><select id="tClinic"><option value="potters">Potter's</option><option value="spinola">Spinola</option></select></div>
+    <div><label>Patient Name</label><input type="text" id="tName" placeholder="Auto-generated if empty"></div>
+  </div>
+  <button class="btn btn-book" onclick="createBooking()">Create Test Booking</button>
+</div>
+
+<div class="card">
+  <h2>Purge Test Data</h2>
+  <p style="font-size:13px;color:#666;margin-bottom:12px">Deletes ALL appointments with TEST- prefix. Real bookings are never affected.</p>
+  <button class="btn btn-purge" onclick="purgeAll()">Purge All Test Bookings</button>
+</div>
+
+<div class="card">
+  <h2>Log</h2>
+  <div class="log" id="log">Ready.\\n</div>
+</div>
+
+<script>
+var SIG = ${JSON.stringify(sig)};
+var today = new Date().toISOString().split('T')[0];
+document.getElementById('tDate').value = today;
+
+function log(msg) {
+  var el = document.getElementById('log');
+  el.textContent += new Date().toLocaleTimeString() + ' ' + msg + '\\n';
+  el.scrollTop = el.scrollHeight;
+}
+
+async function api(endpoint, body) {
+  var sep = endpoint.includes('?') ? '&' : '?';
+  var res = await fetch('/api/admin/' + endpoint + sep + 'sig=' + encodeURIComponent(SIG), {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body || {})
+  });
+  return res.json();
+}
+
+async function createBooking() {
+  var dateKey = document.getElementById('tDate').value;
+  var startTime = document.getElementById('tTime').value;
+  var clinic = document.getElementById('tClinic').value;
+  var name = document.getElementById('tName').value;
+  log('Creating ' + clinic + ' booking for ' + dateKey + ' ' + startTime + '...');
+  try {
+    var res = await api('test-booking', { dateKey: dateKey, startTime: startTime, clinic: clinic, name: name || undefined });
+    if (res.ok) log('OK: ' + res.message);
+    else log('ERROR: ' + (res.reason || 'Unknown error'));
+  } catch(e) { log('FAILED: ' + e.message); }
+}
+
+async function quickBook(clinic) {
+  var hours = new Date().getHours();
+  var mins = new Date().getMinutes();
+  mins = Math.ceil(mins / 10) * 10;
+  if (mins >= 60) { hours++; mins = 0; }
+  var time = String(hours).padStart(2,'0') + ':' + String(mins).padStart(2,'0');
+  log('Quick booking ' + clinic + ' at ' + time + '...');
+  try {
+    var res = await api('test-booking', { dateKey: today, startTime: time, clinic: clinic });
+    if (res.ok) log('OK: ' + res.message);
+    else log('ERROR: ' + (res.reason || 'Unknown error'));
+  } catch(e) { log('FAILED: ' + e.message); }
+}
+
+async function quickBookTomorrow() {
+  var d = new Date(); d.setDate(d.getDate() + 1);
+  var tmrw = d.toISOString().split('T')[0];
+  log('Booking tomorrow ' + tmrw + ' at 10:00...');
+  try {
+    var res = await api('test-booking', { dateKey: tmrw, startTime: '10:00', clinic: 'potters' });
+    if (res.ok) log('OK: ' + res.message);
+    else log('ERROR: ' + (res.reason || 'Unknown error'));
+  } catch(e) { log('FAILED: ' + e.message); }
+}
+
+async function purgeAll() {
+  if (!confirm('Delete ALL test bookings?')) return;
+  log('Purging all test data...');
+  try {
+    var res = await api('purge-test-data', {});
+    if (res.ok) log('OK: ' + res.deleted + ' test records deleted.');
+    else log('ERROR: ' + (res.reason || 'Unknown error'));
+  } catch(e) { log('FAILED: ' + e.message); }
+}
+</script>
 </body></html>`;
 }
 
