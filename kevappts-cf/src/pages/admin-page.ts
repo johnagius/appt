@@ -2256,7 +2256,7 @@ function processAction(action) {
           if (r.newDate) d += ' -> ' + r.newDate + ' ' + r.newTime;
           details.push(d);
         }
-        if (details.length) msg += '\n' + details.join('\n');
+        if (details.length) msg += '\\n' + details.join('\\n');
       }
       showMsg('actionMsg', 'good', msg);
       loadActionAppts();
