@@ -25,7 +25,7 @@ SPINOLA_LOCATION_DETAILS = "Near McDonald's, Love Statue, near bus stop, in Spin
 [[d1_databases]]
 binding = "DB"
 database_name = "kevappts-db"
-database_id = "placeholder-replace-after-creation"
+database_id = "dfd696b3-f6a7-484a-848e-aab1591d9261"
 
 # Durable Objects for real-time WebSockets
 [durable_objects]
