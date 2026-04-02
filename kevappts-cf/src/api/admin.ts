@@ -652,7 +652,6 @@ export async function apiAdminGetSettings(req: Request, env: Env): Promise<Respo
       apptDurationMin: cfg.apptDurationMin,
       advanceDays: cfg.advanceDays,
       maxActiveApptsPerPerson: cfg.maxActiveApptsPerPerson,
-      doublecheckCalendar: cfg.doublecheckCalendar,
       workingHours: cfg.workingHours,
       spinolaHours: cfg.spinolaHours,
     },
@@ -668,7 +667,7 @@ export async function apiAdminSaveSettings(req: Request, env: Env): Promise<Resp
   if (payload.apptDurationMin !== undefined) await setConfigValue(env.DB, 'APPT_DURATION_MIN', String(payload.apptDurationMin));
   if (payload.advanceDays !== undefined) await setConfigValue(env.DB, 'ADVANCE_DAYS', String(payload.advanceDays));
   if (payload.maxActiveApptsPerPerson !== undefined) await setConfigValue(env.DB, 'MAX_ACTIVE_APPTS_PER_PERSON', String(payload.maxActiveApptsPerPerson));
-  if (payload.doublecheckCalendar !== undefined) await setConfigValue(env.DB, 'DOUBLECHECK_CALENDAR', String(payload.doublecheckCalendar));
+
   if (payload.workingHours !== undefined) await setConfigValue(env.DB, 'WORKING_HOURS', JSON.stringify(payload.workingHours));
   if (payload.spinolaHours !== undefined) await setConfigValue(env.DB, 'SPINOLA_WORKING_HOURS', JSON.stringify(payload.spinolaHours));
   if (payload.pottersLocation !== undefined) await setConfigValue(env.DB, 'POTTERS_LOCATION', payload.pottersLocation);

@@ -13,6 +13,7 @@ import {
   sendRedirectToSpinolaEmail,
 } from '../services/email';
 import { generateId } from '../services/crypto';
+import { deleteCalendarEvent, createCalendarEvent } from '../services/calendar';
 
 function json(data: any, status = 200): Response {
   return new Response(JSON.stringify(data), {
@@ -88,6 +89,10 @@ export async function apiCancelAppointment(req: Request, env: Env): Promise<Resp
   const ctx = (globalThis as any).__ctx;
   if (ctx?.waitUntil) {
     ctx.waitUntil((async () => {
+      // Delete Google Calendar event
+      if (appt.calendar_event_id) {
+        try { await deleteCalendarEvent(env, appt.calendar_event_id, appt.clinic as any); } catch {}
+      }
       try { await sendClientCancelledEmail(env, appt, 'Your appointment has been cancelled.'); } catch {}
       try { await sendDoctorCancellationEmail(env, appt, 'Client cancelled via email link.'); } catch {}
       // Push slot freed notification — clients watching this date get instant update
@@ -139,6 +144,9 @@ export async function apiDoctorAction(req: Request, env: Env): Promise<Response>
     const ctx = (globalThis as any).__ctx;
     if (ctx?.waitUntil) {
       ctx.waitUntil((async () => {
+        if (appt.calendar_event_id) {
+          try { await deleteCalendarEvent(env, appt.calendar_event_id, appt.clinic as any); } catch {}
+        }
         try { await sendClientCancelledEmail(env, appt, 'Your appointment has been cancelled by the clinic. Please rebook if needed.'); } catch {}
         try { await sendDoctorCancellationEmail(env, appt, 'You cancelled this appointment.'); } catch {}
         try {
@@ -196,6 +204,16 @@ export async function apiDoctorAction(req: Request, env: Env): Promise<Response>
     const ctx = (globalThis as any).__ctx;
     if (ctx?.waitUntil) {
       ctx.waitUntil((async () => {
+        // Delete old Potter's calendar event, create new Spinola one
+        if (appt.calendar_event_id) {
+          try { await deleteCalendarEvent(env, appt.calendar_event_id, 'potters'); } catch {}
+        }
+        try {
+          const eventId = await createCalendarEvent(env, spinolaCopy);
+          if (eventId) {
+            await env.DB.prepare('UPDATE appointments SET calendar_event_id = ? WHERE id = ?').bind(eventId, spinolaCopy.id).run();
+          }
+        } catch {}
         try { await sendRedirectToSpinolaEmail(env, appt, spinolaLocation); } catch {}
         try { await sendDoctorCancellationEmail(env, appt, 'Appointment redirected to ' + spinolaLocation + '.'); } catch {}
         try {

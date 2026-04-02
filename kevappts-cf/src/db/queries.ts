@@ -35,7 +35,6 @@ export async function getConfig(db: D1Database): Promise<AppConfig> {
     apptDurationMin: dur,
     advanceDays: adv,
     maxActiveApptsPerPerson: maxActive,
-    doublecheckCalendar: map['DOUBLECHECK_CALENDAR'] !== 'false',
     workingHours,
     spinolaHours,
     pottersLocation: map['POTTERS_LOCATION'] || "Potter's Pharmacy Clinic",

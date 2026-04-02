@@ -19,6 +19,7 @@ import {
 import { generateId } from '../services/crypto';
 import { sendClientConfirmationEmail, sendDoctorBookingEmail } from '../services/email';
 import { sendSpinolaConfirmationEmail } from '../services/email';
+import { createCalendarEvent } from '../services/calendar';
 
 // ─── Poll ──────────────────────────────────────────────────
 
@@ -262,6 +263,15 @@ async function doBook(req: Request, env: Env, clinic: 'potters' | 'spinola'): Pr
   const ctx = (globalThis as any).__ctx;
   if (ctx?.waitUntil) {
     ctx.waitUntil((async () => {
+      // Create Google Calendar event (write-only, D1 is source of truth)
+      try {
+        const eventId = await createCalendarEvent(env, appt);
+        if (eventId) {
+          await env.DB.prepare('UPDATE appointments SET calendar_event_id = ? WHERE id = ?').bind(eventId, appt.id).run();
+        }
+      } catch (e) { console.error('Calendar create error:', e); }
+
+      // Send emails
       try {
         if (clinic === 'potters') {
           await sendClientConfirmationEmail(env, appt);

@@ -12,20 +12,22 @@ SPINOLA_DOCTOR_NAME = "Dr James"
 SPINOLA_LOCATION_DETAILS = "Near McDonald's, Love Statue, near bus stop, in Spinola"
 
 # Secrets (set via `wrangler secret put`):
-# SIGNING_SECRET
-# ADMIN_SECRET
-# RESEND_API_KEY
-# GOOGLE_SERVICE_ACCOUNT_JSON
-# GOOGLE_CALENDAR_ID
-# GOOGLE_SPINOLA_CALENDAR_ID
-# DOCTOR_EMAIL
+# SIGNING_SECRET          — HMAC key for cancel/action links (reuse from GAS)
+# ADMIN_SECRET            — HMAC key for admin panel (reuse from GAS)
+# RESEND_API_KEY          — Resend email API key
+# DOCTOR_EMAIL            — Doctor's email for daily schedule
+# GOOGLE_CLIENT_ID        — OAuth2 client ID for Calendar API
+# GOOGLE_CLIENT_SECRET    — OAuth2 client secret
+# GOOGLE_REFRESH_TOKEN    — OAuth2 refresh token (one-time setup)
+# GOOGLE_CALENDAR_ID      — Potter's Google Calendar ID
+# GOOGLE_SPINOLA_CALENDAR_ID — Spinola Google Calendar ID
 
 [[d1_databases]]
 binding = "DB"
 database_name = "kevappts-db"
 database_id = "placeholder-replace-after-creation"
 
-# Durable Objects for real-time SSE
+# Durable Objects for real-time WebSockets
 [durable_objects]
 bindings = [
   { name = "REALTIME", class_name = "RealtimeHub" }

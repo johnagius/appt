@@ -78,7 +78,7 @@ INSERT OR IGNORE INTO data_version (id, version) VALUES (1, 0);
 INSERT OR IGNORE INTO config (key, value) VALUES ('APPT_DURATION_MIN', '10');
 INSERT OR IGNORE INTO config (key, value) VALUES ('ADVANCE_DAYS', '7');
 INSERT OR IGNORE INTO config (key, value) VALUES ('MAX_ACTIVE_APPTS_PER_PERSON', '0');
-INSERT OR IGNORE INTO config (key, value) VALUES ('DOUBLECHECK_CALENDAR', 'true');
+
 INSERT OR IGNORE INTO config (key, value) VALUES ('WORKING_HOURS', '{"MON":[{"start":"09:00","end":"12:00"},{"start":"17:00","end":"19:00"}],"TUE":[{"start":"09:00","end":"12:00"},{"start":"17:00","end":"19:00"}],"WED":[{"start":"09:00","end":"12:00"},{"start":"17:00","end":"19:00"}],"THU":[{"start":"09:00","end":"12:00"},{"start":"17:00","end":"19:00"}],"FRI":[{"start":"09:00","end":"12:00"},{"start":"17:00","end":"19:00"}],"SAT":[{"start":"10:00","end":"12:00"}],"SUN":[]}');
 INSERT OR IGNORE INTO config (key, value) VALUES ('SPINOLA_WORKING_HOURS', '{"MON":[{"start":"09:00","end":"14:00"},{"start":"16:00","end":"19:00"}],"TUE":[{"start":"09:00","end":"14:00"},{"start":"16:00","end":"19:00"}],"WED":[{"start":"09:00","end":"14:00"},{"start":"16:00","end":"19:00"}],"THU":[{"start":"09:00","end":"14:00"},{"start":"16:00","end":"19:00"}],"FRI":[{"start":"09:00","end":"14:00"},{"start":"16:00","end":"19:00"}],"SAT":[{"start":"09:00","end":"13:00"},{"start":"16:00","end":"19:00"}],"SUN":[{"start":"10:00","end":"12:00"}]}');
 INSERT OR IGNORE INTO config (key, value) VALUES ('POTTERS_LOCATION', 'Potter''s Pharmacy Clinic');
