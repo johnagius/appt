@@ -1259,7 +1259,7 @@ function renderCalendar() {
     if (disabled) cls += ' disabled';
     if (cancelled) cls += ' cancelled';
     if (selected) cls += ' selected';
-    daysHtml.push('<button class="' + cls + '"' + (disabled ? ' disabled' : ' onclick="toggleDateSelection(\'' + dateKey + '\')"') + '>'
+    daysHtml.push('<button class="' + cls + '"' + (disabled ? ' disabled' : ' onclick="toggleDateSelection(\\'' + dateKey + '\\')"') + '>'
       + (cancelled ? '<span class="day-x">×</span>' : '')
       + '<span class="day-num">' + day + '</span>'
       + '<span class="day-mark">' + (cancelled ? 'Cancelled' : (selected ? 'Selected' : '&nbsp;')) + '</span>'
