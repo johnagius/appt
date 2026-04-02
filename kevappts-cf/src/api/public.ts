@@ -49,8 +49,10 @@ export async function apiInit(env: Env): Promise<Response> {
   let initialSlots = null;
   let initialSpinola = null;
   if (firstDateKey) {
-    initialSlots = buildAvailabilityResponse(firstDateKey, cfg, offMap, extraMap, tz, 'potters', env);
-    initialSpinola = buildAvailabilityResponse(firstDateKey, cfg, offMap, extraMap, tz, 'spinola', env);
+    [initialSlots, initialSpinola] = await Promise.all([
+      buildAvailabilityResponse(firstDateKey, cfg, offMap, extraMap, tz, 'potters', env),
+      buildAvailabilityResponse(firstDateKey, cfg, offMap, extraMap, tz, 'spinola', env),
+    ]);
   }
 
   const v = await getDataVersion(env.DB);
