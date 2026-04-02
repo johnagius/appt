@@ -21,6 +21,7 @@ import {
   sendClientCancelledEmail, sendRedirectToSpinolaEmail,
   sendAppointmentPushedEmail, sendCustomNotificationEmail, sendReviewRequestEmail,
 } from '../services/email';
+import { createCalendarEvent, deleteCalendarEvent } from '../services/calendar';
 
 function json(data: any, status = 200): Response {
   return new Response(JSON.stringify(data), {
@@ -1071,12 +1072,26 @@ export async function apiAdminCreateTestBooking(req: Request, env: Env): Promise
   await bumpVersion(env.DB);
   broadcast(env, dateKey);
 
+  // Create Google Calendar event
+  try {
+    const eventId = await createCalendarEvent(env, appt);
+    if (eventId) {
+      await env.DB.prepare('UPDATE appointments SET calendar_event_id = ? WHERE id = ?').bind(eventId, appt.id).run();
+    }
+  } catch (e) { console.error('Calendar create error:', e); }
+
   return json({ ok: true, appointment: appt, message: 'Test booking created: ' + id });
 }
 
 export async function apiAdminPurgeTestData(req: Request, env: Env): Promise<Response> {
   const deny = await requireAdmin(req, env);
   if (deny) return deny;
+
+  // Delete calendar events for test appointments first
+  const testAppts = await env.DB.prepare("SELECT id, calendar_event_id, clinic FROM appointments WHERE id LIKE 'TEST-%' AND calendar_event_id != ''").all();
+  for (const row of (testAppts.results || [])) {
+    try { await deleteCalendarEvent(env, row.calendar_event_id as string, (row.clinic as string || 'potters') as any); } catch {}
+  }
 
   // Delete all appointments with ID starting with 'TEST-'
   const result = await env.DB.prepare("DELETE FROM appointments WHERE id LIKE 'TEST-%'").run();
