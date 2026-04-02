@@ -914,6 +914,20 @@ export async function apiAdminGetStatistics(req: Request, env: Env): Promise<Res
           for (const [p, n] of Object.entries(countryMap)) { if (ph.startsWith(p)) { cn = n; break; } }
           sCountry[cn] = (sCountry[cn] || 0) + 1;
         }
+        // Spinola cancellation breakdown
+        const sCancelledClient = spinolaAppts.filter(a => a.status === 'CANCELLED_CLIENT').length;
+        const sCancelledDoctor = spinolaAppts.filter(a => a.status === 'CANCELLED_DOCTOR').length;
+        // Spinola top cancellers
+        const sCancellerCounts: Record<string, number> = {};
+        for (const a of spinolaAppts) {
+          if (!a.status.includes('CANCELLED')) continue;
+          const key = a.full_name + '|' + a.email;
+          sCancellerCounts[key] = (sCancellerCounts[key] || 0) + 1;
+        }
+        const sTopCancellers = Object.entries(sCancellerCounts)
+          .sort((a, b) => b[1] - a[1]).slice(0, 10)
+          .map(([k, c]) => ({ name: k.split('|')[0], email: k.split('|')[1], count: c }));
+
         return {
           totalBooked: spinolaCount - spinolaCancelled,
           cancelRate: spinolaCount > 0 ? (spinolaCancelled / spinolaCount * 100).toFixed(1) : '0',
@@ -921,6 +935,8 @@ export async function apiAdminGetStatistics(req: Request, env: Env): Promise<Res
           uniquePatients: spinolaUniqueEmails.size,
           directBookings: spinolaDirect,
           relocatedBookings: spinolaRedirected,
+          cancelBreakdown: { byDoctor: sCancelledDoctor, byPatient: sCancelledClient },
+          topCancellers: sTopCancellers,
           weeklyTrend: sWeekly,
           hourlyDistribution: sHourly,
           topPatients: sTopPat,
