@@ -86,7 +86,7 @@ export default {
         const redirect = (form.get('redirect') as string) || '/admin';
         const sig = await computeAdminSig(env.ADMIN_SECRET);
         // Compare password against ADMIN_SECRET
-        if (password === env.ADMIN_SECRET) {
+        if (password === env.ADMIN_PASSWORD || password === env.ADMIN_SECRET) {
           return new Response(null, {
             status: 302,
             headers: {
