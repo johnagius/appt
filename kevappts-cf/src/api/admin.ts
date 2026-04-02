@@ -31,11 +31,14 @@ function json(data: any, status = 200): Response {
 
 async function requireAdmin(req: Request, env: Env): Promise<Response | null> {
   const url = new URL(req.url);
+  // Check query string sig
   const sig = (url.searchParams.get('sig') || '').trim();
-  if (!await verifyAdminSig(sig, env.ADMIN_SECRET)) {
-    return json({ ok: false, reason: 'Access denied.' }, 403);
-  }
-  return null;
+  if (sig && await verifyAdminSig(sig, env.ADMIN_SECRET)) return null;
+  // Check cookie
+  const cookie = req.headers.get('Cookie') || '';
+  const match = cookie.match(/(?:^|;\s*)admin_sig=([^\s;]+)/);
+  if (match && await verifyAdminSig(match[1], env.ADMIN_SECRET)) return null;
+  return json({ ok: false, reason: 'Access denied.' }, 403);
 }
 
 function broadcast(env: Env, dateKey: string) {

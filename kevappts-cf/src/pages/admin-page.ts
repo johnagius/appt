@@ -199,6 +199,7 @@ async function api(path, opts = {}) {
   const url = API + path + sep + 'sig=' + encodeURIComponent(SIG);
   const res = await fetch(url, {
     ...opts,
+    credentials: 'same-origin',
     headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) },
   });
   return res.json();

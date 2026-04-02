@@ -97,7 +97,7 @@ function renderTable(containerId, appts) {
 
 async function loadSchedule() {
   try {
-    const res = await fetch('/api/admin/dashboard?sig=' + encodeURIComponent(SIG));
+    const res = await fetch('/api/admin/dashboard?sig=' + encodeURIComponent(SIG), { credentials: 'same-origin' });
     const data = await res.json();
     if (!data.ok) return;
 
