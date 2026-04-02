@@ -891,32 +891,66 @@ export function adminPage(sig: string): string {
   </div>
 </div>
 
+<div id="liveToast" style="display:none;position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:9999;background:#111827;color:#fff;padding:12px 24px;border-radius:12px;font-size:14px;font-weight:700;box-shadow:0 8px 24px rgba(0,0,0,0.3);transition:opacity 0.3s;pointer-events:none;">
+  <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#10b981;margin-right:8px;animation:pulse-dot 1s ease-in-out;"></span>
+  <span id="liveToastText">New booking received</span>
+</div>
+<style>@keyframes pulse-dot{0%,100%{opacity:1}50%{opacity:0.4}}</style>
 
 <script>
 var SIG = ${JSON.stringify(sig)};
 var _silentRefresh = false;
+var _audioCtx = null;
+var _userInteracted = false;
 
-// Notification sound (short ping tone generated via Web Audio API)
-var _notifSound = (function() {
-  return {
-    play: function() {
-      try {
-        var ctx = new (window.AudioContext || window.webkitAudioContext)();
-        var osc = ctx.createOscillator();
-        var gain = ctx.createGain();
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(880, ctx.currentTime);
-        osc.frequency.setValueAtTime(1174, ctx.currentTime + 0.1);
-        gain.gain.setValueAtTime(0.3, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4);
-        osc.start(ctx.currentTime);
-        osc.stop(ctx.currentTime + 0.4);
-      } catch(e) {}
-    }
-  };
-})();
+// Enable audio after first user interaction (Chrome requirement)
+document.addEventListener('click', function() {
+  if (!_userInteracted) {
+    _userInteracted = true;
+    try { _audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e) {}
+  }
+}, { once: false });
+document.addEventListener('keydown', function() {
+  if (!_userInteracted) {
+    _userInteracted = true;
+    try { _audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e) {}
+  }
+}, { once: false });
+
+function playNotifSound() {
+  if (!_audioCtx) {
+    try { _audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e) { return; }
+  }
+  try {
+    if (_audioCtx.state === 'suspended') _audioCtx.resume();
+    var osc = _audioCtx.createOscillator();
+    var gain = _audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(_audioCtx.destination);
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(880, _audioCtx.currentTime);
+    osc.frequency.setValueAtTime(1174, _audioCtx.currentTime + 0.1);
+    gain.gain.setValueAtTime(0.3, _audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, _audioCtx.currentTime + 0.4);
+    osc.start(_audioCtx.currentTime);
+    osc.stop(_audioCtx.currentTime + 0.4);
+  } catch(e) {}
+}
+
+var _toastTimer = null;
+function showLiveToast(msg) {
+  var el = document.getElementById('liveToast');
+  var txt = document.getElementById('liveToastText');
+  if (!el || !txt) return;
+  txt.textContent = msg || 'Schedule updated';
+  el.style.display = 'block';
+  el.style.opacity = '1';
+  if (_toastTimer) clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(function() {
+    el.style.opacity = '0';
+    setTimeout(function() { el.style.display = 'none'; }, 300);
+  }, 4000);
+}
 
 // ── API Layer (fetch instead of google.script.run) ──
 async function apiCall(endpoint, opts) {
@@ -1358,11 +1392,15 @@ function loadDashboard() {
       loadSchedAppts();
       try { loadWeekOverview(); } catch(e) { console.error('Week overview error:', e); }
 
-      // Set default dates for Quick Actions
-      document.getElementById('actionDate').value = res.todayKey;
+      // Refresh Quick Actions — preserve user-selected date, only default if empty
+      if (!document.getElementById('actionDate').value) document.getElementById('actionDate').value = res.todayKey;
       loadActionAppts();
-      document.getElementById('notifyDate').value = res.todayKey;
+      if (!document.getElementById('notifyDate').value) document.getElementById('notifyDate').value = res.todayKey;
       loadNotifyAppts();
+
+      // Refresh stats if they were loaded
+      if (_statsLoaded) { _statsLoaded = false; loadStatistics(); }
+
 
       // Reset poll timer after manual load
       _lastRefreshTime = Date.now();
@@ -3508,6 +3546,11 @@ function connectWS() {
       var msg = JSON.parse(ev.data);
       console.log('[WS] Message received:', msg.type);
       if (msg.type === 'slots_updated' || msg.type === 'slots_data' || msg.type === 'dashboard_data' || msg.type === 'appointment_changed') {
+        console.log('[WS] Triggering refresh and notification');
+        // Show toast notification on ALL tabs
+        showLiveToast('New booking or schedule change detected');
+        // Play notification sound
+        playNotifSound();
         // Silent refresh — no loading overlay
         _silentRefresh = true;
         if (typeof loadDashboard === 'function') loadDashboard();
@@ -3515,8 +3558,6 @@ function connectWS() {
         var lastEl = document.getElementById('refreshLastText');
         if (lastEl) lastEl.textContent = 'Live update received';
         _lastRefreshTime = Date.now();
-        // Play notification sound
-        try { _notifSound.play(); } catch(e2) {}
       }
     } catch(e) { console.log('[WS] Parse error:', e); }
   };
