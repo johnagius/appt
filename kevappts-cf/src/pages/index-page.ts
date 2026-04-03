@@ -2567,6 +2567,18 @@ export function indexPage(env: Env): string {
               _programmaticDateChange = true;
               els.dateSelect.value = prevSelected;
               _programmaticDateChange = false;
+            } else {
+              // Previous date no longer available — select first enabled
+              var first = state.dateOptions.find(function(o) { return !o.disabled; });
+              if (first) {
+                _programmaticDateChange = true;
+                els.dateSelect.value = first.dateKey;
+                state.selectedDateKey = first.dateKey;
+                state.selectedDateLabel = localDate(first.dateKey);
+                els.sumDate.textContent = t('dateTemplate', state.selectedDateLabel);
+                _programmaticDateChange = false;
+                loadAvailability(true, false);
+              }
             }
           }
         })
