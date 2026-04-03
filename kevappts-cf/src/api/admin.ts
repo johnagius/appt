@@ -283,6 +283,10 @@ export async function apiAdminProcessAppointments(req: Request, env: Env): Promi
 
   if (action === 'cancel') {
     for (const appt of appts) {
+      // Delete calendar event
+      if (appt.calendar_event_id) {
+        try { await deleteCalendarEvent(env, appt.calendar_event_id, (appt.clinic as any) || 'potters'); } catch {}
+      }
       await updateAppointmentStatus(env.DB, appt.id, {
         status: 'CANCELLED_DOCTOR',
         cancelled_at: now,
@@ -374,6 +378,9 @@ export async function apiAdminProcessAppointments(req: Request, env: Env): Promi
       }
 
       if (!newSlot) {
+        if (appt.calendar_event_id) {
+          try { await deleteCalendarEvent(env, appt.calendar_event_id, (appt.clinic as any) || 'potters'); } catch {}
+        }
         await updateAppointmentStatus(env.DB, appt.id, {
           status: 'CANCELLED_DOCTOR',
           cancelled_at: now,
@@ -384,6 +391,11 @@ export async function apiAdminProcessAppointments(req: Request, env: Env): Promi
         if (ctx?.waitUntil) ctx.waitUntil(sendClientCancelledEmail(env, appt, 'No slots available for rescheduling. Please rebook.').catch(() => {}));
         results.push({ appointmentId: appt.id, action: 'cancelled_no_slot', patient: appt.full_name });
         continue;
+      }
+
+      // Delete old calendar event
+      if (appt.calendar_event_id) {
+        try { await deleteCalendarEvent(env, appt.calendar_event_id, (appt.clinic as any) || 'potters'); } catch {}
       }
 
       // Cancel old
@@ -419,6 +431,14 @@ export async function apiAdminProcessAppointments(req: Request, env: Env): Promi
 
       await insertAppointment(env.DB, newAppt);
       takenOnNextDay.add(newSlot.start);
+
+      // Create new calendar event
+      try {
+        const eventId = await createCalendarEvent(env, newAppt);
+        if (eventId) {
+          await env.DB.prepare('UPDATE appointments SET calendar_event_id = ? WHERE id = ?').bind(eventId, newAppt.id).run();
+        }
+      } catch {}
 
       const ctx = (globalThis as any).__ctx;
       if (ctx?.waitUntil) ctx.waitUntil(sendAppointmentPushedEmail(env, appt, nextDay, newSlot.start, newSlot.end).catch(() => {}));
@@ -466,12 +486,20 @@ export async function apiAdminProcessAppointments(req: Request, env: Env): Promi
     for (const appt of appts) {
       const newSlot = availableAfterBreak.shift();
       if (!newSlot) {
+        if (appt.calendar_event_id) {
+          try { await deleteCalendarEvent(env, appt.calendar_event_id, (appt.clinic as any) || 'potters'); } catch {}
+        }
         await updateAppointmentStatus(env.DB, appt.id, {
           status: 'CANCELLED_DOCTOR', cancelled_at: now,
           cancel_reason: 'No available slot on same day', calendar_event_id: '',
         }, now);
         results.push({ appointmentId: appt.id, action: 'cancelled_no_slot', patient: appt.full_name });
         continue;
+      }
+
+      // Delete old calendar event
+      if (appt.calendar_event_id) {
+        try { await deleteCalendarEvent(env, appt.calendar_event_id, (appt.clinic as any) || 'potters'); } catch {}
       }
 
       await updateAppointmentStatus(env.DB, appt.id, {
@@ -503,6 +531,14 @@ export async function apiAdminProcessAppointments(req: Request, env: Env): Promi
 
       await insertAppointment(env.DB, newAppt);
       takenSameDay.add(newSlot.start);
+
+      // Create new calendar event
+      try {
+        const eventId = await createCalendarEvent(env, newAppt);
+        if (eventId) {
+          await env.DB.prepare('UPDATE appointments SET calendar_event_id = ? WHERE id = ?').bind(eventId, newAppt.id).run();
+        }
+      } catch {}
 
       const ctx = (globalThis as any).__ctx;
       if (ctx?.waitUntil) ctx.waitUntil(sendAppointmentPushedEmail(env, appt, dateKey, newSlot.start, newSlot.end).catch(() => {}));
