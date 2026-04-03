@@ -6,7 +6,13 @@ export function indexPage(env: Env): string {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Booking</title>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Potter's Pharmacy">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#f5b301">
+  <link rel="manifest" href="/manifest.json">
+  <title>Potter's Pharmacy - Book Appointment</title>
 
   <style>
     :root{
