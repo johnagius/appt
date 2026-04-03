@@ -2896,18 +2896,6 @@ export function indexPage(env: Env): string {
       if (_bp) _bp.textContent = 'See Potter\\'s Slots (from ' + to12h(pottersTime) + ')';
     }
 
-    function showChoiceBannerEarly(pottersSlots, spinolaRes, spinolaTime, pottersTime) {
-      _choicePottersSlots = pottersSlots;
-      _choiceSpinolaPrefetch = spinolaRes;
-      var banner = document.getElementById('choiceBanner');
-      banner.style.display = 'block';
-      document.getElementById('timeGrid').style.display = 'none';
-      var titleEl = banner.children[0];
-      var subEl = banner.children[1];
-      if (titleEl) titleEl.textContent = 'Spinola Clinic is open earlier today!';
-      if (subEl) subEl.innerHTML = 'Dr James at Spinola is available from <b>' + to12h(spinolaTime) + '</b>. Potter&#39;s Pharmacy opens at <b>' + to12h(pottersTime) + '</b>.';
-    }
-
     function hideChoiceBanner() {
       document.getElementById('choiceBanner').style.display = 'none';
       document.getElementById('timeGrid').style.display = '';
