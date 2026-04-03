@@ -2545,6 +2545,34 @@ export function indexPage(env: Env): string {
       if (state.selectedDateKey) loadAvailability(true);
     }
 
+    function refreshDateOptions() {
+      fetch('/api/dates')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (!data || !data.dateOptions) return;
+          state.dateOptions = data.dateOptions;
+          var prevSelected = state.selectedDateKey;
+          els.dateSelect.innerHTML = '';
+          state.dateOptions.forEach(function(opt) {
+            var o = document.createElement('option');
+            o.value = opt.dateKey;
+            o.textContent = localDate(opt.dateKey) + (opt.spinolaOnly ? ' — Spinola Clinic' : '') + (opt.disabled ? ' — ' + opt.reason : '');
+            o.disabled = !!opt.disabled;
+            els.dateSelect.appendChild(o);
+          });
+          // Restore previous selection if still available
+          if (prevSelected) {
+            var still = state.dateOptions.find(function(o) { return o.dateKey === prevSelected && !o.disabled; });
+            if (still) {
+              _programmaticDateChange = true;
+              els.dateSelect.value = prevSelected;
+              _programmaticDateChange = false;
+            }
+          }
+        })
+        .catch(function() {});
+    }
+
     function renderDates() {
       els.dateSelect.innerHTML = '';
 
@@ -3362,6 +3390,8 @@ export function indexPage(env: Env): string {
             }
             // Fallback notification (no data payload) — one lightweight fetch
             if (data.type === 'slots_updated') {
+              // Refresh date options (doctor-off changes affect which dates are available)
+              refreshDateOptions();
               if (data.dateKey === state.selectedDateKey || !data.dateKey) {
                 loadAvailability(true);
               }
