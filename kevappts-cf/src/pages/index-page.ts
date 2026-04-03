@@ -827,8 +827,8 @@ export function indexPage(env: Env): string {
         <div style="font-weight:800;font-size:15px;color:#1e40af;margin-bottom:4px;">Morning slots are full at Potter&#39;s</div>
         <div style="font-size:13px;color:#3b82f6;margin-bottom:14px;">You can see Dr James at Spinola Clinic now, or wait for Potter&#39;s evening slots.</div>
         <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
-          <button type="button" onclick="showChoiceSpinola()" style="flex:1;min-width:140px;max-width:240px;padding:12px 16px;border:none;border-radius:12px;background:#8b5cf6;color:#fff;font-weight:800;font-size:14px;cursor:pointer;">See Spinola Morning Slots</button>
-          <button type="button" onclick="showChoicePotters()" style="flex:1;min-width:140px;max-width:240px;padding:12px 16px;border:none;border-radius:12px;background:#f5b301;color:#111827;font-weight:800;font-size:14px;cursor:pointer;">See Potter&#39;s Evening Slots</button>
+          <button type="button" id="choiceBtnSpinola" onclick="showChoiceSpinola()" style="flex:1;min-width:140px;max-width:240px;padding:12px 16px;border:none;border-radius:12px;background:#8b5cf6;color:#fff;font-weight:800;font-size:14px;cursor:pointer;">See Spinola Slots</button>
+          <button type="button" id="choiceBtnPotters" onclick="showChoicePotters()" style="flex:1;min-width:140px;max-width:240px;padding:12px 16px;border:none;border-radius:12px;background:#f5b301;color:#111827;font-weight:800;font-size:14px;cursor:pointer;">See Potter&#39;s Slots</button>
         </div>
       </div>
       <div class="sectionTitle" data-i18n="selectTime">Select a time</div>
@@ -2864,8 +2864,36 @@ export function indexPage(env: Env): string {
     function showChoiceBanner(pottersSlots, spinolaRes) {
       _choicePottersSlots = pottersSlots;
       _choiceSpinolaPrefetch = spinolaRes;
-      document.getElementById('choiceBanner').style.display = 'block';
+      var banner = document.getElementById('choiceBanner');
+      banner.style.display = 'block';
       document.getElementById('timeGrid').style.display = 'none';
+      var titleEl = banner.children[0];
+      var subEl = banner.children[1];
+      var spinolaEarliest = getEarliestAvailableSlot((spinolaRes && spinolaRes.slots) || []);
+      var pottersEarliest = getEarliestAvailableSlot(pottersSlots || []);
+      if (titleEl) titleEl.textContent = 'Morning slots are full at Potter\\'s';
+      if (subEl) subEl.innerHTML = 'You can see Dr James at Spinola Clinic now, or wait for Potter\\'s later slots.';
+      var _bs = document.getElementById('choiceBtnSpinola');
+      var _bp = document.getElementById('choiceBtnPotters');
+      if (_bs) _bs.textContent = spinolaEarliest ? 'See Spinola Slots (from ' + to12h(spinolaEarliest.start) + ')' : 'See Spinola Slots';
+      if (_bp) _bp.textContent = pottersEarliest ? 'See Potter\\'s Slots (from ' + to12h(pottersEarliest.start) + ')' : 'See Potter\\'s Slots';
+    }
+
+    function showChoiceBannerEarly(pottersSlots, spinolaRes, spinolaTime, pottersTime) {
+      _choicePottersSlots = pottersSlots;
+      _choiceSpinolaPrefetch = spinolaRes;
+      var banner = document.getElementById('choiceBanner');
+      banner.style.display = 'block';
+      document.getElementById('timeGrid').style.display = 'none';
+      var titleEl = banner.children[0];
+      var subEl = banner.children[1];
+      if (titleEl) titleEl.textContent = 'Spinola Clinic is open earlier today!';
+      if (subEl) subEl.innerHTML = 'Dr James at Spinola is available from <b>' + to12h(spinolaTime) + '</b>. Potter&#39;s Pharmacy opens at <b>' + to12h(pottersTime) + '</b>.';
+      // Update button labels with times
+      var _bs = document.getElementById('choiceBtnSpinola');
+      var _bp = document.getElementById('choiceBtnPotters');
+      if (_bs) _bs.textContent = 'See Spinola Slots (from ' + to12h(spinolaTime) + ')';
+      if (_bp) _bp.textContent = 'See Potter\\'s Slots (from ' + to12h(pottersTime) + ')';
     }
 
     function showChoiceBannerEarly(pottersSlots, spinolaRes, spinolaTime, pottersTime) {
