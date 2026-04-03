@@ -2888,7 +2888,7 @@ export function indexPage(env: Env): string {
       var titleEl = banner.children[0];
       var subEl = banner.children[1];
       if (titleEl) titleEl.textContent = 'Spinola Clinic is open earlier today!';
-      if (subEl) subEl.innerHTML = 'Dr James at Spinola is available from <b>' + to12h(spinolaTime) + '</b>. Potter&#39;s Pharmacy opens at <b>' + to12h(pottersTime) + '</b>.';
+      if (subEl) subEl.innerHTML = 'Dr James at Spinola is available from <b>' + to12h(spinolaTime) + '</b>. Potter&#39;s Pharmacy Clinic opens at <b>' + to12h(pottersTime) + '</b>.';
       // Update button labels with times
       var _bs = document.getElementById('choiceBtnSpinola');
       var _bp = document.getElementById('choiceBtnPotters');
