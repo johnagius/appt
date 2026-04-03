@@ -303,7 +303,32 @@ export async function apiAdminProcessAppointments(req: Request, env: Env): Promi
   }
 
   if (action === 'redirect_spinola') {
+    const spinolaTaken = await getTakenSlots(env.DB, dateKey, 'spinola');
+
     for (const appt of appts) {
+      // Find available slot at Spinola — try same time first, then next available
+      const spinolaDateObj = parseDateKey(dateKey);
+      const spinolaSlots = buildSlotsForDate(spinolaDateObj, cfg.apptDurationMin, null, cfg.spinolaHours);
+      let spinolaSlot = spinolaSlots.find(s => s.start === appt.start_time && !spinolaTaken.has(s.start));
+      if (!spinolaSlot) {
+        spinolaSlot = spinolaSlots.find(s => !spinolaTaken.has(s.start));
+      }
+
+      if (!spinolaSlot) {
+        // No Spinola slots available — cancel instead
+        if (appt.calendar_event_id) {
+          try { await deleteCalendarEvent(env, appt.calendar_event_id, 'potters'); } catch {}
+        }
+        await updateAppointmentStatus(env.DB, appt.id, {
+          status: 'CANCELLED_DOCTOR', cancelled_at: now,
+          cancel_reason: 'No available slot at Spinola', calendar_event_id: '',
+        }, now);
+        const ctx = (globalThis as any).__ctx;
+        if (ctx?.waitUntil) ctx.waitUntil(sendClientCancelledEmail(env, appt, 'No slots available at Spinola Clinic for rescheduling. Please rebook.').catch(() => {}));
+        results.push({ appointmentId: appt.id, action: 'cancelled_no_slot', patient: appt.full_name });
+        continue;
+      }
+
       // Delete Potter's calendar event
       if (appt.calendar_event_id) {
         try { await deleteCalendarEvent(env, appt.calendar_event_id, 'potters'); } catch {}
@@ -315,7 +340,7 @@ export async function apiAdminProcessAppointments(req: Request, env: Env): Promi
         calendar_event_id: '',
       }, now);
 
-      // Create spinola copy
+      // Create spinola copy with verified available slot
       const spinolaCopyId = 'A-' + generateId();
       const spinolaToken = generateId();
       try {
@@ -326,10 +351,13 @@ export async function apiAdminProcessAppointments(req: Request, env: Env): Promi
           clinic: 'spinola',
           status: 'RELOCATED_SPINOLA',
           location: cfg.spinolaLocation,
+          start_time: spinolaSlot.start,
+          end_time: spinolaSlot.end,
           updated_at: now,
           calendar_event_id: '',
         });
       } catch {}
+      spinolaTaken.add(spinolaSlot.start);
 
       // Create Spinola calendar event
       try {
