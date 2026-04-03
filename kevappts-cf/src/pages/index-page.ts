@@ -1913,6 +1913,8 @@ export function indexPage(env: Env): string {
         els.sumTime.textContent = t('timeTemplate', to12h(_spinolaSelectedSlot.start), to12h(_spinolaSelectedSlot.end));
         els.sumLoc.textContent = t('locationTemplate', spinolaLoc);
       }
+      // Re-render banners in new language
+      updateBannerLanguage();
     }
 
     // ─── Language picker logic ───
@@ -2894,6 +2896,44 @@ export function indexPage(env: Env): string {
       var _bp = document.getElementById('choiceBtnPotters');
       if (_bs) _bs.textContent = t('choiceBtnSpinola').replace('{time}', to12h(spinolaTime));
       if (_bp) _bp.textContent = t('choiceBtnPotters').replace('{time}', to12h(pottersTime));
+    }
+
+    function updateBannerLanguage() {
+      // Update no-slots-today banner
+      var nsBanner = document.getElementById('noSlotsBanner');
+      if (nsBanner && nsBanner.style.display !== 'none') {
+        var _btxt = document.getElementById('noSlotsBannerText');
+        var _bsub = document.getElementById('noSlotsBannerSub');
+        if (_btxt) _btxt.textContent = t('noSlotsToday');
+        if (_bsub && state.selectedDateKey) {
+          var _nextDate = new Date(state.selectedDateKey + 'T12:00:00');
+          var _dateStr = _nextDate.toLocaleDateString(currentLang === 'en' ? 'en-GB' : currentLang, { weekday: 'long', day: 'numeric', month: 'long' });
+          _bsub.innerHTML = t('noSlotsTodayShowingDate').replace('{date}', '<b>' + _dateStr + '</b>');
+        }
+      }
+      // Update choice banner
+      var chBanner = document.getElementById('choiceBanner');
+      if (chBanner && chBanner.style.display !== 'none') {
+        var titleEl = chBanner.children[0];
+        var subEl = chBanner.children[1];
+        var _bs = document.getElementById('choiceBtnSpinola');
+        var _bp = document.getElementById('choiceBtnPotters');
+        // Determine which type of banner is showing
+        var pottersEarliest = _choicePottersSlots ? getEarliestAvailableSlot(_choicePottersSlots) : null;
+        var spinolaEarliest = _choiceSpinolaPrefetch ? getEarliestAvailableSlot((_choiceSpinolaPrefetch.slots || [])) : null;
+        var periods = _choicePottersSlots ? getAvailableSlotsByPeriod(_choicePottersSlots) : { morning: [], evening: [] };
+        if (periods.morning.length === 0 && periods.evening.length > 0) {
+          // Morning full banner
+          if (titleEl) titleEl.textContent = t('choiceMorningFull');
+          if (subEl) subEl.innerHTML = t('choiceMorningFullSub');
+        } else if (spinolaEarliest && pottersEarliest) {
+          // Earlier banner
+          if (titleEl) titleEl.textContent = t('choiceEarlier');
+          if (subEl) subEl.innerHTML = t('choiceEarlierSub').replace('{time1}', '<b>' + to12h(spinolaEarliest.start) + '</b>').replace('{time2}', '<b>' + to12h(pottersEarliest.start) + '</b>');
+        }
+        if (_bs && spinolaEarliest) _bs.textContent = t('choiceBtnSpinola').replace('{time}', to12h(spinolaEarliest.start));
+        if (_bp && pottersEarliest) _bp.textContent = t('choiceBtnPotters').replace('{time}', to12h(pottersEarliest.start));
+      }
     }
 
     function hideChoiceBanner() {
