@@ -2542,7 +2542,7 @@ export function indexPage(env: Env): string {
       if (!silent) setStatus('good', t('serviceSelected'));
 
       // Refresh slots when switching service (optional; safe)
-      if (state.selectedDateKey) loadAvailability(true);
+      if (state.selectedDateKey) loadAvailability(true, false);
     }
 
     function refreshDateOptions() {
@@ -3256,7 +3256,7 @@ export function indexPage(env: Env): string {
               state.selectedDateLabel = still.label;
             }
           }
-          if (state.selectedDateKey) loadAvailability(true);
+          if (state.selectedDateKey) loadAvailability(true, false);
         })
         .catch(function() { /* silent */ });
     }
@@ -3283,7 +3283,7 @@ export function indexPage(env: Env): string {
         if (isIdle() || document.hidden || !state.selectedDateKey) return;
         // Skip refresh while user is actively filling in details (has slot + recent activity)
         if ((state.selectedSlot || _spinolaSelectedSlot) && (Date.now() - _lastActivity < CLEAR_MS)) return;
-        loadAvailability(true);
+        loadAvailability(true, false);
       }, 30000);
 
       // ── Date refresh (90s) ──
@@ -3393,7 +3393,7 @@ export function indexPage(env: Env): string {
               // Refresh date options (doctor-off changes affect which dates are available)
               refreshDateOptions();
               if (data.dateKey === state.selectedDateKey || !data.dateKey) {
-                loadAvailability(true);
+                loadAvailability(true, false);
               }
             }
           } catch(e) {}

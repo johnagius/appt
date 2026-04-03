@@ -89,7 +89,7 @@ export async function apiGetDates(env: Env): Promise<Response> {
   ]);
   const offMap = buildDoctorOffMap(offRows);
   const extraMap = buildExtraMap(extraRows);
-  return json(buildDateOptions(cfg, offMap, extraMap, env.TIMEZONE));
+  return json({ dateOptions: buildDateOptions(cfg, offMap, extraMap, env.TIMEZONE) });
 }
 
 // ─── Availability ──────────────────────────────────────────
@@ -388,7 +388,7 @@ function buildDateOptions(
 
       // Check if all Potter's slots are blocked by doctor-off
       const availableSlots = offEntry
-        ? slots.filter(s => !slotBlockedByDoctorOff(s.start, s.end, offEntry))
+        ? slots.filter(s => !slotBlockedByDoctorOff(offEntry, s.start, s.end))
         : slots;
 
       if (!availableSlots.length && slots.length > 0) {
