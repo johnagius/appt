@@ -2773,6 +2773,22 @@ export function indexPage(env: Env): string {
           }
         }
 
+        // Check: Spinola has EARLIER slots than Potter's (e.g. Sat 9:30 vs 10:00)
+        if (hasAvailable && spinolaRes && spinolaRes.ok && spinolaRes.slots) {
+          var pottersEarliest = getEarliestAvailableSlot(res.slots || []);
+          var spinolaEarliest = getEarliestAvailableSlot(spinolaRes.slots || []);
+          if (pottersEarliest && spinolaEarliest) {
+            var pMin = parseHHMMToMinutes(pottersEarliest.start);
+            var sMin = parseHHMMToMinutes(spinolaEarliest.start);
+            // If Spinola is at least 20 minutes earlier, offer choice
+            if (sMin < pMin - 10) {
+              showChoiceBannerEarly(res.slots || [], spinolaRes, spinolaEarliest.start, pottersEarliest.start);
+              setStatus('good', t('slotsLoaded'));
+              return;
+            }
+          }
+        }
+
         // Potter's has no slots at all → show Spinola
         if (!hasAvailable) {
           _pottersSlotsEmpty = true;
@@ -2826,6 +2842,22 @@ export function indexPage(env: Env): string {
       return { morning: morning, evening: evening };
     }
 
+    function getEarliestAvailableSlot(slots) {
+      var tz = (state.config && state.config.timezone) ? state.config.timezone : 'Europe/Malta';
+      var now = getNowInTimeZoneParts(tz);
+      var earliest = null;
+      (slots || []).forEach(function(slot) {
+        if (!slot || !slot.start || slot.available !== true) return;
+        if (state.selectedDateKey === now.dateKey) {
+          if (parseHHMMToMinutes(slot.start) < now.minutes) return;
+        }
+        if (!earliest || parseHHMMToMinutes(slot.start) < parseHHMMToMinutes(earliest.start)) {
+          earliest = slot;
+        }
+      });
+      return earliest;
+    }
+
     var _choiceSpinolaPrefetch = null;
     var _choicePottersSlots = null;
 
@@ -2834,6 +2866,18 @@ export function indexPage(env: Env): string {
       _choiceSpinolaPrefetch = spinolaRes;
       document.getElementById('choiceBanner').style.display = 'block';
       document.getElementById('timeGrid').style.display = 'none';
+    }
+
+    function showChoiceBannerEarly(pottersSlots, spinolaRes, spinolaTime, pottersTime) {
+      _choicePottersSlots = pottersSlots;
+      _choiceSpinolaPrefetch = spinolaRes;
+      var banner = document.getElementById('choiceBanner');
+      banner.style.display = 'block';
+      document.getElementById('timeGrid').style.display = 'none';
+      var titleEl = banner.children[0];
+      var subEl = banner.children[1];
+      if (titleEl) titleEl.textContent = 'Spinola Clinic is open earlier today!';
+      if (subEl) subEl.innerHTML = 'Dr James at Spinola is available from <b>' + to12h(spinolaTime) + '</b>. Potter&#39;s Pharmacy opens at <b>' + to12h(pottersTime) + '</b>.';
     }
 
     function hideChoiceBanner() {
