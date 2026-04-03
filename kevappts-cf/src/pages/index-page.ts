@@ -2570,6 +2570,7 @@ export function indexPage(env: Env): string {
     }
 
     els.dateSelect.addEventListener('change', () => {
+      if (_programmaticDateChange) { _programmaticDateChange = false; return; }
       const dateKey = els.dateSelect.value;
       state.selectedDateKey = dateKey;
 
@@ -2956,6 +2957,8 @@ export function indexPage(env: Env): string {
       setStatus('good', t('slotsLoaded'));
     };
 
+    var _programmaticDateChange = false;
+
     function advanceToNextEnabledDate() {
       var currentIdx = state.dateOptions.findIndex(function(x) {
         return x.dateKey === state.selectedDateKey;
@@ -2965,6 +2968,7 @@ export function indexPage(env: Env): string {
       });
       if (!next) return false;
 
+      _programmaticDateChange = true;
       els.dateSelect.value = next.dateKey;
       state.selectedDateKey = next.dateKey;
       state.selectedDateLabel = localDate(next.dateKey);
@@ -2972,6 +2976,7 @@ export function indexPage(env: Env): string {
       state.selectedSlot = null;
       els.sumTime.textContent = t('timeTemplate', t('timeDash'), '').replace(' - ', '');
       hideHint(els.timeHint);
+      _programmaticDateChange = false;
       return true;
     }
 
