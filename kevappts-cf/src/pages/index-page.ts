@@ -3403,8 +3403,6 @@ export function indexPage(env: Env): string {
             }
             // Fallback notification (no data payload) — one lightweight fetch
             if (data.type === 'slots_updated') {
-              // Refresh date options (doctor-off changes affect which dates are available)
-              refreshDateOptions();
               if (data.dateKey === state.selectedDateKey || !data.dateKey) {
                 loadAvailability(true, false);
               }
