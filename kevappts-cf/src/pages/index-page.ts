@@ -823,6 +823,14 @@ export function indexPage(env: Env): string {
         <div style="font-weight:800;font-size:15px;color:#92400e;" id="noSlotsBannerText">No more appointments available today.</div>
         <div style="font-size:13px;color:#b45309;margin-top:4px;" id="noSlotsBannerSub">Showing the next available date below. Please choose a time.</div>
       </div>
+      <div id="choiceBanner" style="display:none;background:#eff6ff;border:2px solid #2563eb;border-radius:12px;padding:18px;margin-bottom:14px;text-align:center;">
+        <div style="font-weight:800;font-size:15px;color:#1e40af;margin-bottom:4px;">Morning slots are full at Potter&#39;s</div>
+        <div style="font-size:13px;color:#3b82f6;margin-bottom:14px;">You can see Dr James at Spinola Clinic now, or wait for Potter&#39;s evening slots.</div>
+        <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+          <button type="button" onclick="showChoiceSpinola()" style="flex:1;min-width:140px;max-width:240px;padding:12px 16px;border:none;border-radius:12px;background:#8b5cf6;color:#fff;font-weight:800;font-size:14px;cursor:pointer;">See Spinola Morning Slots</button>
+          <button type="button" onclick="showChoicePotters()" style="flex:1;min-width:140px;max-width:240px;padding:12px 16px;border:none;border-radius:12px;background:#f5b301;color:#111827;font-weight:800;font-size:14px;cursor:pointer;">See Potter&#39;s Evening Slots</button>
+        </div>
+      </div>
       <div class="sectionTitle" data-i18n="selectTime">Select a time</div>
       <div id="timeGrid" class="timeGrid"></div>
       <div id="timeHint" class="msg"></div>
@@ -2575,6 +2583,7 @@ export function indexPage(env: Env): string {
       hideHint(els.timeHint);
       hideMsg();
       var _nb = document.getElementById('noSlotsBanner'); if (_nb) _nb.style.display = 'none';
+      hideChoiceBanner();
       setStatus('good', t('loadingSlots'));
       loadAvailability(false, false);
     });
@@ -2744,6 +2753,17 @@ export function indexPage(env: Env): string {
               return;
             }
           }
+          // Check: Potter's has evening but no morning → offer choice with Spinola
+          hideChoiceBanner();
+          var periods = getAvailableSlotsByPeriod(res.slots || []);
+          if (periods.morning.length === 0 && periods.evening.length > 0 && _spinolaPrefetchedSlots) {
+            var spinolaAvail = hasAvailableSlots((_spinolaPrefetchedSlots && _spinolaPrefetchedSlots.slots) || []);
+            if (spinolaAvail) {
+              showChoiceBanner(res.slots || [], _spinolaPrefetchedSlots);
+              setStatus('good', t('slotsLoaded'));
+              return;
+            }
+          }
           renderSlots(res.slots || []);
           setStatus('good', t('slotsLoaded'));
         })
@@ -2768,6 +2788,51 @@ export function indexPage(env: Env): string {
         return true;
       });
     }
+
+    // Check if Potter's has only evening slots (no morning available)
+    function getAvailableSlotsByPeriod(slots) {
+      var tz = (state.config && state.config.timezone) ? state.config.timezone : 'Europe/Malta';
+      var now = getNowInTimeZoneParts(tz);
+      var morning = []; var evening = [];
+      (slots || []).forEach(function(slot) {
+        if (!slot || !slot.start || slot.available !== true) return;
+        if (state.selectedDateKey === now.dateKey) {
+          if (parseHHMMToMinutes(slot.start) < now.minutes) return;
+        }
+        if (parseHHMMToMinutes(slot.start) < 14 * 60) morning.push(slot);
+        else evening.push(slot);
+      });
+      return { morning: morning, evening: evening };
+    }
+
+    var _choiceSpinolaPrefetch = null;
+    var _choicePottersSlots = null;
+
+    function showChoiceBanner(pottersSlots, spinolaRes) {
+      _choicePottersSlots = pottersSlots;
+      _choiceSpinolaPrefetch = spinolaRes;
+      document.getElementById('choiceBanner').style.display = 'block';
+      document.getElementById('timeGrid').style.display = 'none';
+    }
+
+    function hideChoiceBanner() {
+      document.getElementById('choiceBanner').style.display = 'none';
+      document.getElementById('timeGrid').style.display = '';
+    }
+
+    // Global functions for choice buttons
+    window.showChoiceSpinola = function() {
+      hideChoiceBanner();
+      _pottersSlotsEmpty = true;
+      showSpinolaInlineWithData(_choiceSpinolaPrefetch);
+    };
+
+    window.showChoicePotters = function() {
+      hideChoiceBanner();
+      hideSpinolaInline();
+      renderSlots(_choicePottersSlots || []);
+      setStatus('good', t('slotsLoaded'));
+    };
 
     function advanceToNextEnabledDate() {
       var currentIdx = state.dateOptions.findIndex(function(x) {
