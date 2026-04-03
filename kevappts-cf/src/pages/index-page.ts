@@ -2747,7 +2747,8 @@ export function indexPage(env: Env): string {
 
         if (!res || !res.ok) {
           // Potter's closed/error — show Spinola offer
-          renderSlots([]);
+          // Don't call renderSlots([]) here — it would also trigger showSpinolaInlineWithData causing a double-advance
+          els.timeGrid.innerHTML = '';
           _pottersSlotsEmpty = true;
           if (spinolaRes) {
             showSpinolaInlineWithData(spinolaRes);
