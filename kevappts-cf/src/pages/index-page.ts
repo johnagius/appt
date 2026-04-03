@@ -2859,7 +2859,11 @@ export function indexPage(env: Env): string {
               var _btxt = document.getElementById('noSlotsBannerText');
               var _bsub = document.getElementById('noSlotsBannerSub');
               if (_btxt) _btxt.textContent = 'No more appointments available today.';
-              if (_bsub) _bsub.textContent = 'We have moved you to the next available date. Please pick a time below.';
+              if (_bsub) {
+                var _nextDate = new Date(state.selectedDateKey + 'T12:00:00');
+                var _dateStr = _nextDate.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
+                _bsub.innerHTML = 'Showing <b>' + _dateStr + '</b> instead. Please pick a time below.';
+              }
             }
             loadAvailability(false, false);
             return;
