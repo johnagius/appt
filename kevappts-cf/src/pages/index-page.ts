@@ -2720,59 +2720,80 @@ export function indexPage(env: Env): string {
         showLoading(t('loadingSlotsTitle'), t('loadingSlotsDesc'));
       }
 
-      // Prefetch Spinola slots in parallel
+      // Fetch BOTH Potter's and Spinola in parallel, wait for both before deciding
       _spinolaPrefetchedSlots = null;
       _spinolaPrefetchDateKey = state.selectedDateKey;
       _pottersSlotsEmpty = false;
-      fetch('/api/spinola?date=' + encodeURIComponent(state.selectedDateKey))
-        .then(function(r) { return r.json(); })
-        .then(function(res) {
-          _spinolaPrefetchedSlots = res;
-          if (_pottersSlotsEmpty && _spinolaPrefetchDateKey === state.selectedDateKey) {
-            hideHint(els.timeHint);
-            showSpinolaInlineWithData(res);
-          }
-        })
-        .catch(function() { _spinolaPrefetchedSlots = null; });
 
-      fetch('/api/availability?date=' + encodeURIComponent(state.selectedDateKey))
+      var spinolaPromise = fetch('/api/spinola?date=' + encodeURIComponent(state.selectedDateKey))
         .then(function(r) { return r.json(); })
-        .then(function(res) {
-          if (!isSilentRefresh) hideLoading();
-          if (res && res._debug) console.log('[APPT DEBUG]', JSON.stringify(res._debug));
-          if (!res || !res.ok) {
-            renderSlots([]);
+        .catch(function() { return null; });
+
+      var pottersPromise = fetch('/api/availability?date=' + encodeURIComponent(state.selectedDateKey))
+        .then(function(r) { return r.json(); })
+        .catch(function() { return null; });
+
+      Promise.all([pottersPromise, spinolaPromise]).then(function(results) {
+        var res = results[0];
+        var spinolaRes = results[1];
+        _spinolaPrefetchedSlots = spinolaRes;
+
+        if (!isSilentRefresh) hideLoading();
+        hideChoiceBanner();
+
+        if (!res || !res.ok) {
+          // Potter's closed/error — show Spinola offer
+          renderSlots([]);
+          _pottersSlotsEmpty = true;
+          if (spinolaRes) {
+            showSpinolaInlineWithData(spinolaRes);
+          } else {
             showHint(els.timeHint, 'bad', (res && res.reason) ? res.reason : t('noAvailability'));
-            setStatus('bad', t('unavailable'));
+          }
+          setStatus('bad', t('unavailable'));
+          return;
+        }
+
+        var hasAvailable = hasAvailableSlots(res.slots || []);
+        if (!hasAvailable && autoAdvance && !res.doctorOff) {
+          if (advanceToNextEnabledDate()) {
+            loadAvailability(false, true);
             return;
           }
-          var hasAvailable = hasAvailableSlots(res.slots || []);
-          if (!hasAvailable && autoAdvance && !res.doctorOff) {
-            if (advanceToNextEnabledDate()) {
-              loadAvailability(false, true);
-              return;
-            }
+        }
+
+        // Check: Potter's has evening but no morning → offer choice with Spinola
+        var periods = getAvailableSlotsByPeriod(res.slots || []);
+        if (periods.morning.length === 0 && periods.evening.length > 0 && spinolaRes) {
+          var spinolaAvail = hasAvailableSlots((spinolaRes && spinolaRes.slots) || []);
+          if (spinolaAvail) {
+            showChoiceBanner(res.slots || [], spinolaRes);
+            setStatus('good', t('slotsLoaded'));
+            return;
           }
-          // Check: Potter's has evening but no morning → offer choice with Spinola
-          hideChoiceBanner();
-          var periods = getAvailableSlotsByPeriod(res.slots || []);
-          if (periods.morning.length === 0 && periods.evening.length > 0 && _spinolaPrefetchedSlots) {
-            var spinolaAvail = hasAvailableSlots((_spinolaPrefetchedSlots && _spinolaPrefetchedSlots.slots) || []);
-            if (spinolaAvail) {
-              showChoiceBanner(res.slots || [], _spinolaPrefetchedSlots);
-              setStatus('good', t('slotsLoaded'));
-              return;
-            }
-          }
-          renderSlots(res.slots || []);
-          setStatus('good', t('slotsLoaded'));
-        })
-        .catch(function(err) {
-          if (!isSilentRefresh) hideLoading();
+        }
+
+        // Potter's has no slots at all → show Spinola
+        if (!hasAvailable) {
+          _pottersSlotsEmpty = true;
           renderSlots([]);
-          showHint(els.timeHint, 'bad', String(err && err.message ? err.message : err));
-          setStatus('bad', t('errorLoadingSlots'));
-        });
+          if (spinolaRes) {
+            showSpinolaInlineWithData(spinolaRes);
+          } else {
+            showHint(els.timeHint, 'bad', t('noAvailability'));
+          }
+          setStatus('bad', t('unavailable'));
+          return;
+        }
+
+        renderSlots(res.slots || []);
+        setStatus('good', t('slotsLoaded'));
+      }).catch(function(err) {
+        if (!isSilentRefresh) hideLoading();
+        renderSlots([]);
+        showHint(els.timeHint, 'bad', String(err && err.message ? err.message : err));
+        setStatus('bad', t('errorLoadingSlots'));
+      });
     }
 
     function hasAvailableSlots(slots) {
