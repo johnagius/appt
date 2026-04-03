@@ -1004,7 +1004,7 @@ export function indexPage(env: Env): string {
       loadingBookingTitle:'Loading booking page…',loadingBookingDesc:'Please wait while we prepare the booking system.',
       loadingSlotsTitle:'Loading time slots…',loadingSlotsDesc:'Please wait while we fetch availability.',
       confirmingTitle:'Confirming appointment…',confirmingDesc:'Sending confirmation email and reserving your slot.',
-      noSlots:'No slots available.',noDates:'No available dates in the next 7 days.',
+      noSlots:'No slots available.',noSlotsToday:'No more slots available today. Showing next available day.',noDates:'No available dates in the next 7 days.',
       serviceSelected:'Service selected',loadingSlots:'Loading slots…',slotsLoaded:'Slots loaded',
       timeSelected:'Time selected',missingFields:'Missing fields',bookingStatus:'Booking…',
       unavailable:'Unavailable',errorLoadingSlots:'Error loading slots',noDatesAvailable:'No dates available',
@@ -2844,6 +2844,13 @@ export function indexPage(env: Env): string {
         });
 
         if (!available.length) {
+          // Both Potter's and Spinola have no slots — auto-advance to next day
+          if (advanceToNextEnabledDate()) {
+            hideSpinolaInline();
+            showHint(els.timeHint, 'good', t('noSlotsToday') || 'No slots left today. Showing next available day.');
+            loadAvailability(false, false);
+            return;
+          }
           els.spinolaNoSlots.textContent = t('spinolaNoSlots');
           els.spinolaNoSlots.style.display = 'block';
         } else {
