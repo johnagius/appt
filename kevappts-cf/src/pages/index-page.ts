@@ -818,6 +818,11 @@ export function indexPage(env: Env): string {
 
     <!-- Main -->
     <div class="card main">
+      <div id="noSlotsBanner" style="display:none;background:#fff7ed;border:2px solid #f59e0b;border-radius:12px;padding:14px 18px;margin-bottom:14px;text-align:center;">
+        <div style="font-size:20px;margin-bottom:4px;">&#9888;</div>
+        <div style="font-weight:800;font-size:15px;color:#92400e;" id="noSlotsBannerText">No more appointments available today.</div>
+        <div style="font-size:13px;color:#b45309;margin-top:4px;" id="noSlotsBannerSub">Showing the next available date below. Please choose a time.</div>
+      </div>
       <div class="sectionTitle" data-i18n="selectTime">Select a time</div>
       <div id="timeGrid" class="timeGrid"></div>
       <div id="timeHint" class="msg"></div>
@@ -2569,6 +2574,7 @@ export function indexPage(env: Env): string {
 
       hideHint(els.timeHint);
       hideMsg();
+      var _nb = document.getElementById('noSlotsBanner'); if (_nb) _nb.style.display = 'none';
       setStatus('good', t('loadingSlots'));
       loadAvailability(false, false);
     });
@@ -2847,7 +2853,14 @@ export function indexPage(env: Env): string {
           // Both Potter's and Spinola have no slots — auto-advance to next day
           if (advanceToNextEnabledDate()) {
             hideSpinolaInline();
-            showHint(els.timeHint, 'good', t('noSlotsToday') || 'No slots left today. Showing next available day.');
+            var _banner = document.getElementById('noSlotsBanner');
+            if (_banner) {
+              _banner.style.display = 'block';
+              var _btxt = document.getElementById('noSlotsBannerText');
+              var _bsub = document.getElementById('noSlotsBannerSub');
+              if (_btxt) _btxt.textContent = 'No more appointments available today.';
+              if (_bsub) _bsub.textContent = 'We have moved you to the next available date. Please pick a time below.';
+            }
             loadAvailability(false, false);
             return;
           }
