@@ -2550,36 +2550,37 @@ export function indexPage(env: Env): string {
         .then(function(r) { return r.json(); })
         .then(function(data) {
           if (!data || !data.dateOptions) return;
-          state.dateOptions = data.dateOptions;
           var prevSelected = state.selectedDateKey;
-          els.dateSelect.innerHTML = '';
-          state.dateOptions.forEach(function(opt) {
-            var o = document.createElement('option');
-            o.value = opt.dateKey;
-            o.textContent = localDate(opt.dateKey) + (opt.spinolaOnly ? ' — Spinola Clinic' : '') + (opt.disabled ? ' — ' + opt.reason : '');
-            o.disabled = !!opt.disabled;
-            els.dateSelect.appendChild(o);
-          });
-          // Restore previous selection if still available
-          if (prevSelected) {
-            var still = state.dateOptions.find(function(o) { return o.dateKey === prevSelected && !o.disabled; });
-            if (still) {
-              _programmaticDateChange = true;
-              els.dateSelect.value = prevSelected;
-              _programmaticDateChange = false;
-            } else {
-              // Previous date no longer available — select first enabled
-              var first = state.dateOptions.find(function(o) { return !o.disabled; });
-              if (first) {
-                _programmaticDateChange = true;
-                els.dateSelect.value = first.dateKey;
-                state.selectedDateKey = first.dateKey;
-                state.selectedDateLabel = localDate(first.dateKey);
-                els.sumDate.textContent = t('dateTemplate', state.selectedDateLabel);
-                _programmaticDateChange = false;
-                loadAvailability(true, false);
+          state.dateOptions = data.dateOptions;
+
+          // Update existing options instead of rebuilding
+          var currentOptions = els.dateSelect.querySelectorAll('option');
+          if (currentOptions.length === state.dateOptions.length) {
+            // Same count — just update disabled/text
+            state.dateOptions.forEach(function(opt, i) {
+              if (currentOptions[i]) {
+                currentOptions[i].disabled = !!opt.disabled;
+                currentOptions[i].textContent = localDate(opt.dateKey) + (opt.spinolaOnly ? ' — Spinola Clinic' : '') + (opt.disabled ? ' — ' + opt.reason : '');
               }
-            }
+            });
+          } else {
+            // Different count — rebuild
+            els.dateSelect.innerHTML = '';
+            state.dateOptions.forEach(function(opt) {
+              var o = document.createElement('option');
+              o.value = opt.dateKey;
+              o.textContent = localDate(opt.dateKey) + (opt.spinolaOnly ? ' — Spinola Clinic' : '') + (opt.disabled ? ' — ' + opt.reason : '');
+              o.disabled = !!opt.disabled;
+              els.dateSelect.appendChild(o);
+            });
+          }
+
+          // Ensure selection is preserved
+          if (prevSelected) {
+            els.dateSelect.value = prevSelected;
+          }
+          if (!els.dateSelect.value && state.selectedDateKey) {
+            els.dateSelect.value = state.selectedDateKey;
           }
         })
         .catch(function() {});
