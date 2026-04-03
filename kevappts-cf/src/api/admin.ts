@@ -300,25 +300,45 @@ export async function apiAdminProcessAppointments(req: Request, env: Env): Promi
 
   if (action === 'redirect_spinola') {
     for (const appt of appts) {
+      // Delete Potter's calendar event
+      if (appt.calendar_event_id) {
+        try { await deleteCalendarEvent(env, appt.calendar_event_id, 'potters'); } catch {}
+      }
+
       await updateAppointmentStatus(env.DB, appt.id, {
         status: 'RELOCATED_SPINOLA',
         location: cfg.spinolaLocation,
+        calendar_event_id: '',
       }, now);
 
       // Create spinola copy
+      const spinolaCopyId = 'A-' + generateId();
+      const spinolaToken = generateId();
       try {
         await insertAppointment(env.DB, {
           ...appt,
-          id: 'A-' + generateId(),
+          id: spinolaCopyId,
+          token: spinolaToken,
           clinic: 'spinola',
           status: 'RELOCATED_SPINOLA',
           location: cfg.spinolaLocation,
           updated_at: now,
+          calendar_event_id: '',
         });
       } catch {}
 
+      // Create Spinola calendar event
+      try {
+        const spinolaCopy = { ...appt, id: spinolaCopyId, token: spinolaToken, clinic: 'spinola' as const, location: cfg.spinolaLocation };
+        const eventId = await createCalendarEvent(env, spinolaCopy);
+        if (eventId) {
+          await env.DB.prepare('UPDATE appointments SET calendar_event_id = ? WHERE id = ?').bind(eventId, spinolaCopyId).run();
+        }
+      } catch {}
+
+      // Send redirect email with cancel link (using the Spinola copy's token)
       const ctx = (globalThis as any).__ctx;
-      if (ctx?.waitUntil) ctx.waitUntil(sendRedirectToSpinolaEmail(env, appt, cfg.spinolaLocation).catch(() => {}));
+      if (ctx?.waitUntil) ctx.waitUntil(sendRedirectToSpinolaEmail(env, { ...appt, token: spinolaToken }, cfg.spinolaLocation).catch(() => {}));
 
       results.push({ appointmentId: appt.id, action: 'redirected_spinola', patient: appt.full_name });
     }

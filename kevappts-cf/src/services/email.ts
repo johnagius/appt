@@ -230,6 +230,7 @@ export async function sendDoctorCancellationEmail(env: Env, appt: Appointment, m
 
 export async function sendRedirectToSpinolaEmail(env: Env, appt: Appointment, spinolaLocation: string): Promise<void> {
   if (!appt.email) return;
+  const cancelUrl = await buildCancelLink(env, appt.token);
 
   const subject = `Appointment Location Changed - ${appt.service_name} (${appt.date_key} ${appt.start_time})`;
   const html = `
@@ -242,6 +243,11 @@ export async function sendRedirectToSpinolaEmail(env: Env, appt: Appointment, sp
     <tr><td style="padding:6px 0;color:#6b7280;">Time</td><td style="padding:6px 0;"><b>${escapeHtml(appt.start_time)} - ${escapeHtml(appt.end_time)}</b></td></tr>
     <tr><td style="padding:6px 0;color:#6b7280;">New Location</td><td style="padding:6px 0;"><b>${escapeHtml(spinolaLocation)}</b></td></tr>
   </table>
+  ${getMapHtml(spinolaLocation)}
+  <div style="margin-top:14px;padding:12px;border:1px solid #e5e7eb;border-radius:12px;background:#f9fafb;">
+    <p style="margin:0 0 10px 0;color:#111827;"><b>Need to cancel?</b></p>
+    <a href="${cancelUrl}" style="display:inline-block;background:#ef4444;color:#fff;text-decoration:none;padding:10px 14px;border-radius:999px;font-weight:700;">Cancel Appointment</a>
+  </div>
 </div>`;
 
   await sendEmail(env, appt.email, subject, html);
