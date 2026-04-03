@@ -777,6 +777,7 @@ export function indexPage(env: Env): string {
         <span class="dot" id="statusDot"></span>
         <span id="statusText" data-i18n="ready">Ready</span>
       </span>
+      <button type="button" id="pwaReloadBtn" onclick="location.reload()" style="display:none;border:none;background:#f3f4f6;border-radius:50%;width:36px;height:36px;font-size:18px;cursor:pointer;margin-left:6px;" title="Reload">&#x21bb;</button>
     </div>
 
     <!-- TOP: 3 columns -->
@@ -3226,6 +3227,17 @@ export function indexPage(env: Env): string {
     }
 
     init();
+
+    // Show reload button only in PWA/standalone mode (no browser chrome)
+    if (window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches) {
+      var rb = document.getElementById('pwaReloadBtn');
+      if (rb) rb.style.display = 'inline-flex';
+    }
+
+    // Register service worker for PWA
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(function(){});
+    }
   </script>
 </body>
 </html>
