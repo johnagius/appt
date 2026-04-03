@@ -2717,6 +2717,7 @@ export function indexPage(env: Env): string {
 
     function loadAvailability(isSilentRefresh, autoAdvance, keepLoading) {
       if (!state.selectedDateKey) return;
+      console.log('[LOAD] loadAvailability for', state.selectedDateKey, 'autoAdvance:', autoAdvance);
 
       if (!isSilentRefresh && !keepLoading) {
         showLoading(t('loadingSlotsTitle'), t('loadingSlotsDesc'));
@@ -3037,7 +3038,9 @@ export function indexPage(env: Env): string {
 
         if (!available.length) {
           // Both Potter's and Spinola have no slots — auto-advance to next day
+          console.log('[ADVANCE] Both clinics empty for', _spinolaDateKey, '- advancing from', state.selectedDateKey);
           if (advanceToNextEnabledDate()) {
+            console.log('[ADVANCE] Advanced to', state.selectedDateKey);
             hideSpinolaInline();
             var _banner = document.getElementById('noSlotsBanner');
             if (_banner) {
