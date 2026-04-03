@@ -3238,6 +3238,36 @@ export function indexPage(env: Env): string {
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js').catch(function(){});
     }
+
+    // Keep iPad awake: tiny silent video loop (prevents Auto-Lock)
+    (function keepAwake() {
+      try {
+        var v = document.createElement('video');
+        v.setAttribute('playsinline', '');
+        v.setAttribute('muted', '');
+        v.setAttribute('loop', '');
+        v.muted = true;
+        v.style.cssText = 'position:fixed;top:-1px;left:-1px;width:1px;height:1px;opacity:0.01;pointer-events:none;z-index:-1;';
+        // Tiny black 1-second silent mp4 (base64)
+        v.src = 'data:video/mp4;base64,AAAAIGZ0eXBpc29tAAACAGlzb21pc28yYXZjMW1wNDEAAAAIZnJlZQAAA' +
+          'PptZGF0AAACrgYF//+q3EXpvebZSLeWLNgg2SPu73gyNjQgLSBjb3JlIDE2NCByMzEwOCAzMWUxOWY5IC0gSC4yNjQv' +
+          'TVBFRy00IEFWQyBjb2RlYyAtIENvcHlsZWZ0IDIwMDMtMjAyMyAtIGh0dHA6Ly93d3cudmlkZW9sYW4ub3JnL3gyNjQ' +
+          'uaHRtbCAtIG9wdGlvbnM6IGNhYmFjPTEgcmVmPTMgZGVibG9jaz0xOjA6MCBhbmFseXNlPTB4MzoweDExMyBtZT1oZX' +
+          'ggc3VibWU9NyBwc3k9MSBwc3lfcmQ9MS4wMDowLjAwIG1peGVkX3JlZj0xIG1lX3JhbmdlPTE2IGNocm9tYV9tZT0xI' +
+          'HRyZWxsaXM9MSA4eDhkY3Q9MSBjcW09MCBkZWFkem9uZT0yMSwxMSBmYXN0X3Bza2lwPTEgY2hyb21hX3FwX29mZnNl' +
+          'dD0tMiB0aHJlYWRzPTEgbG9va2FoZWFkX3RocmVhZHM9MSBzbGljZWRfdGhyZWFkcz0wIG5yPTAgZGVjaW1hdGU9MDEg' +
+          'aW50ZXJsYWNlZD0wIGJsdXJheV9jb21wYXQ9MCBjb25zdHJhaW5lZF9pbnRyYT0wIGJmcmFtZXM9MCB3ZWlnaHRwPTAg' +
+          'a2V5aW50PTI1MCBrZXlpbnRfbWluPTI1IHNjZW5lY3V0PTQwIGludHJhX3JlZnJlc2g9MCByY19sb29rYWhlYWQ9NDAgc' +
+          'mM9Y3JmIG1idHJlZT0xIGNyZj0yMy4wIHFjb21wPTAuNjAgcXBtaW49MCBxcG1heD02OSBxcHN0ZXA9NCBpcF9yYXRpbz' +
+          '0xLjQwIGFxPTE6MS4wMACAAAAAbmWIhAAz//727L4FNf2f0JcRLMXaSnA+KqSAgHc0wAAAAwAAAwAAFgn0AAAAAwAANGAQ' +
+          'AAADAAADAAAAADAA8BAAAADAAADAAAAADAA8BAAAAAwAANIAAAADAAADAAAAADwAAAAAMGFjdFBAAAADAAADAAwAANIAAAADA' +
+          'AADAAAAADAA';
+        document.body.appendChild(v);
+        // Start on user interaction (iOS requires gesture)
+        document.addEventListener('touchstart', function() { v.play().catch(function(){}); }, { once: true });
+        document.addEventListener('click', function() { v.play().catch(function(){}); }, { once: true });
+      } catch(e) {}
+    })();
   </script>
 </body>
 </html>
