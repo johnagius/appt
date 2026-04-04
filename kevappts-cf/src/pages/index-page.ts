@@ -750,6 +750,19 @@ export function indexPage(env: Env): string {
     @keyframes idle-pulse-icon{0%,100%{opacity:1;transform:scale(1);}50%{opacity:0.7;transform:scale(0.95);}}
     .loadingText h4{ margin:0 0 4px 0; font-size:14px; }
     .loadingText div{ margin:0; color: var(--muted); font-size:12.5px; line-height:1.35; }
+    /* Email autocomplete dropdown */
+    .email-wrap{position:relative;}
+    .email-dropdown{position:absolute;top:100%;left:0;right:0;z-index:1000;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.12);max-height:200px;overflow-y:auto;display:none;margin-top:2px;}
+    .email-dropdown.show{display:block;}
+    .email-dd-item{padding:10px 14px;cursor:pointer;font-size:14px;color:var(--text);border-bottom:1px solid rgba(229,231,235,0.5);}
+    .email-dd-item:last-child{border-bottom:none;}
+    .email-dd-item:hover,.email-dd-item.active{background:#eff6ff;color:#1d4ed8;}
+    .email-typo-hint{font-size:12px;color:#2563eb;margin-top:4px;cursor:pointer;font-weight:600;}
+    .email-typo-hint:hover{text-decoration:underline;}
+    /* Floating confirm for mobile keyboard */
+    .floating-confirm{display:none;position:fixed;bottom:0;left:0;right:0;padding:10px 16px;padding-bottom:max(10px, env(safe-area-inset-bottom));background:#fff;border-top:1px solid var(--line);box-shadow:0 -4px 12px rgba(0,0,0,0.08);z-index:1500;text-align:center;}
+    .floating-confirm.show{display:block;}
+    .floating-confirm button{width:100%;max-width:400px;padding:14px 0;font-size:16px;font-weight:800;border:none;border-radius:12px;background:var(--accent);color:#fff;cursor:pointer;}
   </style>
 </head>
 
@@ -876,9 +889,14 @@ export function indexPage(env: Env): string {
           </div>
           <div class="field-error" id="phoneError"></div>
         </div>
-        <div style="flex: 1 1 280px;">
+        <div style="flex: 1 1 280px;" class="email-wrap">
           <label class="label" for="email" data-i18n="emailLabel">Email *</label>
-          <input id="email" type="email" autocomplete="email" placeholder="you@example.com" data-i18n-ph="emailPh">
+          <div style="display:flex;gap:6px;align-items:center;">
+            <input id="email" type="email" autocomplete="email" placeholder="you@example.com" data-i18n-ph="emailPh" style="flex:1;">
+            <button type="button" id="atBtn" style="flex-shrink:0;width:38px;height:38px;border:1px solid var(--line);border-radius:10px;background:#f3f4f6;font-size:18px;font-weight:900;cursor:pointer;color:#2563eb;" title="Insert @">@</button>
+          </div>
+          <div id="emailDropdown" class="email-dropdown"></div>
+          <div id="emailTypoHint" class="email-typo-hint"></div>
           <div class="field-error" id="emailError"></div>
         </div>
       </div>
@@ -891,6 +909,10 @@ export function indexPage(env: Env): string {
       <div class="row" style="margin-top:10px; justify-content:flex-start; gap:10px;">
         <button class="btn btnAccent" id="confirmBtn" data-i18n="confirmBtn">Confirm</button>
         <button class="btn btnGhost" id="clearBtn" data-i18n="clearBtn">Clear</button>
+      </div>
+
+      <div id="floatingConfirm" class="floating-confirm">
+        <button id="floatingConfirmBtn" data-i18n="confirmBtn">Confirm</button>
       </div>
 
       <!-- Dr Kevin next day option (shown when no Potter's slots) -->
@@ -2749,12 +2771,203 @@ export function indexPage(env: Env): string {
       if (!fullName) { setFieldError(els.fullName, 'fullNameError', t('valName')); hasError = true; }
       if (!phone) { setFieldError(els.phone, 'phoneError', t('valPhone')); document.getElementById('phoneWrap').closest('.phoneRow').classList.add('has-error'); hasError = true; }
       if (!email) { setFieldError(els.email, 'emailError', t('valEmail')); hasError = true; }
-      else if (!email.includes('@')) { setFieldError(els.email, 'emailError', t('valEmailFormat')); hasError = true; }
+      else if (!isValidEmail(email)) { setFieldError(els.email, 'emailError', t('valEmailFormat')); hasError = true; }
 
       if (hasError) return t('missingFields') || 'Please fill in the required fields.';
 
       return null;
     }
+
+    // ── Email autocomplete, typo detection, validation ──
+    var EMAIL_DOMAINS = ['gmail.com','googlemail.com','yahoo.com','yahoo.co.uk','yahoo.fr','hotmail.com','hotmail.co.uk','hotmail.fr','outlook.com','live.com','icloud.com','aol.com','mail.com','protonmail.com','zoho.com','ymail.com','msn.com','me.com','mac.com','comcast.net','wp.pl','mail.ru','web.de','gmx.de','libero.it','virgilio.it','orange.fr','wanadoo.fr'];
+
+    var EMAIL_TYPO_MAP = {
+      'gmail.con':'gmail.com','gmail.co':'gmail.com','gmial.com':'gmail.com','gmai.com':'gmail.com',
+      'gmal.com':'gmail.com','gamil.com':'gmail.com','gnail.com':'gmail.com','gmaill.com':'gmail.com',
+      'gmail.om':'gmail.com','gmail.cm':'gmail.com','gmail.cmo':'gmail.com','gmail.vom':'gmail.com',
+      'hotmal.com':'hotmail.com','hotmial.com':'hotmail.com','hotmai.com':'hotmail.com',
+      'hotmaill.com':'hotmail.com','hotmail.con':'hotmail.com','hotmail.co':'hotmail.com',
+      'yaho.com':'yahoo.com','yahooo.com':'yahoo.com','yahoo.con':'yahoo.com','yhoo.com':'yahoo.com',
+      'outloo.com':'outlook.com','outlok.com':'outlook.com','outlook.con':'outlook.com',
+      'icloud.con':'icloud.com','iclod.com':'icloud.com','icoud.com':'icloud.com',
+      'live.con':'live.com','lve.com':'live.com','protonmal.com':'protonmail.com'
+    };
+
+    function isValidEmail(email) {
+      var re = new RegExp('^[^\\s@]+@[^\\s@]+\\.[^\\s@]{2,}$');
+      if (!re.test(email)) return false;
+      if (email.indexOf('..') !== -1) return false;
+      var domain = email.split('@')[1];
+      if (!domain) return false;
+      if (domain.charAt(0) === '.' || domain.charAt(0) === '-') return false;
+      if (domain.charAt(domain.length-1) === '.' || domain.charAt(domain.length-1) === '-') return false;
+      return true;
+    }
+
+    var _emailDDIdx = -1;
+    function showEmailDropdown() {
+      var val = els.email.value;
+      var atIdx = val.indexOf('@');
+      var dd = document.getElementById('emailDropdown');
+      if (atIdx === -1 || atIdx === 0) { dd.classList.remove('show'); return; }
+      var partial = val.substring(atIdx + 1).toLowerCase();
+      var matches = EMAIL_DOMAINS.filter(function(d) { return d.indexOf(partial) === 0; }).slice(0, 5);
+      if (!partial || !matches.length || (matches.length === 1 && matches[0] === partial)) { dd.classList.remove('show'); return; }
+      var localPart = val.substring(0, atIdx);
+      var html = '';
+      matches.forEach(function(d, i) {
+        html += '<div class="email-dd-item' + (i === _emailDDIdx ? ' active' : '') + '" data-domain="' + d + '">' + esc(localPart) + '@<b>' + esc(d) + '</b></div>';
+      });
+      dd.innerHTML = html;
+      dd.classList.add('show');
+      els.email.setAttribute('autocomplete', 'off');
+      // mousedown fires before blur
+      dd.querySelectorAll('.email-dd-item').forEach(function(item) {
+        item.addEventListener('mousedown', function(e) {
+          e.preventDefault();
+          selectEmailDomain(item.getAttribute('data-domain'));
+        });
+      });
+    }
+
+    function selectEmailDomain(domain) {
+      var val = els.email.value;
+      var atIdx = val.indexOf('@');
+      if (atIdx >= 0) {
+        els.email.value = val.substring(0, atIdx) + '@' + domain;
+      }
+      document.getElementById('emailDropdown').classList.remove('show');
+      els.email.setAttribute('autocomplete', 'email');
+      els.email.focus();
+      _emailDDIdx = -1;
+      document.getElementById('emailTypoHint').textContent = '';
+    }
+
+    function checkEmailTypo() {
+      var val = els.email.value.trim();
+      var hint = document.getElementById('emailTypoHint');
+      hint.textContent = '';
+      hint.onclick = null;
+      if (!val || !val.includes('@')) return;
+      var parts = val.split('@');
+      if (parts.length !== 2 || !parts[1]) return;
+      var domain = parts[1].toLowerCase();
+      var suggestion = EMAIL_TYPO_MAP[domain];
+      if (!suggestion) {
+        // Simple distance check: find closest domain within edit distance 2
+        for (var i = 0; i < EMAIL_DOMAINS.length; i++) {
+          if (Math.abs(EMAIL_DOMAINS[i].length - domain.length) <= 2) {
+            var dist = levenshtein(domain, EMAIL_DOMAINS[i]);
+            if (dist > 0 && dist <= 2) { suggestion = EMAIL_DOMAINS[i]; break; }
+          }
+        }
+      }
+      if (suggestion && suggestion !== domain) {
+        var corrected = parts[0] + '@' + suggestion;
+        hint.textContent = 'Did you mean ' + corrected + '?';
+        hint.onclick = function() {
+          els.email.value = corrected;
+          hint.textContent = '';
+          els.email.classList.remove('has-error');
+          document.getElementById('emailError').textContent = '';
+        };
+      }
+    }
+
+    function levenshtein(a, b) {
+      var m = a.length, n = b.length;
+      if (m === 0) return n;
+      if (n === 0) return m;
+      var prev = [], curr = [];
+      for (var j = 0; j <= n; j++) prev[j] = j;
+      for (var i = 1; i <= m; i++) {
+        curr[0] = i;
+        for (var j2 = 1; j2 <= n; j2++) {
+          curr[j2] = Math.min(prev[j2] + 1, curr[j2-1] + 1, prev[j2-1] + (a[i-1] === b[j2-1] ? 0 : 1));
+        }
+        prev = curr.slice();
+      }
+      return prev[n];
+    }
+
+    // @ helper button
+    document.getElementById('atBtn').addEventListener('click', function() {
+      var input = els.email;
+      var val = input.value;
+      if (!val.includes('@')) {
+        input.value = val + '@';
+        input.focus();
+        showEmailDropdown();
+      }
+    });
+
+    // Email input events
+    els.email.addEventListener('input', showEmailDropdown);
+    els.email.addEventListener('keydown', function(e) {
+      var dd = document.getElementById('emailDropdown');
+      var items = dd.querySelectorAll('.email-dd-item');
+      if (!dd.classList.contains('show') || !items.length) return;
+      if (e.key === 'ArrowDown') { e.preventDefault(); _emailDDIdx = Math.min(_emailDDIdx + 1, items.length - 1); updateDDActive(items); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); _emailDDIdx = Math.max(_emailDDIdx - 1, 0); updateDDActive(items); }
+      else if (e.key === 'Enter' && _emailDDIdx >= 0) { e.preventDefault(); selectEmailDomain(items[_emailDDIdx].getAttribute('data-domain')); }
+      else if (e.key === 'Escape') { dd.classList.remove('show'); _emailDDIdx = -1; }
+    });
+    function updateDDActive(items) {
+      items.forEach(function(it, i) { it.classList.toggle('active', i === _emailDDIdx); });
+    }
+    els.email.addEventListener('blur', function() {
+      setTimeout(function() {
+        document.getElementById('emailDropdown').classList.remove('show');
+        _emailDDIdx = -1;
+        checkEmailTypo();
+        // Real-time validation on blur
+        var val = els.email.value.trim();
+        if (val && !isValidEmail(val)) {
+          setFieldError(els.email, 'emailError', t('valEmailFormat'));
+        }
+      }, 200);
+    });
+    document.addEventListener('click', function(e) {
+      if (!e.target.closest('.email-wrap')) {
+        document.getElementById('emailDropdown').classList.remove('show');
+      }
+    });
+
+    // ── Floating confirm button for mobile keyboard ──
+    (function() {
+      var floatEl = document.getElementById('floatingConfirm');
+      if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', function() {
+          var vv = window.visualViewport;
+          var diff = window.innerHeight - vv.height;
+          if (diff > 150) {
+            floatEl.classList.add('show');
+            floatEl.style.bottom = (window.innerHeight - vv.height - vv.offsetTop) + 'px';
+          } else {
+            floatEl.classList.remove('show');
+            floatEl.style.bottom = '0';
+          }
+        });
+      } else {
+        // Fallback: show on focus of form inputs
+        var formInputs = document.querySelectorAll('#fullName, #phone, #email, #comments');
+        formInputs.forEach(function(inp) {
+          inp.addEventListener('focus', function() {
+            setTimeout(function() { floatEl.classList.add('show'); }, 300);
+          });
+          inp.addEventListener('blur', function() {
+            setTimeout(function() {
+              if (!document.activeElement || !document.activeElement.matches('input,textarea')) {
+                floatEl.classList.remove('show');
+              }
+            }, 300);
+          });
+        });
+      }
+      document.getElementById('floatingConfirmBtn').addEventListener('click', function() {
+        els.confirmBtn.click();
+      });
+    })();
 
     function loadAvailability(isSilentRefresh, autoAdvance, keepLoading) {
       if (!state.selectedDateKey) return;
