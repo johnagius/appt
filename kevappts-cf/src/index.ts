@@ -187,6 +187,32 @@ export default {
           return new Response(JSON.stringify({ ok: true, message: 'Test reminder sent to ' + testAppt.email + ' for ' + testAppt.full_name + ' at ' + testAppt.start_time }), { headers: { 'Content-Type': 'application/json' } });
         }
 
+        // Send reminders to selected appointments
+        if (adminPath === 'send-reminders' && method === 'POST') {
+          const deny3 = await (async () => {
+            const u = new URL(request.url);
+            const s = (u.searchParams.get('sig') || '').trim();
+            if (s && await verifyAdminSig(s, env.ADMIN_SECRET)) return null;
+            const cookie = request.headers.get('Cookie') || '';
+            const m = cookie.match(/(?:^|;\s*)admin_sig=([^\s;]+)/);
+            if (m && await verifyAdminSig(m[1], env.ADMIN_SECRET)) return null;
+            return new Response(JSON.stringify({ ok: false }), { status: 403, headers: { 'Content-Type': 'application/json' } });
+          })();
+          if (deny3) return deny3;
+          const body3: any = await request.json();
+          const ids3 = body3.appointmentIds || [];
+          let sent3 = 0;
+          for (const id of ids3) {
+            const appt = await env.DB.prepare('SELECT * FROM appointments WHERE id = ?').bind(id).first<any>();
+            if (appt && appt.email && (appt.status === 'BOOKED' || appt.status === 'RELOCATED_SPINOLA')) {
+              await sendReminderEmail(env, appt);
+              await env.DB.prepare('UPDATE appointments SET reminder_sent = ? WHERE id = ?').bind(nowIso(env.TIMEZONE), id).run();
+              sent3++;
+            }
+          }
+          return new Response(JSON.stringify({ ok: true, sent: sent3 }), { headers: { 'Content-Type': 'application/json' } });
+        }
+
         // Delete routes with ID in path
         if (adminPath.startsWith('doctor-off/') && method === 'DELETE') {
           return apiAdminRemoveDoctorOff(request, env);
