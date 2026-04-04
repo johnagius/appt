@@ -1098,8 +1098,8 @@ function closeAdjustModal() {
 function openAdjustModal(session) {
   var state = _sessionState[session];
   if (!state) return;
-  var baseStart = timeToMin(state.base.start);
-  var baseEnd = timeToMin(state.base.end);
+  var baseStart = state.base ? timeToMin(state.base.start) : 0;
+  var baseEnd = state.base ? timeToMin(state.base.end) : 0;
   // Allow wider range: morning 7:30-13:00, afternoon 13:00-22:00
   var rangeStart, rangeEnd;
   if (session === 'morning') {
@@ -1115,17 +1115,42 @@ function openAdjustModal(session) {
 
   var firstSeg = state.segments[0] || { start: state.base.start, end: state.base.end };
   var lastSeg = state.segments[state.segments.length - 1] || { start: state.base.start, end: state.base.end };
-  var gapSeg = state.segments.length > 1 ? { start: state.segments[0].end, end: state.segments[1].start } : null;
+  var multiSegment = state.segments.length > 2;
 
-  _adjustContext = { session: session, points: points };
+  // For 3+ segments, store internal gaps to preserve them
+  var internalGaps = [];
+  if (multiSegment) {
+    for (var g = 0; g < state.segments.length - 1; g++) {
+      internalGaps.push({ start: state.segments[g].end, end: state.segments[g + 1].start });
+    }
+  }
+
+  var gapSeg = !multiSegment && state.segments.length === 2
+    ? { start: state.segments[0].end, end: state.segments[1].start }
+    : null;
+
+  _adjustContext = { session: session, points: points, multiSegment: multiSegment, internalGaps: internalGaps, originalSegments: state.segments.slice() };
   document.getElementById('adjustTitle').textContent = (session === 'morning' ? 'Morning' : 'Evening') + ' shift time';
-  document.getElementById('adjustText').textContent = 'Use the sliders to choose the start time, end time, and an optional block inside the shift.';
+  if (multiSegment) {
+    document.getElementById('adjustText').textContent = 'Multiple time ranges detected. Use the sliders to adjust the overall start and end. Internal breaks are preserved.';
+  } else {
+    document.getElementById('adjustText').textContent = 'Use the sliders to choose the start time, end time, and an optional block inside the shift.';
+  }
 
   setRange('adjustStartRange', points, timeToMin(firstSeg.start));
   setRange('adjustEndRange', points, timeToMin(lastSeg.end));
-  setRange('gapStartRange', points, gapSeg ? timeToMin(gapSeg.start) : timeToMin(firstSeg.start));
-  setRange('gapEndRange', points, gapSeg ? timeToMin(gapSeg.end) : timeToMin(lastSeg.end));
-  document.getElementById('gapEnabled').checked = !!gapSeg;
+
+  // Hide gap controls for multi-segment; show for simple mode
+  var gapToggleRow = document.getElementById('gapEnabled').closest('.switch-row');
+  if (multiSegment) {
+    gapToggleRow.style.display = 'none';
+    document.getElementById('gapEnabled').checked = false;
+  } else {
+    gapToggleRow.style.display = '';
+    setRange('gapStartRange', points, gapSeg ? timeToMin(gapSeg.start) : timeToMin(firstSeg.start));
+    setRange('gapEndRange', points, gapSeg ? timeToMin(gapSeg.end) : timeToMin(lastSeg.end));
+    document.getElementById('gapEnabled').checked = !!gapSeg;
+  }
   syncAdjustModal();
   document.getElementById('adjustModal').classList.add('show');
 }
@@ -1160,38 +1185,68 @@ function syncAdjustModal() {
     }
   }
 
-  document.getElementById('gapControls').style.display = document.getElementById('gapEnabled').checked ? '' : 'none';
-
-  var gapStartMin = currentRangeValue('gapStartRange');
-  var gapEndMin = currentRangeValue('gapEndRange');
-  if (gapStartMin < startMin) {
-    setRange('gapStartRange', _adjustContext.points, startMin);
-    gapStartMin = currentRangeValue('gapStartRange');
-  }
-  if (gapEndMin > endMin) {
-    setRange('gapEndRange', _adjustContext.points, endMin);
-    gapEndMin = currentRangeValue('gapEndRange');
-  }
-  if (gapStartMin >= gapEndMin) {
-    var gapStartRange = document.getElementById('gapStartRange');
-    var gapEndRange = document.getElementById('gapEndRange');
-    if (document.activeElement === gapEndRange) {
-      gapStartRange.value = Math.max(Number(document.getElementById('adjustStartRange').value), Number(gapEndRange.value) - 1);
-    } else {
-      gapEndRange.value = Math.min(Number(document.getElementById('adjustEndRange').value), Number(gapStartRange.value) + 1);
-    }
-    gapStartMin = currentRangeValue('gapStartRange');
-    gapEndMin = currentRangeValue('gapEndRange');
-  }
-
   document.getElementById('adjustStartValue').textContent = minToTime(startMin);
   document.getElementById('adjustEndValue').textContent = minToTime(endMin);
-  document.getElementById('gapStartValue').textContent = minToTime(gapStartMin);
-  document.getElementById('gapEndValue').textContent = minToTime(gapEndMin);
 
-  var summary = minToTime(startMin) + ' - ' + minToTime(endMin);
-  if (document.getElementById('gapEnabled').checked) summary += ' with a block from ' + minToTime(gapStartMin) + ' - ' + minToTime(gapEndMin);
-  document.getElementById('adjustSummary').textContent = 'New working times: ' + summary + '.';
+  if (_adjustContext.multiSegment) {
+    // Multi-segment mode: hide gap controls, show rebuilt summary
+    document.getElementById('gapControls').style.display = 'none';
+    var rebuilt = rebuildMultiSegments(startMin, endMin, _adjustContext.originalSegments, _adjustContext.internalGaps);
+    var summary = rebuilt.map(function(s) { return s.start + ' - ' + s.end; }).join(' \u2022 ');
+    document.getElementById('adjustSummary').textContent = 'New working times: ' + summary + '.';
+  } else {
+    // Simple mode: single gap controls
+    document.getElementById('gapControls').style.display = document.getElementById('gapEnabled').checked ? '' : 'none';
+
+    var gapStartMin = currentRangeValue('gapStartRange');
+    var gapEndMin = currentRangeValue('gapEndRange');
+    if (gapStartMin < startMin) {
+      setRange('gapStartRange', _adjustContext.points, startMin);
+      gapStartMin = currentRangeValue('gapStartRange');
+    }
+    if (gapEndMin > endMin) {
+      setRange('gapEndRange', _adjustContext.points, endMin);
+      gapEndMin = currentRangeValue('gapEndRange');
+    }
+    if (gapStartMin >= gapEndMin) {
+      var gapStartRange = document.getElementById('gapStartRange');
+      var gapEndRange = document.getElementById('gapEndRange');
+      if (document.activeElement === gapEndRange) {
+        gapStartRange.value = Math.max(Number(document.getElementById('adjustStartRange').value), Number(gapEndRange.value) - 1);
+      } else {
+        gapEndRange.value = Math.min(Number(document.getElementById('adjustEndRange').value), Number(gapStartRange.value) + 1);
+      }
+      gapStartMin = currentRangeValue('gapStartRange');
+      gapEndMin = currentRangeValue('gapEndRange');
+    }
+    document.getElementById('gapStartValue').textContent = minToTime(gapStartMin);
+    document.getElementById('gapEndValue').textContent = minToTime(gapEndMin);
+
+    var summary = minToTime(startMin) + ' - ' + minToTime(endMin);
+    if (document.getElementById('gapEnabled').checked) summary += ' with a block from ' + minToTime(gapStartMin) + ' - ' + minToTime(gapEndMin);
+    document.getElementById('adjustSummary').textContent = 'New working times: ' + summary + '.';
+  }
+}
+function rebuildMultiSegments(newStartMin, newEndMin, originalSegments, internalGaps) {
+  // Adjust outer boundaries while preserving internal gaps
+  var origStart = timeToMin(originalSegments[0].start);
+  var origEnd = timeToMin(originalSegments[originalSegments.length - 1].end);
+  var segments = [];
+
+  // Build segments: new start -> first gap start, gap end -> next gap start, ..., last gap end -> new end
+  var cursor = newStartMin;
+  for (var g = 0; g < internalGaps.length; g++) {
+    var gapStart = timeToMin(internalGaps[g].start);
+    var gapEnd = timeToMin(internalGaps[g].end);
+    // Clamp gaps to be within new boundaries
+    if (gapEnd <= newStartMin || gapStart >= newEndMin) continue;
+    gapStart = Math.max(gapStart, newStartMin);
+    gapEnd = Math.min(gapEnd, newEndMin);
+    if (cursor < gapStart) segments.push({ start: minToTime(cursor), end: minToTime(gapStart) });
+    cursor = gapEnd;
+  }
+  if (cursor < newEndMin) segments.push({ start: minToTime(cursor), end: minToTime(newEndMin) });
+  return segments;
 }
 async function saveAdjustModal() {
   if (!_adjustContext) return;
@@ -1199,14 +1254,19 @@ async function saveAdjustModal() {
   var state = _sessionState[session];
   var startMin = currentRangeValue('adjustStartRange');
   var endMin = currentRangeValue('adjustEndRange');
-  var segments = [{ start: minToTime(startMin), end: minToTime(endMin) }];
+  var segments;
 
-  if (document.getElementById('gapEnabled').checked) {
-    var gapStartMin = currentRangeValue('gapStartRange');
-    var gapEndMin = currentRangeValue('gapEndRange');
-    segments = [];
-    if (gapStartMin > startMin) segments.push({ start: minToTime(startMin), end: minToTime(gapStartMin) });
-    if (gapEndMin < endMin) segments.push({ start: minToTime(gapEndMin), end: minToTime(endMin) });
+  if (_adjustContext.multiSegment) {
+    segments = rebuildMultiSegments(startMin, endMin, _adjustContext.originalSegments, _adjustContext.internalGaps);
+  } else {
+    segments = [{ start: minToTime(startMin), end: minToTime(endMin) }];
+    if (document.getElementById('gapEnabled').checked) {
+      var gapStartMin = currentRangeValue('gapStartRange');
+      var gapEndMin = currentRangeValue('gapEndRange');
+      segments = [];
+      if (gapStartMin > startMin) segments.push({ start: minToTime(startMin), end: minToTime(gapStartMin) });
+      if (gapEndMin < endMin) segments.push({ start: minToTime(gapEndMin), end: minToTime(endMin) });
+    }
   }
 
   // Compute extras (time outside base) and blocks (gaps within base)
