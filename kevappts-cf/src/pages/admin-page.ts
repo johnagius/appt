@@ -813,25 +813,26 @@ export function adminPage(sig: string): string {
 
 <!-- Reminders Tab -->
 <div class="tab-content" id="tab-reminders" style="display:none;">
-  <div style="max-width:900px;margin:0 auto;">
-    <h3 style="margin:0 0 4px;">Send Appointment Reminders</h3>
-    <p style="margin:0 0 16px;font-size:13px;color:var(--muted);">Select patients to send a reminder email with confirm/cancel buttons.</p>
+  <div class="rev-wrap">
+    <h3 class="rev-title">Send Appointment Reminders</h3>
+    <p class="rev-subtitle">Select patients to send a reminder email with confirm/cancel buttons.</p>
+
     <div class="rev-grid">
-      <div class="rev-card">
-        <h3 class="rev-card-title">Potter's Pharmacy</h3>
-        <label style="display:flex;align-items:center;gap:6px;padding:8px 0;border-bottom:1px solid var(--line);font-size:13px;font-weight:700;color:var(--muted);">
-          <input type="checkbox" onchange="toggleAllReminders(this, 'pottersReminderList')"> Select all
-        </label>
-        <div id="pottersReminderList"></div>
-        <button class="btn btn-sm btn-dark" style="margin-top:12px;" onclick="sendSelectedReminders('potters')">Send Reminder</button>
+      <div class="card rev-card">
+        <div class="rev-card-header">
+          <h3 class="rev-card-title">Potter's Pharmacy</h3>
+          <label class="rev-check-label"><input type="checkbox" onchange="toggleAllReminders(this, 'pottersReminderList')"> Select all</label>
+        </div>
+        <div class="rev-list" id="pottersReminderList"><div class="empty">Loading...</div></div>
+        <div style="padding:10px 0;"><button class="btn btn-sm btn-dark" onclick="sendSelectedReminders('potters')">Send Reminder</button></div>
       </div>
-      <div class="rev-card">
-        <h3 class="rev-card-title" style="color:#8b5cf6;">Spinola Clinic</h3>
-        <label style="display:flex;align-items:center;gap:6px;padding:8px 0;border-bottom:1px solid var(--line);font-size:13px;font-weight:700;color:var(--muted);">
-          <input type="checkbox" onchange="toggleAllReminders(this, 'spinolaReminderList')"> Select all
-        </label>
-        <div id="spinolaReminderList"></div>
-        <button class="btn btn-sm btn-dark" style="margin-top:12px;background:#8b5cf6;" onclick="sendSelectedReminders('spinola')">Send Reminder</button>
+      <div class="card rev-card">
+        <div class="rev-card-header">
+          <h3 class="rev-card-title" style="color:#8b5cf6;">Spinola Clinic</h3>
+          <label class="rev-check-label"><input type="checkbox" onchange="toggleAllReminders(this, 'spinolaReminderList')"> Select all</label>
+        </div>
+        <div class="rev-list" id="spinolaReminderList"><div class="empty">Loading...</div></div>
+        <div style="padding:10px 0;"><button class="btn btn-sm btn-dark" style="background:#8b5cf6;" onclick="sendSelectedReminders('spinola')">Send Reminder</button></div>
       </div>
     </div>
     <div class="msg" id="reminderMsg"></div>
