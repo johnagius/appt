@@ -2808,6 +2808,7 @@ export function indexPage(env: Env): string {
       return true;
     }
 
+    function escHtml(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
     var _emailDDIdx = -1;
     function showEmailDropdown() {
       var val = els.email.value;
@@ -2826,7 +2827,7 @@ export function indexPage(env: Env): string {
       var localPart = val.substring(0, atIdx);
       var html = '';
       matches.forEach(function(d, i) {
-        html += '<div class="email-dd-item' + (i === _emailDDIdx ? ' active' : '') + '" data-domain="' + d + '">' + esc(localPart) + '@<b>' + esc(d) + '</b></div>';
+        html += '<div class="email-dd-item' + (i === _emailDDIdx ? ' active' : '') + '" data-domain="' + d + '">' + escHtml(localPart) + '@<b>' + escHtml(d) + '</b></div>';
       });
       dd.innerHTML = html;
       dd.classList.add('show');
