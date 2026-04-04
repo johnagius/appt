@@ -944,6 +944,10 @@ export function indexPage(env: Env): string {
     <div class="modal">
       <h3 id="confirmModalTitle" data-i18n="appointmentConfirmed">Appointment Confirmed</h3>
       <p id="confirmText"></p>
+      <div style="background:#eff6ff;border-radius:12px;padding:12px 14px;margin:0 0 14px 0;text-align:center;">
+        <p style="margin:0 0 8px 0;font-size:13px;color:#1e40af;line-height:1.4;">Save this link to easily book your next appointment with Dr. Kevin:</p>
+        <a href="https://kevappts.labrint.workers.dev/" target="_blank" rel="noopener" style="display:inline-block;padding:10px 20px;background:#2563eb;color:#fff;border-radius:10px;font-weight:800;font-size:14px;text-decoration:none;">Book Again in the Future</a>
+      </div>
       <div class="modalActions">
         <button class="btn btnAccent" id="confirmOk" data-i18n="okBtn">OK</button>
       </div>
