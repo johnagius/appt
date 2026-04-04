@@ -257,6 +257,8 @@ async function doBook(req: Request, env: Env, clinic: 'potters' | 'spinola'): Pr
     calendar_event_id: '',
     cancelled_at: '',
     cancel_reason: '',
+    reminder_sent: '',
+    confirmed: '',
   };
 
   await insertAppointment(env.DB, appt);

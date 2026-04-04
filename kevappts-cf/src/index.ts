@@ -24,9 +24,9 @@ import {
   apiAdminCreateTestBooking, apiAdminPurgeTestData,
 } from './api/admin';
 import { verifyAdminSig, computeAdminSig } from './services/crypto';
-import { todayKeyLocal } from './services/utils';
-import { getActiveAppointmentsByDate } from './db/queries';
-import { sendDailyDoctorSchedule } from './services/email';
+import { todayKeyLocal, nowIso, parseTimeToMinutes } from './services/utils';
+import { getActiveAppointmentsByDate, getAppointmentByToken } from './db/queries';
+import { sendDailyDoctorSchedule, sendReminderEmail } from './services/email';
 import { indexPage } from './pages/index-page';
 import { cancelPage } from './pages/cancel-page';
 import { docActionPage } from './pages/docaction-page';
@@ -182,6 +182,17 @@ export default {
       // ─── HTML Pages ────────────────────────────────
       if (method === 'GET') {
         if (path === '/' || path === '/book') return html(indexPage(env));
+        if (path === '/confirm') {
+          const token = url.searchParams.get('token') || '';
+          if (token) {
+            const appt = await getAppointmentByToken(env.DB, token);
+            if (appt && appt.status === 'BOOKED' || appt?.status === 'RELOCATED_SPINOLA') {
+              await env.DB.prepare('UPDATE appointments SET confirmed = ? WHERE token = ?').bind(nowIso(env.TIMEZONE), token).run();
+              return html('<div style="font-family:Arial,sans-serif;max-width:500px;margin:60px auto;text-align:center;"><h1 style="color:#10b981;">Confirmed!</h1><p style="font-size:18px;color:#374151;">Thank you for confirming your appointment.</p><p style="color:#6b7280;">See you at <b>' + (appt?.start_time || '') + '</b> at <b>' + (appt?.location || '') + '</b>.</p></div>');
+            }
+          }
+          return html('<div style="font-family:Arial,sans-serif;max-width:500px;margin:60px auto;text-align:center;"><h1>Appointment Not Found</h1><p>This link may have expired or the appointment was already cancelled.</p></div>');
+        }
         if (path === '/cancel') return html(cancelPage());
         if (path === '/action') return html(docActionPage());
         if (path === '/admin' || path === '/doctor' || path === '/test') {
@@ -219,13 +230,48 @@ export default {
   // Cron trigger: daily doctor schedule email at 7am Malta time
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
     (globalThis as any).__ctx = ctx;
-    try {
-      const todayKey = todayKeyLocal(env.TIMEZONE);
-      const active = await getActiveAppointmentsByDate(env.DB, todayKey);
-      await sendDailyDoctorSchedule(env, todayKey, active);
-    } catch (e) {
-      console.error('Cron error:', e);
+    const tz = env.TIMEZONE;
+    const todayKey = todayKeyLocal(tz);
+
+    // Daily schedule email (runs at 5am UTC / 7am Malta)
+    const hour = new Date().getUTCHours();
+    if (hour === 5) {
+      try {
+        const active = await getActiveAppointmentsByDate(env.DB, todayKey);
+        await sendDailyDoctorSchedule(env, todayKey, active);
+      } catch (e) { console.error('Daily schedule error:', e); }
     }
+
+    // Appointment reminders (runs every 10 minutes)
+    try {
+      const now = new Date();
+      // Get current time in Malta
+      const maltaNow = new Date(now.toLocaleString('en-US', { timeZone: tz }));
+      const nowMin = maltaNow.getHours() * 60 + maltaNow.getMinutes();
+
+      // Find today's BOOKED/RELOCATED appointments that haven't been reminded
+      const appts = await getActiveAppointmentsByDate(env.DB, todayKey);
+      for (const appt of appts) {
+        if (appt.reminder_sent) continue; // Already reminded
+        if (appt.status !== 'BOOKED' && appt.status !== 'RELOCATED_SPINOLA') continue;
+
+        const apptMin = parseTimeToMinutes(appt.start_time);
+        const minsUntil = apptMin - nowMin;
+
+        // Send reminder if appointment is 25-35 minutes away
+        if (minsUntil >= 25 && minsUntil <= 35) {
+          // Only remind if booked more than 1 hour ago (skip same-session bookings)
+          const createdAt = new Date(appt.created_at.replace(' ', 'T') + '+02:00'); // Malta time
+          const hoursSinceBooked = (now.getTime() - createdAt.getTime()) / 3600000;
+          if (hoursSinceBooked < 1) continue;
+
+          await sendReminderEmail(env, appt);
+          await env.DB.prepare('UPDATE appointments SET reminder_sent = ? WHERE id = ?')
+            .bind(nowIso(tz), appt.id).run();
+          console.log('Reminder sent:', appt.id, appt.full_name, appt.start_time);
+        }
+      }
+    } catch (e) { console.error('Reminder error:', e); }
   },
 };
 

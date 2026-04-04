@@ -39,6 +39,8 @@ export interface Appointment {
   calendar_event_id: string;
   cancelled_at: string;
   cancel_reason: string;
+  reminder_sent: string;
+  confirmed: string;
 }
 
 export type AppointmentStatus =
