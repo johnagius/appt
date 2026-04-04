@@ -752,7 +752,7 @@ export function indexPage(env: Env): string {
     .loadingText div{ margin:0; color: var(--muted); font-size:12.5px; line-height:1.35; }
     /* Email autocomplete dropdown */
     .email-wrap{position:relative;}
-    .email-dropdown{position:absolute;top:100%;left:0;right:0;z-index:1000;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.12);max-height:200px;overflow-y:auto;display:none;margin-top:2px;}
+    .email-dropdown{position:absolute;bottom:100%;left:0;right:0;z-index:2000;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 -4px 24px rgba(0,0,0,0.12);max-height:200px;overflow-y:auto;display:none;margin-bottom:4px;}
     .email-dropdown.show{display:block;}
     .email-dd-item{padding:10px 14px;cursor:pointer;font-size:14px;color:var(--text);border-bottom:1px solid rgba(229,231,235,0.5);}
     .email-dd-item:last-child{border-bottom:none;}
@@ -2815,8 +2815,14 @@ export function indexPage(env: Env): string {
       var dd = document.getElementById('emailDropdown');
       if (atIdx === -1 || atIdx === 0) { dd.classList.remove('show'); return; }
       var partial = val.substring(atIdx + 1).toLowerCase();
-      var matches = EMAIL_DOMAINS.filter(function(d) { return d.indexOf(partial) === 0; }).slice(0, 5);
-      if (!partial || !matches.length || (matches.length === 1 && matches[0] === partial)) { dd.classList.remove('show'); return; }
+      var matches;
+      if (!partial) {
+        // Just typed @ — show top domains
+        matches = EMAIL_DOMAINS.slice(0, 5);
+      } else {
+        matches = EMAIL_DOMAINS.filter(function(d) { return d.indexOf(partial) === 0; }).slice(0, 5);
+      }
+      if (!matches.length || (matches.length === 1 && matches[0] === partial)) { dd.classList.remove('show'); return; }
       var localPart = val.substring(0, atIdx);
       var html = '';
       matches.forEach(function(d, i) {
@@ -2900,9 +2906,9 @@ export function indexPage(env: Env): string {
       var val = input.value;
       if (!val.includes('@')) {
         input.value = val + '@';
-        input.focus();
-        showEmailDropdown();
       }
+      input.focus();
+      showEmailDropdown();
     });
 
     // Email input events
@@ -2940,24 +2946,50 @@ export function indexPage(env: Env): string {
     // ── Floating confirm button for mobile keyboard ──
     (function() {
       var floatEl = document.getElementById('floatingConfirm');
+      var _floatBarHeight = 56;
+
+      function scrollInputIntoView() {
+        var active = document.activeElement;
+        if (!active || !active.matches('input,textarea')) return;
+        // Wait for layout to settle after keyboard opens
+        setTimeout(function() {
+          var rect = active.getBoundingClientRect();
+          var floatRect = floatEl.getBoundingClientRect();
+          var visibleBottom = floatEl.classList.contains('show') ? floatRect.top : window.innerHeight;
+          // If the input is hidden behind the floating bar, scroll it up
+          if (rect.bottom > visibleBottom - 10) {
+            var scrollBy = rect.bottom - visibleBottom + 60;
+            window.scrollBy({ top: scrollBy, behavior: 'smooth' });
+          }
+        }, 150);
+      }
+
       if (window.visualViewport) {
-        window.visualViewport.addEventListener('resize', function() {
+        var onViewportChange = function() {
           var vv = window.visualViewport;
           var diff = window.innerHeight - vv.height;
           if (diff > 150) {
+            // Keyboard is open — position bar just above keyboard
+            var bottomOffset = window.innerHeight - vv.height - vv.offsetTop;
+            floatEl.style.bottom = bottomOffset + 'px';
             floatEl.classList.add('show');
-            floatEl.style.bottom = (window.innerHeight - vv.height - vv.offsetTop) + 'px';
+            scrollInputIntoView();
           } else {
             floatEl.classList.remove('show');
             floatEl.style.bottom = '0';
           }
-        });
+        };
+        window.visualViewport.addEventListener('resize', onViewportChange);
+        window.visualViewport.addEventListener('scroll', onViewportChange);
       } else {
-        // Fallback: show on focus of form inputs
+        // Fallback for browsers without visualViewport
         var formInputs = document.querySelectorAll('#fullName, #phone, #email, #comments');
         formInputs.forEach(function(inp) {
           inp.addEventListener('focus', function() {
-            setTimeout(function() { floatEl.classList.add('show'); }, 300);
+            setTimeout(function() {
+              floatEl.classList.add('show');
+              scrollInputIntoView();
+            }, 300);
           });
           inp.addEventListener('blur', function() {
             setTimeout(function() {
@@ -2968,6 +3000,12 @@ export function indexPage(env: Env): string {
           });
         });
       }
+
+      // Also scroll into view when user tabs between fields
+      document.querySelectorAll('#fullName, #phone, #email, #comments').forEach(function(inp) {
+        inp.addEventListener('focus', scrollInputIntoView);
+      });
+
       document.getElementById('floatingConfirmBtn').addEventListener('click', function() {
         els.confirmBtn.click();
       });
