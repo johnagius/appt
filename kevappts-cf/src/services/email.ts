@@ -283,11 +283,20 @@ export async function sendReminderEmail(env: Env, appt: Appointment): Promise<vo
   const cancelUrl = await buildCancelLink(env, appt.token);
   const confirmUrl = getBaseUrl(env) + '/confirm?token=' + encodeURIComponent(appt.token);
 
-  const subject = `Reminder: Your appointment is in 30 minutes - ${appt.start_time}`;
+  // Calculate actual minutes until appointment
+  const tz = env.TIMEZONE;
+  const now = new Date();
+  const maltaNow = new Date(now.toLocaleString('en-US', { timeZone: tz }));
+  const nowMin = maltaNow.getHours() * 60 + maltaNow.getMinutes();
+  const apptMin = parseInt(appt.start_time.split(':')[0]) * 60 + parseInt(appt.start_time.split(':')[1]);
+  const minsUntil = Math.max(0, apptMin - nowMin);
+  const timeLabel = minsUntil > 0 ? minsUntil + ' minutes' : 'shortly';
+
+  const subject = "Reminder: Your appointment is in " + timeLabel + " - " + appt.start_time;
   const html = `
 <div style="font-family:Arial,sans-serif;line-height:1.4;color:#111827;">
   <h2 style="margin:0 0 10px 0;">Appointment Reminder</h2>
-  <p style="margin:0 0 10px 0;">Your appointment is coming up in <b>30 minutes</b>.</p>
+  <p style="margin:0 0 10px 0;">Your appointment is coming up in <b>${timeLabel}</b>.</p>
   <table style="border-collapse:collapse;width:100%;max-width:520px;">
     <tr><td style="padding:6px 0;color:#6b7280;">Service</td><td style="padding:6px 0;"><b>${escapeHtml(appt.service_name)}</b></td></tr>
     <tr><td style="padding:6px 0;color:#6b7280;">Date</td><td style="padding:6px 0;"><b>${escapeHtml(appt.date_key)}</b></td></tr>

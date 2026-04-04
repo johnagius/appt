@@ -3546,23 +3546,24 @@ function renderReminderList(el, appts) {
     var confirmed = a.confirmed || (a.confirmed === undefined && false);
     var badge = reminded ? '<span style="display:inline-block;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:800;background:#d1fae5;color:#065f46;margin-left:6px;">Sent</span>' : '';
     if (confirmed) badge += '<span style="display:inline-block;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:800;background:#dbeafe;color:#1d4ed8;margin-left:4px;">Confirmed</span>';
-    html += '<label style="display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--line);">';
-    html += '<input type="checkbox" value="' + esc(a.appointmentId || a.id) + '">';
-    html += '<div style="flex:1;"><div style="font-weight:700;">' + esc(a.fullName || a.full_name) + badge + '</div>';
-    html += '<div style="font-size:12px;color:var(--muted);">' + esc(a.email) + ' &middot; ' + esc(a.startTime || a.start_time) + ' &middot; ' + esc(a.serviceName || a.service_name) + '</div></div>';
-    html += '</label>';
+    html += '<label style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);cursor:pointer;">';
+    html += '<input type="checkbox" class="rem-cb" value="' + esc(a.appointmentId || a.id) + '">';
+    html += '<div class="rev-patient-info">';
+    html += '<div class="rev-patient-name">' + esc(a.fullName || a.full_name) + badge + '</div>';
+    html += '<div class="rev-patient-detail">' + esc(a.email) + ' &middot; ' + esc(a.startTime || a.start_time) + ' &middot; ' + esc(a.serviceName || a.service_name) + '</div>';
+    html += '</div></label>';
   });
   el.innerHTML = html;
 }
 
 function toggleAllReminders(master, containerId) {
-  var boxes = document.getElementById(containerId).querySelectorAll('input[type=checkbox]');
+  var boxes = document.getElementById(containerId).querySelectorAll('.rem-cb');
   for (var i = 0; i < boxes.length; i++) boxes[i].checked = master.checked;
 }
 
 function sendSelectedReminders(clinic) {
   var containerId = clinic === 'spinola' ? 'spinolaReminderList' : 'pottersReminderList';
-  var boxes = document.getElementById(containerId).querySelectorAll('input[type=checkbox]:checked');
+  var boxes = document.getElementById(containerId).querySelectorAll('.rem-cb:checked');
   var ids = [];
   for (var i = 0; i < boxes.length; i++) {
     if (boxes[i].value) ids.push(boxes[i].value);
