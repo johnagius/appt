@@ -125,7 +125,7 @@ export async function countActiveAppointmentsInWindow(
   const result = await db.prepare(`
     SELECT COUNT(*) as cnt FROM appointments
     WHERE date_key >= ? AND date_key <= ?
-    AND status IN ('BOOKED', 'RELOCATED_SPINOLA')
+    AND status = 'BOOKED'
     AND (email = ? OR phone = ?)
   `).bind(todayKey, maxDateKey, email, phone).first<{ cnt: number }>();
   return result?.cnt ?? 0;
@@ -141,7 +141,7 @@ export async function personAlreadyBookedSameSlot(
   const result = await db.prepare(`
     SELECT COUNT(*) as cnt FROM appointments
     WHERE date_key = ? AND start_time = ?
-    AND status IN ('BOOKED', 'RELOCATED_SPINOLA')
+    AND status = 'BOOKED'
     AND (email = ? OR phone = ?)
   `).bind(dateKey, startTime, email, phone).first<{ cnt: number }>();
   return (result?.cnt ?? 0) > 0;
@@ -151,7 +151,7 @@ export async function isSlotTaken(db: D1Database, dateKey: string, startTime: st
   const result = await db.prepare(`
     SELECT COUNT(*) as cnt FROM appointments
     WHERE date_key = ? AND start_time = ? AND clinic = ?
-    AND status IN ('BOOKED', 'RELOCATED_SPINOLA')
+    AND status = 'BOOKED'
   `).bind(dateKey, startTime, clinic).first<{ cnt: number }>();
   return (result?.cnt ?? 0) > 0;
 }
@@ -160,7 +160,7 @@ export async function getTakenSlots(db: D1Database, dateKey: string, clinic: str
   const result = await db.prepare(`
     SELECT start_time FROM appointments
     WHERE date_key = ? AND clinic = ?
-    AND status IN ('BOOKED', 'RELOCATED_SPINOLA')
+    AND status = 'BOOKED'
   `).bind(dateKey, clinic).all<{ start_time: string }>();
   return new Set(result.results.map(r => r.start_time));
 }
