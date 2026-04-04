@@ -738,11 +738,11 @@ export function indexPage(env: Env): string {
     /* Idle overlay */
     .idle-overlay{position:fixed;inset:0;z-index:2000;display:flex;align-items:center;justify-content:center;background:rgba(246,247,251,0.50);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);cursor:pointer;opacity:0;visibility:hidden;pointer-events:none;transition:opacity 0.5s ease,visibility 0.5s ease;}
     .idle-overlay.show{opacity:1;visibility:visible;pointer-events:auto;}
-    .idle-card{text-align:center;padding:48px 36px;max-width:340px;animation:idle-float 3s ease-in-out infinite;}
-    .idle-icon{font-size:56px;margin-bottom:16px;animation:idle-pulse-icon 2.5s ease-in-out infinite;}
-    .idle-title{font-size:22px;font-weight:800;color:var(--text);margin:0 0 8px 0;letter-spacing:-0.3px;}
+    .idle-card{text-align:center;padding:60px 40px;max-width:500px;animation:idle-float 3s ease-in-out infinite;}
+    .idle-icon{font-size:120px;margin-bottom:24px;animation:idle-pulse-icon 2.5s ease-in-out infinite;}
+    .idle-title{font-size:36px;font-weight:900;color:var(--text);margin:0 0 28px 0;letter-spacing:-0.5px;line-height:1.2;}
     .idle-sub{font-size:14px;color:var(--muted);margin:0 0 24px 0;line-height:1.5;}
-    .idle-cta{display:inline-flex;align-items:center;gap:8px;padding:12px 28px;background:var(--accent);color:#fff;border-radius:40px;font-size:15px;font-weight:700;box-shadow:0 4px 20px rgba(245,179,1,0.35);transition:transform 0.2s,box-shadow 0.2s;}
+    .idle-cta{display:inline-flex;align-items:center;gap:10px;padding:16px 40px;background:var(--accent);color:#fff;border-radius:40px;font-size:20px;font-weight:800;box-shadow:0 4px 20px rgba(245,179,1,0.35);transition:transform 0.2s,box-shadow 0.2s;}
     .idle-cta:hover{transform:scale(1.05);box-shadow:0 6px 28px rgba(245,179,1,0.45);}
     .idle-cta .idle-arrow{display:inline-block;transition:transform 0.3s;font-size:18px;}
     .idle-overlay:hover .idle-arrow{transform:translateX(4px);}
@@ -912,8 +912,7 @@ export function indexPage(env: Env): string {
   <div class="idle-overlay" id="idleOverlay">
     <div class="idle-card">
       <div class="idle-icon">🩺</div>
-      <div class="idle-title">Book Your Doctor Appointment</div>
-      <div class="idle-sub">See Dr Kevin at Potter's Pharmacy Clinic<br>or Dr James at Spinola Clinic.<br>Quick, easy, and instant confirmation.</div>
+      <div class="idle-title">BOOK YOUR DOCTOR'S<br>APPOINTMENT HERE</div>
       <div class="idle-cta">Book Now <span class="idle-arrow">→</span></div>
     </div>
   </div>
