@@ -911,10 +911,10 @@ export function indexPage(env: Env): string {
   <!-- Idle overlay — shown after inactivity to pause all background fetches -->
   <div class="idle-overlay" id="idleOverlay">
     <div class="idle-card">
-      <div class="idle-icon">📋</div>
-      <div class="idle-title">Ready to Book?</div>
-      <div class="idle-sub">Tap anywhere to view the latest<br>available appointment slots</div>
-      <div class="idle-cta">Start Booking <span class="idle-arrow">→</span></div>
+      <div class="idle-icon">🩺</div>
+      <div class="idle-title">Book Your Doctor Appointment</div>
+      <div class="idle-sub">See Dr Kevin at Potter's Pharmacy Clinic<br>or Dr James at Spinola Clinic.<br>Quick, easy, and instant confirmation.</div>
+      <div class="idle-cta">Book Now <span class="idle-arrow">→</span></div>
     </div>
   </div>
 
