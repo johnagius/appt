@@ -134,6 +134,22 @@ export function doctorPage(sig: string): string {
   .affected-meta{font-size:12px;color:var(--muted);line-height:1.4;margin-top:2px;}
   .action-grid{display:grid;gap:10px;}
 
+  .piece-header{display:flex;align-items:center;gap:8px;padding:10px 14px;border-radius:12px;margin:14px 0 4px;font-size:14px;font-weight:900;}
+  .piece-header:first-child{margin-top:0;}
+  .piece-header-available{background:#d1fae5;color:#065f46;}
+  .piece-header-blocker{background:#fee2e2;color:#991b1b;}
+  .piece-hint{font-size:11px;color:var(--bad);min-height:14px;padding:2px 4px 0;}
+  .range-block-available .range-value{color:#065f46;}
+  .range-block-available input[type=range]::-webkit-slider-thumb{background:#16a34a;box-shadow:0 4px 10px rgba(22,163,74,.35);}
+  .range-block-available input[type=range]::-moz-range-thumb{background:#16a34a;box-shadow:0 4px 10px rgba(22,163,74,.35);}
+  .range-block-available input[type=range]::-webkit-slider-runnable-track{background:#dcfce7;}
+  .range-block-available input[type=range]::-moz-range-track{background:#dcfce7;}
+  .range-block-blocker .range-value{color:#991b1b;}
+  .range-block-blocker input[type=range]::-webkit-slider-thumb{background:#dc2626;box-shadow:0 4px 10px rgba(220,38,38,.35);}
+  .range-block-blocker input[type=range]::-moz-range-thumb{background:#dc2626;box-shadow:0 4px 10px rgba(220,38,38,.35);}
+  .range-block-blocker input[type=range]::-webkit-slider-runnable-track{background:#fee2e2;}
+  .range-block-blocker input[type=range]::-moz-range-track{background:#fee2e2;}
+
   .break-options{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px;}
   .break-opt{border:2px solid var(--line);border-radius:16px;padding:14px 8px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s;background:#fff;}
   .break-opt.selected{border-color:var(--blue);background:#eff6ff;}
@@ -267,61 +283,7 @@ export function doctorPage(sig: string): string {
       <div class="modal-title" id="adjustTitle">Adjust shift</div>
       <div class="modal-text" id="adjustText"></div>
 
-      <div class="range-block">
-        <div class="range-top">
-          <div>
-            <div class="range-label">Shift starts</div>
-            <div class="range-hint">Slide to choose when work starts.</div>
-          </div>
-          <div class="range-value" id="adjustStartValue">—</div>
-        </div>
-        <input type="range" id="adjustStartRange" min="0" max="0" step="1" oninput="syncAdjustModal()">
-      </div>
-
-      <div class="range-block">
-        <div class="range-top">
-          <div>
-            <div class="range-label">Shift ends</div>
-            <div class="range-hint">Slide to choose when work ends.</div>
-          </div>
-          <div class="range-value" id="adjustEndValue">—</div>
-        </div>
-        <input type="range" id="adjustEndRange" min="0" max="0" step="1" oninput="syncAdjustModal()">
-      </div>
-
-      <div class="switch-row">
-        <div class="switch-copy">
-          <strong>Insert a block</strong>
-          <span>Add a gap inside the shift where patients cannot book.</span>
-        </div>
-        <label class="switch">
-          <input type="checkbox" id="gapEnabled" onchange="syncAdjustModal()">
-          <span class="switch-slider"></span>
-        </label>
-      </div>
-
-      <div id="gapControls" style="display:none;">
-        <div class="range-block">
-          <div class="range-top">
-            <div>
-              <div class="range-label">Block starts</div>
-              <div class="range-hint">Choose when the gap begins.</div>
-            </div>
-            <div class="range-value" id="gapStartValue">—</div>
-          </div>
-          <input type="range" id="gapStartRange" min="0" max="0" step="1" oninput="syncAdjustModal()">
-        </div>
-        <div class="range-block">
-          <div class="range-top">
-            <div>
-              <div class="range-label">Block ends</div>
-              <div class="range-hint">Choose when the gap finishes.</div>
-            </div>
-            <div class="range-value" id="gapEndValue">—</div>
-          </div>
-          <input type="range" id="gapEndRange" min="0" max="0" step="1" oninput="syncAdjustModal()">
-        </div>
-      </div>
+      <div id="adjustSliders"></div>
 
       <div class="action-summary" id="adjustSummary"></div>
       <div class="modal-actions">
@@ -1095,58 +1057,110 @@ function closeAdjustModal() {
   document.getElementById('adjustModal').classList.remove('show');
   _adjustContext = null;
 }
-function openAdjustModal(session) {
-  var state = _sessionState[session];
-  if (!state) return;
+function buildAdjustPoints(session, state) {
   var baseStart = state.base ? timeToMin(state.base.start) : 0;
   var baseEnd = state.base ? timeToMin(state.base.end) : 0;
-  // Allow wider range: morning 7:30-13:00, afternoon 13:00-22:00
   var rangeStart, rangeEnd;
   if (session === 'morning') {
-    rangeStart = Math.min(baseStart, 450);  // 07:30
-    rangeEnd = Math.max(baseEnd, 780);      // 13:00
+    rangeStart = Math.min(baseStart, 450);
+    rangeEnd = Math.max(baseEnd, 780);
   } else {
-    rangeStart = Math.min(baseStart, 780);  // 13:00
-    rangeEnd = Math.max(baseEnd, 1320);     // 22:00
+    rangeStart = Math.min(baseStart, 780);
+    rangeEnd = Math.max(baseEnd, 1320);
+  }
+  // Include segment boundaries that may extend beyond base
+  for (var s = 0; s < state.segments.length; s++) {
+    rangeStart = Math.min(rangeStart, timeToMin(state.segments[s].start));
+    rangeEnd = Math.max(rangeEnd, timeToMin(state.segments[s].end));
   }
   var points = [];
   for (var min = rangeStart; min <= rangeEnd; min += SLOT_MINUTES) points.push(min);
   if (points[points.length - 1] !== rangeEnd) points.push(rangeEnd);
-
-  var firstSeg = state.segments[0] || { start: state.base.start, end: state.base.end };
-  var lastSeg = state.segments[state.segments.length - 1] || { start: state.base.start, end: state.base.end };
-  var multiSegment = state.segments.length > 2;
-
-  // For 3+ segments, store internal gaps to preserve them
-  var internalGaps = [];
-  if (multiSegment) {
-    for (var g = 0; g < state.segments.length - 1; g++) {
-      internalGaps.push({ start: state.segments[g].end, end: state.segments[g + 1].start });
+  return points;
+}
+function buildPiecesFromSegments(segs) {
+  var pieces = [];
+  for (var i = 0; i < segs.length; i++) {
+    if (i > 0) {
+      pieces.push({ type: 'blocker', start: segs[i - 1].end, end: segs[i].start });
     }
+    pieces.push({ type: 'available', start: segs[i].start, end: segs[i].end });
   }
+  return pieces;
+}
+function generateSingleModeHTML() {
+  return '<div class="range-block">' +
+    '<div class="range-top"><div><div class="range-label">Shift starts</div><div class="range-hint">Slide to choose when work starts.</div></div>' +
+    '<div class="range-value" id="adjustStartValue">\u2014</div></div>' +
+    '<input type="range" id="adjustStartRange" min="0" max="0" step="1" oninput="syncAdjustModal()"></div>' +
+    '<div class="range-block">' +
+    '<div class="range-top"><div><div class="range-label">Shift ends</div><div class="range-hint">Slide to choose when work ends.</div></div>' +
+    '<div class="range-value" id="adjustEndValue">\u2014</div></div>' +
+    '<input type="range" id="adjustEndRange" min="0" max="0" step="1" oninput="syncAdjustModal()"></div>' +
+    '<div class="switch-row"><div class="switch-copy"><strong>Insert a block</strong>' +
+    '<span>Add a gap inside the shift where patients cannot book.</span></div>' +
+    '<label class="switch"><input type="checkbox" id="gapEnabled" onchange="syncAdjustModal()">' +
+    '<span class="switch-slider"></span></label></div>' +
+    '<div id="gapControls" style="display:none;">' +
+    '<div class="range-block"><div class="range-top"><div><div class="range-label">Block starts</div>' +
+    '<div class="range-hint">Choose when the gap begins.</div></div>' +
+    '<div class="range-value" id="gapStartValue">\u2014</div></div>' +
+    '<input type="range" id="gapStartRange" min="0" max="0" step="1" oninput="syncAdjustModal()"></div>' +
+    '<div class="range-block"><div class="range-top"><div><div class="range-label">Block ends</div>' +
+    '<div class="range-hint">Choose when the gap finishes.</div></div>' +
+    '<div class="range-value" id="gapEndValue">\u2014</div></div>' +
+    '<input type="range" id="gapEndRange" min="0" max="0" step="1" oninput="syncAdjustModal()"></div></div>';
+}
+function generateMultiModeHTML(pieces) {
+  var html = '';
+  var availNum = 0, blockNum = 0;
+  for (var i = 0; i < pieces.length; i++) {
+    var p = pieces[i];
+    var isAvail = p.type === 'available';
+    var cls = isAvail ? 'available' : 'blocker';
+    var label = isAvail ? 'Available ' + (++availNum) : 'Break ' + (++blockNum);
+    html += '<div class="piece-header piece-header-' + cls + '">' + (isAvail ? '\u25CF' : '\u25CF') + ' ' + label + '</div>';
+    html += '<div class="range-block range-block-' + cls + '">' +
+      '<div class="range-top"><div><div class="range-label">Starts</div></div>' +
+      '<div class="range-value" id="p' + i + 'StartVal">\u2014</div></div>' +
+      '<input type="range" id="p' + i + 'Start" min="0" max="0" step="1" oninput="syncAdjustModal()"></div>';
+    html += '<div class="range-block range-block-' + cls + '">' +
+      '<div class="range-top"><div><div class="range-label">Ends</div></div>' +
+      '<div class="range-value" id="p' + i + 'EndVal">\u2014</div></div>' +
+      '<input type="range" id="p' + i + 'End" min="0" max="0" step="1" oninput="syncAdjustModal()"></div>';
+    html += '<div class="piece-hint" id="p' + i + 'Hint"></div>';
+  }
+  return html;
+}
+function openAdjustModal(session) {
+  var state = _sessionState[session];
+  if (!state) return;
+  var points = buildAdjustPoints(session, state);
+  var useMulti = state.segments.length > 2;
 
-  var gapSeg = !multiSegment && state.segments.length === 2
-    ? { start: state.segments[0].end, end: state.segments[1].start }
-    : null;
-
-  _adjustContext = { session: session, points: points, multiSegment: multiSegment, internalGaps: internalGaps, originalSegments: state.segments.slice() };
   document.getElementById('adjustTitle').textContent = (session === 'morning' ? 'Morning' : 'Evening') + ' shift time';
-  if (multiSegment) {
-    document.getElementById('adjustText').textContent = 'Multiple time ranges detected. Use the sliders to adjust the overall start and end. Internal breaks are preserved.';
+  var container = document.getElementById('adjustSliders');
+
+  if (useMulti) {
+    var pieces = buildPiecesFromSegments(state.segments);
+    container.innerHTML = generateMultiModeHTML(pieces);
+    _adjustContext = { session: session, points: points, mode: 'multi', pieces: pieces, pieceCount: pieces.length };
+    document.getElementById('adjustText').textContent = 'Drag the sliders to adjust each time range. Breaks and available times cannot overlap.';
+    for (var i = 0; i < pieces.length; i++) {
+      setRange('p' + i + 'Start', points, timeToMin(pieces[i].start));
+      setRange('p' + i + 'End', points, timeToMin(pieces[i].end));
+    }
   } else {
+    container.innerHTML = generateSingleModeHTML();
+    var firstSeg = state.segments[0] || { start: state.base.start, end: state.base.end };
+    var lastSeg = state.segments[state.segments.length - 1] || { start: state.base.start, end: state.base.end };
+    var gapSeg = state.segments.length === 2
+      ? { start: state.segments[0].end, end: state.segments[1].start }
+      : null;
+    _adjustContext = { session: session, points: points, mode: 'single' };
     document.getElementById('adjustText').textContent = 'Use the sliders to choose the start time, end time, and an optional block inside the shift.';
-  }
-
-  setRange('adjustStartRange', points, timeToMin(firstSeg.start));
-  setRange('adjustEndRange', points, timeToMin(lastSeg.end));
-
-  // Hide gap controls for multi-segment; show for simple mode
-  var gapToggleRow = document.getElementById('gapEnabled').closest('.switch-row');
-  if (multiSegment) {
-    gapToggleRow.style.display = 'none';
-    document.getElementById('gapEnabled').checked = false;
-  } else {
-    gapToggleRow.style.display = '';
+    setRange('adjustStartRange', points, timeToMin(firstSeg.start));
+    setRange('adjustEndRange', points, timeToMin(lastSeg.end));
     setRange('gapStartRange', points, gapSeg ? timeToMin(gapSeg.start) : timeToMin(firstSeg.start));
     setRange('gapEndRange', points, gapSeg ? timeToMin(gapSeg.end) : timeToMin(lastSeg.end));
     document.getElementById('gapEnabled').checked = !!gapSeg;
@@ -1169,8 +1183,23 @@ function currentRangeValue(id) {
   var input = document.getElementById(id);
   return _adjustContext.points[Number(input.value)];
 }
+function pointIndex(points, value) {
+  var idx = 0;
+  for (var i = 0; i < points.length; i++) {
+    if (points[i] === value) return i;
+    if (points[i] <= value) idx = i;
+  }
+  return idx;
+}
 function syncAdjustModal() {
   if (!_adjustContext) return;
+  if (_adjustContext.mode === 'multi') {
+    syncMultiMode();
+  } else {
+    syncSingleMode();
+  }
+}
+function syncSingleMode() {
   var startMin = currentRangeValue('adjustStartRange');
   var endMin = currentRangeValue('adjustEndRange');
   if (startMin >= endMin) {
@@ -1184,81 +1213,150 @@ function syncAdjustModal() {
       endMin = currentRangeValue('adjustEndRange');
     }
   }
+  document.getElementById('gapControls').style.display = document.getElementById('gapEnabled').checked ? '' : 'none';
+
+  var gapStartMin = currentRangeValue('gapStartRange');
+  var gapEndMin = currentRangeValue('gapEndRange');
+  if (gapStartMin < startMin) {
+    setRange('gapStartRange', _adjustContext.points, startMin);
+    gapStartMin = currentRangeValue('gapStartRange');
+  }
+  if (gapEndMin > endMin) {
+    setRange('gapEndRange', _adjustContext.points, endMin);
+    gapEndMin = currentRangeValue('gapEndRange');
+  }
+  if (gapStartMin >= gapEndMin) {
+    var gapStartRange = document.getElementById('gapStartRange');
+    var gapEndRange = document.getElementById('gapEndRange');
+    if (document.activeElement === gapEndRange) {
+      gapStartRange.value = Math.max(Number(document.getElementById('adjustStartRange').value), Number(gapEndRange.value) - 1);
+    } else {
+      gapEndRange.value = Math.min(Number(document.getElementById('adjustEndRange').value), Number(gapStartRange.value) + 1);
+    }
+    gapStartMin = currentRangeValue('gapStartRange');
+    gapEndMin = currentRangeValue('gapEndRange');
+  }
 
   document.getElementById('adjustStartValue').textContent = minToTime(startMin);
   document.getElementById('adjustEndValue').textContent = minToTime(endMin);
+  document.getElementById('gapStartValue').textContent = minToTime(gapStartMin);
+  document.getElementById('gapEndValue').textContent = minToTime(gapEndMin);
 
-  if (_adjustContext.multiSegment) {
-    // Multi-segment mode: hide gap controls, show rebuilt summary
-    document.getElementById('gapControls').style.display = 'none';
-    var rebuilt = rebuildMultiSegments(startMin, endMin, _adjustContext.originalSegments, _adjustContext.internalGaps);
-    var summary = rebuilt.map(function(s) { return s.start + ' - ' + s.end; }).join(' \u2022 ');
-    document.getElementById('adjustSummary').textContent = 'New working times: ' + summary + '.';
-  } else {
-    // Simple mode: single gap controls
-    document.getElementById('gapControls').style.display = document.getElementById('gapEnabled').checked ? '' : 'none';
-
-    var gapStartMin = currentRangeValue('gapStartRange');
-    var gapEndMin = currentRangeValue('gapEndRange');
-    if (gapStartMin < startMin) {
-      setRange('gapStartRange', _adjustContext.points, startMin);
-      gapStartMin = currentRangeValue('gapStartRange');
-    }
-    if (gapEndMin > endMin) {
-      setRange('gapEndRange', _adjustContext.points, endMin);
-      gapEndMin = currentRangeValue('gapEndRange');
-    }
-    if (gapStartMin >= gapEndMin) {
-      var gapStartRange = document.getElementById('gapStartRange');
-      var gapEndRange = document.getElementById('gapEndRange');
-      if (document.activeElement === gapEndRange) {
-        gapStartRange.value = Math.max(Number(document.getElementById('adjustStartRange').value), Number(gapEndRange.value) - 1);
-      } else {
-        gapEndRange.value = Math.min(Number(document.getElementById('adjustEndRange').value), Number(gapStartRange.value) + 1);
-      }
-      gapStartMin = currentRangeValue('gapStartRange');
-      gapEndMin = currentRangeValue('gapEndRange');
-    }
-    document.getElementById('gapStartValue').textContent = minToTime(gapStartMin);
-    document.getElementById('gapEndValue').textContent = minToTime(gapEndMin);
-
-    var summary = minToTime(startMin) + ' - ' + minToTime(endMin);
-    if (document.getElementById('gapEnabled').checked) summary += ' with a block from ' + minToTime(gapStartMin) + ' - ' + minToTime(gapEndMin);
-    document.getElementById('adjustSummary').textContent = 'New working times: ' + summary + '.';
-  }
+  var summary = minToTime(startMin) + ' - ' + minToTime(endMin);
+  if (document.getElementById('gapEnabled').checked) summary += ' with a block from ' + minToTime(gapStartMin) + ' - ' + minToTime(gapEndMin);
+  document.getElementById('adjustSummary').textContent = 'New working times: ' + summary + '.';
 }
-function rebuildMultiSegments(newStartMin, newEndMin, originalSegments, internalGaps) {
-  // Adjust outer boundaries while preserving internal gaps
-  var origStart = timeToMin(originalSegments[0].start);
-  var origEnd = timeToMin(originalSegments[originalSegments.length - 1].end);
-  var segments = [];
+function syncMultiMode() {
+  var pts = _adjustContext.points;
+  var n = _adjustContext.pieceCount;
+  var minSlots = 1; // minimum slots per piece (= SLOT_MINUTES)
 
-  // Build segments: new start -> first gap start, gap end -> next gap start, ..., last gap end -> new end
-  var cursor = newStartMin;
-  for (var g = 0; g < internalGaps.length; g++) {
-    var gapStart = timeToMin(internalGaps[g].start);
-    var gapEnd = timeToMin(internalGaps[g].end);
-    // Clamp gaps to be within new boundaries
-    if (gapEnd <= newStartMin || gapStart >= newEndMin) continue;
-    gapStart = Math.max(gapStart, newStartMin);
-    gapEnd = Math.min(gapEnd, newEndMin);
-    if (cursor < gapStart) segments.push({ start: minToTime(cursor), end: minToTime(gapStart) });
-    cursor = gapEnd;
+  // Read all current slider values into arrays
+  var starts = [], ends = [];
+  for (var i = 0; i < n; i++) {
+    starts[i] = currentRangeValue('p' + i + 'Start');
+    ends[i] = currentRangeValue('p' + i + 'End');
   }
-  if (cursor < newEndMin) segments.push({ start: minToTime(cursor), end: minToTime(newEndMin) });
-  return segments;
+
+  // Find which slider the user is actively dragging
+  var activeId = document.activeElement ? document.activeElement.id : '';
+  var activeMatch = activeId.match(/^p(\d+)(Start|End)$/);
+  var activeIdx = activeMatch ? Number(activeMatch[1]) : -1;
+  var activeIsStart = activeMatch ? activeMatch[2] === 'Start' : false;
+  var activeIsEnd = activeMatch ? activeMatch[2] === 'End' : false;
+
+  // Clear all hints
+  for (var h = 0; h < n; h++) {
+    var hint = document.getElementById('p' + h + 'Hint');
+    if (hint) hint.textContent = '';
+  }
+
+  // Enforce constraints from active slider outward
+  if (activeIdx >= 0) {
+    if (activeIsEnd) {
+      // Dragging piece activeIdx end
+      // 1. Ensure end > start for this piece (min width)
+      if (ends[activeIdx] - starts[activeIdx] < SLOT_MINUTES) {
+        ends[activeIdx] = starts[activeIdx] + SLOT_MINUTES;
+        setRange('p' + activeIdx + 'End', pts, ends[activeIdx]);
+        ends[activeIdx] = currentRangeValue('p' + activeIdx + 'End');
+      }
+      // 2. Link: set next piece's start to this piece's end, cascade forward
+      for (var fwd = activeIdx + 1; fwd < n; fwd++) {
+        starts[fwd] = ends[fwd - 1];
+        setRange('p' + fwd + 'Start', pts, starts[fwd]);
+        starts[fwd] = currentRangeValue('p' + fwd + 'Start');
+        if (ends[fwd] - starts[fwd] < SLOT_MINUTES) {
+          ends[fwd] = starts[fwd] + SLOT_MINUTES;
+          setRange('p' + fwd + 'End', pts, ends[fwd]);
+          ends[fwd] = currentRangeValue('p' + fwd + 'End');
+        }
+      }
+    } else if (activeIsStart) {
+      // Dragging piece activeIdx start
+      // 1. Ensure end > start for this piece
+      if (ends[activeIdx] - starts[activeIdx] < SLOT_MINUTES) {
+        starts[activeIdx] = ends[activeIdx] - SLOT_MINUTES;
+        setRange('p' + activeIdx + 'Start', pts, starts[activeIdx]);
+        starts[activeIdx] = currentRangeValue('p' + activeIdx + 'Start');
+      }
+      // 2. Link: set previous piece's end to this piece's start, cascade backward
+      for (var bwd = activeIdx - 1; bwd >= 0; bwd--) {
+        ends[bwd] = starts[bwd + 1];
+        setRange('p' + bwd + 'End', pts, ends[bwd]);
+        ends[bwd] = currentRangeValue('p' + bwd + 'End');
+        if (ends[bwd] - starts[bwd] < SLOT_MINUTES) {
+          starts[bwd] = ends[bwd] - SLOT_MINUTES;
+          setRange('p' + bwd + 'Start', pts, starts[bwd]);
+          starts[bwd] = currentRangeValue('p' + bwd + 'Start');
+        }
+      }
+    }
+  }
+
+  // Final pass: enforce all constraints (handles edge cases)
+  for (var j = 0; j < n; j++) {
+    starts[j] = currentRangeValue('p' + j + 'Start');
+    ends[j] = currentRangeValue('p' + j + 'End');
+    if (ends[j] - starts[j] < SLOT_MINUTES) {
+      ends[j] = starts[j] + SLOT_MINUTES;
+      setRange('p' + j + 'End', pts, ends[j]);
+      ends[j] = currentRangeValue('p' + j + 'End');
+      var hintEl = document.getElementById('p' + j + 'Hint');
+      if (hintEl) hintEl.textContent = 'Each time range needs at least ' + SLOT_MINUTES + ' minutes.';
+    }
+  }
+
+  // Update all display values
+  var availParts = [];
+  for (var d = 0; d < n; d++) {
+    document.getElementById('p' + d + 'StartVal').textContent = minToTime(starts[d]);
+    document.getElementById('p' + d + 'EndVal').textContent = minToTime(ends[d]);
+    if (_adjustContext.pieces[d].type === 'available') {
+      availParts.push(minToTime(starts[d]) + ' - ' + minToTime(ends[d]));
+    }
+  }
+  document.getElementById('adjustSummary').textContent = 'New working times: ' + availParts.join(' \u2022 ') + '.';
 }
 async function saveAdjustModal() {
   if (!_adjustContext) return;
   var session = _adjustContext.session;
   var state = _sessionState[session];
-  var startMin = currentRangeValue('adjustStartRange');
-  var endMin = currentRangeValue('adjustEndRange');
   var segments;
 
-  if (_adjustContext.multiSegment) {
-    segments = rebuildMultiSegments(startMin, endMin, _adjustContext.originalSegments, _adjustContext.internalGaps);
+  if (_adjustContext.mode === 'multi') {
+    segments = [];
+    for (var i = 0; i < _adjustContext.pieceCount; i++) {
+      if (_adjustContext.pieces[i].type === 'available') {
+        segments.push({
+          start: minToTime(currentRangeValue('p' + i + 'Start')),
+          end: minToTime(currentRangeValue('p' + i + 'End'))
+        });
+      }
+    }
   } else {
+    var startMin = currentRangeValue('adjustStartRange');
+    var endMin = currentRangeValue('adjustEndRange');
     segments = [{ start: minToTime(startMin), end: minToTime(endMin) }];
     if (document.getElementById('gapEnabled').checked) {
       var gapStartMin = currentRangeValue('gapStartRange');
@@ -1270,8 +1368,8 @@ async function saveAdjustModal() {
   }
 
   // Compute extras (time outside base) and blocks (gaps within base)
-  var baseStart = timeToMin(state.base.start);
-  var baseEnd = timeToMin(state.base.end);
+  var baseStart = state.base ? timeToMin(state.base.start) : 0;
+  var baseEnd = state.base ? timeToMin(state.base.end) : 1440;
   var extras = [];
   for (var s = 0; s < segments.length; s++) {
     var sStart = timeToMin(segments[s].start);
@@ -1282,7 +1380,7 @@ async function saveAdjustModal() {
   var clippedSegments = segments.map(function(seg) {
     return { start: minToTime(Math.max(timeToMin(seg.start), baseStart)), end: minToTime(Math.min(timeToMin(seg.end), baseEnd)) };
   }).filter(function(seg) { return timeToMin(seg.end) > timeToMin(seg.start); });
-  var blocks = blocksFromSegments(state.base, clippedSegments);
+  var blocks = state.base ? blocksFromSegments(state.base, clippedSegments) : [];
   var affected = getSessionAffectedAppointments(session, segments);
 
   if (affected.length) {
@@ -1300,7 +1398,7 @@ async function saveAdjustModal() {
   }
 
   try {
-    showLoading('Saving shift…');
+    showLoading('Saving shift\u2026');
     await applySessionChanges(session, blocks, extras);
     closeAdjustModal();
     showMsg(session + 'Msg', 'good', 'Shift updated.');

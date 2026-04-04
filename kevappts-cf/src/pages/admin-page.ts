@@ -843,10 +843,15 @@ export function adminPage(sig: string): string {
 <div class="tab-content" id="tab-reviews" style="display:none;">
   <div class="rev-wrap">
     <h3 class="rev-title">Request Google Reviews</h3>
-    <p class="rev-subtitle">Select today's patients to send a friendly review request email.</p>
+    <p class="rev-subtitle">Select patients to send a friendly review request email.</p>
+
+    <div class="form-group" style="margin-bottom:14px;">
+      <label>Date</label>
+      <input type="date" id="reviewDate" onchange="loadReviewPatients()">
+    </div>
 
     <div class="rev-team">
-      <label class="rev-team-label">Team members present today:</label>
+      <label class="rev-team-label">Team members present:</label>
       <div class="rev-team-checks">
         <label class="rev-check-label"><input type="checkbox" id="teamJohn" checked> John</label>
         <label class="rev-check-label"><input type="checkbox" id="teamLaura"> Laura</label>
@@ -3513,6 +3518,7 @@ function renderSpCountryBreakdown(countries) {
 
 var _reviewPotters = [];
 var _reviewSpinola = [];
+var _reviewDateKey = '';
 
 // ── Reminders Tab ──
 function loadReminderPatients() {
@@ -3593,20 +3599,25 @@ function sendSelectedReminders(clinic) {
 }
 
 function loadReviewPatients() {
-  showMsg('reviewsMsg', '', 'Loading today\\'s patients...');
-  google.script.run
-    .withSuccessHandler(function(res) {
+  var dateInput = document.getElementById('reviewDate');
+  if (!dateInput.value) {
+    dateInput.value = new Date().toISOString().slice(0, 10);
+  }
+  var dateKey = dateInput.value.replace(/-/g, '-');
+  showMsg('reviewsMsg', '', 'Loading patients...');
+  apiCall('reviews?date=' + encodeURIComponent(dateKey))
+    .then(function(res) {
       if (!res || !res.ok) { showMsg('reviewsMsg', 'bad', res.reason || 'Failed.'); return; }
       showMsg('reviewsMsg', '', '');
       _reviewPotters = res.potters || [];
       _reviewSpinola = res.spinola || [];
+      _reviewDateKey = dateKey;
       renderReviewList('potters', _reviewPotters);
       renderReviewList('spinola', _reviewSpinola);
     })
-    .withFailureHandler(function(err) {
+    .catch(function(err) {
       showMsg('reviewsMsg', 'bad', 'Error: ' + (err && err.message ? err.message : String(err)));
-    })
-    .apiAdminGetReviewPatients(SIG);
+    });
 }
 
 function renderReviewList(loc, patients) {
@@ -3657,14 +3668,13 @@ function sendReviewEmails(loc) {
   var teamNames = getSelectedTeamNames();
   if (!teamNames.length) { showMsg('reviewsMsg', 'bad', 'Please select at least one team member.'); return; }
 
-  var location = loc === 'potters' ? 'potters' : 'spinola';
+  var clinicLoc = loc === 'potters' ? 'potters' : 'spinola';
   showMsg('reviewsMsg', '', 'Sending ' + ids.length + ' email(s)...');
 
-  google.script.run
-    .withSuccessHandler(function(res) {
+  apiCall('reviews/send', { body: { appointmentIds: ids, location: clinicLoc, teamNames: teamNames, dateKey: _reviewDateKey } })
+    .then(function(res) {
       if (!res || !res.ok) { showMsg('reviewsMsg', 'bad', res.reason || 'Failed.'); return; }
       showMsg('reviewsMsg', 'good', res.message);
-      // Mark sent patients in UI
       for (var i = 0; i < cbs.length; i++) {
         cbs[i].checked = false;
         cbs[i].disabled = true;
@@ -3679,10 +3689,9 @@ function sendReviewEmails(loc) {
       var selAll = document.getElementById(loc === 'potters' ? 'revSelectAllPotters' : 'revSelectAllSpinola');
       if (selAll) selAll.checked = false;
     })
-    .withFailureHandler(function(err) {
+    .catch(function(err) {
       showMsg('reviewsMsg', 'bad', 'Error: ' + (err && err.message ? err.message : String(err)));
-    })
-    .apiAdminSendReviewRequests(SIG, { appointmentIds: ids, location: location, teamNames: teamNames });
+    });
 }
 
 
