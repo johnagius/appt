@@ -3549,14 +3549,17 @@ function renderReminderList(el, appts) {
     var id = a.appointmentId || a.id || '';
     var reminded = a.reminder_sent;
     var confirmed = a.confirmed;
-    var badge = reminded ? '<span style="display:inline-block;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:800;background:#d1fae5;color:#065f46;margin-left:6px;">Sent</span>' : '';
-    if (confirmed) badge += '<span style="display:inline-block;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:800;background:#dbeafe;color:#1d4ed8;margin-left:4px;">Confirmed</span>';
-    html += '<label style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);cursor:pointer;">';
-    html += '<input type="checkbox" class="rem-cb" value="' + esc(id) + '" style="flex-shrink:0;margin-top:2px;">';
-    html += '<div style="flex:1;min-width:0;">';
-    html += '<div style="font-size:13px;font-weight:700;color:#111827;">' + esc(name) + ' ' + badge + '</div>';
-    html += '<div style="font-size:11px;color:#6b7280;margin-top:2px;">' + esc(email) + ' · ' + esc(time) + ' · ' + esc(service) + '</div>';
-    html += '</div></label>';
+    html += '<div class="rev-row">';
+    html += '<label>';
+    html += '<input type="checkbox" class="rem-cb" value="' + esc(id) + '">';
+    html += '<div class="rev-patient-info">';
+    html += '<div class="rev-patient-name">' + esc(name) + '</div>';
+    html += '<div class="rev-patient-detail">' + esc(email) + ' · ' + esc(time) + ' · ' + esc(service) + '</div>';
+    html += '</div>';
+    html += '</label>';
+    if (reminded) html += '<span class="rev-sent-badge">Sent</span>';
+    if (confirmed) html += '<span class="rev-sent-badge" style="background:#dbeafe;color:#1d4ed8;">Confirmed</span>';
+    html += '</div>';
   });
   el.innerHTML = html;
 }
