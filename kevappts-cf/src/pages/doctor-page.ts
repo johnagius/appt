@@ -742,6 +742,7 @@ function renderPatientList(session) {
     if (emailText) html += '<a class="contact-link" href="mailto:' + esc(emailText) + '">' + esc(emailText) + '</a>';
     html += '</div>';
     if (isSpinola) html += '<div class="patient-badge spinola">Sent to Spinola</div>';
+    if (a.confirmed) html += '<div class="patient-badge" style="background:#d1fae5;color:#065f46;">Confirmed</div>';
     html += '</div>';
     html += '<div class="patient-time">' + esc(a.start_time || '') + '</div>';
     html += '</div>';
