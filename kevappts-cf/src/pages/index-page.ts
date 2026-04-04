@@ -2799,13 +2799,18 @@ export function indexPage(env: Env): string {
     };
 
     function isValidEmail(email) {
-      var re = new RegExp('^[^\\s@]+@[^\\s@]+\\.[^\\s@]{2,}$');
-      if (!re.test(email)) return false;
+      if (!email || email.indexOf('@') === -1) return false;
+      var parts = email.split('@');
+      if (parts.length !== 2) return false;
+      var local = parts[0];
+      var domain = parts[1];
+      if (!local || !domain) return false;
+      if (domain.indexOf('.') === -1) return false;
       if (email.indexOf('..') !== -1) return false;
-      var domain = email.split('@')[1];
-      if (!domain) return false;
       if (domain.charAt(0) === '.' || domain.charAt(0) === '-') return false;
       if (domain.charAt(domain.length-1) === '.' || domain.charAt(domain.length-1) === '-') return false;
+      var tld = domain.substring(domain.lastIndexOf('.') + 1);
+      if (tld.length < 2) return false;
       return true;
     }
 
@@ -2864,13 +2869,15 @@ export function indexPage(env: Env): string {
       var parts = val.split('@');
       if (parts.length !== 2 || !parts[1]) return;
       var domain = parts[1].toLowerCase();
+      // Don't suggest if domain is already a known valid domain
+      if (EMAIL_DOMAINS.indexOf(domain) !== -1) return;
       var suggestion = EMAIL_TYPO_MAP[domain];
       if (!suggestion) {
-        // Simple distance check: find closest domain within edit distance 2
+        // Simple distance check: find closest domain within edit distance 1 only
         for (var i = 0; i < EMAIL_DOMAINS.length; i++) {
-          if (Math.abs(EMAIL_DOMAINS[i].length - domain.length) <= 2) {
+          if (Math.abs(EMAIL_DOMAINS[i].length - domain.length) <= 1) {
             var dist = levenshtein(domain, EMAIL_DOMAINS[i]);
-            if (dist > 0 && dist <= 2) { suggestion = EMAIL_DOMAINS[i]; break; }
+            if (dist === 1) { suggestion = EMAIL_DOMAINS[i]; break; }
           }
         }
       }
