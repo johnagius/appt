@@ -49,6 +49,12 @@ function getBaseUrl(env: Env): string {
   return 'https://kevappts.labrint.workers.dev';
 }
 
+const BOOK_AGAIN_FOOTER = `
+  <div style="margin-top:20px;padding:14px;border:1px solid #dbeafe;border-radius:12px;background:#eff6ff;text-align:center;">
+    <p style="margin:0 0 10px 0;font-size:13px;color:#1e40af;line-height:1.4;">Need to book another appointment in the future? Save this link:</p>
+    <a href="https://kevappts.labrint.workers.dev/" style="display:inline-block;background:#2563eb;color:#fff;text-decoration:none;padding:10px 20px;border-radius:999px;font-weight:700;font-size:14px;">Book an Appointment</a>
+  </div>`;
+
 async function buildCancelLink(env: Env, token: string): Promise<string> {
   const sig = await computeSig('cancel|' + token, env.SIGNING_SECRET);
   return getBaseUrl(env) + '/cancel?token=' + encodeURIComponent(token) + '&sig=' + encodeURIComponent(sig);
@@ -86,6 +92,7 @@ export async function sendClientConfirmationEmail(env: Env, appt: Appointment): 
     <p style="margin:0 0 10px 0;color:#111827;"><b>Cancel appointment</b></p>
     <a href="${cancelUrl}" style="display:inline-block;background:#ef4444;color:#fff;text-decoration:none;padding:10px 14px;border-radius:999px;font-weight:700;">Cancel Appointment</a>
   </div>
+  ${BOOK_AGAIN_FOOTER}
 </div>`;
 
   await sendEmail(env, appt.email, subject, html);
@@ -116,6 +123,7 @@ export async function sendSpinolaConfirmationEmail(env: Env, appt: Appointment):
     <p style="margin:0 0 10px 0;color:#111827;"><b>Cancel appointment</b></p>
     <a href="${cancelUrl}" style="display:inline-block;background:#ef4444;color:#fff;text-decoration:none;padding:10px 14px;border-radius:999px;font-weight:700;">Cancel Appointment</a>
   </div>
+  ${BOOK_AGAIN_FOOTER}
 </div>`;
 
   await sendEmail(env, appt.email, subject, html);
@@ -197,7 +205,7 @@ export async function sendClientCancelledEmail(env: Env, appt: Appointment, mess
     <tr><td style="padding:6px 0;color:#6b7280;">Time</td><td style="padding:6px 0;"><b>${escapeHtml(appt.start_time)} - ${escapeHtml(appt.end_time)}</b></td></tr>
     <tr><td style="padding:6px 0;color:#6b7280;">Location</td><td style="padding:6px 0;"><b>${escapeHtml(appt.location)}</b></td></tr>
   </table>
-  <p style="margin:14px 0 0 0;"><a href="${bookingUrl}" style="color:#2563eb;">Book a new appointment</a></p>
+  ${BOOK_AGAIN_FOOTER}
 </div>`;
 
   await sendEmail(env, appt.email, subject, html);
@@ -248,6 +256,7 @@ export async function sendRedirectToSpinolaEmail(env: Env, appt: Appointment, sp
     <p style="margin:0 0 10px 0;color:#111827;"><b>Need to cancel?</b></p>
     <a href="${cancelUrl}" style="display:inline-block;background:#ef4444;color:#fff;text-decoration:none;padding:10px 14px;border-radius:999px;font-weight:700;">Cancel Appointment</a>
   </div>
+  ${BOOK_AGAIN_FOOTER}
 </div>`;
 
   await sendEmail(env, appt.email, subject, html);
@@ -271,6 +280,7 @@ export async function sendAppointmentPushedEmail(env: Env, appt: Appointment, ne
     <tr><td style="padding:6px 0;color:#6b7280;">Location</td><td style="padding:6px 0;"><b>${escapeHtml(appt.location)}</b></td></tr>
   </table>
   <p style="margin:14px 0 0 0;color:#6b7280;font-size:12px;">If this new time does not work for you, please cancel and rebook.</p>
+  ${BOOK_AGAIN_FOOTER}
 </div>`;
 
   await sendEmail(env, appt.email, subject, html);
@@ -309,6 +319,7 @@ export async function sendReminderEmail(env: Env, appt: Appointment): Promise<vo
     <a href="${cancelUrl}" style="display:inline-block;background:#ef4444;color:#fff;text-decoration:none;padding:12px 20px;border-radius:999px;font-weight:700;font-size:14px;">Cancel Appointment</a>
   </div>
   <p style="margin:14px 0 0 0;color:#6b7280;font-size:12px;">Please confirm or cancel so the doctor can prepare accordingly.</p>
+  ${BOOK_AGAIN_FOOTER}
 </div>`;
 
   await sendEmail(env, appt.email, subject, html);
@@ -376,6 +387,7 @@ export async function sendCustomNotificationEmail(env: Env, appt: Appointment, c
     <tr><td style="padding:6px 0;color:#6b7280;">Time</td><td style="padding:6px 0;"><b>${escapeHtml(appt.start_time)} - ${escapeHtml(appt.end_time)}</b></td></tr>
     <tr><td style="padding:6px 0;color:#6b7280;">Location</td><td style="padding:6px 0;"><b>${escapeHtml(appt.location)}</b></td></tr>
   </table>
+  ${BOOK_AGAIN_FOOTER}
 </div>`;
 
   await sendEmail(env, appt.email, subject, html);
