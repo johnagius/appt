@@ -627,29 +627,8 @@ function classifyBaseWindow(session) {
 }
 function buildSessionState(session) {
   var base = classifyBaseWindow(session);
-  if (!base) return null;
-  var baseStart = timeToMin(base.start);
-  var baseEnd = timeToMin(base.end);
-  var blocks = [];
-  var offIds = [];
-  for (var i = 0; i < _offEntries.length; i++) {
-    var off = _offEntries[i];
-    if (_selectedDateKey < off.start_date || _selectedDateKey > (off.end_date || off.start_date)) continue;
-    var blockStart = off.start_time ? timeToMin(off.start_time) : 0;
-    var blockEnd = off.end_time ? timeToMin(off.end_time) : 1440;
-    if (!off.start_time && !off.end_time) {
-      blockStart = 0;
-      blockEnd = 1440;
-    }
-    var startMin = Math.max(baseStart, blockStart);
-    var endMin = Math.min(baseEnd, blockEnd);
-    if (endMin <= startMin) continue;
-    blocks.push({ startMin: startMin, endMin: endMin, offId: off.id });
-    offIds.push(off.id);
-  }
-  var baseSegments = subtractBlocks(base, blocks);
 
-  // Find extra entries for today in this session
+  // Find extra entries for today in this session (check BEFORE bailing out)
   var extraIds = [];
   var extraSegments = [];
   for (var e = 0; e < _extraEntries.length; e++) {
@@ -661,6 +640,32 @@ function buildSessionState(session) {
     extraSegments.push({ start: ex.start_time, end: ex.end_time });
     extraIds.push(ex.id);
   }
+
+  // No base window AND no extras for this session — nothing to show
+  if (!base && extraSegments.length === 0) return null;
+
+  var baseStart = base ? timeToMin(base.start) : 0;
+  var baseEnd = base ? timeToMin(base.end) : 0;
+  var blocks = [];
+  var offIds = [];
+  if (base) {
+    for (var i = 0; i < _offEntries.length; i++) {
+      var off = _offEntries[i];
+      if (_selectedDateKey < off.start_date || _selectedDateKey > (off.end_date || off.start_date)) continue;
+      var blockStart = off.start_time ? timeToMin(off.start_time) : 0;
+      var blockEnd = off.end_time ? timeToMin(off.end_time) : 1440;
+      if (!off.start_time && !off.end_time) {
+        blockStart = 0;
+        blockEnd = 1440;
+      }
+      var startMin = Math.max(baseStart, blockStart);
+      var endMin = Math.min(baseEnd, blockEnd);
+      if (endMin <= startMin) continue;
+      blocks.push({ startMin: startMin, endMin: endMin, offId: off.id });
+      offIds.push(off.id);
+    }
+  }
+  var baseSegments = base ? subtractBlocks(base, blocks) : [];
 
   // Merge base segments with extras, sort and merge overlapping
   var allSegments = baseSegments.concat(extraSegments);
@@ -686,7 +691,7 @@ function buildSessionState(session) {
   return {
     session: session,
     base: base,
-    blocks: blocksFromSegments(base, baseSegments),
+    blocks: base ? blocksFromSegments(base, baseSegments) : [],
     segments: merged,
     offIds: uniqueRowIndices,
     extraIds: extraIds
@@ -712,7 +717,9 @@ function renderSession(session) {
   document.getElementById(session + 'Times').textContent = available
     ? state.segments.map(function(seg) { return seg.start + ' - ' + seg.end; }).join(' • ')
     : 'Not coming to work for this session';
-  document.getElementById(session + 'Hint').textContent = 'Normal hours: ' + state.base.start + ' - ' + state.base.end + '.';
+  document.getElementById(session + 'Hint').textContent = state.base
+    ? 'Normal hours: ' + state.base.start + ' - ' + state.base.end + '.'
+    : 'Added hours (no regular schedule).';
 
   renderPatientList(session);
 }
