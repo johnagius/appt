@@ -390,6 +390,7 @@ export function adminPage(sig: string): string {
     <div class="tab" data-tab="availability" onclick="switchTab('availability')">Availability</div>
     <div class="tab" data-tab="actions" onclick="switchTab('actions')">Quick Actions</div>
     <div class="tab" data-tab="statistics" onclick="switchTab('statistics')">Statistics</div>
+    <div class="tab" data-tab="reminders" onclick="switchTab('reminders')">Reminders</div>
     <div class="tab" data-tab="reviews" onclick="switchTab('reviews')">Reviews</div>
     <div class="tab" data-tab="settings" onclick="switchTab('settings')">Settings</div>
   </div>
@@ -810,6 +811,33 @@ export function adminPage(sig: string): string {
   <div class="msg" id="statsMsg"></div>
 </div>
 
+<!-- Reminders Tab -->
+<div class="tab-content" id="tab-reminders" style="display:none;">
+  <div style="max-width:900px;margin:0 auto;">
+    <h3 style="margin:0 0 4px;">Send Appointment Reminders</h3>
+    <p style="margin:0 0 16px;font-size:13px;color:var(--muted);">Select patients to send a reminder email with confirm/cancel buttons.</p>
+    <div class="rev-grid">
+      <div class="rev-card">
+        <h3 class="rev-card-title">Potter's Pharmacy</h3>
+        <label style="display:flex;align-items:center;gap:6px;padding:8px 0;border-bottom:1px solid var(--line);font-size:13px;font-weight:700;color:var(--muted);">
+          <input type="checkbox" onchange="toggleAllReminders(this, 'pottersReminderList')"> Select all
+        </label>
+        <div id="pottersReminderList"></div>
+        <button class="btn btn-sm btn-dark" style="margin-top:12px;" onclick="sendSelectedReminders('potters')">Send Reminder</button>
+      </div>
+      <div class="rev-card">
+        <h3 class="rev-card-title" style="color:#8b5cf6;">Spinola Clinic</h3>
+        <label style="display:flex;align-items:center;gap:6px;padding:8px 0;border-bottom:1px solid var(--line);font-size:13px;font-weight:700;color:var(--muted);">
+          <input type="checkbox" onchange="toggleAllReminders(this, 'spinolaReminderList')"> Select all
+        </label>
+        <div id="spinolaReminderList"></div>
+        <button class="btn btn-sm btn-dark" style="margin-top:12px;background:#8b5cf6;" onclick="sendSelectedReminders('spinola')">Send Reminder</button>
+      </div>
+    </div>
+    <div class="msg" id="reminderMsg"></div>
+  </div>
+</div>
+
 <!-- Reviews Tab -->
 <div class="tab-content" id="tab-reviews" style="display:none;">
   <div class="rev-wrap">
@@ -1218,6 +1246,7 @@ function switchTab(name) {
   if (name === 'settings') loadSettings();
   if (name === 'statistics') loadStatistics();
   if (name === 'actions') { loadActionAppts(); if (document.getElementById('notifyDate').value) loadNotifyAppts(); }
+  if (name === 'reminders') loadReminderPatients();
   if (name === 'reviews') loadReviewPatients();
 }
 
@@ -3481,6 +3510,75 @@ function renderSpCountryBreakdown(countries) {
 
 var _reviewPotters = [];
 var _reviewSpinola = [];
+
+// ── Reminders Tab ──
+function loadReminderPatients() {
+  var pList = document.getElementById('pottersReminderList');
+  var sList = document.getElementById('spinolaReminderList');
+  pList.innerHTML = '<div class="empty">Loading...</div>';
+  sList.innerHTML = '<div class="empty">Loading...</div>';
+
+  apiCall('dashboard').then(function(res) {
+    if (!res || !res.ok) return;
+    var appts = (res.todayAppointments || []).concat(res.tomorrowAppointments || []);
+    var potters = [], spinola = [];
+    appts.forEach(function(a) {
+      if (a.status !== 'BOOKED' && a.status !== 'RELOCATED_SPINOLA') return;
+      if (!a.email) return;
+      var item = transformAppt ? transformAppt(a) : a;
+      if (a.clinic === 'spinola') spinola.push(item);
+      else potters.push(item);
+    });
+
+    renderReminderList(pList, potters);
+    renderReminderList(sList, spinola);
+  }).catch(function() {
+    pList.innerHTML = '<div class="empty">Error loading.</div>';
+  });
+}
+
+function renderReminderList(el, appts) {
+  if (!appts.length) { el.innerHTML = '<div class="empty">No patients with email today.</div>'; return; }
+  var html = '';
+  appts.forEach(function(a) {
+    var reminded = a.reminder_sent || (a.reminder_sent === undefined && false);
+    var confirmed = a.confirmed || (a.confirmed === undefined && false);
+    var badge = reminded ? '<span style="display:inline-block;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:800;background:#d1fae5;color:#065f46;margin-left:6px;">Sent</span>' : '';
+    if (confirmed) badge += '<span style="display:inline-block;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:800;background:#dbeafe;color:#1d4ed8;margin-left:4px;">Confirmed</span>';
+    html += '<label style="display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--line);">';
+    html += '<input type="checkbox" value="' + esc(a.appointmentId || a.id) + '">';
+    html += '<div style="flex:1;"><div style="font-weight:700;">' + esc(a.fullName || a.full_name) + badge + '</div>';
+    html += '<div style="font-size:12px;color:var(--muted);">' + esc(a.email) + ' &middot; ' + esc(a.startTime || a.start_time) + ' &middot; ' + esc(a.serviceName || a.service_name) + '</div></div>';
+    html += '</label>';
+  });
+  el.innerHTML = html;
+}
+
+function toggleAllReminders(master, containerId) {
+  var boxes = document.getElementById(containerId).querySelectorAll('input[type=checkbox]');
+  for (var i = 0; i < boxes.length; i++) boxes[i].checked = master.checked;
+}
+
+function sendSelectedReminders(clinic) {
+  var containerId = clinic === 'spinola' ? 'spinolaReminderList' : 'pottersReminderList';
+  var boxes = document.getElementById(containerId).querySelectorAll('input[type=checkbox]:checked');
+  var ids = [];
+  for (var i = 0; i < boxes.length; i++) {
+    if (boxes[i].value) ids.push(boxes[i].value);
+  }
+  if (!ids.length) { showMsg('reminderMsg', 'bad', 'No patients selected.'); return; }
+
+  apiCall('send-reminders', { body: { appointmentIds: ids } }).then(function(res) {
+    if (res && res.ok) {
+      showMsg('reminderMsg', 'good', 'Reminders sent to ' + res.sent + ' patient(s).');
+      loadReminderPatients();
+    } else {
+      showMsg('reminderMsg', 'bad', (res && res.reason) || 'Failed to send reminders.');
+    }
+  }).catch(function(err) {
+    showMsg('reminderMsg', 'bad', 'Error: ' + err.message);
+  });
+}
 
 function loadReviewPatients() {
   showMsg('reviewsMsg', '', 'Loading today\\'s patients...');
