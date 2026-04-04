@@ -128,15 +128,9 @@ export async function apiAdminGetDateAppointments(req: Request, env: Env): Promi
   if (!dateKey) return json({ ok: false, reason: 'Missing date.' }, 400);
 
   const appts = await getNonCancelledAppointmentsByDate(env.DB, dateKey);
-  // Deduplicate: if a RELOCATED_SPINOLA original exists, hide the spinola copy (same name+time)
-  const seen = new Set<string>();
-  const deduped = appts.filter(a => {
-    const key = a.full_name + '|' + a.start_time + '|' + a.date_key;
-    if (a.clinic === 'spinola' && a.status === 'RELOCATED_SPINOLA' && seen.has(key)) return false;
-    if (a.status === 'RELOCATED_SPINOLA') seen.add(key);
-    return true;
-  });
-  return json({ ok: true, dateKey, appointments: deduped });
+  // Doctor page is for Potter's only — exclude direct Spinola bookings
+  const pottersOnly = appts.filter(a => a.clinic !== 'spinola');
+  return json({ ok: true, dateKey, appointments: pottersOnly });
 }
 
 // ─── Mark Doctor Off ───────────────────────────────────────
