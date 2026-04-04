@@ -37,6 +37,8 @@ bindings = [
 tag = "v1"
 new_classes = ["RealtimeHub"]
 
-# Daily schedule email at 7am Malta time (6am UTC in winter, 5am UTC in summer)
+# Cron triggers:
+# 1. Daily schedule email at 7am Malta time (5am UTC summer)
+# 2. Appointment reminders every 10 minutes
 [triggers]
-crons = ["0 5 * * *"]
+crons = ["0 5 * * *", "*/10 * * * *"]

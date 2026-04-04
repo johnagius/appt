@@ -19,7 +19,9 @@ CREATE TABLE IF NOT EXISTS appointments (
   token TEXT NOT NULL UNIQUE,
   calendar_event_id TEXT DEFAULT '',
   cancelled_at TEXT DEFAULT '',
-  cancel_reason TEXT DEFAULT ''
+  cancel_reason TEXT DEFAULT '',
+  reminder_sent TEXT DEFAULT '',
+  confirmed TEXT DEFAULT ''
 );
 
 CREATE INDEX IF NOT EXISTS idx_appt_date ON appointments(date_key);

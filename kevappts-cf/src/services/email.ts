@@ -276,6 +276,35 @@ export async function sendAppointmentPushedEmail(env: Env, appt: Appointment, ne
   await sendEmail(env, appt.email, subject, html);
 }
 
+// ─── Appointment Reminder (30 min before) ─────────────────
+
+export async function sendReminderEmail(env: Env, appt: Appointment): Promise<void> {
+  if (!appt.email) return;
+  const cancelUrl = await buildCancelLink(env, appt.token);
+  const confirmUrl = getBaseUrl(env) + '/confirm?token=' + encodeURIComponent(appt.token);
+
+  const subject = `Reminder: Your appointment is in 30 minutes - ${appt.start_time}`;
+  const html = `
+<div style="font-family:Arial,sans-serif;line-height:1.4;color:#111827;">
+  <h2 style="margin:0 0 10px 0;">Appointment Reminder</h2>
+  <p style="margin:0 0 10px 0;">Your appointment is coming up in <b>30 minutes</b>.</p>
+  <table style="border-collapse:collapse;width:100%;max-width:520px;">
+    <tr><td style="padding:6px 0;color:#6b7280;">Service</td><td style="padding:6px 0;"><b>${escapeHtml(appt.service_name)}</b></td></tr>
+    <tr><td style="padding:6px 0;color:#6b7280;">Date</td><td style="padding:6px 0;"><b>${escapeHtml(appt.date_key)}</b></td></tr>
+    <tr><td style="padding:6px 0;color:#6b7280;">Time</td><td style="padding:6px 0;"><b>${escapeHtml(appt.start_time)} - ${escapeHtml(appt.end_time)}</b></td></tr>
+    <tr><td style="padding:6px 0;color:#6b7280;">Location</td><td style="padding:6px 0;"><b>${escapeHtml(appt.location)}</b></td></tr>
+  </table>
+  ${getMapHtml(appt.location)}
+  <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap;">
+    <a href="${confirmUrl}" style="display:inline-block;background:#10b981;color:#fff;text-decoration:none;padding:12px 20px;border-radius:999px;font-weight:700;font-size:14px;">Yes, I'm Coming</a>
+    <a href="${cancelUrl}" style="display:inline-block;background:#ef4444;color:#fff;text-decoration:none;padding:12px 20px;border-radius:999px;font-weight:700;font-size:14px;">Cancel Appointment</a>
+  </div>
+  <p style="margin:14px 0 0 0;color:#6b7280;font-size:12px;">Please confirm or cancel so the doctor can prepare accordingly.</p>
+</div>`;
+
+  await sendEmail(env, appt.email, subject, html);
+}
+
 // ─── 8. Daily Doctor Schedule ─────────────────────────────
 
 export async function sendDailyDoctorSchedule(env: Env, todayKey: string, active: Appointment[]): Promise<void> {
