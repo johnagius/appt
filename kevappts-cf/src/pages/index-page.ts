@@ -2352,6 +2352,7 @@ export function indexPage(env: Env): string {
       els.email.value = '';
       els.phone.value = '';
       els.comments.value = '';
+      _hasScrolledToForm = false;
       els.sumTime.textContent = t('timeTemplate', t('timeDash'), '').replace(' - ', '');
       els.timeGrid.innerHTML = '';
       clearFieldErrors();
@@ -2901,8 +2902,9 @@ export function indexPage(env: Env): string {
       return prev[n];
     }
 
-    // @ helper button
-    document.getElementById('atBtn').addEventListener('click', function() {
+    // @ helper button — use mousedown to prevent blur from firing
+    document.getElementById('atBtn').addEventListener('mousedown', function(e) {
+      e.preventDefault(); // prevents blur on email input
       var input = els.email;
       var val = input.value;
       if (!val.includes('@')) {
@@ -2944,6 +2946,29 @@ export function indexPage(env: Env): string {
       }
     });
 
+    // ── One-time scroll to show bottom section when fields are empty ──
+    var _hasScrolledToForm = false;
+    function maybeScrollToForm() {
+      if (_hasScrolledToForm) return;
+      // Only scroll if all fields are empty (fresh booking)
+      var name = els.fullName.value.trim();
+      var phone = els.phone.value.trim();
+      var email = els.email.value.trim();
+      var comments = document.getElementById('comments').value.trim();
+      if (name || phone || email || comments) return;
+      _hasScrolledToForm = true;
+      // Scroll so the confirm button area is visible
+      var confirmBtn = els.confirmBtn;
+      if (confirmBtn) {
+        setTimeout(function() {
+          confirmBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 150);
+      }
+    }
+    ['fullName', 'phone', 'email', 'comments'].forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el) el.addEventListener('focus', maybeScrollToForm, { once: false });
+    });
     // ── Floating confirm button for mobile keyboard ──
     (function() {
       var floatEl = document.getElementById('floatingConfirm');
