@@ -1057,7 +1057,9 @@ function transformAppt(a) {
     calendarEventId: a.calendar_event_id || a.calendarEventId,
     cancelledAt: a.cancelled_at || a.cancelledAt,
     cancelReason: a.cancel_reason || a.cancelReason,
-    clinic: a.clinic
+    clinic: a.clinic,
+    confirmed: a.confirmed || '',
+    reminder_sent: a.reminder_sent || ''
   };
 }
 function transformOff(o) {
@@ -1280,7 +1282,7 @@ function renderApptTable(appts, containerId, withCheckboxes, showDate) {
     html += '<td>' + esc(a.phone) + '</td>';
     html += '<td>' + esc(a.serviceName) + '</td>';
     html += '<td>' + esc(a.location) + '</td>';
-    html += '<td><span class="badge ' + badge.cls + '">' + badge.text + '</span></td>';
+    html += '<td><span class="badge ' + badge.cls + '">' + badge.text + '</span>' + (a.confirmed ? ' <span class="badge" style="background:#d1fae5;color:#065f46;">Confirmed</span>' : '') + '</td>';
     html += '<td>';
     if (a.status === 'BOOKED' || a.status === 'RELOCATED_SPINOLA') {
       html += '<button class="btn btn-sm btn-danger" onclick="event.stopPropagation();cancelSingleAppt(\\'' + esc(a.appointmentId) + '\\', \\'' + containerId + '\\')">Cancel</button>';
@@ -1604,7 +1606,7 @@ function doSearch(query) {
         html += '<td>' + esc(r.phone) + '</td>';
         html += '<td>' + esc(r.serviceName) + '</td>';
         html += '<td>' + esc(r.location) + '</td>';
-        html += '<td><span class="badge ' + badge.cls + '">' + badge.text + '</span></td>';
+        html += '<td><span class="badge ' + badge.cls + '">' + badge.text + '</span>' + (r.confirmed ? ' <span class="badge" style="background:#d1fae5;color:#065f46;">Confirmed</span>' : '') + '</td>';
         html += '</tr>';
       }
       html += '</tbody></table></div></div>';
@@ -2970,7 +2972,7 @@ function showPatientHistory(email, phone) {
           html += '<tr>';
           html += '<td><b>' + esc(a.dateKey) + '</b></td>';
           html += '<td>' + esc(a.startTime) + ' - ' + esc(a.endTime) + '</td>';
-          html += '<td><span class="badge ' + badge.cls + '">' + badge.text + '</span></td>';
+          html += '<td><span class="badge ' + badge.cls + '">' + badge.text + '</span>' + (a.confirmed ? ' <span class="badge" style="background:#d1fae5;color:#065f46;">Confirmed</span>' : '') + '</td>';
           html += '<td>' + esc(a.location) + '</td>';
           html += '<td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(a.comments || '') + '</td>';
           html += '</tr>';
