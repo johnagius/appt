@@ -879,7 +879,9 @@ async function loadTodayAppointments() {
     var morningBase = classifyBaseWindow('morning');
     var eveningBase = classifyBaseWindow('evening');
     if (morningBase && mins < timeToMin(morningBase.end)) _appointmentsBySession.morning.push(a);
-    else if (eveningBase) _appointmentsBySession.evening.push(a);
+    else if (eveningBase && mins >= timeToMin(eveningBase.start)) _appointmentsBySession.evening.push(a);
+    else if (mins < 780) _appointmentsBySession.morning.push(a);
+    else _appointmentsBySession.evening.push(a);
   }
 }
 function buildAllSessionState() {
