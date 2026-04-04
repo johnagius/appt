@@ -3460,8 +3460,38 @@ export function indexPage(env: Env): string {
                 // No slots for first date — fall through to loadAvailability with autoAdvance
                 loadAvailability(false, true);
               } else {
-                renderSlots(res.slots || []);
-                setStatus('good', t('slotsLoaded'));
+                // Check: Spinola opens earlier than Potter's (e.g. Sat 9:30 vs 10:00)
+                var spinolaRes = data.initialSpinola;
+                if (spinolaRes && spinolaRes.ok && spinolaRes.slots) {
+                  var pottersEarliest = getEarliestAvailableSlot(res.slots || []);
+                  var spinolaEarliest = getEarliestAvailableSlot(spinolaRes.slots || []);
+                  if (pottersEarliest && spinolaEarliest) {
+                    var pMin = parseHHMMToMinutes(pottersEarliest.start);
+                    var sMin = parseHHMMToMinutes(spinolaEarliest.start);
+                    if (sMin < pMin - 10) {
+                      _spinolaPrefetchedSlots = spinolaRes;
+                      showChoiceBannerEarly(res.slots || [], spinolaRes, spinolaEarliest.start, pottersEarliest.start);
+                      setStatus('good', t('slotsLoaded'));
+                    } else {
+                      renderSlots(res.slots || []);
+                      setStatus('good', t('slotsLoaded'));
+                    }
+                  } else {
+                    // Check: Potter's morning full, Spinola has slots
+                    var periods = getAvailableSlotsByPeriod(res.slots || []);
+                    if (periods.morning.length === 0 && periods.evening.length > 0 && hasAvailableSlots(spinolaRes.slots || [])) {
+                      _spinolaPrefetchedSlots = spinolaRes;
+                      showChoiceBanner(res.slots || [], spinolaRes);
+                      setStatus('good', t('slotsLoaded'));
+                    } else {
+                      renderSlots(res.slots || []);
+                      setStatus('good', t('slotsLoaded'));
+                    }
+                  }
+                } else {
+                  renderSlots(res.slots || []);
+                  setStatus('good', t('slotsLoaded'));
+                }
               }
             } else {
               renderSlots([]);
