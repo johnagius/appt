@@ -170,6 +170,23 @@ export default {
           }
         }
 
+        // Send test reminder for the next upcoming appointment
+        if (adminPath === 'test-reminder' && method === 'POST') {
+          const tSig2 = new URL(request.url).searchParams.get('sig') || '';
+          if (!tSig2 || !await verifyAdminSig(tSig2, env.ADMIN_SECRET)) {
+            return new Response(JSON.stringify({ ok: false }), { status: 403, headers: { 'Content-Type': 'application/json' } });
+          }
+          const todayKey2 = todayKeyLocal(env.TIMEZONE);
+          const appts2 = await getActiveAppointmentsByDate(env.DB, todayKey2);
+          const booked = appts2.filter(a => a.status === 'BOOKED' || a.status === 'RELOCATED_SPINOLA');
+          if (!booked.length) {
+            return new Response(JSON.stringify({ ok: false, reason: 'No active appointments today to test with.' }), { headers: { 'Content-Type': 'application/json' } });
+          }
+          const testAppt = booked[0];
+          await sendReminderEmail(env, testAppt);
+          return new Response(JSON.stringify({ ok: true, message: 'Test reminder sent to ' + testAppt.email + ' for ' + testAppt.full_name + ' at ' + testAppt.start_time }), { headers: { 'Content-Type': 'application/json' } });
+        }
+
         // Delete routes with ID in path
         if (adminPath.startsWith('doctor-off/') && method === 'DELETE') {
           return apiAdminRemoveDoctorOff(request, env);
@@ -359,6 +376,7 @@ function testPage(sig: string): string {
   <p style="font-size:13px;color:#666;margin-bottom:12px">Deletes ALL appointments with TEST- prefix. Real bookings are never affected.</p>
   <button class="btn btn-purge" onclick="purgeAll()">Purge All Test Bookings</button>
   <button class="btn btn-quick" onclick="testBroadcast()" style="margin-top:8px;background:#f59e0b">Test WebSocket Broadcast</button>
+  <button class="btn btn-quick" onclick="sendTestReminder()" style="margin-top:8px;background:#8b5cf6">Send Test Reminder Email</button>
 </div>
 
 <div class="card">
@@ -442,6 +460,15 @@ async function testBroadcast() {
     var res = await api('test-broadcast', {});
     log('Broadcast result: ' + JSON.stringify(res));
     log('If admin page is open, it should have received a [WS] message and pinged.');
+  } catch(e) { log('FAILED: ' + e.message); }
+}
+
+async function sendTestReminder() {
+  log('Sending test reminder email for first appointment today...');
+  try {
+    var res = await api('test-reminder', {});
+    if (res.ok) log('OK: ' + res.message);
+    else log('ERROR: ' + (res.reason || 'No appointments today'));
   } catch(e) { log('FAILED: ' + e.message); }
 }
 </script>
