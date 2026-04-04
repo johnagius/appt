@@ -3542,15 +3542,20 @@ function renderReminderList(el, appts) {
   if (!appts.length) { el.innerHTML = '<div class="empty">No patients with email today.</div>'; return; }
   var html = '';
   appts.forEach(function(a) {
-    var reminded = a.reminder_sent || (a.reminder_sent === undefined && false);
-    var confirmed = a.confirmed || (a.confirmed === undefined && false);
+    var name = a.fullName || a.full_name || '';
+    var email = a.email || '';
+    var time = a.startTime || a.start_time || '';
+    var service = a.serviceName || a.service_name || '';
+    var id = a.appointmentId || a.id || '';
+    var reminded = a.reminder_sent;
+    var confirmed = a.confirmed;
     var badge = reminded ? '<span style="display:inline-block;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:800;background:#d1fae5;color:#065f46;margin-left:6px;">Sent</span>' : '';
     if (confirmed) badge += '<span style="display:inline-block;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:800;background:#dbeafe;color:#1d4ed8;margin-left:4px;">Confirmed</span>';
     html += '<label style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);cursor:pointer;">';
-    html += '<input type="checkbox" class="rem-cb" value="' + esc(a.appointmentId || a.id) + '">';
+    html += '<input type="checkbox" class="rem-cb" value="' + esc(id) + '">';
     html += '<div class="rev-patient-info">';
-    html += '<div class="rev-patient-name">' + esc(a.fullName || a.full_name) + badge + '</div>';
-    html += '<div class="rev-patient-detail">' + esc(a.email) + ' &middot; ' + esc(a.startTime || a.start_time) + ' &middot; ' + esc(a.serviceName || a.service_name) + '</div>';
+    html += '<div class="rev-patient-name">' + esc(name) + badge + '</div>';
+    html += '<div class="rev-patient-detail">' + esc(email) + ' &middot; ' + esc(time) + ' &middot; ' + esc(service) + '</div>';
     html += '</div></label>';
   });
   el.innerHTML = html;
