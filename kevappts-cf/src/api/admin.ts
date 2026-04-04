@@ -615,9 +615,10 @@ export async function apiAdminGetReviewPatients(req: Request, env: Env): Promise
   if (denied) return denied;
 
   const tz = env.TIMEZONE;
-  const todayKey = toDateKey(todayLocal(tz));
+  const url = new URL(req.url);
+  const dateKey = (url.searchParams.get('date') || '').trim() || toDateKey(todayLocal(tz));
 
-  const allAppts = await getAppointmentsByDate(env.DB, todayKey);
+  const allAppts = await getAppointmentsByDate(env.DB, dateKey);
 
   const potters: any[] = [];
   const spinola: any[] = [];
@@ -641,7 +642,7 @@ export async function apiAdminGetReviewPatients(req: Request, env: Env): Promise
     }
   }
 
-  return json({ ok: true, potters, spinola });
+  return json({ ok: true, potters, spinola, dateKey });
 }
 
 // ─── Send Review Requests ──────────────────────────────────
@@ -656,10 +657,11 @@ export async function apiAdminSendReviewRequests(req: Request, env: Env): Promis
   const location = payload.location || 'potters';
   const teamNames: string[] = payload.teamNames || [];
 
+  const dateKey = (payload.dateKey || '').trim() || toDateKey(todayLocal(tz));
+
   if (!appointmentIds.length || !teamNames.length) return json({ ok: false, reason: 'Missing selections.' }, 400);
 
-  const todayKey = toDateKey(todayLocal(tz));
-  const allAppts = await getAppointmentsByDate(env.DB, todayKey);
+  const allAppts = await getAppointmentsByDate(env.DB, dateKey);
   const idSet = new Set(appointmentIds);
   let sent = 0;
 
