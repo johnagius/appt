@@ -377,6 +377,49 @@ export async function markReviewSent(db: D1Database, appointmentId: string, nowS
     .bind(appointmentId, nowStr).run();
 }
 
+// ─── Follow-up Tracking ───────────────────────────────────
+
+export async function isFollowUpSent(db: D1Database, appointmentId: string): Promise<boolean> {
+  const row = await db.prepare('SELECT 1 FROM follow_ups WHERE appointment_id = ?').bind(appointmentId).first();
+  return !!row;
+}
+
+export async function insertFollowUp(db: D1Database, data: {
+  appointment_id: string; clinic: string; patient_name: string; email: string; phone: string; date_key: string; sent_at: string;
+}): Promise<void> {
+  await db.prepare(
+    'INSERT INTO follow_ups (appointment_id, clinic, patient_name, email, phone, date_key, sent_at, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+  ).bind(data.appointment_id, data.clinic, data.patient_name, data.email, data.phone, data.date_key, data.sent_at, 'sent').run();
+}
+
+export async function updateFollowUpResponse(db: D1Database, appointmentId: string, response: string, responseAt: string, questionText?: string): Promise<void> {
+  if (questionText) {
+    await db.prepare('UPDATE follow_ups SET response = ?, response_at = ?, question_text = ?, status = ? WHERE appointment_id = ?')
+      .bind(response, responseAt, questionText, response === 'question' ? 'needs_reply' : 'responded', appointmentId).run();
+  } else {
+    await db.prepare('UPDATE follow_ups SET response = ?, response_at = ?, status = ? WHERE appointment_id = ?')
+      .bind(response, responseAt, 'responded', appointmentId).run();
+  }
+}
+
+export async function getFollowUps(db: D1Database, status?: string): Promise<any[]> {
+  if (status) {
+    return (await db.prepare('SELECT * FROM follow_ups WHERE status = ? ORDER BY sent_at DESC').bind(status).all()).results;
+  }
+  return (await db.prepare('SELECT * FROM follow_ups ORDER BY sent_at DESC LIMIT 100').all()).results;
+}
+
+export async function getFollowUpByAppointmentId(db: D1Database, appointmentId: string): Promise<any> {
+  return db.prepare('SELECT * FROM follow_ups WHERE appointment_id = ?').bind(appointmentId).first();
+}
+
+export async function getAttendedAppointmentsByDate(db: D1Database, dateKey: string): Promise<Appointment[]> {
+  const result = await db.prepare(
+    "SELECT * FROM appointments WHERE date_key = ? AND status = 'ATTENDED' ORDER BY start_time"
+  ).bind(dateKey).all<Appointment>();
+  return result.results;
+}
+
 // ─── Find next available day ───────────────────────────────
 
 export function findNextAvailableDay(

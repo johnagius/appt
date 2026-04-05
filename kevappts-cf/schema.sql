@@ -73,6 +73,24 @@ CREATE TABLE IF NOT EXISTS review_sent (
   sent_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS follow_ups (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  appointment_id TEXT NOT NULL,
+  clinic TEXT NOT NULL DEFAULT 'potters',
+  patient_name TEXT NOT NULL,
+  email TEXT NOT NULL,
+  phone TEXT NOT NULL,
+  date_key TEXT NOT NULL,
+  sent_at TEXT NOT NULL,
+  response TEXT DEFAULT '',
+  response_at TEXT DEFAULT '',
+  question_text TEXT DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'sent'
+);
+
+CREATE INDEX IF NOT EXISTS idx_followup_status ON follow_ups(status);
+CREATE INDEX IF NOT EXISTS idx_followup_appt ON follow_ups(appointment_id);
+
 -- Seed data version
 INSERT OR IGNORE INTO data_version (id, version) VALUES (1, 0);
 

@@ -13,7 +13,7 @@
 import type { Env } from './types';
 import { RealtimeHub } from './realtime';
 import { apiPoll, apiInit, apiGetDates, apiGetAvailability, apiGetSpinolaAvailability, apiBook, apiBookSpinola } from './api/public';
-import { apiGetCancelInfo, apiCancelAppointment, apiDoctorAction, apiGetRescheduleInfo, apiGetRescheduleSlots, apiRescheduleAppointment } from './api/cancel';
+import { apiGetCancelInfo, apiCancelAppointment, apiDoctorAction, apiGetRescheduleInfo, apiGetRescheduleSlots, apiRescheduleAppointment, apiFollowUpResponse } from './api/cancel';
 import {
   apiAdminGetDashboard, apiAdminGetDateAppointments, apiAdminMarkDoctorOff,
   apiAdminAddExtraSlots, apiAdminRemoveDoctorOff, apiAdminRemoveExtraSlots,
@@ -21,18 +21,19 @@ import {
   apiAdminSendReviewRequests, apiAdminGetWeekOverview, apiAdminSearchAppointments,
   apiAdminGetSettings, apiAdminSaveSettings, apiAdminGetStatistics,
   apiAdminMarkAttendance, apiAdminGetPatientHistory, apiAdminDoctorOffDates,
-  apiAdminCreateTestBooking, apiAdminPurgeTestData,
+  apiAdminCreateTestBooking, apiAdminPurgeTestData, apiAdminTestFollowUp, apiAdminGetFollowUps,
 } from './api/admin';
 import { verifyAdminSig, computeAdminSig } from './services/crypto';
-import { todayKeyLocal, nowIso, parseTimeToMinutes } from './services/utils';
-import { getActiveAppointmentsByDate, getAppointmentByToken } from './db/queries';
-import { sendDailyDoctorSchedule, sendReminderEmail } from './services/email';
+import { todayKeyLocal, nowIso, parseTimeToMinutes, toDateKey, todayLocal, addDays } from './services/utils';
+import { getActiveAppointmentsByDate, getAppointmentByToken, getAttendedAppointmentsByDate, isFollowUpSent, insertFollowUp } from './db/queries';
+import { sendDailyDoctorSchedule, sendReminderEmail, sendFollowUpEmail } from './services/email';
 import { indexPage } from './pages/index-page';
 import { cancelPage } from './pages/cancel-page';
 import { docActionPage } from './pages/docaction-page';
 import { adminPage } from './pages/admin-page';
 import { doctorPage } from './pages/doctor-page';
 import { reschedulePage } from './pages/reschedule-page';
+import { followupPage } from './pages/followup-page';
 
 export { RealtimeHub };
 
@@ -107,6 +108,7 @@ export default {
       if (path === '/api/reschedule-info' && method === 'GET') return apiGetRescheduleInfo(request, env);
       if (path === '/api/reschedule-slots' && method === 'GET') return apiGetRescheduleSlots(request, env);
       if (path === '/api/reschedule' && method === 'POST') return apiRescheduleAppointment(request, env);
+      if (path === '/api/followup-response' && method === 'POST') return apiFollowUpResponse(request, env);
 
       // ─── Admin Login ─────────────────────────────────
       if (path === '/admin/login' && method === 'POST') {
@@ -149,6 +151,8 @@ export default {
         if (adminPath === 'doctor-off-dates' && method === 'POST') return apiAdminDoctorOffDates(request, env);
         if (adminPath === 'test-booking' && method === 'POST') return apiAdminCreateTestBooking(request, env);
         if (adminPath === 'purge-test-data' && method === 'POST') return apiAdminPurgeTestData(request, env);
+        if (adminPath === 'test-followup' && method === 'POST') return apiAdminTestFollowUp(request, env);
+        if (adminPath === 'follow-ups' && method === 'GET') return apiAdminGetFollowUps(request, env);
 
         // Test broadcast — manually trigger a WebSocket notification
         if (adminPath === 'test-broadcast' && method === 'POST') {
@@ -242,6 +246,7 @@ export default {
         }
         if (path === '/cancel') return html(cancelPage());
         if (path === '/reschedule') return html(reschedulePage());
+        if (path === '/followup') return html(followupPage());
         if (path === '/action') return html(docActionPage());
         if (path === '/admin' || path === '/doctor' || path === '/test') {
           // Check sig from query string or cookie
@@ -320,6 +325,30 @@ export default {
         }
       }
     } catch (e) { console.error('Reminder error:', e); }
+
+    // Post-visit follow-up emails (24h after attended appointments)
+    try {
+      const yesterdayKey = toDateKey(addDays(todayLocal(tz), -1));
+      const attendedYesterday = await getAttendedAppointmentsByDate(env.DB, yesterdayKey);
+      for (const appt of attendedYesterday) {
+        if (!appt.email) continue;
+        const alreadySent = await isFollowUpSent(env.DB, appt.id);
+        if (alreadySent) continue;
+        try {
+          await sendFollowUpEmail(env, appt);
+          await insertFollowUp(env.DB, {
+            appointment_id: appt.id,
+            clinic: appt.clinic || 'potters',
+            patient_name: appt.full_name,
+            email: appt.email,
+            phone: appt.phone,
+            date_key: appt.date_key,
+            sent_at: nowIso(tz),
+          });
+          console.log('Follow-up sent:', appt.id, appt.full_name);
+        } catch (e) { console.error('Follow-up send error:', appt.id, e); }
+      }
+    } catch (e) { console.error('Follow-up cron error:', e); }
   },
 };
 
@@ -408,6 +437,7 @@ function testPage(sig: string): string {
   <button class="btn btn-purge" onclick="purgeAll()">Purge All Test Bookings</button>
   <button class="btn btn-quick" onclick="testBroadcast()" style="margin-top:8px;background:#f59e0b">Test WebSocket Broadcast</button>
   <button class="btn btn-quick" onclick="sendTestReminder()" style="margin-top:8px;background:#8b5cf6">Send Test Reminder Email</button>
+  <button class="btn btn-quick" onclick="testFollowUp()" style="margin-top:8px;background:#10b981">Test Follow-up Email (labrint@gmail.com)</button>
 </div>
 
 <div class="card">
@@ -500,6 +530,14 @@ async function sendTestReminder() {
     var res = await api('test-reminder', {});
     if (res.ok) log('OK: ' + res.message);
     else log('ERROR: ' + (res.reason || 'No appointments today'));
+  } catch(e) { log('FAILED: ' + e.message); }
+}
+async function testFollowUp() {
+  log('Sending test follow-up email to labrint@gmail.com...');
+  try {
+    var res = await api('test-followup', {});
+    if (res.ok) log('OK: ' + res.message);
+    else log('ERROR: ' + (res.reason || 'Failed'));
   } catch(e) { log('FAILED: ' + e.message); }
 }
 </script>

@@ -454,7 +454,7 @@ export async function sendReviewRequestEmail(env: Env, appt: Appointment, locati
   const placeName = isPotters ? "Potter's Pharmacy" : 'Spinola Clinic';
   const reviewUrl = isPotters
     ? 'https://search.google.com/local/writereview?placeid=ChIJ3dCu7mtFDhMRYBPbRR0pgtE'
-    : 'https://search.google.com/local/writereview?placeid=ChIJ3dCu7mtFDhMRYBPbRR0pgtE';
+    : 'https://search.google.com/local/writereview?placeid=ChIJ3dCu7mtFDhMRYBPbRR0pgtE'; // TODO: Replace with actual Spinola place ID when available
 
   let teamLine = '';
   if (teamNames.length === 1) teamLine = teamNames[0];
@@ -496,6 +496,59 @@ export async function sendReviewRequestEmail(env: Env, appt: Appointment, locati
 </table>
 </td></tr></table>
 </body></html>`;
+
+  await sendEmail(env, appt.email, subject, html);
+}
+
+// ─── 12. Post-Visit Follow-up Email ────────────────────────
+
+export async function sendFollowUpEmail(env: Env, appt: Appointment): Promise<void> {
+  if (!appt.email) return;
+
+  const firstName = (appt.full_name || '').split(' ')[0] || 'there';
+  const clinic = appt.clinic || 'potters';
+  const doctorName = clinic === 'spinola' ? (env.SPINOLA_DOCTOR_NAME || 'Dr James') : 'Dr Kevin';
+  const baseUrl = getBaseUrl(env);
+  const sig = await computeSig('followup|' + appt.id, env.SIGNING_SECRET);
+  const responseBase = baseUrl + '/followup?id=' + encodeURIComponent(appt.id) + '&sig=' + encodeURIComponent(sig);
+
+  const greatUrl = responseBase + '&r=great';
+  const questionUrl = responseBase + '&r=question';
+  const rebookUrl = responseBase + '&r=rebook';
+
+  const subject = `How are you feeling, ${firstName}? \u2014 ${doctorName}`;
+  const html = `
+<div style="font-family:Arial,sans-serif;line-height:1.5;color:#111827;max-width:520px;">
+  <h2 style="margin:0 0 14px 0;font-size:18px;">Hi ${escapeHtml(firstName)},</h2>
+  <p style="margin:0 0 14px 0;font-size:15px;">
+    ${escapeHtml(doctorName)} wanted to check in after your visit yesterday.
+    Hope everything is going well!
+  </p>
+  <p style="margin:0 0 18px 0;font-size:15px;">How are you feeling?</p>
+  <table style="border-collapse:collapse;width:100%;"><tr>
+    <td style="padding:4px;">
+      <a href="${greatUrl}" style="display:block;text-align:center;background:#10b981;color:#fff;text-decoration:none;padding:14px 8px;border-radius:14px;font-weight:700;font-size:15px;">
+        Everything's great
+      </a>
+    </td>
+  </tr><tr>
+    <td style="padding:4px;">
+      <a href="${questionUrl}" style="display:block;text-align:center;background:#3b82f6;color:#fff;text-decoration:none;padding:14px 8px;border-radius:14px;font-weight:700;font-size:15px;">
+        I have a question
+      </a>
+    </td>
+  </tr><tr>
+    <td style="padding:4px;">
+      <a href="${rebookUrl}" style="display:block;text-align:center;background:#f5b301;color:#fff;text-decoration:none;padding:14px 8px;border-radius:14px;font-weight:700;font-size:15px;">
+        I need another appointment
+      </a>
+    </td>
+  </tr></table>
+  <p style="margin:18px 0 0 0;color:#6b7280;font-size:13px;">
+    This is an automated follow-up from ${clinic === 'spinola' ? 'Spinola Clinic' : "Potter's Pharmacy"}.
+    If you need urgent help, please call the clinic directly.
+  </p>
+</div>`;
 
   await sendEmail(env, appt.email, subject, html);
 }
