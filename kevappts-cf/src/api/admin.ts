@@ -1238,6 +1238,10 @@ export async function apiAdminPurgeTestData(req: Request, env: Env): Promise<Res
   const result = await env.DB.prepare("DELETE FROM appointments WHERE id LIKE 'TEST-%' OR full_name LIKE 'Test %' OR full_name LIKE 'TEST %'").run();
   // Also delete test clients
   await env.DB.prepare("DELETE FROM clients WHERE email = 'test@example.com'").run();
+  // Delete test referrals
+  try { await env.DB.prepare("DELETE FROM referrals WHERE referrer_name LIKE 'Test %' OR referrer_name LIKE 'TEST %' OR referred_name LIKE 'Test %' OR referred_name LIKE 'TEST %'").run(); } catch {}
+  // Delete test follow-ups
+  try { await env.DB.prepare("DELETE FROM follow_ups WHERE patient_name LIKE 'Test %' OR patient_name LIKE 'TEST %'").run(); } catch {}
   await bumpVersion(env.DB);
 
   // Broadcast to all WebSocket clients (booking page + admin + doctor)
