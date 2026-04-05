@@ -128,9 +128,10 @@ export async function sendClientConfirmationEmail(env: Env, appt: Appointment): 
   const html = `
 <div style="font-family:Arial,sans-serif;line-height:1.4;color:#111827;">
   <h2 style="margin:0 0 10px 0;">Appointment Confirmed</h2>
-  <p style="margin:0 0 10px 0;">Your appointment has been confirmed.</p>
+  <p style="margin:0 0 10px 0;">Your appointment with <b>Dr Kevin</b> has been confirmed.</p>
   <table style="border-collapse:collapse;width:100%;max-width:520px;">
     <tr><td style="padding:6px 0;color:#6b7280;">Service</td><td style="padding:6px 0;"><b>${escapeHtml(appt.service_name)}</b></td></tr>
+    <tr><td style="padding:6px 0;color:#6b7280;">Doctor</td><td style="padding:6px 0;"><b>Dr Kevin</b></td></tr>
     <tr><td style="padding:6px 0;color:#6b7280;">Date</td><td style="padding:6px 0;"><b>${escapeHtml(appt.date_key)}</b></td></tr>
     <tr><td style="padding:6px 0;color:#6b7280;">Time</td><td style="padding:6px 0;"><b>${escapeHtml(appt.start_time)} - ${escapeHtml(appt.end_time)}</b></td></tr>
     <tr><td style="padding:6px 0;color:#6b7280;">Location</td><td style="padding:6px 0;"><b>${escapeHtml(appt.location)}</b></td></tr>

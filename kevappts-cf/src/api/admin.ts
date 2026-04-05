@@ -408,6 +408,28 @@ export async function apiAdminProcessAppointments(req: Request, env: Env): Promi
         );
       }
 
+      // If no slot on the initial nextDay, cascade through future days
+      let pushDay: string = nextDay;
+      if (!newSlot) {
+        let searchDate = pushDay;
+        for (let attempt = 0; attempt < 30 && !newSlot; attempt++) {
+          searchDate = toDateKey(addDays(parseDateKey(searchDate), 1));
+          const searchDateObj = parseDateKey(searchDate);
+          const holiday = isHolidayOrClosed(searchDateObj);
+          if (holiday.closed) continue;
+          const offEntry = offMap[searchDate];
+          if (offEntry?.allDay) continue;
+
+          const daySlots = buildSlotsForDate(searchDateObj, cfg.apptDurationMin, extraMap[searchDate] || null, cfg.workingHours);
+          const dayTaken = await getTakenSlots(env.DB, searchDate, 'potters');
+          newSlot = daySlots.find(s =>
+            !dayTaken.has(s.start) &&
+            !slotBlockedByDoctorOff(offMap[searchDate], s.start, s.end)
+          );
+          if (newSlot) pushDay = searchDate;
+        }
+      }
+
       if (!newSlot) {
         if (appt.calendar_event_id) {
           try { await deleteCalendarEvent(env, appt.calendar_event_id, (appt.clinic as any) || 'potters'); } catch {}
@@ -415,11 +437,11 @@ export async function apiAdminProcessAppointments(req: Request, env: Env): Promi
         await updateAppointmentStatus(env.DB, appt.id, {
           status: 'CANCELLED_DOCTOR',
           cancelled_at: now,
-          cancel_reason: 'No available slot on ' + nextDay,
+          cancel_reason: 'No available slot in next 30 days',
           calendar_event_id: '',
         }, now);
         const ctx = (globalThis as any).__ctx;
-        if (ctx?.waitUntil) ctx.waitUntil(sendClientCancelledEmail(env, appt, 'No slots available for rescheduling. Please rebook.').catch(() => {}));
+        if (ctx?.waitUntil) ctx.waitUntil(sendClientCancelledEmail(env, appt, 'We could not find an available slot in the next 30 days. Please rebook at your convenience.').catch(() => {}));
         results.push({ appointmentId: appt.id, action: 'cancelled_no_slot', patient: appt.full_name });
         continue;
       }
@@ -433,14 +455,14 @@ export async function apiAdminProcessAppointments(req: Request, env: Env): Promi
       await updateAppointmentStatus(env.DB, appt.id, {
         status: 'CANCELLED_DOCTOR',
         cancelled_at: now,
-        cancel_reason: 'Pushed to ' + nextDay + ' ' + newSlot.start,
+        cancel_reason: 'Pushed to ' + pushDay + ' ' + newSlot.start,
         calendar_event_id: '',
       }, now);
 
       // Create new
       const newAppt: Appointment = {
         id: 'A-' + generateId(),
-        date_key: nextDay,
+        date_key: pushDay,
         start_time: newSlot.start,
         end_time: newSlot.end,
         service_id: appt.service_id,
@@ -461,7 +483,7 @@ export async function apiAdminProcessAppointments(req: Request, env: Env): Promi
       };
 
       await insertAppointment(env.DB, newAppt);
-      takenOnNextDay.add(newSlot.start);
+      if (pushDay === nextDay) takenOnNextDay.add(newSlot.start);
 
       // Create new calendar event
       try {
@@ -472,9 +494,9 @@ export async function apiAdminProcessAppointments(req: Request, env: Env): Promi
       } catch {}
 
       const ctx = (globalThis as any).__ctx;
-      if (ctx?.waitUntil) ctx.waitUntil(sendAppointmentPushedEmail(env, appt, nextDay, newSlot.start, newSlot.end).catch(() => {}));
+      if (ctx?.waitUntil) ctx.waitUntil(sendAppointmentPushedEmail(env, appt, pushDay, newSlot.start, newSlot.end).catch(() => {}));
 
-      results.push({ appointmentId: newAppt.id, action: 'pushed', patient: appt.full_name, newDate: nextDay, newTime: newSlot.start });
+      results.push({ appointmentId: newAppt.id, action: 'pushed', patient: appt.full_name, newDate: pushDay, newTime: newSlot.start });
     }
   }
 

@@ -3656,17 +3656,20 @@ export function indexPage(env: Env): string {
     });
 
 
-    // ── WebSocket: Real-time slot updates (zero polling) ──
+    // ── WebSocket: Real-time slot updates (with exponential backoff) ──
     var _ws = null;
     var _wsConnected = false;
     var _wsSubscribedDate = null;
+    var _wsReconnectDelay = 1000;
+    var _wsReconnectTimer = null;
     function connectWS() {
+      if (_wsReconnectTimer) { clearTimeout(_wsReconnectTimer); _wsReconnectTimer = null; }
       try {
         var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
         _ws = new WebSocket(proto + '//' + location.host + '/api/ws');
         _ws.onopen = function() {
           _wsConnected = true;
-          // Subscribe to the date we're currently viewing
+          _wsReconnectDelay = 1000;
           if (state.selectedDateKey) {
             _ws.send(JSON.stringify({ subscribe: 'date', dateKey: state.selectedDateKey }));
             _wsSubscribedDate = state.selectedDateKey;
@@ -3675,7 +3678,6 @@ export function indexPage(env: Env): string {
         _ws.onmessage = function(event) {
           try {
             var data = JSON.parse(event.data);
-            // Server pushed fresh slot data — render directly, ZERO API calls
             if (data.type === 'slots_data' && data.dateKey === state.selectedDateKey && data.data) {
               var res = data.data;
               if (res && res.ok) {
@@ -3684,7 +3686,6 @@ export function indexPage(env: Env): string {
               }
               return;
             }
-            // Fallback notification (no data payload) — one lightweight fetch
             if (data.type === 'slots_updated') {
               if (data.dateKey === state.selectedDateKey || !data.dateKey) {
                 loadAvailability(true, false);
@@ -3694,12 +3695,25 @@ export function indexPage(env: Env): string {
         };
         _ws.onclose = function() {
           _wsConnected = false;
-          setTimeout(connectWS, 2000);
+          scheduleWSReconnect();
         };
         _ws.onerror = function() { try { _ws.close(); } catch(e) {} };
-      } catch(e) { _wsConnected = false; }
+      } catch(e) { _wsConnected = false; scheduleWSReconnect(); }
     }
-    // Keepalive ping
+    function scheduleWSReconnect() {
+      if (_wsReconnectTimer) return;
+      _wsReconnectTimer = setTimeout(function() {
+        _wsReconnectTimer = null;
+        connectWS();
+      }, _wsReconnectDelay);
+      _wsReconnectDelay = Math.min(_wsReconnectDelay * 2, 30000);
+    }
+    document.addEventListener('visibilitychange', function() {
+      if (!document.hidden && !_wsConnected) {
+        _wsReconnectDelay = 1000;
+        connectWS();
+      }
+    });
     setInterval(function() { if (_ws && _ws.readyState === 1) _ws.send(JSON.stringify({type:'ping'})); }, 30000);
 
     // When user picks a different date, update WebSocket subscription

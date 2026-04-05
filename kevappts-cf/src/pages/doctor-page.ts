@@ -73,6 +73,7 @@ export function doctorPage(sig: string): string {
   .patient-card.relocated .patient-time{text-decoration:line-through;text-decoration-color:var(--muted);}
   .patient-badge{display:inline-block;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;padding:2px 8px;border-radius:8px;margin-top:4px;text-decoration:none;}
   .patient-badge.spinola{background:#fef3c7;color:#92400e;}
+  .patient-comment{font-size:12px;color:#6b7280;margin-top:4px;padding:4px 8px;background:#f3f4f6;border-radius:8px;line-height:1.35;font-style:italic;}
   .patient-main{flex:1;min-width:0;}
   .patient-name{font-size:15px;font-weight:800;line-height:1.25;}
   .patient-meta{font-size:12px;color:var(--muted);line-height:1.45;margin-top:3px;word-break:break-word;}
@@ -712,6 +713,7 @@ function renderPatientList(session) {
     html += '</div>';
     if (isSpinola) html += '<div class="patient-badge spinola">Sent to Spinola</div>';
     if (a.confirmed) html += '<div class="patient-badge" style="background:#d1fae5;color:#065f46;">Confirmed</div>';
+    if (a.comments && String(a.comments).trim()) html += '<div class="patient-comment">' + esc(a.comments) + '</div>';
     html += '</div>';
     html += '<div class="patient-time">' + esc(a.start_time || '') + '</div>';
     html += '</div>';
@@ -1597,23 +1599,26 @@ document.getElementById('actionModal').addEventListener('click', function(e) {
   if (e.target === this) closeActionModal();
 });
 
-// ── WebSocket for real-time updates ──
+// ── WebSocket for real-time updates (with exponential backoff) ──
 var _ws = null;
+var _wsReconnectDelay = 1000;
+var _wsReconnectTimer = null;
 function connectWS() {
+  if (_wsReconnectTimer) { clearTimeout(_wsReconnectTimer); _wsReconnectTimer = null; }
   var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-  try { _ws = new WebSocket(proto + '//' + location.host + '/api/ws'); } catch(e) { return; }
+  try { _ws = new WebSocket(proto + '//' + location.host + '/api/ws'); } catch(e) { scheduleWSReconnect(); return; }
   _ws.onopen = function() {
+    _wsReconnectDelay = 1000;
     try { _ws.send(JSON.stringify({ subscribe: 'admin' })); } catch(e) {}
   };
   _ws.onmessage = function(ev) {
     try {
       var msg = JSON.parse(ev.data);
       if (msg.type === 'slots_updated' || msg.type === 'slots_data' || msg.type === 'dashboard_data') {
-        // Toast notification
         var toast = document.getElementById('liveToast');
         var toastTxt = document.getElementById('liveToastText');
         if (toast && toastTxt) {
-          toastTxt.textContent = 'Schedule updated — new booking or change';
+          toastTxt.textContent = 'Schedule updated \u2014 new booking or change';
           toast.style.display = 'block'; toast.style.opacity = '1';
           setTimeout(function(){ toast.style.opacity = '0'; setTimeout(function(){ toast.style.display = 'none'; }, 300); }, 4000);
         }
@@ -1626,9 +1631,23 @@ function connectWS() {
       }
     } catch(e) {}
   };
-  _ws.onclose = function() { setTimeout(connectWS, 2000); };
+  _ws.onclose = function() { scheduleWSReconnect(); };
   _ws.onerror = function() { try { _ws.close(); } catch(e) {} };
 }
+function scheduleWSReconnect() {
+  if (_wsReconnectTimer) return;
+  _wsReconnectTimer = setTimeout(function() {
+    _wsReconnectTimer = null;
+    connectWS();
+  }, _wsReconnectDelay);
+  _wsReconnectDelay = Math.min(_wsReconnectDelay * 2, 30000);
+}
+document.addEventListener('visibilitychange', function() {
+  if (!document.hidden && (!_ws || _ws.readyState !== 1) && !_idlePaused) {
+    _wsReconnectDelay = 1000;
+    connectWS();
+  }
+});
 setInterval(function() { if (_ws && _ws.readyState === 1) try { _ws.send('ping'); } catch(e) {} }, 30000);
 
 ['pointerdown', 'keydown', 'scroll', 'touchstart', 'mousemove'].forEach(function(evt) {
