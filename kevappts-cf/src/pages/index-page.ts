@@ -32,6 +32,7 @@ export function indexPage(env: Env): string {
     body{
       margin:0;
       font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Apple Color Emoji","Segoe UI Emoji";
+      font-size: 14.5px;
       background: var(--bg);
       color: var(--text);
     }
@@ -112,7 +113,7 @@ export function indexPage(env: Env): string {
     .headerClinic,.headerTz{
       margin:0;
       color: var(--muted);
-      font-size:12px;
+      font-size:13.5px;
       line-height:1.2;
       white-space:nowrap;
       overflow:hidden;
@@ -128,7 +129,7 @@ export function indexPage(env: Env): string {
       border:1px solid var(--line);
       background:#fff;
       color: var(--muted);
-      font-size:12px;
+      font-size:13.5px;
       white-space:nowrap;
     }
     .dot{
@@ -163,11 +164,11 @@ export function indexPage(env: Env): string {
     .topTitle{
       margin:0 0 8px 0;
       font-weight:900;
-      font-size:13.5px;
+      font-size:15px;
     }
     .topLine{
       margin:0;
-      font-size:12.5px;
+      font-size:14px;
       color: var(--muted);
       line-height:1.4;
     }
@@ -186,7 +187,7 @@ export function indexPage(env: Env): string {
 
     .sectionTitle{
       margin:0 0 6px 0;
-      font-size:12px;
+      font-size:13.5px;
       color: var(--muted);
       font-weight:800;
       letter-spacing:0.02em;
@@ -194,13 +195,13 @@ export function indexPage(env: Env): string {
     }
     .label{
       display:block;
-      font-size:12px;
+      font-size:13.5px;
       color: var(--muted);
       font-weight:800;
       margin-bottom:6px;
     }
     .field-error{
-      font-size:11.5px;
+      font-size:13px;
       color: var(--bad);
       margin-top:4px;
       min-height:0;
@@ -219,7 +220,7 @@ export function indexPage(env: Env): string {
       border:1px solid var(--line);
       border-radius:12px;
       outline:none;
-      font-size:13px;
+      font-size:14.5px;
       background:#fff;
       color: var(--text);
       transition: border-color 0.15s ease, box-shadow 0.15s ease;
@@ -245,7 +246,7 @@ export function indexPage(env: Env): string {
       flex:1;
     }
     .phoneWrap .dialCode{
-      font-size:13px;
+      font-size:14.5px;
       color:var(--muted);
       font-weight:600;
       padding:0 2px 0 0;
@@ -305,7 +306,7 @@ export function indexPage(env: Env): string {
     }
     .ccSearchWrap::before{
       content:'🔍';
-      font-size:13px;
+      font-size:14.5px;
       opacity:0.5;
       flex-shrink:0;
     }
@@ -335,13 +336,13 @@ export function indexPage(env: Env): string {
       padding:10px 12px;
       min-height:44px;
       cursor:pointer;
-      font-size:13px;
+      font-size:14.5px;
       white-space:nowrap;
       transition: background 0.12s ease;
     }
     .ccItem:hover,.ccItem.hl{background:var(--accent);color:#fff;}
     .ccItem .ccFlag{font-size:16px;}
-    .ccItem .ccCode{color:var(--muted);margin-left:auto;font-size:12px;}
+    .ccItem .ccCode{color:var(--muted);margin-left:auto;font-size:13.5px;}
     .ccItem:hover .ccCode,.ccItem.hl .ccCode{color:rgba(255,255,255,.8);}
 
     /* Language picker */
@@ -381,7 +382,7 @@ export function indexPage(env: Env): string {
     }
     .langBtn:hover{ border-color:#d1d5db; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
     .langBtn .langLabel{
-      font-size:11px;
+      font-size:12.5px;
       font-weight:800;
       color:var(--muted);
     }
@@ -408,7 +409,7 @@ export function indexPage(env: Env): string {
       padding:10px 12px;
       min-height:44px;
       cursor:pointer;
-      font-size:13px;
+      font-size:14.5px;
       white-space:nowrap;
       transition: background 0.12s ease;
     }
@@ -463,12 +464,12 @@ export function indexPage(env: Env): string {
     .serviceMeta{ display:flex; flex-direction:column; gap:2px; min-width:0; }
     .serviceName{
       font-weight:900;
-      font-size:13px;
+      font-size:14.5px;
       white-space:nowrap;
       overflow:hidden;
       text-overflow:ellipsis;
     }
-    .serviceDur{ font-size:12px; color: var(--muted); }
+    .serviceDur{ font-size:13.5px; color: var(--muted); }
     .chev{ font-size:18px; color: var(--muted); padding: 0 4px; flex:0 0 auto; }
 
     /* MAIN booking area */
@@ -503,7 +504,7 @@ export function indexPage(env: Env): string {
       background:#fff;
       cursor:pointer;
       font-weight:900;
-      font-size:12.5px;
+      font-size:14px;
       text-align:center;
       user-select:none;
       white-space:nowrap;
@@ -534,7 +535,7 @@ export function indexPage(env: Env): string {
       padding:12px 20px;
       min-height:44px;
       font-weight:750;
-      font-size:13px;
+      font-size:14.5px;
       cursor:pointer;
       background:#111827;
       color:#fff;
@@ -564,7 +565,7 @@ export function indexPage(env: Env): string {
       border:1px solid var(--line);
       background:#fff;
       color: var(--text);
-      font-size:13px;
+      font-size:14.5px;
       line-height:1.4;
       display:none;
     }
@@ -614,7 +615,7 @@ export function indexPage(env: Env): string {
     }
     .modal p{
       margin:0 0 12px 0;
-      font-size:13px;
+      font-size:14.5px;
       color: var(--muted);
       line-height:1.45;
       white-space:pre-line;
@@ -623,6 +624,32 @@ export function indexPage(env: Env): string {
       display:flex;
       justify-content:flex-end;
       gap:10px;
+    }
+    .confirm-actions{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:10px;
+      margin:14px 0 6px;
+    }
+    .confirm-action-btn{
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      gap:8px;
+      padding:12px 14px;
+      border-radius:14px;
+      border:1.5px solid var(--line);
+      background:#fff;
+      font-size:13.5px;
+      font-weight:700;
+      color:var(--text);
+      cursor:pointer;
+      transition:background 0.15s,border-color 0.15s;
+    }
+    .confirm-action-btn:hover{background:#f3f4f6;border-color:#d1d5db;}
+    .confirm-action-btn .ca-icon{font-size:18px;}
+    @media(max-width:380px){
+      .confirm-actions{grid-template-columns:1fr;}
     }
 
     /* Spinola inline offer (replaces time grid when no Potter's slots) */
@@ -640,7 +667,7 @@ export function indexPage(env: Env): string {
     }
     .spinola-inline .spinola-subtitle{
       margin:0 0 16px 0;
-      font-size:13px;
+      font-size:14.5px;
       color:var(--muted);
     }
     .spinola-option-card{
@@ -660,13 +687,13 @@ export function indexPage(env: Env): string {
     }
     .spinola-option-card .spinola-loc-details{
       margin:0 0 10px 0;
-      font-size:12px;
+      font-size:13.5px;
       color:var(--muted);
       line-height:1.4;
     }
     .spinola-option-card .spinola-date-label{
       margin:0 0 8px 0;
-      font-size:12px;
+      font-size:13.5px;
       font-weight:600;
       color:var(--text);
     }
@@ -677,17 +704,17 @@ export function indexPage(env: Env): string {
       margin-bottom:8px;
     }
     .spinola-slots-grid .timeBtn{
-      font-size:12px;
+      font-size:13.5px;
       padding:6px 4px;
     }
     .spinola-no-slots{
-      font-size:12px;
+      font-size:13.5px;
       color:var(--muted);
       padding:8px 0;
     }
     .spinola-divider{
       text-align:center;
-      font-size:12px;
+      font-size:13.5px;
       color:var(--muted);
       margin:14px 0;
     }
@@ -698,7 +725,7 @@ export function indexPage(env: Env): string {
       padding:10px 14px;
       border-radius:999px;
       font-weight:700;
-      font-size:13px;
+      font-size:14.5px;
       cursor:pointer;
       transition:filter 0.15s;
     }
@@ -749,7 +776,7 @@ export function indexPage(env: Env): string {
     @keyframes idle-float{0%,100%{transform:translateY(0);}50%{transform:translateY(-8px);}}
     @keyframes idle-pulse-icon{0%,100%{opacity:1;transform:scale(1);}50%{opacity:0.7;transform:scale(0.95);}}
     .loadingText h4{ margin:0 0 4px 0; font-size:14px; }
-    .loadingText div{ margin:0; color: var(--muted); font-size:12.5px; line-height:1.35; }
+    .loadingText div{ margin:0; color: var(--muted); font-size:14px; line-height:1.35; }
     /* Email autocomplete dropdown */
     .email-wrap{position:relative;}
     .email-dropdown{position:absolute;bottom:100%;left:0;right:0;z-index:2000;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 -4px 24px rgba(0,0,0,0.12);max-height:200px;overflow-y:auto;display:none;margin-bottom:4px;}
@@ -757,7 +784,7 @@ export function indexPage(env: Env): string {
     .email-dd-item{padding:10px 14px;cursor:pointer;font-size:14px;color:var(--text);border-bottom:1px solid rgba(229,231,235,0.5);}
     .email-dd-item:last-child{border-bottom:none;}
     .email-dd-item:hover,.email-dd-item.active{background:#eff6ff;color:#1d4ed8;}
-    .email-typo-hint{font-size:12px;color:#2563eb;margin-top:4px;cursor:pointer;font-weight:600;}
+    .email-typo-hint{font-size:13.5px;color:#2563eb;margin-top:4px;cursor:pointer;font-weight:600;}
     .email-typo-hint:hover{text-decoration:underline;}
     /* Floating confirm for mobile keyboard */
     .floating-confirm{display:none;position:fixed;bottom:0;left:0;right:0;padding:10px 16px;padding-bottom:max(10px, env(safe-area-inset-bottom));background:#fff;border-top:1px solid var(--line);box-shadow:0 -4px 12px rgba(0,0,0,0.08);z-index:1500;text-align:center;}
@@ -834,11 +861,11 @@ export function indexPage(env: Env): string {
       <div id="noSlotsBanner" style="display:none;background:#fff7ed;border:2px solid #f59e0b;border-radius:12px;padding:14px 18px;margin-bottom:14px;text-align:center;">
         <div style="font-size:20px;margin-bottom:4px;">&#9888;</div>
         <div style="font-weight:800;font-size:15px;color:#92400e;" id="noSlotsBannerText">No more appointments available today.</div>
-        <div style="font-size:13px;color:#b45309;margin-top:4px;" id="noSlotsBannerSub">Showing the next available date below. Please choose a time.</div>
+        <div style="font-size:14.5px;color:#b45309;margin-top:4px;" id="noSlotsBannerSub">Showing the next available date below. Please choose a time.</div>
       </div>
       <div id="choiceBanner" style="display:none;background:#eff6ff;border:2px solid #2563eb;border-radius:12px;padding:18px;margin-bottom:14px;text-align:center;">
         <div style="font-weight:800;font-size:15px;color:#1e40af;margin-bottom:4px;">Morning slots are full at Potter&#39;s</div>
-        <div style="font-size:13px;color:#3b82f6;margin-bottom:14px;">You can see Dr James at Spinola Clinic now, or wait for Potter&#39;s evening slots.</div>
+        <div style="font-size:14.5px;color:#3b82f6;margin-bottom:14px;">You can see Dr James at Spinola Clinic now, or wait for Potter&#39;s evening slots.</div>
         <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
           <button type="button" id="choiceBtnSpinola" onclick="showChoiceSpinola()" style="flex:1;min-width:140px;max-width:240px;padding:12px 16px;border:none;border-radius:12px;background:#8b5cf6;color:#fff;font-weight:800;font-size:14px;cursor:pointer;">See Spinola Slots</button>
           <button type="button" id="choiceBtnPotters" onclick="showChoicePotters()" style="flex:1;min-width:140px;max-width:240px;padding:12px 16px;border:none;border-radius:12px;background:#f5b301;color:#111827;font-weight:800;font-size:14px;cursor:pointer;">See Potter&#39;s Slots</button>
@@ -944,6 +971,14 @@ export function indexPage(env: Env): string {
     <div class="modal">
       <h3 id="confirmModalTitle" data-i18n="appointmentConfirmed">Appointment Confirmed</h3>
       <p id="confirmText"></p>
+      <div class="confirm-actions" id="confirmActions" style="display:none;">
+        <button class="confirm-action-btn" id="addCalBtn" onclick="addToCalendar()">
+          <span class="ca-icon">📅</span> Add to Calendar
+        </button>
+        <button class="confirm-action-btn" id="shareBtn" onclick="shareAppointment()">
+          <span class="ca-icon">💬</span> Let someone know
+        </button>
+      </div>
       <div class="modalActions">
         <button class="btn btnAccent" id="confirmOk" data-i18n="okBtn">OK</button>
       </div>
@@ -2381,24 +2416,76 @@ export function indexPage(env: Env): string {
       hideOverlay(els.loadingOverlay);
     }
 
-    function showConfirmModal(text){
+    var _lastBooking = null;
+    function showConfirmModal(text, bookingInfo){
       els.confirmText.textContent = text;
+      _lastBooking = bookingInfo || null;
+      var actionsEl = document.getElementById('confirmActions');
+      if (_lastBooking) {
+        actionsEl.style.display = '';
+      } else {
+        actionsEl.style.display = 'none';
+      }
       showOverlay(els.confirmOverlay);
-      // Auto-close after 4 seconds and continue as if user clicked OK
-      setTimeout(function() {
-        if (els.confirmOverlay.classList.contains('show')) {
-          hideConfirmModal();
-          applyLanguage('en');
-          goToExecAfterBooking_();
-        }
-      }, 4000);
     }
     function hideConfirmModal(){
       hideOverlay(els.confirmOverlay);
     }
+    function addToCalendar() {
+      if (!_lastBooking) return;
+      var b = _lastBooking;
+      var dtStart = b.dateKey.replace(/-/g, '') + 'T' + b.startTime.replace(':', '') + '00';
+      var dtEnd = b.dateKey.replace(/-/g, '') + 'T' + b.endTime.replace(':', '') + '00';
+      var ics = [
+        'BEGIN:VCALENDAR',
+        'VERSION:2.0',
+        'PRODID:-//PottersPharmacy//Booking//EN',
+        'BEGIN:VEVENT',
+        'DTSTART:' + dtStart,
+        'DTEND:' + dtEnd,
+        'SUMMARY:Doctor Appointment - ' + b.serviceName,
+        'LOCATION:' + b.location,
+        'DESCRIPTION:' + b.serviceName + ' at ' + b.location,
+        'BEGIN:VALARM',
+        'TRIGGER:-PT1H',
+        'ACTION:DISPLAY',
+        'DESCRIPTION:Appointment in 1 hour',
+        'END:VALARM',
+        'END:VEVENT',
+        'END:VCALENDAR'
+      ].join('\\r\\n');
+      var blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = 'appointment.ics';
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+    function shareAppointment() {
+      if (!_lastBooking) return;
+      var b = _lastBooking;
+      var shareText = 'I have a doctor\\'s appointment:\\n' +
+        b.serviceName + '\\n' +
+        b.dateLabel + ' at ' + to12h(b.startTime) + '\\n' +
+        b.location + '\\n\\n' +
+        'Book your own appointment: ' + location.origin;
+      if (navigator.share) {
+        navigator.share({ title: 'Doctor Appointment', text: shareText }).catch(function(){});
+      } else {
+        // Fallback: copy to clipboard
+        navigator.clipboard.writeText(shareText).then(function() {
+          var btn = document.getElementById('shareBtn');
+          var orig = btn.innerHTML;
+          btn.innerHTML = '<span class="ca-icon">✓</span> Copied!';
+          setTimeout(function() { btn.innerHTML = orig; }, 2000);
+        }).catch(function(){});
+      }
+    }
 
     els.confirmOk.addEventListener('click', () => {
       hideConfirmModal();
+      _lastBooking = null;
       applyLanguage('en');
       goToExecAfterBooking_();
     });
@@ -3474,7 +3561,7 @@ export function indexPage(env: Env): string {
               var dateLabel2 = localDate(_spinolaDateKey);
               var text = t('confirmMsg', res.serviceName, dateLabel2, to12h(res.startTime), to12h(res.endTime), res.location);
               if (res.calWarning) console.warn('SPINOLA CAL:', res.calWarning);
-              showConfirmModal(text);
+              showConfirmModal(text, { dateKey: _spinolaDateKey, dateLabel: dateLabel2, startTime: res.startTime, endTime: res.endTime, serviceName: res.serviceName, location: res.location });
               return;
             }
             showMsg('bad', (res && res.reason) || t('couldNotBook'));
@@ -3505,7 +3592,7 @@ export function indexPage(env: Env): string {
           hideLoading();
           if (res && res.ok) {
             var text = t('confirmMsg', res.serviceName, state.selectedDateLabel, to12h(res.startTime), to12h(res.endTime), res.location);
-            showConfirmModal(text);
+            showConfirmModal(text, { dateKey: state.selectedDateKey, dateLabel: state.selectedDateLabel, startTime: res.startTime, endTime: res.endTime, serviceName: res.serviceName, location: res.location });
             return;
           }
           showMsg('bad', (res && res.reason) || t('couldNotBook'));
@@ -3712,7 +3799,7 @@ export function indexPage(env: Env): string {
 
     function init() {
       // Show inline loading in time grid instead of full-screen overlay
-      els.timeGrid.innerHTML = '<div style="text-align:center;padding:24px 0;color:var(--muted);font-size:13px;"><div class="spinner" style="margin:0 auto 10px;width:28px;height:28px;"></div>Loading available times...</div>';
+      els.timeGrid.innerHTML = '<div style="text-align:center;padding:24px 0;color:var(--muted);font-size:14.5px;"><div class="spinner" style="margin:0 auto 10px;width:28px;height:28px;"></div>Loading available times...</div>';
       setStatus('good', t('loadingSlots'));
 
       fetch('/api/init')
