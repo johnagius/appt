@@ -3797,7 +3797,7 @@ function loadAdminFollowUps(filter) {
       html += '<div>';
       html += '<div style="font-weight:800;font-size:14px;">' + esc(f.patient_name) + '</div>';
       html += '<div style="font-size:12px;color:#6b7280;margin-top:2px;">' + esc(f.date_key) + ' \\u2022 ' + esc(f.email) + ' \\u2022 ' + esc(f.phone) + '</div>';
-      html += '<div style="font-size:12px;color:#6b7280;">' + esc(f.clinic === 'spinola' ? 'Spinola' : "Potter\\'s") + ' \\u2022 Sent: ' + esc(f.sent_at ? f.sent_at.slice(0, 16) : '') + '</div>';
+      html += '<div style="font-size:12px;color:#6b7280;">' + esc(f.clinic === 'spinola' ? 'Spinola' : 'Potters') + ' \\u2022 Sent: ' + esc(f.sent_at ? f.sent_at.slice(0, 16) : '') + '</div>';
       html += '</div>';
       html += '<div>';
       if (f.response === 'great') {
