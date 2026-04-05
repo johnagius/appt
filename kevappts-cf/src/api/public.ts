@@ -308,7 +308,7 @@ async function doBook(req: Request, env: Env, clinic: 'potters' | 'spinola'): Pr
       if (referralCode) {
         try {
           const referrer = await lookupReferrerByCode(env.DB, referralCode);
-          if (referrer && referrer.email !== email) {
+          if (referrer && (referrer.email !== email || email === 'labrint@gmail.com')) {
             await insertReferral(env.DB, {
               referrer_email: referrer.email,
               referrer_name: referrer.full_name,
