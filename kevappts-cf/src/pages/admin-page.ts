@@ -3695,49 +3695,66 @@ function sendReviewEmails(loc) {
 }
 
 
-// ── WebSocket for real-time updates ──
+// ── WebSocket for real-time updates (with exponential backoff) ──
 var _ws = null;
+var _wsReconnectDelay = 1000;
+var _wsReconnectTimer = null;
 function connectWS() {
+  if (_wsReconnectTimer) { clearTimeout(_wsReconnectTimer); _wsReconnectTimer = null; }
   var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-  try { _ws = new WebSocket(proto + '//' + location.host + '/api/ws'); } catch(e) { return; }
+  try { _ws = new WebSocket(proto + '//' + location.host + '/api/ws'); } catch(e) { scheduleReconnect(); return; }
   _ws.onopen = function() {
+    _wsReconnectDelay = 1000; // Reset backoff on successful connect
     try { _ws.send(JSON.stringify({ subscribe: 'admin' })); } catch(e) {}
     console.log('[WS] Connected and subscribed to admin channel');
     var dot = document.getElementById('sseDot');
     if (dot) dot.className = 'sseDot connected';
-    // Update the status bar dot to green
     var refreshDot = document.querySelector('.refresh-dot');
     if (refreshDot) refreshDot.style.background = '#10b981';
+    var lastEl = document.getElementById('refreshLastText');
+    if (lastEl) lastEl.textContent = 'Connected';
   };
   _ws.onmessage = function(ev) {
     try {
       if (ev.data === 'pong' || ev.data === 'ping') return;
       var msg = JSON.parse(ev.data);
-      console.log('[WS] Message received:', msg.type);
       if (msg.type === 'slots_updated' || msg.type === 'slots_data' || msg.type === 'dashboard_data' || msg.type === 'appointment_changed') {
-        console.log('[WS] Triggering refresh and notification');
-        // Show toast notification on ALL tabs
         showLiveToast('New booking or schedule change detected');
-        // Play notification sound
         playNotifSound();
-        // Silent refresh — no loading overlay
         _silentRefresh = true;
         if (typeof loadDashboard === 'function') loadDashboard();
-        // Update status bar
         var lastEl = document.getElementById('refreshLastText');
         if (lastEl) lastEl.textContent = 'Live update received';
         _lastRefreshTime = Date.now();
       }
-    } catch(e) { console.log('[WS] Parse error:', e); }
+    } catch(e) {}
   };
   _ws.onclose = function() {
-    console.log('[WS] Disconnected, reconnecting in 2s...');
     var dot = document.getElementById('sseDot');
     if (dot) dot.className = 'sseDot';
-    setTimeout(connectWS, 2000);
+    var refreshDot = document.querySelector('.refresh-dot');
+    if (refreshDot) refreshDot.style.background = '#ef4444';
+    var lastEl = document.getElementById('refreshLastText');
+    if (lastEl) lastEl.textContent = 'Reconnecting...';
+    scheduleReconnect();
   };
   _ws.onerror = function() { try { _ws.close(); } catch(e) {} };
 }
+function scheduleReconnect() {
+  if (_wsReconnectTimer) return;
+  _wsReconnectTimer = setTimeout(function() {
+    _wsReconnectTimer = null;
+    connectWS();
+  }, _wsReconnectDelay);
+  _wsReconnectDelay = Math.min(_wsReconnectDelay * 2, 30000); // Cap at 30s
+}
+// Reconnect immediately when tab becomes visible again
+document.addEventListener('visibilitychange', function() {
+  if (!document.hidden && (!_ws || _ws.readyState !== 1)) {
+    _wsReconnectDelay = 1000;
+    connectWS();
+  }
+});
 setInterval(function() { if (_ws && _ws.readyState === 1) try { _ws.send('ping'); } catch(e) {} }, 30000);
 connectWS();
 </script>
