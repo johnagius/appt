@@ -461,10 +461,15 @@ export async function getReferrerByCode(db: D1Database, code: string): Promise<a
 }
 
 export async function lookupReferrerByCode(db: D1Database, code: string): Promise<any> {
-  // Find any patient whose email hashes to this code
+  // Find any patient whose email hashes to this code — check clients first, then appointments
   const clients = await db.prepare("SELECT full_name, email, phone FROM clients ORDER BY created_at DESC LIMIT 500").all();
   for (const c of clients.results) {
     if (generateReferralCode(c.email as string) === code) return c;
+  }
+  // Fallback: check appointments table
+  const appts = await db.prepare("SELECT DISTINCT full_name, email, phone FROM appointments ORDER BY created_at DESC LIMIT 500").all();
+  for (const a of appts.results) {
+    if (generateReferralCode(a.email as string) === code) return a;
   }
   return null;
 }
