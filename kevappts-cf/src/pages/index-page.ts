@@ -3500,7 +3500,8 @@ export function indexPage(env: Env): string {
         fullName: els.fullName.value.trim(),
         email: els.email.value.trim(),
         phone: getFullPhone(),
-        comments: els.comments.value.trim()
+        comments: els.comments.value.trim(),
+        referralCode: _referralCode || undefined
       };
 
       fetch('/api/book', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)})
