@@ -3,11 +3,11 @@
  */
 import type { Env, Appointment } from '../types';
 import { nowIso, buildSlotsForDate, parseDateKey, toDateKey, todayLocal, addDays, parseTimeToMinutes, dayOfWeekKey, isSunday, isHolidayOrClosed } from '../services/utils';
-import { verifyCancelSig, verifyDocActionSig, verifyRescheduleSig } from '../services/crypto';
+import { verifyCancelSig, verifyDocActionSig, verifyRescheduleSig, computeSig } from '../services/crypto';
 import {
   getAppointmentByToken, updateAppointmentStatus, bumpVersion,
   getActiveAppointmentsByDate, insertAppointment, getConfig,
-  isSlotTaken, getTakenSlots,
+  isSlotTaken, getTakenSlots, getFollowUpByAppointmentId, updateFollowUpResponse,
 } from '../db/queries';
 import {
   sendClientCancelledEmail, sendDoctorCancellationEmail,
@@ -470,4 +470,35 @@ export async function apiRescheduleAppointment(req: Request, env: Env): Promise<
     location: newAppt.location,
     dateKey: newDateKey,
   });
+}
+
+// ─── Follow-up Response ─────────────────────────────────────
+
+export async function apiFollowUpResponse(req: Request, env: Env): Promise<Response> {
+  const body: any = await req.json();
+  const appointmentId = (body.id || '').trim();
+  const sig = (body.sig || '').trim();
+  const response = (body.response || '').trim();
+  const questionText = (body.text || '').trim();
+
+  if (!appointmentId || !sig) return json({ ok: false, reason: 'Invalid link.' });
+
+  const expected = await computeSig('followup|' + appointmentId, env.SIGNING_SECRET);
+  if (expected !== sig) return json({ ok: false, reason: 'Invalid link.' });
+
+  const followUp = await getFollowUpByAppointmentId(env.DB, appointmentId);
+  if (!followUp) return json({ ok: false, reason: 'Follow-up not found.' });
+
+  const now = nowIso(env.TIMEZONE);
+  await updateFollowUpResponse(env.DB, appointmentId, response, now, questionText || undefined);
+
+  // For "great" response, return the review URL based on clinic
+  if (response === 'great') {
+    const reviewUrl = followUp.clinic === 'spinola'
+      ? 'https://search.google.com/local/writereview?placeid=ChIJ3dCu7mtFDhMRYBPbRR0pgtE' // TODO: Spinola place ID
+      : 'https://search.google.com/local/writereview?placeid=ChIJ3dCu7mtFDhMRYBPbRR0pgtE';
+    return json({ ok: true, reviewUrl });
+  }
+
+  return json({ ok: true });
 }

@@ -15,11 +15,13 @@ import {
   searchAppointments, getAppointmentsByDateRange, getPatientHistory,
   slotBlockedByDoctorOff, doctorOffReason, findNextAvailableDay,
   setConfigValue, getTakenSlots, isReviewSent, markReviewSent,
+  insertFollowUp, getFollowUps, isFollowUpSent,
 } from '../db/queries';
 import { verifyAdminSig, generateId } from '../services/crypto';
 import {
   sendClientCancelledEmail, sendRedirectToSpinolaEmail,
   sendAppointmentPushedEmail, sendCustomNotificationEmail, sendReviewRequestEmail,
+  sendFollowUpEmail,
 } from '../services/email';
 import { createCalendarEvent, deleteCalendarEvent } from '../services/calendar';
 
@@ -1249,4 +1251,68 @@ export async function apiAdminPurgeTestData(req: Request, env: Env): Promise<Res
   } catch {}
 
   return json({ ok: true, deleted: result.meta?.changes || 0, message: 'All test data purged.' });
+}
+
+// ─── Test Follow-up ──────────────────────────────────────────
+
+export async function apiAdminTestFollowUp(req: Request, env: Env): Promise<Response> {
+  const deny = await requireAdmin(req, env);
+  if (deny) return deny;
+
+  const tz = env.TIMEZONE;
+  const cfg = await getConfig(env.DB);
+  const yesterdayKey = toDateKey(addDays(todayLocal(tz), -1));
+
+  // Create a test ATTENDED appointment from yesterday
+  const id = 'TEST-' + generateId();
+  const token = generateId();
+  const appt: Appointment = {
+    id,
+    date_key: yesterdayKey,
+    start_time: '10:00',
+    end_time: '10:10',
+    service_id: 'clinic',
+    service_name: 'Clinic Consultation',
+    full_name: 'Test John',
+    email: 'labrint@gmail.com',
+    phone: '+35679206470',
+    comments: 'TEST FOLLOW-UP — safe to delete',
+    status: 'ATTENDED',
+    location: (cfg as any).pottersLocation || "Potter's Pharmacy Clinic",
+    clinic: 'potters',
+    created_at: nowIso(tz),
+    updated_at: nowIso(tz),
+    token,
+    calendar_event_id: '',
+    cancelled_at: '',
+    cancel_reason: '',
+  };
+
+  await insertAppointment(env.DB, appt);
+
+  // Send follow-up immediately
+  await sendFollowUpEmail(env, appt);
+  await insertFollowUp(env.DB, {
+    appointment_id: appt.id,
+    clinic: 'potters',
+    patient_name: appt.full_name,
+    email: appt.email,
+    phone: appt.phone,
+    date_key: appt.date_key,
+    sent_at: nowIso(tz),
+  });
+
+  return json({ ok: true, message: 'Test follow-up email sent to labrint@gmail.com' });
+}
+
+// ─── Get Follow-ups ──────────────────────────────────────────
+
+export async function apiAdminGetFollowUps(req: Request, env: Env): Promise<Response> {
+  const deny = await requireAdmin(req, env);
+  if (deny) return deny;
+
+  const url = new URL(req.url);
+  const status = (url.searchParams.get('status') || '').trim() || undefined;
+  const followUps = await getFollowUps(env.DB, status);
+  return json({ ok: true, followUps });
 }
