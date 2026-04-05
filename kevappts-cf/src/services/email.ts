@@ -55,6 +55,33 @@ const BOOK_AGAIN_FOOTER = `
     <a href="https://kevappts.labrint.workers.dev/" style="display:inline-block;background:#2563eb;color:#fff;text-decoration:none;padding:10px 20px;border-radius:999px;font-weight:700;font-size:14px;">Book an Appointment</a>
   </div>`;
 
+function buildCalendarLinks(appt: Appointment): string {
+  const dtStart = appt.date_key.replace(/-/g, '') + 'T' + appt.start_time.replace(':', '') + '00';
+  const dtEnd = appt.date_key.replace(/-/g, '') + 'T' + appt.end_time.replace(':', '') + '00';
+  const title = encodeURIComponent('Doctor Appointment - ' + appt.service_name);
+  const loc = encodeURIComponent(appt.location);
+  const details = encodeURIComponent(appt.service_name + ' at ' + appt.location);
+
+  const googleUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${dtStart}/${dtEnd}&location=${loc}&details=${details}`;
+
+  const shareText = encodeURIComponent(
+    `I have a doctor's appointment:\n${appt.service_name}\n${appt.date_key} at ${appt.start_time}\n${appt.location}\n\nBook your own appointment: https://kevappts.labrint.workers.dev/`
+  );
+  const whatsappUrl = `https://wa.me/?text=${shareText}`;
+
+  return `
+  <div style="margin-top:14px;padding:12px;border:1px solid #e5e7eb;border-radius:12px;background:#f9fafb;">
+    <table style="width:100%;border-collapse:collapse;"><tr>
+      <td style="padding:4px 4px 4px 0;width:50%;">
+        <a href="${googleUrl}" target="_blank" style="display:block;text-align:center;background:#1a73e8;color:#fff;text-decoration:none;padding:10px 8px;border-radius:999px;font-weight:700;font-size:14px;">📅 Add to Calendar</a>
+      </td>
+      <td style="padding:4px 0 4px 4px;width:50%;">
+        <a href="${whatsappUrl}" target="_blank" style="display:block;text-align:center;background:#25D366;color:#fff;text-decoration:none;padding:10px 8px;border-radius:999px;font-weight:700;font-size:14px;">💬 Let someone know</a>
+      </td>
+    </tr></table>
+  </div>`;
+}
+
 async function buildCancelLink(env: Env, token: string): Promise<string> {
   const sig = await computeSig('cancel|' + token, env.SIGNING_SECRET);
   return getBaseUrl(env) + '/cancel?token=' + encodeURIComponent(token) + '&sig=' + encodeURIComponent(sig);
@@ -92,6 +119,7 @@ export async function sendClientConfirmationEmail(env: Env, appt: Appointment): 
     <p style="margin:0 0 10px 0;color:#111827;"><b>Cancel appointment</b></p>
     <a href="${cancelUrl}" style="display:inline-block;background:#ef4444;color:#fff;text-decoration:none;padding:10px 14px;border-radius:999px;font-weight:700;">Cancel Appointment</a>
   </div>
+  ${buildCalendarLinks(appt)}
   ${BOOK_AGAIN_FOOTER}
 </div>`;
 
@@ -123,6 +151,7 @@ export async function sendSpinolaConfirmationEmail(env: Env, appt: Appointment):
     <p style="margin:0 0 10px 0;color:#111827;"><b>Cancel appointment</b></p>
     <a href="${cancelUrl}" style="display:inline-block;background:#ef4444;color:#fff;text-decoration:none;padding:10px 14px;border-radius:999px;font-weight:700;">Cancel Appointment</a>
   </div>
+  ${buildCalendarLinks(appt)}
   ${BOOK_AGAIN_FOOTER}
 </div>`;
 
