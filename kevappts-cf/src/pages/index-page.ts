@@ -625,32 +625,6 @@ export function indexPage(env: Env): string {
       justify-content:flex-end;
       gap:10px;
     }
-    .confirm-actions{
-      display:grid;
-      grid-template-columns:1fr 1fr;
-      gap:10px;
-      margin:14px 0 6px;
-    }
-    .confirm-action-btn{
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      gap:8px;
-      padding:12px 14px;
-      border-radius:14px;
-      border:1.5px solid var(--line);
-      background:#fff;
-      font-size:13.5px;
-      font-weight:700;
-      color:var(--text);
-      cursor:pointer;
-      transition:background 0.15s,border-color 0.15s;
-    }
-    .confirm-action-btn:hover{background:#f3f4f6;border-color:#d1d5db;}
-    .confirm-action-btn .ca-icon{font-size:18px;}
-    @media(max-width:380px){
-      .confirm-actions{grid-template-columns:1fr;}
-    }
 
     /* Spinola inline offer (replaces time grid when no Potter's slots) */
     .spinola-inline{
@@ -971,14 +945,6 @@ export function indexPage(env: Env): string {
     <div class="modal">
       <h3 id="confirmModalTitle" data-i18n="appointmentConfirmed">Appointment Confirmed</h3>
       <p id="confirmText"></p>
-      <div class="confirm-actions" id="confirmActions" style="display:none;">
-        <button class="confirm-action-btn" id="addCalBtn" onclick="addToCalendar()">
-          <span class="ca-icon">📅</span> Add to Calendar
-        </button>
-        <button class="confirm-action-btn" id="shareBtn" onclick="shareAppointment()">
-          <span class="ca-icon">💬</span> Let someone know
-        </button>
-      </div>
       <div class="modalActions">
         <button class="btn btnAccent" id="confirmOk" data-i18n="okBtn">OK</button>
       </div>
@@ -2416,76 +2382,23 @@ export function indexPage(env: Env): string {
       hideOverlay(els.loadingOverlay);
     }
 
-    var _lastBooking = null;
-    function showConfirmModal(text, bookingInfo){
+    function showConfirmModal(text){
       els.confirmText.textContent = text;
-      _lastBooking = bookingInfo || null;
-      var actionsEl = document.getElementById('confirmActions');
-      if (_lastBooking) {
-        actionsEl.style.display = '';
-      } else {
-        actionsEl.style.display = 'none';
-      }
       showOverlay(els.confirmOverlay);
+      setTimeout(function() {
+        if (els.confirmOverlay.classList.contains('show')) {
+          hideConfirmModal();
+          applyLanguage('en');
+          goToExecAfterBooking_();
+        }
+      }, 4000);
     }
     function hideConfirmModal(){
       hideOverlay(els.confirmOverlay);
     }
-    function addToCalendar() {
-      if (!_lastBooking) return;
-      var b = _lastBooking;
-      var dtStart = b.dateKey.replace(/-/g, '') + 'T' + b.startTime.replace(':', '') + '00';
-      var dtEnd = b.dateKey.replace(/-/g, '') + 'T' + b.endTime.replace(':', '') + '00';
-      var ics = [
-        'BEGIN:VCALENDAR',
-        'VERSION:2.0',
-        'PRODID:-//PottersPharmacy//Booking//EN',
-        'BEGIN:VEVENT',
-        'DTSTART:' + dtStart,
-        'DTEND:' + dtEnd,
-        'SUMMARY:Doctor Appointment - ' + b.serviceName,
-        'LOCATION:' + b.location,
-        'DESCRIPTION:' + b.serviceName + ' at ' + b.location,
-        'BEGIN:VALARM',
-        'TRIGGER:-PT1H',
-        'ACTION:DISPLAY',
-        'DESCRIPTION:Appointment in 1 hour',
-        'END:VALARM',
-        'END:VEVENT',
-        'END:VCALENDAR'
-      ].join('\\r\\n');
-      var blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
-      var url = URL.createObjectURL(blob);
-      var a = document.createElement('a');
-      a.href = url;
-      a.download = 'appointment.ics';
-      a.click();
-      URL.revokeObjectURL(url);
-    }
-    function shareAppointment() {
-      if (!_lastBooking) return;
-      var b = _lastBooking;
-      var shareText = 'I have a doctor\\'s appointment:\\n' +
-        b.serviceName + '\\n' +
-        b.dateLabel + ' at ' + to12h(b.startTime) + '\\n' +
-        b.location + '\\n\\n' +
-        'Book your own appointment: ' + location.origin;
-      if (navigator.share) {
-        navigator.share({ title: 'Doctor Appointment', text: shareText }).catch(function(){});
-      } else {
-        // Fallback: copy to clipboard
-        navigator.clipboard.writeText(shareText).then(function() {
-          var btn = document.getElementById('shareBtn');
-          var orig = btn.innerHTML;
-          btn.innerHTML = '<span class="ca-icon">✓</span> Copied!';
-          setTimeout(function() { btn.innerHTML = orig; }, 2000);
-        }).catch(function(){});
-      }
-    }
 
     els.confirmOk.addEventListener('click', () => {
       hideConfirmModal();
-      _lastBooking = null;
       applyLanguage('en');
       goToExecAfterBooking_();
     });
@@ -3561,7 +3474,7 @@ export function indexPage(env: Env): string {
               var dateLabel2 = localDate(_spinolaDateKey);
               var text = t('confirmMsg', res.serviceName, dateLabel2, to12h(res.startTime), to12h(res.endTime), res.location);
               if (res.calWarning) console.warn('SPINOLA CAL:', res.calWarning);
-              showConfirmModal(text, { dateKey: _spinolaDateKey, dateLabel: dateLabel2, startTime: res.startTime, endTime: res.endTime, serviceName: res.serviceName, location: res.location });
+              showConfirmModal(text);
               return;
             }
             showMsg('bad', (res && res.reason) || t('couldNotBook'));
@@ -3592,7 +3505,7 @@ export function indexPage(env: Env): string {
           hideLoading();
           if (res && res.ok) {
             var text = t('confirmMsg', res.serviceName, state.selectedDateLabel, to12h(res.startTime), to12h(res.endTime), res.location);
-            showConfirmModal(text, { dateKey: state.selectedDateKey, dateLabel: state.selectedDateLabel, startTime: res.startTime, endTime: res.endTime, serviceName: res.serviceName, location: res.location });
+            showConfirmModal(text);
             return;
           }
           showMsg('bad', (res && res.reason) || t('couldNotBook'));
