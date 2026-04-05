@@ -1647,6 +1647,7 @@ function connectWS() {
           _refreshInFlight = true;
           _cachedDateAppointments = {};
           reloadAll().catch(function(){}).finally(function(){ _refreshInFlight = false; });
+          loadFollowUps();
         }
       }
     } catch(e) {}
@@ -1691,16 +1692,19 @@ async function loadFollowUps() {
   var el = document.getElementById('followUpList');
   try {
     var res = await apiCall('follow-ups');
-    if (!res || !res.ok || !res.followUps) { el.innerHTML = '<div class="empty-session">No follow-ups yet.</div>'; return; }
+    if (!res || !res.ok || !res.followUps || !res.followUps.length) { el.innerHTML = '<div class="empty-session">No follow-ups yet.</div>'; document.getElementById('followUpHint').textContent = 'Patient responses to post-visit check-ins.'; return; }
     var items = res.followUps;
-    if (!items.length) { el.innerHTML = '<div class="empty-session">No follow-ups yet.</div>'; return; }
     var html = '';
     for (var i = 0; i < items.length; i++) {
       var f = items[i];
-      var statusCls = f.status === 'needs_reply' ? ' needs-reply' : '';
-      html += '<div class="followup-card' + statusCls + '">';
+      var cardCls = f.response === 'question' ? ' needs-reply' : '';
+      html += '<div class="followup-card' + cardCls + '">';
       html += '<div class="followup-name">' + esc(f.patient_name) + '</div>';
-      html += '<div class="followup-meta">' + esc(f.date_key) + ' \u2022 ' + esc(f.email) + ' \u2022 ' + esc(f.clinic === 'spinola' ? 'Spinola' : 'Potters') + '</div>';
+      html += '<div class="followup-meta">';
+      if (f.phone) html += '<a class="contact-link" href="tel:' + esc(f.phone) + '">' + esc(f.phone) + '</a> \u2022 ';
+      if (f.email) html += '<a class="contact-link" href="mailto:' + esc(f.email) + '">' + esc(f.email) + '</a>';
+      html += '</div>';
+      html += '<div class="followup-meta">' + esc(f.date_key) + ' \u2022 ' + esc(f.clinic === 'spinola' ? 'Spinola' : 'Potters') + '</div>';
       if (f.response === 'great') {
         html += '<div class="followup-response great">Feeling great</div>';
       } else if (f.response === 'question') {
@@ -1711,16 +1715,22 @@ async function loadFollowUps() {
       } else {
         html += '<div class="followup-response sent">Awaiting response</div>';
       }
+      if (f.response) {
+        html += '<label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:12px;color:#6b7280;cursor:pointer;"><input type="checkbox" ' + (f.status === 'handled' ? 'checked' : '') + ' onchange="toggleFollowUpHandled(' + f.id + ',this.checked)"> Handled</label>';
+      }
       html += '</div>';
     }
     el.innerHTML = html;
-    var count = items.filter(function(f) { return f.status === 'needs_reply'; }).length;
-    document.getElementById('followUpHint').textContent = count > 0
-      ? count + ' patient(s) need a reply.'
+    var qCount = items.filter(function(f) { return f.response === 'question' && f.status !== 'handled'; }).length;
+    document.getElementById('followUpHint').textContent = qCount > 0
+      ? qCount + ' patient(s) have questions.'
       : 'Patient responses to post-visit check-ins.';
   } catch(e) {
     el.innerHTML = '<div class="empty-session">No follow-ups yet.</div>';
   }
+}
+function toggleFollowUpHandled(id, checked) {
+  apiCall('follow-up-handled', { body: { id: id, handled: checked } }).catch(function(){});
 }
 
 (async function init() {
