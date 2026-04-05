@@ -49,11 +49,25 @@ function getBaseUrl(env: Env): string {
   return 'https://kevappts.labrint.workers.dev';
 }
 
-const BOOK_AGAIN_FOOTER = `
-  <div style="margin-top:20px;padding:14px;border:1px solid #dbeafe;border-radius:12px;background:#eff6ff;text-align:center;">
-    <p style="margin:0 0 10px 0;font-size:13px;color:#1e40af;line-height:1.4;">Need to book another appointment in the future? Save this link:</p>
-    <a href="https://kevappts.labrint.workers.dev/" style="display:inline-block;background:#2563eb;color:#fff;text-decoration:none;padding:10px 20px;border-radius:999px;font-weight:700;font-size:14px;">Book an Appointment</a>
+import { generateReferralCode } from '../db/queries';
+
+function buildFooter(appt: Appointment): string {
+  const code = generateReferralCode(appt.email);
+  const referralUrl = 'https://kevappts.labrint.workers.dev/?ref=' + code;
+  const firstName = (appt.full_name || '').split(' ')[0] || 'there';
+  const shareText = encodeURIComponent(
+    'I see Dr Kevin at Potter\u2019s Pharmacy in St Julian\u2019s \u2014 really recommend. You can book here: ' + referralUrl
+  );
+  const whatsappUrl = 'https://wa.me/?text=' + shareText;
+
+  return `
+  <div style="margin-top:20px;padding:16px;border:1px solid #dbeafe;border-radius:14px;background:#eff6ff;">
+    <p style="margin:0 0 6px 0;font-size:15px;font-weight:700;color:#1e40af;">Know someone who needs a doctor?</p>
+    <p style="margin:0 0 12px 0;font-size:13px;color:#1e40af;line-height:1.4;">Share your personal link \u2014 it means a lot to us!</p>
+    <a href="${whatsappUrl}" target="_blank" style="display:inline-block;background:#25D366;color:#fff;text-decoration:none;padding:10px 20px;border-radius:999px;font-weight:700;font-size:14px;">Share with a friend</a>
+    <p style="margin:10px 0 0 0;font-size:12px;color:#6b7280;">Or copy your link: <a href="${referralUrl}" style="color:#2563eb;">${referralUrl}</a></p>
   </div>`;
+}
 
 function buildCalendarLinks(appt: Appointment): string {
   const dtStart = appt.date_key.replace(/-/g, '') + 'T' + appt.start_time.replace(':', '') + '00';
@@ -139,7 +153,7 @@ export async function sendClientConfirmationEmail(env: Env, appt: Appointment): 
   ${getMapHtml(appt.location)}
   ${buildManageSection(cancelUrl, rescheduleUrl)}
   ${buildCalendarLinks(appt)}
-  ${BOOK_AGAIN_FOOTER}
+  ${buildFooter(appt)}
 </div>`;
 
   await sendEmail(env, appt.email, subject, html);
@@ -169,7 +183,7 @@ export async function sendSpinolaConfirmationEmail(env: Env, appt: Appointment):
   ${getMapHtml(spinolaLocation)}
   ${buildManageSection(cancelUrl, rescheduleUrl)}
   ${buildCalendarLinks(appt)}
-  ${BOOK_AGAIN_FOOTER}
+  ${buildFooter(appt)}
 </div>`;
 
   await sendEmail(env, appt.email, subject, html);
@@ -251,7 +265,7 @@ export async function sendClientCancelledEmail(env: Env, appt: Appointment, mess
     <tr><td style="padding:6px 0;color:#6b7280;">Time</td><td style="padding:6px 0;"><b>${escapeHtml(appt.start_time)} - ${escapeHtml(appt.end_time)}</b></td></tr>
     <tr><td style="padding:6px 0;color:#6b7280;">Location</td><td style="padding:6px 0;"><b>${escapeHtml(appt.location)}</b></td></tr>
   </table>
-  ${BOOK_AGAIN_FOOTER}
+  ${buildFooter(appt)}
 </div>`;
 
   await sendEmail(env, appt.email, subject, html);
@@ -300,7 +314,7 @@ export async function sendRedirectToSpinolaEmail(env: Env, appt: Appointment, sp
   </table>
   ${getMapHtml(spinolaLocation)}
   ${buildManageSection(cancelUrl, rescheduleUrl)}
-  ${BOOK_AGAIN_FOOTER}
+  ${buildFooter(appt)}
 </div>`;
 
   await sendEmail(env, appt.email, subject, html);
@@ -327,7 +341,7 @@ export async function sendAppointmentPushedEmail(env: Env, appt: Appointment, ne
   </table>
   <p style="margin:14px 0 0 0;color:#6b7280;font-size:12px;">If this new time does not work for you, use the buttons below.</p>
   ${buildManageSection(cancelUrl, rescheduleUrl)}
-  ${BOOK_AGAIN_FOOTER}
+  ${buildFooter(appt)}
 </div>`;
 
   await sendEmail(env, appt.email, subject, html);
@@ -370,7 +384,7 @@ export async function sendReminderEmail(env: Env, appt: Appointment): Promise<vo
     </tr></table>
   </div>
   <p style="margin:14px 0 0 0;color:#6b7280;font-size:12px;">Please confirm, reschedule or cancel so the doctor can prepare accordingly.</p>
-  ${BOOK_AGAIN_FOOTER}
+  ${buildFooter(appt)}
 </div>`;
 
   await sendEmail(env, appt.email, subject, html);
@@ -438,7 +452,7 @@ export async function sendCustomNotificationEmail(env: Env, appt: Appointment, c
     <tr><td style="padding:6px 0;color:#6b7280;">Time</td><td style="padding:6px 0;"><b>${escapeHtml(appt.start_time)} - ${escapeHtml(appt.end_time)}</b></td></tr>
     <tr><td style="padding:6px 0;color:#6b7280;">Location</td><td style="padding:6px 0;"><b>${escapeHtml(appt.location)}</b></td></tr>
   </table>
-  ${BOOK_AGAIN_FOOTER}
+  ${buildFooter(appt)}
 </div>`;
 
   await sendEmail(env, appt.email, subject, html);
@@ -550,4 +564,31 @@ export async function sendFollowUpEmail(env: Env, appt: Appointment): Promise<vo
 </div>`;
 
   await sendEmail(env, appt.email, subject, html);
+}
+
+// ─── 13. Referral Thank You Email ──────────────────────────
+
+export async function sendReferralThankYouEmail(env: Env, referrerEmail: string, referrerName: string, friendName: string): Promise<void> {
+  if (!referrerEmail) return;
+
+  const firstName = (referrerName || '').split(' ')[0] || 'there';
+  const friendFirst = (friendName || '').split(' ')[0] || 'someone';
+
+  const subject = `Thank you, ${firstName}!`;
+  const html = `
+<div style="font-family:Arial,sans-serif;line-height:1.5;color:#111827;max-width:520px;">
+  <h2 style="margin:0 0 14px 0;font-size:18px;">Thank you, ${escapeHtml(firstName)}!</h2>
+  <p style="margin:0 0 14px 0;font-size:15px;">
+    Your friend <b>${escapeHtml(friendFirst)}</b> just booked their first appointment with us.
+    We really appreciate you spreading the word!
+  </p>
+  <p style="margin:0 0 14px 0;font-size:15px;">
+    It means a lot to the whole team at Potter\u2019s Pharmacy.
+  </p>
+  <p style="margin:0;color:#6b7280;font-size:13px;">
+    \u2014 Dr Kevin and the Potter\u2019s Pharmacy team
+  </p>
+</div>`;
+
+  await sendEmail(env, referrerEmail, subject, html);
 }

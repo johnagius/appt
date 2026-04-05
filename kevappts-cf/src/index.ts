@@ -21,7 +21,7 @@ import {
   apiAdminSendReviewRequests, apiAdminGetWeekOverview, apiAdminSearchAppointments,
   apiAdminGetSettings, apiAdminSaveSettings, apiAdminGetStatistics,
   apiAdminMarkAttendance, apiAdminGetPatientHistory, apiAdminDoctorOffDates,
-  apiAdminCreateTestBooking, apiAdminPurgeTestData, apiAdminTestFollowUp, apiAdminGetFollowUps, apiAdminToggleFollowUpHandled,
+  apiAdminCreateTestBooking, apiAdminPurgeTestData, apiAdminTestFollowUp, apiAdminGetFollowUps, apiAdminToggleFollowUpHandled, apiAdminGetReferrals,
 } from './api/admin';
 import { verifyAdminSig, computeAdminSig } from './services/crypto';
 import { todayKeyLocal, nowIso, parseTimeToMinutes, toDateKey, todayLocal, addDays } from './services/utils';
@@ -154,6 +154,7 @@ export default {
         if (adminPath === 'test-followup' && method === 'POST') return apiAdminTestFollowUp(request, env);
         if (adminPath === 'follow-ups' && method === 'GET') return apiAdminGetFollowUps(request, env);
         if (adminPath === 'follow-up-handled' && method === 'POST') return apiAdminToggleFollowUpHandled(request, env);
+        if (adminPath === 'referrals' && method === 'GET') return apiAdminGetReferrals(request, env);
 
         // Test broadcast — manually trigger a WebSocket notification
         if (adminPath === 'test-broadcast' && method === 'POST') {

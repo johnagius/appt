@@ -440,3 +440,53 @@ export function findNextAvailableDay(
   }
   return null;
 }
+
+// ─── Referral Tracking ────────────────────────────────────
+
+export function generateReferralCode(email: string): string {
+  // Simple deterministic hash: first 8 chars of base36-encoded hash
+  let hash = 0;
+  const str = email.toLowerCase().trim();
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) - hash + str.charCodeAt(i)) | 0;
+  }
+  return 'ref-' + Math.abs(hash).toString(36).slice(0, 6);
+}
+
+export async function getReferrerByCode(db: D1Database, code: string): Promise<any> {
+  // Look up the most recent client who was assigned this code
+  return db.prepare(
+    "SELECT full_name, email, phone FROM clients WHERE email IN (SELECT referrer_email FROM referrals WHERE referral_code = ? LIMIT 1) LIMIT 1"
+  ).bind(code).first();
+}
+
+export async function lookupReferrerByCode(db: D1Database, code: string): Promise<any> {
+  // Find any patient whose email hashes to this code
+  const clients = await db.prepare("SELECT full_name, email, phone FROM clients ORDER BY created_at DESC LIMIT 500").all();
+  for (const c of clients.results) {
+    if (generateReferralCode(c.email as string) === code) return c;
+  }
+  return null;
+}
+
+export async function insertReferral(db: D1Database, data: {
+  referrer_email: string; referrer_name: string; referrer_phone: string;
+  referred_email: string; referred_name: string; referred_appointment_id: string;
+  referral_code: string; created_at: string;
+}): Promise<void> {
+  await db.prepare(
+    'INSERT INTO referrals (referrer_email, referrer_name, referrer_phone, referred_email, referred_name, referred_appointment_id, referral_code, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+  ).bind(data.referrer_email, data.referrer_name, data.referrer_phone, data.referred_email, data.referred_name, data.referred_appointment_id, data.referral_code, data.created_at).run();
+}
+
+export async function markReferralThanked(db: D1Database, id: number): Promise<void> {
+  await db.prepare('UPDATE referrals SET thanked = 1 WHERE id = ?').bind(id).run();
+}
+
+export async function getReferrals(db: D1Database): Promise<any[]> {
+  return (await db.prepare('SELECT * FROM referrals ORDER BY created_at DESC LIMIT 100').all()).results;
+}
+
+export async function getUnthankedReferrals(db: D1Database): Promise<any[]> {
+  return (await db.prepare('SELECT * FROM referrals WHERE thanked = 0 ORDER BY created_at DESC').all()).results;
+}

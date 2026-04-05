@@ -15,10 +15,11 @@ import {
   getDoctorOffRows, buildDoctorOffMap, getDoctorExtraRows, buildExtraMap,
   slotBlockedByDoctorOff, doctorOffReason,
   countActiveAppointmentsInWindow, personAlreadyBookedSameSlot, isSlotTaken,
+  lookupReferrerByCode, insertReferral,
 } from '../db/queries';
 import { generateId } from '../services/crypto';
 import { sendClientConfirmationEmail, sendDoctorBookingEmail } from '../services/email';
-import { sendSpinolaConfirmationEmail } from '../services/email';
+import { sendSpinolaConfirmationEmail, sendReferralThankYouEmail } from '../services/email';
 import { createCalendarEvent } from '../services/calendar';
 
 // ─── Poll ──────────────────────────────────────────────────
@@ -150,6 +151,7 @@ async function doBook(req: Request, env: Env, clinic: 'potters' | 'spinola'): Pr
   const email = sanitizeEmail(payload.email);
   const phone = sanitizePhone(payload.phone);
   const comments = (payload.comments || '').trim();
+  const referralCode = ((payload as any).referralCode || '').trim();
 
   if (!dateKey || !startTime || !serviceId || !fullName || !email || !phone) {
     return json({ ok: false, reason: 'Missing required fields' }, 400);
@@ -300,6 +302,26 @@ async function doBook(req: Request, env: Env, clinic: 'potters' | 'spinola'): Pr
         await sendDoctorBookingEmail(env, appt, dayList);
       } catch (e) {
         console.error('Email send error:', e);
+      }
+
+      // Track referral if applicable
+      if (referralCode) {
+        try {
+          const referrer = await lookupReferrerByCode(env.DB, referralCode);
+          if (referrer && referrer.email !== email) {
+            await insertReferral(env.DB, {
+              referrer_email: referrer.email,
+              referrer_name: referrer.full_name,
+              referrer_phone: referrer.phone || '',
+              referred_email: email,
+              referred_name: fullName,
+              referred_appointment_id: appt.id,
+              referral_code: referralCode,
+              created_at: now,
+            });
+            await sendReferralThankYouEmail(env, referrer.email, referrer.full_name, fullName);
+          }
+        } catch (e) { console.error('Referral tracking error:', e); }
       }
 
       // Push updated slot data directly to WebSocket clients
