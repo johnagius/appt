@@ -3747,6 +3747,7 @@ function connectWS() {
         _silentRefresh = true;
         if (typeof loadDashboard === 'function') loadDashboard();
         if (document.getElementById('tab-followups').style.display !== 'none') loadAdminFollowUps();
+        if (document.getElementById('tab-referrals').style.display !== 'none') loadReferrals();
         var lastEl = document.getElementById('refreshLastText');
         if (lastEl) lastEl.textContent = 'Live update received';
         _lastRefreshTime = Date.now();
