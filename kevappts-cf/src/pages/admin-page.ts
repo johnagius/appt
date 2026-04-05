@@ -392,6 +392,7 @@ export function adminPage(sig: string): string {
     <div class="tab" data-tab="statistics" onclick="switchTab('statistics')">Statistics</div>
     <div class="tab" data-tab="reminders" onclick="switchTab('reminders')">Reminders</div>
     <div class="tab" data-tab="reviews" onclick="switchTab('reviews')">Reviews</div>
+    <div class="tab" data-tab="followups" onclick="switchTab('followups')">Follow-ups</div>
     <div class="tab" data-tab="settings" onclick="switchTab('settings')">Settings</div>
   </div>
 
@@ -885,6 +886,21 @@ export function adminPage(sig: string): string {
   </div>
 </div>
 
+<!-- Follow-ups Tab -->
+<div class="tab-content" id="tab-followups" style="display:none;">
+  <div class="card" style="padding:18px;">
+    <h3 style="margin:0 0 6px 0;font-size:16px;font-weight:900;">Patient Follow-ups</h3>
+    <p style="margin:0 0 14px 0;color:#6b7280;font-size:13px;">Automated post-visit check-ins. Most recent first.</p>
+    <div class="followup-filter" style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+      <button class="btn btn-sm btn-blue fu-filter active" data-filter="" onclick="filterFollowUps(this,'')">All</button>
+      <button class="btn btn-sm fu-filter" style="background:#3b82f6;color:#fff;" data-filter="needs_reply" onclick="filterFollowUps(this,'needs_reply')">Needs Reply</button>
+      <button class="btn btn-sm fu-filter" style="background:#d1d5db;color:#111;" data-filter="sent" onclick="filterFollowUps(this,'sent')">Awaiting</button>
+      <button class="btn btn-sm fu-filter" style="background:#10b981;color:#fff;" data-filter="responded" onclick="filterFollowUps(this,'responded')">Responded</button>
+    </div>
+    <div id="followUpAdminList"><div class="empty">Loading...</div></div>
+  </div>
+</div>
+
 <!-- Patient History modal -->
 <div class="overlay" id="patientOverlay">
   <div class="patient-modal">
@@ -1256,6 +1272,7 @@ function switchTab(name) {
   if (name === 'actions') { loadActionAppts(); if (document.getElementById('notifyDate').value) loadNotifyAppts(); }
   if (name === 'reminders') loadReminderPatients();
   if (name === 'reviews') loadReviewPatients();
+  if (name === 'followups') loadAdminFollowUps();
 }
 
 function getStatusBadge(status) {
@@ -3757,6 +3774,61 @@ document.addEventListener('visibilitychange', function() {
 });
 setInterval(function() { if (_ws && _ws.readyState === 1) try { _ws.send('ping'); } catch(e) {} }, 30000);
 connectWS();
+
+// ── Follow-ups ──
+var _fuFilter = '';
+function loadAdminFollowUps(filter) {
+  if (filter !== undefined) _fuFilter = filter;
+  var el = document.getElementById('followUpAdminList');
+  el.innerHTML = '<div class="empty">Loading...</div>';
+  var url = 'follow-ups';
+  if (_fuFilter) url += '?status=' + encodeURIComponent(_fuFilter);
+  apiCall(url).then(function(res) {
+    if (!res || !res.ok || !res.followUps || !res.followUps.length) {
+      el.innerHTML = '<div class="empty">No follow-ups found.</div>';
+      return;
+    }
+    var html = '';
+    for (var i = 0; i < res.followUps.length; i++) {
+      var f = res.followUps[i];
+      var border = f.status === 'needs_reply' ? 'border-left:4px solid #3b82f6;' : '';
+      html += '<div style="border:1px solid #e5e7eb;border-radius:14px;padding:12px;margin-bottom:8px;background:#fff;' + border + '">';
+      html += '<div style="display:flex;justify-content:space-between;align-items:flex-start;">';
+      html += '<div>';
+      html += '<div style="font-weight:800;font-size:14px;">' + esc(f.patient_name) + '</div>';
+      html += '<div style="font-size:12px;color:#6b7280;margin-top:2px;">' + esc(f.date_key) + ' \\u2022 ' + esc(f.email) + ' \\u2022 ' + esc(f.phone) + '</div>';
+      html += '<div style="font-size:12px;color:#6b7280;">' + esc(f.clinic === 'spinola' ? 'Spinola' : "Potter\\'s") + ' \\u2022 Sent: ' + esc(f.sent_at ? f.sent_at.slice(0, 16) : '') + '</div>';
+      html += '</div>';
+      html += '<div>';
+      if (f.response === 'great') {
+        html += '<span style="display:inline-block;padding:4px 10px;border-radius:8px;font-size:11px;font-weight:800;background:#d1fae5;color:#065f46;">GREAT</span>';
+      } else if (f.response === 'question') {
+        html += '<span style="display:inline-block;padding:4px 10px;border-radius:8px;font-size:11px;font-weight:800;background:#dbeafe;color:#1e40af;">QUESTION</span>';
+      } else if (f.response === 'rebook') {
+        html += '<span style="display:inline-block;padding:4px 10px;border-radius:8px;font-size:11px;font-weight:800;background:#fef3c7;color:#92400e;">REBOOK</span>';
+      } else {
+        html += '<span style="display:inline-block;padding:4px 10px;border-radius:8px;font-size:11px;font-weight:800;background:#f3f4f6;color:#6b7280;">AWAITING</span>';
+      }
+      html += '</div>';
+      html += '</div>';
+      if (f.question_text) {
+        html += '<div style="margin-top:8px;padding:8px 10px;background:#f0f9ff;border-radius:10px;border:1px solid #bfdbfe;color:#1e40af;font-size:13px;font-style:italic;">' + esc(f.question_text) + '</div>';
+      }
+      if (f.response_at) {
+        html += '<div style="font-size:11px;color:#9ca3af;margin-top:4px;">Responded: ' + esc(f.response_at.slice(0, 16)) + '</div>';
+      }
+      html += '</div>';
+    }
+    el.innerHTML = html;
+  }).catch(function() {
+    el.innerHTML = '<div class="empty">Error loading follow-ups.</div>';
+  });
+}
+function filterFollowUps(btn, filter) {
+  document.querySelectorAll('.fu-filter').forEach(function(b) { b.classList.remove('active'); });
+  btn.classList.add('active');
+  loadAdminFollowUps(filter);
+}
 </script>
 </body>
 </html>
