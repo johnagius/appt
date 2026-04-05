@@ -81,6 +81,7 @@ export async function apiAdminGetDashboard(req: Request, env: Env): Promise<Resp
     const dk = toDateKey(addDays(today, d));
     const appts = await getAppointmentsByDate(env.DB, dk);
     for (const a of appts) {
+      if (a.clinic === 'spinola') continue;
       if (['BOOKED', 'RELOCATED_SPINOLA', 'ATTENDED'].includes(a.status)) weekBooked++;
       if (a.status.includes('CANCELLED')) weekCancelled++;
     }
@@ -107,8 +108,8 @@ export async function apiAdminGetDashboard(req: Request, env: Env): Promise<Resp
     ok: true,
     todayKey,
     tomorrowKey,
-    todayAppointments: todayAppts,
-    tomorrowAppointments: tomorrowAppts,
+    todayAppointments: todayAppts.filter(a => a.clinic !== 'spinola'),
+    tomorrowAppointments: tomorrowAppts.filter(a => a.clinic !== 'spinola'),
     doctorOffEntries: futureOffRows,
     extraSlotEntries: futureExtraRows,
     workingHours: cfg.workingHours,
@@ -697,7 +698,7 @@ export async function apiAdminGetWeekOverview(req: Request, env: Env): Promise<R
     const dk = toDateKey(dt);
 
     const appts = await getAppointmentsByDate(env.DB, dk);
-    const count = appts.filter(a => ['BOOKED', 'RELOCATED_SPINOLA', 'ATTENDED'].includes(a.status)).length;
+    const count = appts.filter(a => a.clinic !== 'spinola' && ['BOOKED', 'RELOCATED_SPINOLA', 'ATTENDED'].includes(a.status)).length;
     const hasBlock = offRows.some(r => r.start_date <= dk && r.end_date >= dk);
     const hasExtra = extraRows.some(r => r.date_key === dk);
     const hasHours = (cfg.workingHours[dayOfWeekKey(dt)] || []).length > 0;
