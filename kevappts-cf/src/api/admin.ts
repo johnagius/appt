@@ -1288,19 +1288,21 @@ export async function apiAdminTestFollowUp(req: Request, env: Env): Promise<Resp
     cancel_reason: '',
   };
 
-  await insertAppointment(env.DB, appt);
+  try { await insertAppointment(env.DB, appt); } catch {}
 
   // Send follow-up immediately
   await sendFollowUpEmail(env, appt);
-  await insertFollowUp(env.DB, {
-    appointment_id: appt.id,
-    clinic: 'potters',
-    patient_name: appt.full_name,
-    email: appt.email,
-    phone: appt.phone,
-    date_key: appt.date_key,
-    sent_at: nowIso(tz),
-  });
+  try {
+    await insertFollowUp(env.DB, {
+      appointment_id: appt.id,
+      clinic: 'potters',
+      patient_name: appt.full_name,
+      email: appt.email,
+      phone: appt.phone,
+      date_key: appt.date_key,
+      sent_at: nowIso(tz),
+    });
+  } catch {}
 
   return json({ ok: true, message: 'Test follow-up email sent to labrint@gmail.com' });
 }

@@ -1700,9 +1700,9 @@ async function loadFollowUps() {
       var statusCls = f.status === 'needs_reply' ? ' needs-reply' : '';
       html += '<div class="followup-card' + statusCls + '">';
       html += '<div class="followup-name">' + esc(f.patient_name) + '</div>';
-      html += '<div class="followup-meta">' + esc(f.date_key) + ' \u2022 ' + esc(f.email) + ' \u2022 ' + esc(f.clinic === 'spinola' ? 'Spinola' : "Potter's") + '</div>';
+      html += '<div class="followup-meta">' + esc(f.date_key) + ' \u2022 ' + esc(f.email) + ' \u2022 ' + esc(f.clinic === 'spinola' ? 'Spinola' : 'Potters') + '</div>';
       if (f.response === 'great') {
-        html += '<div class="followup-response great">Everything\'s great</div>';
+        html += '<div class="followup-response great">Feeling great</div>';
       } else if (f.response === 'question') {
         html += '<div class="followup-response question">Has a question</div>';
         if (f.question_text) html += '<div class="followup-question">' + esc(f.question_text) + '</div>';
