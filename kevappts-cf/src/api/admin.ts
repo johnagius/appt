@@ -1318,3 +1318,15 @@ export async function apiAdminGetFollowUps(req: Request, env: Env): Promise<Resp
   const followUps = await getFollowUps(env.DB, status);
   return json({ ok: true, followUps });
 }
+
+export async function apiAdminToggleFollowUpHandled(req: Request, env: Env): Promise<Response> {
+  const deny = await requireAdmin(req, env);
+  if (deny) return deny;
+  const body: any = await req.json();
+  const id = body.id;
+  const handled = body.handled;
+  if (!id) return json({ ok: false, reason: 'Missing id.' }, 400);
+  const newStatus = handled ? 'handled' : 'responded';
+  await env.DB.prepare('UPDATE follow_ups SET status = ? WHERE id = ?').bind(newStatus, id).run();
+  return json({ ok: true });
+}
