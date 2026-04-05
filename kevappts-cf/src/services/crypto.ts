@@ -79,6 +79,12 @@ export async function verifyAdminSig(sig: string, secret: string): Promise<boole
   return safeEqual(expected, sig);
 }
 
+export async function verifyRescheduleSig(token: string, sig: string, secret: string): Promise<boolean> {
+  if (!token || !sig) return false;
+  const expected = await computeSig('reschedule|' + token, secret);
+  return safeEqual(expected, sig);
+}
+
 export function generateId(): string {
   return crypto.randomUUID();
 }

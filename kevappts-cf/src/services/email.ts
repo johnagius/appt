@@ -82,6 +82,11 @@ function buildCalendarLinks(appt: Appointment): string {
   </div>`;
 }
 
+async function buildRescheduleLink(env: Env, token: string): Promise<string> {
+  const sig = await computeSig('reschedule|' + token, env.SIGNING_SECRET);
+  return getBaseUrl(env) + '/reschedule?token=' + encodeURIComponent(token) + '&sig=' + encodeURIComponent(sig);
+}
+
 async function buildCancelLink(env: Env, token: string): Promise<string> {
   const sig = await computeSig('cancel|' + token, env.SIGNING_SECRET);
   return getBaseUrl(env) + '/cancel?token=' + encodeURIComponent(token) + '&sig=' + encodeURIComponent(sig);
@@ -97,11 +102,27 @@ async function buildAdminLink(env: Env): Promise<string> {
   return getBaseUrl(env) + '/admin?sig=' + encodeURIComponent(sig);
 }
 
+function buildManageSection(cancelUrl: string, rescheduleUrl: string): string {
+  return `
+  <div style="margin-top:14px;padding:12px;border:1px solid #e5e7eb;border-radius:12px;background:#f9fafb;">
+    <p style="margin:0 0 10px 0;color:#111827;"><b>Manage your appointment</b></p>
+    <table style="border-collapse:collapse;width:100%;"><tr>
+      <td style="padding:4px 4px 4px 0;width:50%;">
+        <a href="${rescheduleUrl}" style="display:block;text-align:center;background:#f5b301;color:#fff;text-decoration:none;padding:10px 8px;border-radius:999px;font-weight:700;font-size:14px;">Reschedule</a>
+      </td>
+      <td style="padding:4px 0 4px 4px;width:50%;">
+        <a href="${cancelUrl}" style="display:block;text-align:center;background:#ef4444;color:#fff;text-decoration:none;padding:10px 8px;border-radius:999px;font-weight:700;font-size:14px;">Cancel</a>
+      </td>
+    </tr></table>
+  </div>`;
+}
+
 // ─── 1. Client Booking Confirmation ───────────────────────
 
 export async function sendClientConfirmationEmail(env: Env, appt: Appointment): Promise<void> {
   if (!appt.email) return;
   const cancelUrl = await buildCancelLink(env, appt.token);
+  const rescheduleUrl = await buildRescheduleLink(env, appt.token);
 
   const subject = `Appointment Confirmed - ${appt.service_name} (${appt.date_key} ${appt.start_time})`;
   const html = `
@@ -115,10 +136,7 @@ export async function sendClientConfirmationEmail(env: Env, appt: Appointment): 
     <tr><td style="padding:6px 0;color:#6b7280;">Location</td><td style="padding:6px 0;"><b>${escapeHtml(appt.location)}</b></td></tr>
   </table>
   ${getMapHtml(appt.location)}
-  <div style="margin-top:14px;padding:12px;border:1px solid #e5e7eb;border-radius:12px;background:#f9fafb;">
-    <p style="margin:0 0 10px 0;color:#111827;"><b>Cancel appointment</b></p>
-    <a href="${cancelUrl}" style="display:inline-block;background:#ef4444;color:#fff;text-decoration:none;padding:10px 14px;border-radius:999px;font-weight:700;">Cancel Appointment</a>
-  </div>
+  ${buildManageSection(cancelUrl, rescheduleUrl)}
   ${buildCalendarLinks(appt)}
   ${BOOK_AGAIN_FOOTER}
 </div>`;
@@ -131,6 +149,7 @@ export async function sendClientConfirmationEmail(env: Env, appt: Appointment): 
 export async function sendSpinolaConfirmationEmail(env: Env, appt: Appointment): Promise<void> {
   if (!appt.email) return;
   const cancelUrl = await buildCancelLink(env, appt.token);
+  const rescheduleUrl = await buildRescheduleLink(env, appt.token);
   const spinolaLocation = appt.location || 'Spinola Clinic';
 
   const subject = `Appointment Confirmed - Dr James at ${spinolaLocation} (${appt.date_key} ${appt.start_time})`;
@@ -147,10 +166,7 @@ export async function sendSpinolaConfirmationEmail(env: Env, appt: Appointment):
     <tr><td style="padding:6px 0;color:#6b7280;">Location</td><td style="padding:6px 0;"><b>${escapeHtml(spinolaLocation)}</b></td></tr>
   </table>
   ${getMapHtml(spinolaLocation)}
-  <div style="margin-top:14px;padding:12px;border:1px solid #e5e7eb;border-radius:12px;background:#f9fafb;">
-    <p style="margin:0 0 10px 0;color:#111827;"><b>Cancel appointment</b></p>
-    <a href="${cancelUrl}" style="display:inline-block;background:#ef4444;color:#fff;text-decoration:none;padding:10px 14px;border-radius:999px;font-weight:700;">Cancel Appointment</a>
-  </div>
+  ${buildManageSection(cancelUrl, rescheduleUrl)}
   ${buildCalendarLinks(appt)}
   ${BOOK_AGAIN_FOOTER}
 </div>`;
@@ -268,6 +284,7 @@ export async function sendDoctorCancellationEmail(env: Env, appt: Appointment, m
 export async function sendRedirectToSpinolaEmail(env: Env, appt: Appointment, spinolaLocation: string): Promise<void> {
   if (!appt.email) return;
   const cancelUrl = await buildCancelLink(env, appt.token);
+  const rescheduleUrl = await buildRescheduleLink(env, appt.token);
 
   const subject = `Appointment Location Changed - ${appt.service_name} (${appt.date_key} ${appt.start_time})`;
   const html = `
@@ -281,10 +298,7 @@ export async function sendRedirectToSpinolaEmail(env: Env, appt: Appointment, sp
     <tr><td style="padding:6px 0;color:#6b7280;">New Location</td><td style="padding:6px 0;"><b>${escapeHtml(spinolaLocation)}</b></td></tr>
   </table>
   ${getMapHtml(spinolaLocation)}
-  <div style="margin-top:14px;padding:12px;border:1px solid #e5e7eb;border-radius:12px;background:#f9fafb;">
-    <p style="margin:0 0 10px 0;color:#111827;"><b>Need to cancel?</b></p>
-    <a href="${cancelUrl}" style="display:inline-block;background:#ef4444;color:#fff;text-decoration:none;padding:10px 14px;border-radius:999px;font-weight:700;">Cancel Appointment</a>
-  </div>
+  ${buildManageSection(cancelUrl, rescheduleUrl)}
   ${BOOK_AGAIN_FOOTER}
 </div>`;
 
@@ -295,6 +309,8 @@ export async function sendRedirectToSpinolaEmail(env: Env, appt: Appointment, sp
 
 export async function sendAppointmentPushedEmail(env: Env, appt: Appointment, newDateKey: string, newStartTime: string, newEndTime: string): Promise<void> {
   if (!appt.email) return;
+  const cancelUrl = await buildCancelLink(env, appt.token);
+  const rescheduleUrl = await buildRescheduleLink(env, appt.token);
 
   const subject = `Appointment Rescheduled - ${appt.service_name} (moved to ${newDateKey} ${newStartTime})`;
   const html = `
@@ -308,7 +324,8 @@ export async function sendAppointmentPushedEmail(env: Env, appt: Appointment, ne
     <tr><td style="padding:6px 0;color:#10b981;">New Time</td><td style="padding:6px 0;"><b>${escapeHtml(newStartTime)} - ${escapeHtml(newEndTime)}</b></td></tr>
     <tr><td style="padding:6px 0;color:#6b7280;">Location</td><td style="padding:6px 0;"><b>${escapeHtml(appt.location)}</b></td></tr>
   </table>
-  <p style="margin:14px 0 0 0;color:#6b7280;font-size:12px;">If this new time does not work for you, please cancel and rebook.</p>
+  <p style="margin:14px 0 0 0;color:#6b7280;font-size:12px;">If this new time does not work for you, use the buttons below.</p>
+  ${buildManageSection(cancelUrl, rescheduleUrl)}
   ${BOOK_AGAIN_FOOTER}
 </div>`;
 
@@ -320,6 +337,7 @@ export async function sendAppointmentPushedEmail(env: Env, appt: Appointment, ne
 export async function sendReminderEmail(env: Env, appt: Appointment): Promise<void> {
   if (!appt.email) return;
   const cancelUrl = await buildCancelLink(env, appt.token);
+  const rescheduleUrl = await buildRescheduleLink(env, appt.token);
   const confirmUrl = getBaseUrl(env) + '/confirm?token=' + encodeURIComponent(appt.token);
 
   // Calculate actual minutes until appointment
@@ -343,11 +361,14 @@ export async function sendReminderEmail(env: Env, appt: Appointment): Promise<vo
     <tr><td style="padding:6px 0;color:#6b7280;">Location</td><td style="padding:6px 0;"><b>${escapeHtml(appt.location)}</b></td></tr>
   </table>
   ${getMapHtml(appt.location)}
-  <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap;">
-    <a href="${confirmUrl}" style="display:inline-block;background:#10b981;color:#fff;text-decoration:none;padding:12px 20px;border-radius:999px;font-weight:700;font-size:14px;">Yes, I'm Coming</a>
-    <a href="${cancelUrl}" style="display:inline-block;background:#ef4444;color:#fff;text-decoration:none;padding:12px 20px;border-radius:999px;font-weight:700;font-size:14px;">Cancel Appointment</a>
+  <div style="margin-top:14px;">
+    <table style="border-collapse:collapse;width:100%;max-width:520px;"><tr>
+      <td style="padding:4px 4px 4px 0;width:33%;"><a href="${confirmUrl}" style="display:block;text-align:center;background:#10b981;color:#fff;text-decoration:none;padding:12px 8px;border-radius:999px;font-weight:700;font-size:14px;">I'm Coming</a></td>
+      <td style="padding:4px;width:33%;"><a href="${rescheduleUrl}" style="display:block;text-align:center;background:#f5b301;color:#fff;text-decoration:none;padding:12px 8px;border-radius:999px;font-weight:700;font-size:14px;">Reschedule</a></td>
+      <td style="padding:4px 0 4px 4px;width:33%;"><a href="${cancelUrl}" style="display:block;text-align:center;background:#ef4444;color:#fff;text-decoration:none;padding:12px 8px;border-radius:999px;font-weight:700;font-size:14px;">Cancel</a></td>
+    </tr></table>
   </div>
-  <p style="margin:14px 0 0 0;color:#6b7280;font-size:12px;">Please confirm or cancel so the doctor can prepare accordingly.</p>
+  <p style="margin:14px 0 0 0;color:#6b7280;font-size:12px;">Please confirm, reschedule or cancel so the doctor can prepare accordingly.</p>
   ${BOOK_AGAIN_FOOTER}
 </div>`;
 

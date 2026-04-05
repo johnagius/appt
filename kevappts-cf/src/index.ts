@@ -13,7 +13,7 @@
 import type { Env } from './types';
 import { RealtimeHub } from './realtime';
 import { apiPoll, apiInit, apiGetDates, apiGetAvailability, apiGetSpinolaAvailability, apiBook, apiBookSpinola } from './api/public';
-import { apiGetCancelInfo, apiCancelAppointment, apiDoctorAction } from './api/cancel';
+import { apiGetCancelInfo, apiCancelAppointment, apiDoctorAction, apiGetRescheduleInfo, apiGetRescheduleSlots, apiRescheduleAppointment } from './api/cancel';
 import {
   apiAdminGetDashboard, apiAdminGetDateAppointments, apiAdminMarkDoctorOff,
   apiAdminAddExtraSlots, apiAdminRemoveDoctorOff, apiAdminRemoveExtraSlots,
@@ -32,6 +32,7 @@ import { cancelPage } from './pages/cancel-page';
 import { docActionPage } from './pages/docaction-page';
 import { adminPage } from './pages/admin-page';
 import { doctorPage } from './pages/doctor-page';
+import { reschedulePage } from './pages/reschedule-page';
 
 export { RealtimeHub };
 
@@ -103,6 +104,9 @@ export default {
       if (path === '/api/cancel-info' && method === 'GET') return apiGetCancelInfo(request, env);
       if (path === '/api/cancel' && method === 'POST') return apiCancelAppointment(request, env);
       if (path === '/api/doctor-action' && method === 'POST') return apiDoctorAction(request, env);
+      if (path === '/api/reschedule-info' && method === 'GET') return apiGetRescheduleInfo(request, env);
+      if (path === '/api/reschedule-slots' && method === 'GET') return apiGetRescheduleSlots(request, env);
+      if (path === '/api/reschedule' && method === 'POST') return apiRescheduleAppointment(request, env);
 
       // ─── Admin Login ─────────────────────────────────
       if (path === '/admin/login' && method === 'POST') {
@@ -237,6 +241,7 @@ export default {
           return html('<div style="font-family:Arial,sans-serif;max-width:500px;margin:60px auto;text-align:center;"><h1>Appointment Not Found</h1><p>This link may have expired or the appointment was already cancelled.</p></div>');
         }
         if (path === '/cancel') return html(cancelPage());
+        if (path === '/reschedule') return html(reschedulePage());
         if (path === '/action') return html(docActionPage());
         if (path === '/admin' || path === '/doctor' || path === '/test') {
           // Check sig from query string or cookie
