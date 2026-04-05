@@ -393,6 +393,7 @@ export function adminPage(sig: string): string {
     <div class="tab" data-tab="reminders" onclick="switchTab('reminders')">Reminders</div>
     <div class="tab" data-tab="reviews" onclick="switchTab('reviews')">Reviews</div>
     <div class="tab" data-tab="followups" onclick="switchTab('followups')">Follow-ups</div>
+    <div class="tab" data-tab="referrals" onclick="switchTab('referrals')">Referrals</div>
     <div class="tab" data-tab="settings" onclick="switchTab('settings')">Settings</div>
   </div>
 
@@ -895,6 +896,16 @@ export function adminPage(sig: string): string {
   </div>
 </div>
 
+<!-- Referrals Tab -->
+<div class="tab-content" id="tab-referrals" style="display:none;">
+  <div class="card" style="padding:18px;">
+    <h3 style="margin:0 0 6px 0;font-size:16px;font-weight:900;">Patient Referrals</h3>
+    <p style="margin:0 0 4px 0;color:#6b7280;font-size:13px;">Patients who shared your booking link and brought new patients.</p>
+    <div id="referralStats" style="margin-bottom:14px;"></div>
+    <div id="referralList"><div class="empty">Loading...</div></div>
+  </div>
+</div>
+
 <!-- Patient History modal -->
 <div class="overlay" id="patientOverlay">
   <div class="patient-modal">
@@ -1267,6 +1278,7 @@ function switchTab(name) {
   if (name === 'reminders') loadReminderPatients();
   if (name === 'reviews') loadReviewPatients();
   if (name === 'followups') loadAdminFollowUps();
+  if (name === 'referrals') loadReferrals();
 }
 
 function getStatusBadge(status) {
@@ -3820,6 +3832,57 @@ function loadAdminFollowUps() {
 }
 function toggleHandled(id, checked) {
   apiCall('follow-up-handled', { body: { id: id, handled: checked } }).catch(function(){});
+}
+
+// ── Referrals ──
+function loadReferrals() {
+  var el = document.getElementById('referralList');
+  var statsEl = document.getElementById('referralStats');
+  el.innerHTML = '<div class="empty">Loading...</div>';
+  apiCall('referrals').then(function(res) {
+    if (!res || !res.ok || !res.referrals || !res.referrals.length) {
+      el.innerHTML = '<div class="empty">No referrals yet. Referral links are included in all patient emails.</div>';
+      statsEl.innerHTML = '';
+      return;
+    }
+    var referrals = res.referrals;
+    // Stats
+    var uniqueReferrers = {};
+    for (var s = 0; s < referrals.length; s++) {
+      var key = referrals[s].referrer_email;
+      if (!uniqueReferrers[key]) uniqueReferrers[key] = { name: referrals[s].referrer_name, count: 0 };
+      uniqueReferrers[key].count++;
+    }
+    var topList = Object.keys(uniqueReferrers).map(function(k) { return uniqueReferrers[k]; }).sort(function(a,b) { return b.count - a.count; });
+    statsEl.innerHTML = '<div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;">' +
+      '<div style="padding:12px 16px;border-radius:14px;background:#d1fae5;font-weight:800;font-size:18px;color:#065f46;">' + referrals.length + '<div style="font-size:11px;font-weight:600;">Total Referrals</div></div>' +
+      '<div style="padding:12px 16px;border-radius:14px;background:#eff6ff;font-weight:800;font-size:18px;color:#1e40af;">' + topList.length + '<div style="font-size:11px;font-weight:600;">Ambassadors</div></div>' +
+      (topList[0] ? '<div style="padding:12px 16px;border-radius:14px;background:#fef3c7;font-weight:800;font-size:14px;color:#92400e;">' + esc(topList[0].name) + '<div style="font-size:11px;font-weight:600;">Top Referrer (' + topList[0].count + ')</div></div>' : '') +
+      '</div>';
+    // List
+    var html = '';
+    for (var i = 0; i < referrals.length; i++) {
+      var r = referrals[i];
+      html += '<div style="border:1px solid #e5e7eb;border-radius:14px;padding:12px;margin-bottom:8px;background:#fff;">';
+      html += '<div style="display:flex;justify-content:space-between;align-items:flex-start;">';
+      html += '<div>';
+      html += '<div style="font-size:13px;color:#6b7280;">Referred by</div>';
+      html += '<div style="font-weight:800;font-size:14px;">' + esc(r.referrer_name) + '</div>';
+      html += '<div style="font-size:12px;color:#6b7280;">' + esc(r.referrer_email) + '</div>';
+      html += '</div>';
+      html += '<div style="text-align:right;">';
+      html += '<div style="font-size:13px;color:#10b981;font-weight:700;">New patient</div>';
+      html += '<div style="font-weight:800;font-size:14px;">' + esc(r.referred_name) + '</div>';
+      html += '<div style="font-size:12px;color:#6b7280;">' + esc(r.referred_email) + '</div>';
+      html += '</div>';
+      html += '</div>';
+      html += '<div style="font-size:11px;color:#9ca3af;margin-top:6px;">' + esc(r.created_at ? r.created_at.slice(0, 16) : '') + (r.thanked ? ' \\u2022 Thanked' : '') + '</div>';
+      html += '</div>';
+    }
+    el.innerHTML = html;
+  }).catch(function() {
+    el.innerHTML = '<div class="empty">Error loading referrals.</div>';
+  });
 }
 </script>
 </body>

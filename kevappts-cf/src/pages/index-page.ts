@@ -963,6 +963,9 @@ export function indexPage(env: Env): string {
   </div>
 
   <script>
+    // Capture referral code from URL
+    var _referralCode = (new URLSearchParams(location.search).get('ref') || '').trim();
+
     const state = {
       config: null,
       dateOptions: [],
@@ -3463,7 +3466,8 @@ export function indexPage(env: Env): string {
           fullName: els.fullName.value.trim(),
           email: els.email.value.trim(),
           phone: getFullPhone(),
-          comments: els.comments.value.trim()
+          comments: els.comments.value.trim(),
+          referralCode: _referralCode || undefined
         };
 
         fetch('/api/book-spinola', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(spinolaPayload)})

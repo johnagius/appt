@@ -91,6 +91,22 @@ CREATE TABLE IF NOT EXISTS follow_ups (
 CREATE INDEX IF NOT EXISTS idx_followup_status ON follow_ups(status);
 CREATE INDEX IF NOT EXISTS idx_followup_appt ON follow_ups(appointment_id);
 
+CREATE TABLE IF NOT EXISTS referrals (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  referrer_email TEXT NOT NULL,
+  referrer_name TEXT NOT NULL,
+  referrer_phone TEXT DEFAULT '',
+  referred_email TEXT NOT NULL,
+  referred_name TEXT NOT NULL,
+  referred_appointment_id TEXT NOT NULL,
+  referral_code TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  thanked INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_referral_code ON referrals(referral_code);
+CREATE INDEX IF NOT EXISTS idx_referral_referrer ON referrals(referrer_email);
+
 -- Seed data version
 INSERT OR IGNORE INTO data_version (id, version) VALUES (1, 0);
 

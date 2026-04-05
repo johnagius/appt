@@ -15,7 +15,7 @@ import {
   searchAppointments, getAppointmentsByDateRange, getPatientHistory,
   slotBlockedByDoctorOff, doctorOffReason, findNextAvailableDay,
   setConfigValue, getTakenSlots, isReviewSent, markReviewSent,
-  insertFollowUp, getFollowUps, isFollowUpSent,
+  insertFollowUp, getFollowUps, isFollowUpSent, getReferrals,
 } from '../db/queries';
 import { verifyAdminSig, generateId } from '../services/crypto';
 import {
@@ -1317,6 +1317,17 @@ export async function apiAdminGetFollowUps(req: Request, env: Env): Promise<Resp
   const status = (url.searchParams.get('status') || '').trim() || undefined;
   const followUps = await getFollowUps(env.DB, status);
   return json({ ok: true, followUps });
+}
+
+export async function apiAdminGetReferrals(req: Request, env: Env): Promise<Response> {
+  const deny = await requireAdmin(req, env);
+  if (deny) return deny;
+  try {
+    const referrals = await getReferrals(env.DB);
+    return json({ ok: true, referrals });
+  } catch {
+    return json({ ok: true, referrals: [] });
+  }
 }
 
 export async function apiAdminToggleFollowUpHandled(req: Request, env: Env): Promise<Response> {
