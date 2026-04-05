@@ -60,14 +60,15 @@ function buildFooter(appt: Appointment): string {
   const whatsappUrl = 'https://wa.me/?text=' + shareText;
 
   return `
-  <div style="margin-top:20px;padding:14px;border:1px solid #dbeafe;border-radius:12px;background:#eff6ff;text-align:center;">
-    <p style="margin:0 0 10px 0;font-size:13px;color:#1e40af;line-height:1.4;">Need to book another appointment in the future? Save this link:</p>
-    <a href="https://kevappts.labrint.workers.dev/" style="display:inline-block;background:#2563eb;color:#fff;text-decoration:none;padding:10px 20px;border-radius:999px;font-weight:700;font-size:14px;">Book an Appointment</a>
-  </div>
-  <div style="margin-top:12px;padding:16px;border:1px solid #d1fae5;border-radius:14px;background:#f0fdf4;">
-    <p style="margin:0 0 6px 0;font-size:15px;font-weight:700;color:#065f46;">Know someone who needs a doctor?</p>
-    <p style="margin:0 0 12px 0;font-size:13px;color:#065f46;line-height:1.4;">Share your personal link \u2014 it means a lot to us!</p>
-    <a href="${whatsappUrl}" target="_blank" style="display:inline-block;background:#25D366;color:#fff;text-decoration:none;padding:10px 20px;border-radius:999px;font-weight:700;font-size:14px;">Share with a friend</a>
+  <div style="margin-top:20px;">
+    <table style="border-collapse:collapse;width:100%;"><tr>
+      <td style="padding:4px 4px 4px 0;width:50%;">
+        <a href="https://kevappts.labrint.workers.dev/" style="display:block;text-align:center;background:#2563eb;color:#fff;text-decoration:none;padding:12px 8px;border-radius:999px;font-weight:700;font-size:14px;">Book an Appointment</a>
+      </td>
+      <td style="padding:4px 0 4px 4px;width:50%;">
+        <a href="${whatsappUrl}" target="_blank" style="display:block;text-align:center;background:#25D366;color:#fff;text-decoration:none;padding:12px 8px;border-radius:999px;font-weight:700;font-size:14px;">Share with a friend</a>
+      </td>
+    </tr></table>
   </div>`;
 }
 
