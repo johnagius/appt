@@ -89,12 +89,15 @@ export function followupPage(): string {
     var ID = params.get('id') || '';
     var SIG = params.get('sig') || '';
     var RESPONSE = params.get('r') || '';
+    var CLINIC = params.get('c') || 'potters';
+    var REVIEW_URL = CLINIC === 'spinola'
+      ? 'https://search.google.com/local/writereview?placeid=ChIJ3dCu7mtFDhMRYBPbRR0pgtE' // TODO: Spinola place ID
+      : 'https://search.google.com/local/writereview?placeid=ChIJ3dCu7mtFDhMRYBPbRR0pgtE';
 
     async function init() {
       if (!ID || !SIG || !RESPONSE) { showView('viewError'); return; }
 
       if (RESPONSE === 'rebook') {
-        // Record response then redirect to booking page
         showView('viewRebook');
         try {
           await fetch('/api/followup-response', {
@@ -108,21 +111,17 @@ export function followupPage(): string {
       }
 
       if (RESPONSE === 'great') {
+        // Record response (fire and forget — don't block UI)
         try {
-          var res = await fetch('/api/followup-response', {
+          fetch('/api/followup-response', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ id: ID, sig: SIG, response: 'great' })
-          });
-          var data = await res.json();
-          showView('viewGreat');
-          if (data.reviewUrl) {
-            document.getElementById('reviewBox').style.display = 'block';
-            document.getElementById('reviewLink').href = data.reviewUrl;
-          }
-        } catch(e) {
-          showView('viewGreat');
-        }
+          }).catch(function(){});
+        } catch(e) {}
+        showView('viewGreat');
+        document.getElementById('reviewBox').style.display = 'block';
+        document.getElementById('reviewLink').href = REVIEW_URL;
         return;
       }
 

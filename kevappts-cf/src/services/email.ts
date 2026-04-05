@@ -510,7 +510,7 @@ export async function sendFollowUpEmail(env: Env, appt: Appointment): Promise<vo
   const doctorName = clinic === 'spinola' ? (env.SPINOLA_DOCTOR_NAME || 'Dr James') : 'Dr Kevin';
   const baseUrl = getBaseUrl(env);
   const sig = await computeSig('followup|' + appt.id, env.SIGNING_SECRET);
-  const responseBase = baseUrl + '/followup?id=' + encodeURIComponent(appt.id) + '&sig=' + encodeURIComponent(sig);
+  const responseBase = baseUrl + '/followup?id=' + encodeURIComponent(appt.id) + '&sig=' + encodeURIComponent(sig) + '&c=' + clinic;
 
   const greatUrl = responseBase + '&r=great';
   const questionUrl = responseBase + '&r=question';
@@ -545,7 +545,6 @@ export async function sendFollowUpEmail(env: Env, appt: Appointment): Promise<vo
     </td>
   </tr></table>
   <p style="margin:18px 0 0 0;color:#6b7280;font-size:13px;">
-    This is an automated follow-up from ${clinic === 'spinola' ? 'Spinola Clinic' : "Potter's Pharmacy"}.
     If you need urgent help, please call the clinic directly.
   </p>
 </div>`;

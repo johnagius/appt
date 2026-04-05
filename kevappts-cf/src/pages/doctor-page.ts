@@ -74,6 +74,16 @@ export function doctorPage(sig: string): string {
   .patient-badge{display:inline-block;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;padding:2px 8px;border-radius:8px;margin-top:4px;text-decoration:none;}
   .patient-badge.spinola{background:#fef3c7;color:#92400e;}
   .patient-comment{font-size:12px;color:#6b7280;margin-top:4px;padding:4px 8px;background:#f3f4f6;border-radius:8px;line-height:1.35;font-style:italic;}
+  .followup-card{border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:8px;background:#fff;}
+  .followup-card.needs-reply{border-color:#3b82f6;background:#eff6ff;}
+  .followup-name{font-weight:800;font-size:14px;}
+  .followup-meta{font-size:12px;color:var(--muted);margin-top:2px;}
+  .followup-response{margin-top:6px;font-size:13px;padding:6px 10px;border-radius:10px;display:inline-block;}
+  .followup-response.great{background:#d1fae5;color:#065f46;}
+  .followup-response.question{background:#dbeafe;color:#1e40af;}
+  .followup-response.rebook{background:#fef3c7;color:#92400e;}
+  .followup-response.sent{background:#f3f4f6;color:#6b7280;}
+  .followup-question{margin-top:6px;font-size:13px;padding:8px 10px;background:#f0f9ff;border-radius:10px;border:1px solid #bfdbfe;color:#1e40af;font-style:italic;}
   .patient-main{flex:1;min-width:0;}
   .patient-name{font-size:15px;font-weight:800;line-height:1.25;}
   .patient-meta{font-size:12px;color:var(--muted);line-height:1.45;margin-top:3px;word-break:break-word;}
@@ -275,6 +285,16 @@ export function doctorPage(sig: string): string {
       </div>
       <div class="selection-summary" id="calendarSelectionSummary">No days selected.</div>
       <div class="msg" id="calendarMsg"></div>
+    </section>
+
+    <section class="card" id="followUpSection">
+      <div class="session-header">
+        <div>
+          <div class="session-title">Follow-ups</div>
+          <div class="session-times" id="followUpHint" style="font-size:12px;color:var(--muted);">Patient responses to post-visit check-ins.</div>
+        </div>
+      </div>
+      <div id="followUpList" class="patient-list"><div class="empty-session">Loading...</div></div>
     </section>
   </div>
 
@@ -1667,10 +1687,47 @@ _idleOverlay.addEventListener('click', function() {
   resumeDashboardFromIdle();
 });
 
+async function loadFollowUps() {
+  var el = document.getElementById('followUpList');
+  try {
+    var res = await apiCall('follow-ups');
+    if (!res || !res.ok || !res.followUps) { el.innerHTML = '<div class="empty-session">No follow-ups yet.</div>'; return; }
+    var items = res.followUps;
+    if (!items.length) { el.innerHTML = '<div class="empty-session">No follow-ups yet.</div>'; return; }
+    var html = '';
+    for (var i = 0; i < items.length; i++) {
+      var f = items[i];
+      var statusCls = f.status === 'needs_reply' ? ' needs-reply' : '';
+      html += '<div class="followup-card' + statusCls + '">';
+      html += '<div class="followup-name">' + esc(f.patient_name) + '</div>';
+      html += '<div class="followup-meta">' + esc(f.date_key) + ' \u2022 ' + esc(f.email) + ' \u2022 ' + esc(f.clinic === 'spinola' ? 'Spinola' : "Potter's") + '</div>';
+      if (f.response === 'great') {
+        html += '<div class="followup-response great">Everything\'s great</div>';
+      } else if (f.response === 'question') {
+        html += '<div class="followup-response question">Has a question</div>';
+        if (f.question_text) html += '<div class="followup-question">' + esc(f.question_text) + '</div>';
+      } else if (f.response === 'rebook') {
+        html += '<div class="followup-response rebook">Needs another appointment</div>';
+      } else {
+        html += '<div class="followup-response sent">Awaiting response</div>';
+      }
+      html += '</div>';
+    }
+    el.innerHTML = html;
+    var count = items.filter(function(f) { return f.status === 'needs_reply'; }).length;
+    document.getElementById('followUpHint').textContent = count > 0
+      ? count + ' patient(s) need a reply.'
+      : 'Patient responses to post-visit check-ins.';
+  } catch(e) {
+    el.innerHTML = '<div class="empty-session">No follow-ups yet.</div>';
+  }
+}
+
 (async function init() {
   try {
     showLoading('Loading schedule…');
     await reloadAll();
+    loadFollowUps();
     connectWS();
   } catch (err) {
     showMsg('calendarMsg', 'bad', String(err && err.message ? err.message : err));
