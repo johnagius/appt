@@ -288,9 +288,10 @@ export default {
     const tz = env.TIMEZONE;
     const todayKey = todayKeyLocal(tz);
 
-    // Daily schedule email (runs at 5am UTC / 7am Malta)
+    // Daily schedule email (runs once at exactly 5:00 UTC / 7:00 Malta)
     const hour = new Date().getUTCHours();
-    if (hour === 5) {
+    const minute = new Date().getUTCMinutes();
+    if (hour === 5 && minute < 5) {
       try {
         const active = await getActiveAppointmentsByDate(env.DB, todayKey);
         await sendDailyDoctorSchedule(env, todayKey, active);
