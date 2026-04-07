@@ -61,10 +61,12 @@ export default {
     try {
       // ─── PWA Manifest & Service Worker ────────────
       if (path === '/manifest.json') {
+        const manifestLoc = url.searchParams.get('loc') || '';
+        const startUrl = manifestLoc ? '/from/' + manifestLoc.replace(/[^a-zA-Z0-9_-]/g, '') : '/';
         return new Response(JSON.stringify({
           name: "Potter's Pharmacy - Book Appointment",
           short_name: "Potter's",
-          start_url: "/",
+          start_url: startUrl,
           display: "standalone",
           background_color: "#f6f7fb",
           theme_color: "#f5b301",
@@ -72,7 +74,7 @@ export default {
             { src: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%23f5b301'/%3E%3Ctext x='50' y='68' font-size='50' font-weight='bold' text-anchor='middle' fill='white' font-family='Arial'%3EMD%3C/text%3E%3C/svg%3E", sizes: "512x512", type: "image/svg+xml" }
           ]
         }), {
-          headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=86400' },
+          headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' },
         });
       }
 
