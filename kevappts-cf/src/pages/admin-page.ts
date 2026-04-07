@@ -3000,7 +3000,7 @@ function showPatientHistory(email, phone) {
       // Appointment table
       if (res.appointments && res.appointments.length > 0) {
         html += '<div class="table-wrap" style="margin-top:10px;"><table><thead><tr>';
-        html += '<th>Date</th><th>Time</th><th>Status</th><th>Location</th><th>Notes</th>';
+        html += '<th>Date</th><th>Time</th><th>Status</th><th>Source</th><th>Location</th><th>Notes</th>';
         html += '</tr></thead><tbody>';
         for (var i = 0; i < res.appointments.length; i++) {
           var a = res.appointments[i];
@@ -3009,6 +3009,7 @@ function showPatientHistory(email, phone) {
           html += '<td><b>' + esc(a.dateKey) + '</b></td>';
           html += '<td>' + esc(a.startTime) + ' - ' + esc(a.endTime) + '</td>';
           html += '<td><span class="badge ' + badge.cls + '">' + badge.text + '</span>' + (a.confirmed ? ' <span class="badge" style="background:#d1fae5;color:#065f46;">Confirmed</span>' : '') + '</td>';
+          html += '<td>' + (a.bookingSource ? '<span class="badge" style="background:#eff6ff;color:#1e40af;">' + esc(a.bookingSource) + '</span>' : '<span style="color:#d1d5db;">\u2014</span>') + '</td>';
           html += '<td>' + esc(a.location) + '</td>';
           html += '<td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(a.comments || '') + '</td>';
           html += '</tr>';
@@ -3616,6 +3617,7 @@ function renderReminderList(el, appts) {
     html += '<div class="rev-patient-detail">' + esc(email) + ' · ' + esc(time) + ' · ' + esc(service) + '</div>';
     html += '</div>';
     html += '</label>';
+    if (a.bookingSource) html += '<span class="badge" style="background:#eff6ff;color:#1e40af;">' + esc(a.bookingSource) + '</span>';
     if (reminded) html += '<span class="rev-sent-badge">Sent</span>';
     if (confirmed) html += '<span class="rev-sent-badge" style="background:#dbeafe;color:#1d4ed8;">Confirmed</span>';
     html += '</div>';
@@ -3690,6 +3692,7 @@ function renderReviewList(loc, patients) {
     html += '<div class="rev-patient-detail">' + esc(detail) + '</div>';
     html += '</div>';
     html += '</label>';
+    if (p.bookingSource) html += '<span class="badge" style="background:#eff6ff;color:#1e40af;">' + esc(p.bookingSource) + '</span>';
     if (sent) html += '<span class="rev-sent-badge">Sent</span>';
     html += '</div>';
   }

@@ -77,13 +77,14 @@ export async function apiAdminGetDashboard(req: Request, env: Env): Promise<Resp
   const futureOffRows = offRows.filter(r => r.end_date >= todayKey || r.start_date >= todayKey);
   const futureExtraRows = extraRows.filter(r => r.date_key >= todayKey);
 
-  // Week stats
+  // Week stats (full Mon-Sun of current week)
   let weekBooked = 0, weekCancelled = 0;
-  for (let d = 0; d <= 6; d++) {
+  const todayDow = today.getDay(); // 0=Sun, 1=Mon
+  const mondayOffset = todayDow === 0 ? -6 : 1 - todayDow;
+  for (let d = mondayOffset; d <= mondayOffset + 6; d++) {
     const dk = toDateKey(addDays(today, d));
     const appts = await getAppointmentsByDate(env.DB, dk);
     for (const a of appts) {
-      if (a.clinic === 'spinola') continue;
       if (['BOOKED', 'RELOCATED_SPINOLA', 'ATTENDED'].includes(a.status)) weekBooked++;
       if (a.status.includes('CANCELLED')) weekCancelled++;
     }
@@ -661,6 +662,7 @@ export async function apiAdminGetReviewPatients(req: Request, env: Env): Promise
       serviceName: a.service_name,
       status: a.status,
       reviewSent,
+      bookingSource: (a as any).booking_source || '',
     };
     if (a.clinic === 'spinola' || a.location.toLowerCase().includes('spinola') || a.status === 'RELOCATED_SPINOLA') {
       spinola.push(item);

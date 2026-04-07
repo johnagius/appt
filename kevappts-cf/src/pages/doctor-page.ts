@@ -718,6 +718,7 @@ function renderPatientList(session) {
     var a = appts[i];
     var phoneText = formatPhoneDisplay(a.phone);
     var phoneHref = buildPhoneHref(a.phone);
+    var waHref = buildWhatsAppHref(a.phone);
     var emailText = String(a.email || '').trim();
     var isSpinola = (a.status === 'RELOCATED_SPINOLA');
     html += '<div class="patient-card' + (isSpinola ? ' relocated' : '') + '">';
@@ -725,10 +726,11 @@ function renderPatientList(session) {
     html += '<div class="patient-name">' + esc(a.full_name || 'Patient') + '</div>';
     html += '<div class="patient-meta">';
     if (phoneText) {
-      if (phoneHref) html += '<a class="contact-link" href="' + esc(phoneHref) + '">' + esc(phoneText) + '</a>';
+      if (phoneHref) html += '<a class="contact-link" href="' + esc(phoneHref) + '" title="Call">\u260E ' + esc(phoneText) + '</a>';
       else html += esc(phoneText);
+      if (waHref) html += ' <a class="contact-link" href="' + esc(waHref) + '" target="_blank" title="WhatsApp" style="color:#25D366;">WA</a>';
     }
-    if (phoneText && emailText) html += ' • ';
+    if (phoneText && emailText) html += ' \u2022 ';
     if (emailText) html += '<a class="contact-link" href="mailto:' + esc(emailText) + '">' + esc(emailText) + '</a>';
     html += '</div>';
     if (isSpinola) html += '<div class="patient-badge spinola">Sent to Spinola</div>';
@@ -743,14 +745,20 @@ function renderPatientList(session) {
 }
 function formatPhoneDisplay(phone) {
   var raw = String(phone || '').trim();
-  if (!raw) return '';
+  if (!raw || raw === '+') return '';
   return raw.charAt(0) === '+' ? raw : '+' + raw;
 }
 function buildPhoneHref(phone) {
   var display = formatPhoneDisplay(phone);
-  if (!display) return '';
+  if (!display || display.length < 5) return '';
   var normalized = display.replace(/[^\d+]/g, '');
-  return normalized ? 'tel:' + normalized : '';
+  return normalized && normalized.length > 2 ? 'tel:' + normalized : '';
+}
+function buildWhatsAppHref(phone) {
+  var raw = String(phone || '').trim().replace(/[^\d+]/g, '');
+  if (!raw || raw.length < 5) return '';
+  var num = raw.charAt(0) === '+' ? raw.slice(1) : raw;
+  return 'https://wa.me/' + num;
 }
 function markUserActivity() {
   _lastActivityAt = Date.now();
