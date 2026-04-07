@@ -86,13 +86,13 @@ export async function insertAppointment(db: D1Database, appt: Appointment): Prom
   await db.prepare(`
     INSERT INTO appointments (id, date_key, start_time, end_time, service_id, service_name,
       full_name, email, phone, comments, status, location, clinic, created_at, updated_at,
-      token, calendar_event_id, cancelled_at, cancel_reason, reminder_sent, confirmed)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      token, calendar_event_id, cancelled_at, cancel_reason, reminder_sent, confirmed, booking_source)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).bind(
     appt.id, appt.date_key, appt.start_time, appt.end_time, appt.service_id, appt.service_name,
     appt.full_name, appt.email, appt.phone, appt.comments, appt.status, appt.location, appt.clinic,
     appt.created_at, appt.updated_at, appt.token, appt.calendar_event_id, appt.cancelled_at, appt.cancel_reason,
-    appt.reminder_sent || '', appt.confirmed || ''
+    appt.reminder_sent || '', appt.confirmed || '', appt.booking_source || ''
   ).run();
 }
 
