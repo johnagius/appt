@@ -1,0 +1,18 @@
+Setup Guide for Blackview Tab 20 Kiosk Mode
+
+Phase 1: Initial Preparation
+Connect to Wi-Fi.
+Install Chrome or Edge (for your PWA).
+Create the PWA: Open your URL in Chrome, tap the 3-dot menu > "Add to Home Screen" or "Install App".
+Enable Developer Options: Go to Settings > About Tablet and tap Build Number 7 times.
+Enable Stay Awake: Go to Settings > System > Developer Options > Enable "Stay Awake" (keeps screen on while charging).
+Phase 2: Install and Configure Kiosk Software
+Install Fully Kiosk Browser & Launcher from the Google Play Store (recommended).
+Open Fully Kiosk and grant necessary permissions.
+Set PWA as Homepage: In Settings, set your PWA URL as the "Start URL".
+Prevent Exit: Enable "Lock Screen," "Disable Home Button," "Disable Recents Button," and "Disable Status Bar" (requires setting up PIN).
+Prevent Sleep: Under "Power Management," enable "Keep Screen On" (set to "Always On").
+Phase 3: Auto-Boot and Final Lockdown
+Auto-Launch on Boot: In Fully Kiosk settings, enable "Launch on Boot".
+Set as Launcher: Set Fully Kiosk Browser as your default Home app (Launcher) to prevent exiting to the Android home screen.
+Test Restart: Power off and on to ensure the PWA launches and all menus are locked.
