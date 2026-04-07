@@ -3504,7 +3504,8 @@ export function indexPage(env: Env): string {
         email: els.email.value.trim(),
         phone: getFullPhone(),
         comments: els.comments.value.trim(),
-        referralCode: _referralCode || undefined
+        referralCode: _referralCode || undefined,
+        bookingSource: _bookingSource || undefined
       };
 
       fetch('/api/book', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)})
