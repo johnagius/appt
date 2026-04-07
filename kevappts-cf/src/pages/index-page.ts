@@ -12,7 +12,7 @@ export function indexPage(env: Env, bookingSource?: string): string {
   <meta name="apple-mobile-web-app-title" content="Potter's Pharmacy">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#f5b301">
-  <link rel="manifest" href="/manifest.json">
+  <link rel="manifest" href="/manifest.json${bakedSource ? '?loc=' + bakedSource : ''}">
   <title>Potter's Pharmacy - Book Appointment</title>
 
   <style>
