@@ -1,6 +1,7 @@
 import type { Env } from '../types';
 
-export function indexPage(env: Env): string {
+export function indexPage(env: Env, bookingSource?: string): string {
+  const bakedSource = bookingSource ? bookingSource.replace(/[^a-zA-Z0-9_-]/g, '') : '';
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -963,10 +964,10 @@ export function indexPage(env: Env): string {
   </div>
 
   <script>
-    // Capture referral code and booking source from URL
+    // Capture referral code and booking source
     var _urlParams = new URLSearchParams(location.search);
     var _referralCode = (_urlParams.get('ref') || '').trim();
-    var _bookingSource = (_urlParams.get('loc') || '').trim();
+    var _bookingSource = '${bakedSource}' || (_urlParams.get('loc') || '').trim();
 
     const state = {
       config: null,

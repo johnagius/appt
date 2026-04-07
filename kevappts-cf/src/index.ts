@@ -235,6 +235,10 @@ export default {
       // ─── HTML Pages ────────────────────────────────
       if (method === 'GET') {
         if (path === '/' || path === '/book') return html(indexPage(env));
+        if (path.startsWith('/from/')) {
+          const loc = path.slice(6).replace(/[^a-zA-Z0-9_-]/g, '');
+          if (loc) return html(indexPage(env, loc));
+        }
         if (path === '/confirm') {
           const token = url.searchParams.get('token') || '';
           if (token) {
