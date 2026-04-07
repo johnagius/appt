@@ -41,6 +41,7 @@ export interface Appointment {
   cancel_reason: string;
   reminder_sent: string;
   confirmed: string;
+  booking_source: string;
 }
 
 export type AppointmentStatus =

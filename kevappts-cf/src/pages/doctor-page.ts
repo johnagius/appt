@@ -733,6 +733,7 @@ function renderPatientList(session) {
     html += '</div>';
     if (isSpinola) html += '<div class="patient-badge spinola">Sent to Spinola</div>';
     if (a.confirmed) html += '<div class="patient-badge" style="background:#d1fae5;color:#065f46;">Confirmed</div>';
+    if (a.booking_source && a.booking_source !== 'test') html += '<div class="patient-badge" style="background:#eff6ff;color:#1e40af;">via ' + esc(a.booking_source) + '</div>';
     if (a.comments && String(a.comments).trim()) html += '<div class="patient-comment">' + esc(a.comments) + '</div>';
     html += '</div>';
     html += '<div class="patient-time">' + esc(a.start_time || '') + '</div>';

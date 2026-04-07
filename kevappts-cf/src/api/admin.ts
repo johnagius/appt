@@ -482,6 +482,7 @@ export async function apiAdminProcessAppointments(req: Request, env: Env): Promi
         calendar_event_id: '',
         cancelled_at: '',
         cancel_reason: '',
+        booking_source: appt.booking_source || '',
       };
 
       await insertAppointment(env.DB, newAppt);
@@ -582,6 +583,7 @@ export async function apiAdminProcessAppointments(req: Request, env: Env): Promi
         calendar_event_id: '',
         cancelled_at: '',
         cancel_reason: '',
+        booking_source: appt.booking_source || '',
       };
 
       await insertAppointment(env.DB, newAppt);
@@ -950,6 +952,17 @@ export async function apiAdminGetStatistics(req: Request, env: Env): Promise<Res
     .sort((a, b) => b[1] - a[1])
     .map(([country, count]) => ({ country, count }));
 
+  // Booking source breakdown
+  const sourceCounts: Record<string, number> = {};
+  for (const a of allAppts) {
+    if (a.status.includes('CANCELLED')) continue;
+    const src = (a as any).booking_source || 'direct';
+    sourceCounts[src] = (sourceCounts[src] || 0) + 1;
+  }
+  const sourceBreakdown = Object.entries(sourceCounts)
+    .sort((a, b) => b[1] - a[1])
+    .map(([source, count]) => ({ source, count }));
+
   // Same-day cancellations
   const sameDayCancels = allAppts.filter(a => {
     if (!a.status.includes('CANCELLED') || !a.cancelled_at) return false;
@@ -993,6 +1006,7 @@ export async function apiAdminGetStatistics(req: Request, env: Env): Promise<Res
       busiestDay,
       countryBreakdown,
       sameDayCancels,
+      sourceBreakdown,
       locationSplit: { potters: pottersCount, spinola: spinolaCount },
       cancelBreakdown: { byDoctor: cancelledDoctor, byPatient: cancelledClient },
       period: { from: past28, to: todayKey },
@@ -1207,6 +1221,7 @@ export async function apiAdminCreateTestBooking(req: Request, env: Env): Promise
     calendar_event_id: '',
     cancelled_at: '',
     cancel_reason: '',
+    booking_source: 'test',
   };
 
   await insertAppointment(env.DB, appt);
@@ -1290,6 +1305,7 @@ export async function apiAdminTestFollowUp(req: Request, env: Env): Promise<Resp
     calendar_event_id: '',
     cancelled_at: '',
     cancel_reason: '',
+    booking_source: 'test',
   };
 
   try { await insertAppointment(env.DB, appt); } catch {}

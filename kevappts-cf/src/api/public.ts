@@ -152,6 +152,7 @@ async function doBook(req: Request, env: Env, clinic: 'potters' | 'spinola'): Pr
   const phone = sanitizePhone(payload.phone);
   const comments = (payload.comments || '').trim();
   const referralCode = ((payload as any).referralCode || '').trim();
+  const bookingSource = ((payload as any).bookingSource || '').trim();
 
   if (!dateKey || !startTime || !serviceId || !fullName || !email || !phone) {
     return json({ ok: false, reason: 'Missing required fields' }, 400);
@@ -261,6 +262,7 @@ async function doBook(req: Request, env: Env, clinic: 'potters' | 'spinola'): Pr
     cancel_reason: '',
     reminder_sent: '',
     confirmed: '',
+    booking_source: bookingSource,
   };
 
   await insertAppointment(env.DB, appt);

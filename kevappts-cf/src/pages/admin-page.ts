@@ -728,6 +728,11 @@ export function adminPage(sig: string): string {
       <div id="doctorActionsChart"></div>
     </div>
     <div class="card">
+      <h3>Bookings by Source</h3>
+      <p style="margin:0 0 8px;font-size:12px;color:var(--muted);">Where bookings came from (use ?loc= on tablet URLs to track)</p>
+      <div id="sourceChart"></div>
+    </div>
+    <div class="card">
       <h3>Bookings by Country</h3>
       <div id="countryChart"></div>
     </div>
@@ -1085,7 +1090,8 @@ function transformAppt(a) {
     cancelReason: a.cancel_reason || a.cancelReason,
     clinic: a.clinic,
     confirmed: a.confirmed || '',
-    reminder_sent: a.reminder_sent || ''
+    reminder_sent: a.reminder_sent || '',
+    bookingSource: a.booking_source || a.bookingSource || ''
   };
 }
 function transformOff(o) {
@@ -1149,6 +1155,7 @@ function transformResponse(method, res) {
     res.busiestDay = st.busiestDay || null;
     res.upcomingLoad = st.upcomingLoad || [];
     res.countryBreakdown = st.countryBreakdown || [];
+    res.sourceBreakdown = st.sourceBreakdown || [];
     res.cancelBreakdown = st.cancelBreakdown || { byDoctor: st.cancelledDoctor || 0, byPatient: st.cancelledClient || 0 };
     res.period = st.period || { from: '', to: '' };
     res.generated = st.generated || '';
@@ -1298,7 +1305,7 @@ function renderApptTable(appts, containerId, withCheckboxes, showDate) {
   var html = '<div class="table-wrap"><table><thead><tr>';
   if (withCheckboxes) html += '<th><input type="checkbox" onchange="toggleAll(this, \\'' + containerId + '\\')"></th>';
   if (showDate) html += '<th>Date</th>';
-  html += '<th>Time</th><th>Patient</th><th>Phone</th><th>Service</th><th>Location</th><th>Status</th><th></th></tr></thead><tbody>';
+  html += '<th>Time</th><th>Patient</th><th>Phone</th><th>Service</th><th>Location</th><th>Source</th><th>Status</th><th></th></tr></thead><tbody>';
   for (var i = 0; i < appts.length; i++) {
     var a = appts[i];
     var badge = getStatusBadge(a.status);
@@ -1310,6 +1317,7 @@ function renderApptTable(appts, containerId, withCheckboxes, showDate) {
     html += '<td>' + esc(a.phone) + '</td>';
     html += '<td>' + esc(a.serviceName) + '</td>';
     html += '<td>' + esc(a.location) + '</td>';
+    html += '<td>' + (a.bookingSource ? '<span class="badge" style="background:#eff6ff;color:#1e40af;">' + esc(a.bookingSource) + '</span>' : '<span style="color:#d1d5db;">—</span>') + '</td>';
     html += '<td><span class="badge ' + badge.cls + '">' + badge.text + '</span>' + (a.confirmed ? ' <span class="badge" style="background:#d1fae5;color:#065f46;">Confirmed</span>' : '') + '</td>';
     html += '<td>';
     if (a.status === 'BOOKED' || a.status === 'RELOCATED_SPINOLA') {
@@ -3075,6 +3083,7 @@ function renderAllStats(s) {
   renderLeadTime(s);
   renderAttendance(s);
   renderDoctorActions(s);
+  renderSourceBreakdown(s.sourceBreakdown);
   renderCountryBreakdown(s.countryBreakdown);
   renderTopCancellers(s.topCancellers);
   renderSpinolaStats(s.spinola);
@@ -3330,6 +3339,25 @@ function renderDoctorActions(s) {
   }
 
   if (!html) html = '<div class="empty">No data yet.</div>';
+  el.innerHTML = html;
+}
+
+function renderSourceBreakdown(sources) {
+  var el = document.getElementById('sourceChart');
+  if (!sources || !sources.length) { el.innerHTML = '<div class="empty">No source data yet. Add ?loc=name to tablet URLs to start tracking.</div>'; return; }
+  var maxCount = sources[0].count || 1;
+  var colors = ['#2563eb','#10b981','#f59e0b','#8b5cf6','#ef4444','#06b6d4','#ec4899'];
+  var html = '';
+  for (var i = 0; i < sources.length; i++) {
+    var s = sources[i];
+    var pct = Math.round(s.count / maxCount * 100);
+    var color = colors[i % colors.length];
+    html += '<div class="h-bar-row">';
+    html += '<div class="h-bar-label" style="width:100px;">' + esc(s.source) + '</div>';
+    html += '<div class="h-bar-track"><div class="h-bar-fill" style="width:' + pct + '%;background:' + color + ';"></div></div>';
+    html += '<div class="h-bar-count">' + s.count + '</div>';
+    html += '</div>';
+  }
   el.innerHTML = html;
 }
 
