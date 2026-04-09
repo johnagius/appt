@@ -1943,6 +1943,8 @@ export function indexPage(env: Env, bookingSource?: string): string {
       if (state.config && state.config.pottersLocation) {
         els.sumLoc.textContent = t('locationTemplate', state.config.pottersLocation);
       }
+      // Re-render clinic hours + slot duration (replaces {duration} placeholder)
+      if (state.config) renderClinicHours();
       // Re-apply Spinola dynamic text if section is visible
       if (els.spinolaInline && els.spinolaInline.classList.contains('show') && _spinolaDateKey) {
         els.spinolaDateLabel.textContent = t('spinolaDateSlots') + ' ' + localDate(_spinolaDateKey);
