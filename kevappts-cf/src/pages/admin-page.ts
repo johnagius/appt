@@ -198,6 +198,7 @@ export function adminPage(sig: string): string {
     .tl-tick{flex:1;position:relative;border-left:1px solid var(--line);}
     .tl-tick:last-child{border-right:1px solid var(--line);}
     .tl-tick-label{position:absolute;top:2px;left:0;font-size:10px;color:var(--muted);font-weight:600;white-space:nowrap;transform:translateX(-50%);}
+    .tl-tick-label-end{left:100%;}
     .tl-legend{display:flex;gap:12px;margin-top:10px;font-size:11px;color:var(--muted);justify-content:center;}
     .tl-legend-dot{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:middle;}
     .tl-tooltip{position:absolute;bottom:calc(100% + 6px);background:#111827;color:#fff;padding:4px 8px;border-radius:6px;font-size:11px;white-space:nowrap;pointer-events:none;z-index:10;transform:translateX(-50%);display:none;}
@@ -1719,15 +1720,21 @@ function renderTimeline() {
     return ((m - _tlDayStart * 60) / totalMin * 100);
   }
 
-  // Render tick marks below the bar
+  // Render tick marks below the bar (14 items for 14-hour span so flex positions match bar percentages)
   ticksEl.innerHTML = '';
-  for (var h = _tlDayStart; h <= _tlDayEnd; h++) {
+  for (var h = _tlDayStart; h < _tlDayEnd; h++) {
     var tick = document.createElement('div');
     tick.className = 'tl-tick';
     var lbl = document.createElement('div');
     lbl.className = 'tl-tick-label';
     lbl.textContent = String(h).padStart(2, '0') + ':00';
     tick.appendChild(lbl);
+    if (h === _tlDayEnd - 1) {
+      var endLbl = document.createElement('div');
+      endLbl.className = 'tl-tick-label tl-tick-label-end';
+      endLbl.textContent = String(_tlDayEnd).padStart(2, '0') + ':00';
+      tick.appendChild(endLbl);
+    }
     ticksEl.appendChild(tick);
   }
 
