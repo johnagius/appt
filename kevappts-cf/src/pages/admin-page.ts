@@ -3055,6 +3055,7 @@ function loadStatistics() {
 }
 
 function renderAllStats(s) {
+  var at = s.allTime || {};
   // Period label
   document.getElementById('statsPeriod').textContent = s.period.from + ' to ' + s.period.to + ' (generated ' + s.generated + ')';
 
@@ -3066,47 +3067,53 @@ function renderAllStats(s) {
   var trendArrow = '';
   if (s.trendDirection === 'up') trendArrow = '<span class="trend-arrow trend-up">&uarr;' + s.trendPct + '%</span>';
   else if (s.trendDirection === 'down') trendArrow = '<span class="trend-arrow trend-down">&darr;' + s.trendPct + '%</span>';
-  document.getElementById('heroBookedSub').innerHTML = 'last 28 days ' + trendArrow;
+  document.getElementById('heroBookedSub').innerHTML = 'Last 28 days ' + trendArrow + (at.totalBooked != null ? '<br><span style="font-size:11px;color:var(--muted);">All time: ' + at.totalBooked + '</span>' : '');
   document.getElementById('heroCancelRate').textContent = s.cancelRate + '%';
   var crEl = document.getElementById('heroCancelRate');
   crEl.style.color = s.cancelRate < 10 ? 'var(--good)' : s.cancelRate < 20 ? '#f59e0b' : 'var(--bad)';
+  if (at.cancelRate != null) crEl.insertAdjacentHTML('afterend', '<div id="heroCancelRateAll" style="font-size:11px;color:var(--muted);margin-top:2px;">All time: ' + at.cancelRate + '%</div>');
   document.getElementById('heroPatients').textContent = s.totalUniquePatients;
   document.getElementById('heroRepeat').textContent = s.repeatPatients + ' returning';
+  if (at.totalUniquePatients != null) {
+    document.getElementById('heroPatients').insertAdjacentHTML('afterend', '<div style="font-size:11px;color:var(--muted);margin-top:2px;">All time: ' + at.totalUniquePatients + ' (' + at.repeatPatients + ' returning)</div>');
+  }
 
   renderWeeklyTrend(s.weeklyTrend);
   renderPeakHours(s.hourlyDistribution);
   renderUtilByDay(s.utilizationByDay);
   renderUpcomingLoad(s.upcomingLoad);
-  renderLocationSplit(s.locationSplit);
-  renderTopPatients(s.topPatients);
-  renderCancelBreakdown(s);
-  renderBusiestDay(s.busiestDay);
-  renderLeadTime(s);
-  renderAttendance(s);
-  renderDoctorActions(s);
-  renderSourceBreakdown(s.sourceBreakdown);
-  renderCountryBreakdown(s.countryBreakdown);
-  renderTopCancellers(s.topCancellers);
-  renderSpinolaStats(s.spinola);
+  renderLocationSplit(s.locationSplit, at.locationSplit);
+  renderTopPatients(s.topPatients, at.topPatients);
+  renderCancelBreakdown(s, at);
+  renderBusiestDay(s.busiestDay, at.busiestDay);
+  renderLeadTime(s, at);
+  renderAttendance(s, at);
+  renderDoctorActions(s, at);
+  renderSourceBreakdown(s.sourceBreakdown, at.sourceBreakdown);
+  renderCountryBreakdown(s.countryBreakdown, at.countryBreakdown);
+  renderTopCancellers(s.topCancellers, at.topCancellers);
+  renderSpinolaStats(s.spinola, at.spinola);
 }
 
-function renderLeadTime(s) {
+function renderLeadTime(s, at) {
   var el = document.getElementById('leadTimeChart');
   var html = '<div style="text-align:center;padding:12px 0;">';
   html += '<div style="font-size:42px;font-weight:900;color:#2563eb;">' + (s.avgLeadTimeDays || 0) + '</div>';
-  html += '<div style="font-size:14px;font-weight:700;margin-top:4px;">days average</div>';
+  html += '<div style="font-size:14px;font-weight:700;margin-top:4px;">days average <span style="font-size:11px;color:var(--muted);font-weight:500;">Last 28 days</span></div>';
+  if (at && at.avgLeadTimeDays != null) html += '<div style="font-size:12px;color:var(--muted);margin-top:2px;">All time: ' + at.avgLeadTimeDays + ' days avg</div>';
   html += '<div style="font-size:12px;color:var(--muted);margin-top:2px;">How far ahead patients book</div>';
   if (s.sameDayCancels > 0) {
     html += '<div style="margin-top:12px;padding:8px 12px;background:rgba(245,158,11,0.08);border-radius:10px;display:inline-block;">';
     html += '<span style="font-size:18px;font-weight:800;color:#b45309;">' + s.sameDayCancels + '</span>';
     html += '<span style="font-size:12px;color:#b45309;margin-left:6px;">same-day cancellations</span>';
+    if (at && at.sameDayCancels != null) html += '<span style="font-size:11px;color:var(--muted);margin-left:8px;">(All time: ' + at.sameDayCancels + ')</span>';
     html += '</div>';
   }
   html += '</div>';
   el.innerHTML = html;
 }
 
-function renderAttendance(s) {
+function renderAttendance(s, at) {
   var el = document.getElementById('attendanceChart');
   var attended = s.totalAttended || 0;
   var noShow = s.totalNoShow || 0;
@@ -3117,7 +3124,12 @@ function renderAttendance(s) {
     var noShowRate = s.noShowRate || 0;
     var noShowColor = noShowRate < 5 ? 'var(--good)' : noShowRate < 15 ? '#f59e0b' : 'var(--bad)';
     html += '<div style="font-size:36px;font-weight:900;color:' + noShowColor + ';">' + noShowRate + '%</div>';
-    html += '<div style="font-size:12px;color:var(--muted);margin-bottom:12px;">No-show rate</div>';
+    html += '<div style="font-size:12px;color:var(--muted);margin-bottom:12px;">No-show rate <span style="font-size:10px;">(Last 28 days)</span></div>';
+    if (at && at.attended != null) {
+      var atTotal = at.attended + at.noShow;
+      var atRate = atTotal > 0 ? (at.noShow / atTotal * 100).toFixed(1) : '0';
+      html += '<div style="font-size:11px;color:var(--muted);margin-bottom:8px;">All time: ' + atRate + '% (' + at.attended + ' attended, ' + at.noShow + ' no-show)</div>';
+    }
     html += '<div class="h-bar-row"><div class="h-bar-label" style="width:70px;">Attended</div>';
     var pctA = total > 0 ? Math.round(attended / total * 100) : 0;
     html += '<div class="h-bar-track"><div class="h-bar-fill" style="width:' + pctA + '%;background:var(--good);"></div></div>';
@@ -3238,7 +3250,7 @@ function renderUpcomingLoad(load) {
   el.innerHTML = html || '<div class="empty">No working days ahead.</div>';
 }
 
-function renderLocationSplit(split) {
+function renderLocationSplit(split, atSplit) {
   var el = document.getElementById('locationSplitChart');
   if (!split) { el.innerHTML = '<div class="empty">No data.</div>'; return; }
 
@@ -3248,17 +3260,20 @@ function renderLocationSplit(split) {
   var pctP = Math.round(split.potters / total * 100);
   var pctS = 100 - pctP;
 
-  var html = '';
+  var html = '<div style="font-size:11px;color:var(--muted);margin-bottom:8px;">Last 28 days</div>';
   html += '<div class="h-bar-row"><div class="h-bar-label" style="width:60px;">Potter\\'s</div>';
   html += '<div class="h-bar-track"><div class="h-bar-fill" style="width:' + pctP + '%;background:#2563eb;"></div></div>';
   html += '<div class="h-bar-pct">' + split.potters + '</div></div>';
   html += '<div class="h-bar-row"><div class="h-bar-label" style="width:60px;">Spinola</div>';
   html += '<div class="h-bar-track"><div class="h-bar-fill" style="width:' + pctS + '%;background:#8b5cf6;"></div></div>';
   html += '<div class="h-bar-pct">' + split.spinola + '</div></div>';
+  if (atSplit) {
+    html += '<div style="margin-top:10px;font-size:11px;color:var(--muted);">All time: Potter\\'s ' + atSplit.potters + ' &bull; Spinola ' + atSplit.spinola + '</div>';
+  }
   el.innerHTML = html;
 }
 
-function renderTopPatients(patients) {
+function renderTopPatients(patients, atPatients) {
   var el = document.getElementById('topPatientsChart');
   if (!patients || !patients.length) { el.innerHTML = '<div class="empty">No patient data yet.</div>'; return; }
 
@@ -3274,14 +3289,15 @@ function renderTopPatients(patients) {
   el.innerHTML = html;
 }
 
-function renderCancelBreakdown(s) {
+function renderCancelBreakdown(s, at) {
   var el = document.getElementById('cancelBreakdownChart');
   var cb = s.cancelBreakdown;
   var total = cb.byDoctor + cb.byPatient;
 
   var html = '<div style="margin-bottom:12px;">';
   html += '<div style="font-size:36px;font-weight:900;color:' + (s.cancelRate < 10 ? 'var(--good)' : s.cancelRate < 20 ? '#f59e0b' : 'var(--bad)') + ';">' + s.cancelRate + '%</div>';
-  html += '<div style="font-size:12px;color:var(--muted);">Overall cancel rate</div>';
+  html += '<div style="font-size:12px;color:var(--muted);">Overall cancel rate <span style="font-size:10px;">(Last 28 days)</span></div>';
+  if (at && at.cancelRate != null) html += '<div style="font-size:11px;color:var(--muted);margin-top:2px;">All time: ' + at.cancelRate + '%</div>';
   html += '</div>';
 
   if (total > 0) {
@@ -3297,31 +3313,35 @@ function renderCancelBreakdown(s) {
     html += '<div class="empty">No cancellations!</div>';
   }
   html += '<div style="margin-top:10px;font-size:12px;color:var(--muted);">Total cancelled: ' + s.totalCancelled + ' of ' + (s.totalBooked + s.totalCancelled) + '</div>';
+  if (at && at.cancelBreakdown) html += '<div style="font-size:11px;color:var(--muted);">All time: Doctor ' + at.cancelBreakdown.byDoctor + ' &bull; Patient ' + at.cancelBreakdown.byPatient + '</div>';
   el.innerHTML = html;
 }
 
-function renderBusiestDay(day) {
+function renderBusiestDay(day, atDay) {
   var el = document.getElementById('busiestDayChart');
   if (!day || !day.dateKey) { el.innerHTML = '<div class="empty">No data yet.</div>'; return; }
 
-  el.innerHTML = '<div style="text-align:center;padding:12px 0;">'
+  var html = '<div style="text-align:center;padding:12px 0;">'
     + '<div style="font-size:42px;font-weight:900;color:#2563eb;">' + day.count + '</div>'
     + '<div style="font-size:14px;font-weight:700;margin-top:4px;">' + day.dayName + ', ' + day.dateKey + '</div>'
-    + '<div style="font-size:12px;color:var(--muted);margin-top:2px;">Most appointments in a single day</div>'
-    + '</div>';
+    + '<div style="font-size:12px;color:var(--muted);margin-top:2px;">Most appointments in a single day <span style="font-size:10px;">(Last 28 days)</span></div>';
+  if (atDay && atDay.dateKey) html += '<div style="font-size:11px;color:var(--muted);margin-top:6px;">All time: ' + atDay.count + ' on ' + atDay.dayName + ', ' + atDay.dateKey + '</div>';
+  html += '</div>';
+  el.innerHTML = html;
 }
 
-function renderDoctorActions(s) {
+function renderDoctorActions(s, at) {
   var el = document.getElementById('doctorActionsChart');
   var cb = s.cancelBreakdown || {};
-  var html = '';
+  var atCb = (at && at.cancelBreakdown) || {};
+  var html = '<div style="font-size:11px;color:var(--muted);margin-bottom:8px;">Last 28 days' + (at ? ' (All time in parentheses)' : '') + '</div>';
 
   var items = [
-    { label: 'Cancelled by doctor', count: cb.byDoctor || 0, color: '#f59e0b' },
-    { label: 'Cancelled by patient', count: cb.byPatient || 0, color: '#ef4444' },
-    { label: 'Redirected to Spinola', count: s.relocatedSpinola || 0, color: '#8b5cf6' },
-    { label: 'Pushed to next day', count: s.pushedNextDay || 0, color: '#2563eb' },
-    { label: 'Pushed to next time', count: s.pushedSameDay || 0, color: '#06b6d4' }
+    { label: 'Cancelled by doctor', count: cb.byDoctor || 0, atCount: atCb.byDoctor || 0, color: '#f59e0b' },
+    { label: 'Cancelled by patient', count: cb.byPatient || 0, atCount: atCb.byPatient || 0, color: '#ef4444' },
+    { label: 'Redirected to Spinola', count: s.relocatedSpinola || 0, atCount: (at && at.relocatedSpinola) || 0, color: '#8b5cf6' },
+    { label: 'Pushed to next day', count: s.pushedNextDay || 0, atCount: 0, color: '#2563eb' },
+    { label: 'Pushed to next time', count: s.pushedSameDay || 0, atCount: 0, color: '#06b6d4' }
   ];
 
   var maxCount = 1;
@@ -3335,7 +3355,7 @@ function renderDoctorActions(s) {
     html += '<div class="h-bar-row">';
     html += '<div class="h-bar-label" style="width:140px;font-size:12px;">' + it.label + '</div>';
     html += '<div class="h-bar-track"><div class="h-bar-fill" style="width:' + pct + '%;background:' + it.color + ';"></div></div>';
-    html += '<div class="h-bar-pct">' + it.count + '</div>';
+    html += '<div class="h-bar-pct">' + it.count + (at && it.atCount ? ' <span style="font-size:10px;color:var(--muted);">(' + it.atCount + ')</span>' : '') + '</div>';
     html += '</div>';
   }
 
@@ -3343,12 +3363,12 @@ function renderDoctorActions(s) {
   el.innerHTML = html;
 }
 
-function renderSourceBreakdown(sources) {
+function renderSourceBreakdown(sources, atSources) {
   var el = document.getElementById('sourceChart');
   if (!sources || !sources.length) { el.innerHTML = '<div class="empty">No source data yet. Add ?loc=name to tablet URLs to start tracking.</div>'; return; }
   var maxCount = sources[0].count || 1;
   var colors = ['#2563eb','#10b981','#f59e0b','#8b5cf6','#ef4444','#06b6d4','#ec4899'];
-  var html = '';
+  var html = '<div style="font-size:11px;color:var(--muted);margin-bottom:8px;">Last 28 days</div>';
   for (var i = 0; i < sources.length; i++) {
     var s = sources[i];
     var pct = Math.round(s.count / maxCount * 100);
@@ -3359,17 +3379,22 @@ function renderSourceBreakdown(sources) {
     html += '<div class="h-bar-count">' + s.count + '</div>';
     html += '</div>';
   }
+  if (atSources && atSources.length) {
+    html += '<div style="margin-top:10px;font-size:11px;color:var(--muted);">All time: ';
+    html += atSources.map(function(s) { return esc(s.source) + ' ' + s.count; }).join(' &bull; ');
+    html += '</div>';
+  }
   el.innerHTML = html;
 }
 
-function renderCountryBreakdown(countries) {
+function renderCountryBreakdown(countries, atCountries) {
   var el = document.getElementById('countryChart');
   if (!countries || !countries.length) { el.innerHTML = '<div class="empty">No country data yet.</div>'; return; }
 
   var maxCount = countries[0].count || 1;
   var colors = ['#2563eb','#8b5cf6','#06b6d4','#10b981','#f59e0b','#ef4444','#ec4899','#6366f1','#14b8a6','#f97316'];
 
-  var html = '';
+  var html = '<div style="font-size:11px;color:var(--muted);margin-bottom:8px;">Last 28 days</div>';
   for (var i = 0; i < countries.length; i++) {
     var c = countries[i];
     var pct = Math.round(c.count / maxCount * 100);
@@ -3380,10 +3405,15 @@ function renderCountryBreakdown(countries) {
     html += '<div class="h-bar-pct">' + c.count + '</div>';
     html += '</div>';
   }
+  if (atCountries && atCountries.length) {
+    html += '<div style="margin-top:10px;font-size:11px;color:var(--muted);">All time: ';
+    html += atCountries.map(function(c) { return esc(c.country) + ' ' + c.count; }).join(' &bull; ');
+    html += '</div>';
+  }
   el.innerHTML = html;
 }
 
-function renderTopCancellers(cancellers) {
+function renderTopCancellers(cancellers, atCancellers) {
   var el = document.getElementById('topCancellersChart');
   if (!cancellers || !cancellers.length) { el.innerHTML = '<div class="empty">No cancellation data yet.</div>'; return; }
 
@@ -3401,27 +3431,31 @@ function renderTopCancellers(cancellers) {
 
 // ── Spinola Clinic Stats ──
 
-function renderSpinolaStats(sp) {
+function renderSpinolaStats(sp, atSp) {
   if (!sp) return;
   document.getElementById('spHeroBooked').textContent = sp.totalBooked;
+  if (atSp && atSp.totalBooked != null) document.getElementById('spHeroBooked').insertAdjacentHTML('afterend', '<div style="font-size:11px;color:var(--muted);">All time: ' + atSp.totalBooked + '</div>');
   var crEl = document.getElementById('spHeroCancelRate');
   crEl.textContent = sp.cancelRate + '%';
   crEl.style.color = sp.cancelRate < 10 ? 'var(--good)' : sp.cancelRate < 20 ? '#f59e0b' : 'var(--bad)';
+  if (atSp && atSp.cancelRate != null) crEl.insertAdjacentHTML('afterend', '<div style="font-size:11px;color:var(--muted);">All time: ' + atSp.cancelRate + '%</div>');
   var nsEl = document.getElementById('spHeroNoShowRate');
   nsEl.textContent = sp.noShowRate + '%';
   nsEl.style.color = sp.noShowRate < 5 ? 'var(--good)' : sp.noShowRate < 15 ? '#f59e0b' : 'var(--bad)';
+  if (atSp && atSp.noShowRate != null) nsEl.insertAdjacentHTML('afterend', '<div style="font-size:11px;color:var(--muted);">All time: ' + atSp.noShowRate + '%</div>');
   document.getElementById('spHeroPatients').textContent = sp.uniquePatients;
+  if (atSp && atSp.uniquePatients != null) document.getElementById('spHeroPatients').insertAdjacentHTML('afterend', '<div style="font-size:11px;color:var(--muted);">All time: ' + atSp.uniquePatients + '</div>');
 
-  renderSpDirectSplit(sp);
+  renderSpDirectSplit(sp, atSp);
   renderSpWeeklyTrend(sp.weeklyTrend);
   renderSpPeakHours(sp.peakHours);
   renderSpTopPatients(sp.topPatients);
-  renderSpCancelBreakdown(sp);
+  renderSpCancelBreakdown(sp, atSp);
   renderSpTopCancellers(sp.topCancellers);
-  renderSpCountryBreakdown(sp.countryBreakdown);
+  renderSpCountryBreakdown(sp.countryBreakdown, atSp ? atSp.countryBreakdown : null);
 }
 
-function renderSpDirectSplit(sp) {
+function renderSpDirectSplit(sp, atSp) {
   var el = document.getElementById('spDirectSplitChart');
   var direct = sp.directBookings || 0;
   var redir = sp.relocatedBookings || 0;
@@ -3430,7 +3464,7 @@ function renderSpDirectSplit(sp) {
 
   var pctD = Math.round(direct / total * 100);
   var pctR = 100 - pctD;
-  var html = '';
+  var html = '<div style="font-size:11px;color:var(--muted);margin-bottom:8px;">Last 28 days</div>';
   html += '<div class="h-bar-row"><div class="h-bar-label" style="width:80px;">Direct</div>';
   html += '<div class="h-bar-track"><div class="h-bar-fill" style="width:' + pctD + '%;background:#8b5cf6;"></div></div>';
   html += '<div class="h-bar-pct">' + direct + '</div></div>';
@@ -3438,6 +3472,9 @@ function renderSpDirectSplit(sp) {
   html += '<div class="h-bar-track"><div class="h-bar-fill" style="width:' + pctR + '%;background:#2563eb;"></div></div>';
   html += '<div class="h-bar-pct">' + redir + '</div></div>';
   html += '<div style="margin-top:8px;font-size:11px;color:var(--muted);">Direct = booked via system &bull; Redirected = moved from Potter\\'s</div>';
+  if (atSp) {
+    html += '<div style="margin-top:6px;font-size:11px;color:var(--muted);">All time: Direct ' + (atSp.directBookings || 0) + ' &bull; Redirected ' + (atSp.relocatedBookings || 0) + '</div>';
+  }
   el.innerHTML = html;
 }
 
@@ -3509,14 +3546,16 @@ function renderSpTopPatients(patients) {
   el.innerHTML = html;
 }
 
-function renderSpCancelBreakdown(sp) {
+function renderSpCancelBreakdown(sp, atSp) {
   var el = document.getElementById('spCancelChart');
   if (!el) return;
   var cb = sp.cancelBreakdown || { byDoctor: 0, byPatient: 0 };
   var total = cb.byDoctor + cb.byPatient;
   var html = '<div style="margin-bottom:12px;">';
   html += '<div style="font-size:36px;font-weight:900;color:' + (sp.cancelRate < 10 ? 'var(--good)' : sp.cancelRate < 20 ? '#f59e0b' : 'var(--bad)') + ';">' + sp.cancelRate + '%</div>';
-  html += '<div style="font-size:12px;color:var(--muted);">Cancel rate</div></div>';
+  html += '<div style="font-size:12px;color:var(--muted);">Cancel rate <span style="font-size:10px;">(Last 28 days)</span></div>';
+  if (atSp && atSp.cancelRate != null) html += '<div style="font-size:11px;color:var(--muted);">All time: ' + atSp.cancelRate + '%</div>';
+  html += '</div>';
   if (total > 0) {
     var pctD = Math.round(cb.byDoctor / total * 100);
     var pctP = 100 - pctD;
@@ -3527,6 +3566,7 @@ function renderSpCancelBreakdown(sp) {
     html += '<div class="h-bar-track"><div class="h-bar-fill" style="width:' + pctP + '%;background:#ef4444;"></div></div>';
     html += '<div class="h-bar-pct">' + cb.byPatient + '</div></div>';
   } else { html += '<div class="empty">No cancellations yet.</div>'; }
+  if (atSp && atSp.cancelBreakdown) html += '<div style="margin-top:8px;font-size:11px;color:var(--muted);">All time: Doctor ' + atSp.cancelBreakdown.byDoctor + ' &bull; Patient ' + atSp.cancelBreakdown.byPatient + '</div>';
   el.innerHTML = html;
 }
 
@@ -3545,14 +3585,14 @@ function renderSpTopCancellers(cancellers) {
   el.innerHTML = html;
 }
 
-function renderSpCountryBreakdown(countries) {
+function renderSpCountryBreakdown(countries, atCountries) {
   var el = document.getElementById('spCountryChart');
   if (!countries || !countries.length) { el.innerHTML = '<div class="empty">No country data yet.</div>'; return; }
 
   var maxCount = countries[0].count || 1;
   var colors = ['#8b5cf6','#a78bfa','#c4b5fd','#7c3aed','#6d28d9','#5b21b6','#4c1d95','#ddd6fe','#ede9fe','#f5f3ff'];
 
-  var html = '';
+  var html = '<div style="font-size:11px;color:var(--muted);margin-bottom:8px;">Last 28 days</div>';
   for (var i = 0; i < countries.length; i++) {
     var c = countries[i];
     var pct = Math.round(c.count / maxCount * 100);
@@ -3561,6 +3601,11 @@ function renderSpCountryBreakdown(countries) {
     html += '<div class="h-bar-label" style="width:90px;font-size:12px;">' + esc(c.country) + '</div>';
     html += '<div class="h-bar-track"><div class="h-bar-fill" style="width:' + pct + '%;background:' + color + ';"></div></div>';
     html += '<div class="h-bar-pct">' + c.count + '</div>';
+    html += '</div>';
+  }
+  if (atCountries && atCountries.length) {
+    html += '<div style="margin-top:8px;font-size:11px;color:var(--muted);">All time: ';
+    html += atCountries.map(function(c) { return esc(c.country) + ' ' + c.count; }).join(' &bull; ');
     html += '</div>';
   }
   el.innerHTML = html;

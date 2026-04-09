@@ -192,6 +192,13 @@ export async function getAppointmentsByDateRange(db: D1Database, fromDate: strin
   return result.results;
 }
 
+export async function getAllAppointments(db: D1Database): Promise<Appointment[]> {
+  const result = await db.prepare(
+    'SELECT * FROM appointments ORDER BY date_key, start_time'
+  ).all<Appointment>();
+  return result.results;
+}
+
 export async function getPatientHistory(db: D1Database, email: string, phone: string, limit = 100): Promise<Appointment[]> {
   const result = await db.prepare(`
     SELECT * FROM appointments
