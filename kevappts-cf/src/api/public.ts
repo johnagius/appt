@@ -435,10 +435,18 @@ function buildDateOptions(
         disabled = true;
         reason = 'Closed';
       } else if (dk === todayKey) {
-        const lastEnd = Math.max(...slots.map(s => parseTimeToMinutes(s.end)));
+        const lastEnd = Math.max(...availableSlots.map(s => parseTimeToMinutes(s.end)));
         if (nowMin >= lastEnd) {
-          disabled = true;
-          reason = 'No slots remaining today';
+          // All available Potter's slots are in the past — check Spinola
+          const spinolaSlots = buildSlotsForDate(d, cfg.apptDurationMin, null, cfg.spinolaHours);
+          const spinolaHasRemaining = spinolaSlots.some(s => parseTimeToMinutes(s.end) > nowMin);
+          if (spinolaHasRemaining) {
+            spinolaOnly = true;
+            reason = 'Dr Kevin not available (Spinola Clinic open)';
+          } else {
+            disabled = true;
+            reason = 'No slots remaining today';
+          }
         }
       } else {
         const remaining = slots.filter(s => !slotBlockedByDoctorOff(offEntry, s.start, s.end)).length;
