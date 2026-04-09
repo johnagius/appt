@@ -664,9 +664,9 @@ export async function apiAdminGetReviewPatients(req: Request, env: Env): Promise
       reviewSent,
       bookingSource: (a as any).booking_source || '',
     };
-    if (a.clinic === 'spinola' || a.location.toLowerCase().includes('spinola') || a.status === 'RELOCATED_SPINOLA') {
+    if (a.clinic === 'spinola') {
       spinola.push(item);
-    } else {
+    } else if (a.status !== 'RELOCATED_SPINOLA') {
       potters.push(item);
     }
   }
