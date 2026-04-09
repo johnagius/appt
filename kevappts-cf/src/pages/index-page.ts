@@ -2349,8 +2349,6 @@ export function indexPage(env: Env, bookingSource?: string): string {
 
     function clearForm(){
       state.selectedSlot = null;
-      state.selectedServiceId = '';
-      state.selectedServiceName = '';
       els.fullName.value = '';
       els.email.value = '';
       els.phone.value = '';
@@ -2571,47 +2569,6 @@ export function indexPage(env: Env, bookingSource?: string): string {
 
       // Refresh slots when switching service (optional; safe)
       if (state.selectedDateKey) loadAvailability(true, false);
-    }
-
-    function refreshDateOptions() {
-      fetch('/api/dates')
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-          if (!data || !data.dateOptions) return;
-          var prevSelected = state.selectedDateKey;
-          state.dateOptions = data.dateOptions;
-
-          // Update existing options instead of rebuilding
-          var currentOptions = els.dateSelect.querySelectorAll('option');
-          if (currentOptions.length === state.dateOptions.length) {
-            // Same count — just update disabled/text
-            state.dateOptions.forEach(function(opt, i) {
-              if (currentOptions[i]) {
-                currentOptions[i].disabled = !!opt.disabled;
-                currentOptions[i].textContent = localDate(opt.dateKey) + (opt.spinolaOnly ? ' — Spinola Clinic' : '') + (opt.disabled ? ' — ' + opt.reason : '');
-              }
-            });
-          } else {
-            // Different count — rebuild
-            els.dateSelect.innerHTML = '';
-            state.dateOptions.forEach(function(opt) {
-              var o = document.createElement('option');
-              o.value = opt.dateKey;
-              o.textContent = localDate(opt.dateKey) + (opt.spinolaOnly ? ' — Spinola Clinic' : '') + (opt.disabled ? ' — ' + opt.reason : '');
-              o.disabled = !!opt.disabled;
-              els.dateSelect.appendChild(o);
-            });
-          }
-
-          // Ensure selection is preserved
-          if (prevSelected) {
-            els.dateSelect.value = prevSelected;
-          }
-          if (!els.dateSelect.value && state.selectedDateKey) {
-            els.dateSelect.value = state.selectedDateKey;
-          }
-        })
-        .catch(function() {});
     }
 
     function renderDates() {
@@ -3549,17 +3506,17 @@ export function indexPage(env: Env, bookingSource?: string): string {
     function refreshDateOptions() {
       fetch('/api/dates')
         .then(function(r) { return r.json(); })
-        .then(function(dateOptions) {
-          if (!dateOptions) return;
+        .then(function(data) {
+          if (!data || !data.dateOptions) return;
           var prevSelected = state.selectedDateKey;
-          state.dateOptions = dateOptions;
+          state.dateOptions = data.dateOptions;
           renderDates();
           if (prevSelected) {
             var still = state.dateOptions.find(function(o) { return o.dateKey === prevSelected && !o.disabled; });
             if (still) {
               els.dateSelect.value = prevSelected;
               state.selectedDateKey = prevSelected;
-              state.selectedDateLabel = still.label;
+              state.selectedDateLabel = localDate(still.dateKey);
             }
           }
           if (state.selectedDateKey) loadAvailability(true, false);
