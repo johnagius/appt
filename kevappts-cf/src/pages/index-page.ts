@@ -2775,7 +2775,10 @@ export function indexPage(env: Env, bookingSource?: string): string {
     };
 
     function hasNonAsciiEmail(email) {
-      return /[^\x00-\x7F]/.test(email);
+      for (var i = 0; i < email.length; i++) {
+        if (email.charCodeAt(i) > 127) return true;
+      }
+      return false;
     }
 
     function isValidEmail(email) {
@@ -3524,7 +3527,7 @@ export function indexPage(env: Env, bookingSource?: string): string {
       // Warn if email contains non-ASCII characters (e.g. ż, ħ, ü, ö, ß, ñ)
       var email = els.email.value.trim();
       if (hasNonAsciiEmail(email)) {
-        var badChars = email.match(/[^\x00-\x7F]/g);
+        var badChars = email.split('').filter(function(c) { return c.charCodeAt(0) > 127; });
         var unique = badChars.filter(function(c, i) { return badChars.indexOf(c) === i; });
         var charList = unique.map(function(c) { return '<b style="font-size:20px;color:var(--bad);">' + escHtml(c) + '</b>'; }).join('  ');
         els.emailWarnText.innerHTML = 'Your email <b style="font-size:17px;word-break:break-all;">' + escHtml(email) + '</b> contains unusual characters: ' + charList + '<br><br>Most email providers don\'t support these characters. <b>Did you type it correctly?</b>';
