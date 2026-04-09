@@ -3530,7 +3530,7 @@ export function indexPage(env: Env, bookingSource?: string): string {
         var badChars = email.split('').filter(function(c) { return c.charCodeAt(0) > 127; });
         var unique = badChars.filter(function(c, i) { return badChars.indexOf(c) === i; });
         var charList = unique.map(function(c) { return '<b style="font-size:20px;color:var(--bad);">' + escHtml(c) + '</b>'; }).join('  ');
-        els.emailWarnText.innerHTML = 'Your email <b style="font-size:17px;word-break:break-all;">' + escHtml(email) + '</b> contains unusual characters: ' + charList + '<br><br>Most email providers don\'t support these characters. <b>Did you type it correctly?</b>';
+        els.emailWarnText.innerHTML = 'Your email <b style="font-size:17px;word-break:break-all;">' + escHtml(email) + '</b> contains unusual characters: ' + charList + '<br><br>Most email providers do not support these characters. <b>Did you type it correctly?</b>';
         showOverlay(els.emailWarnOverlay);
         return;
       }
