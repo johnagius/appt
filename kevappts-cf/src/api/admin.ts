@@ -841,6 +841,8 @@ export async function apiAdminGetStatistics(req: Request, env: Env): Promise<Res
     let _leadTimeSum = 0, _leadTimeCount = 0;
 
     for (const a of appts) {
+      // Skip relocated originals (phantom records) — the spinola copy is the real appointment
+      if (a.status === 'RELOCATED_SPINOLA' && a.clinic !== 'spinola') continue;
       _total++;
       if (a.status.includes('CANCELLED')) {
         _cancelled++;
