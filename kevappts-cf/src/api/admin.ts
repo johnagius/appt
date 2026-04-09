@@ -1064,7 +1064,7 @@ export async function apiAdminGetStatistics(req: Request, env: Env): Promise<Res
           noShowRate: spinolaCount > 0 ? (spinolaNoShow / spinolaCount * 100).toFixed(1) : '0',
           uniquePatients: spinolaUniqueEmails.size,
           directBookings: spinolaDirect,
-          relocatedSpinola: spinolaRedirected,
+          relocatedBookings: spinolaRedirected,
           cancelBreakdown: { byDoctor: sCancelledDoctor, byPatient: sCancelledClient },
           topCancellers: sTopCancellers,
           weeklyTrend: sWeekly,
