@@ -3058,6 +3058,7 @@ function loadStatistics(period) {
     .then(function(res) {
       if (!res || !res.ok) { showMsg('statsMsg', 'bad', res.reason || 'Failed.'); return; }
       showMsg('statsMsg', '', '');
+      res = transformResponse('apiAdminGetStatistics', res);
       _statsCache[period] = res;
       renderAllStats(res);
     })
