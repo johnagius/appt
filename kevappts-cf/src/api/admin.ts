@@ -805,13 +805,32 @@ export async function apiAdminGetStatistics(req: Request, env: Env): Promise<Res
   const cfg = await getConfig(env.DB);
   const today = todayLocal(tz);
   const todayKey = toDateKey(today);
-  const past28 = toDateKey(addDays(today, -28));
+  const url = new URL(req.url);
+  const period = url.searchParams.get('period') || '28';
+
+  // Determine date range based on period
+  let periodFrom: string;
+  let periodLabel: string;
+  if (period === 'week') {
+    // This week (Monday to Sunday)
+    const dayOfWeek = today.getDay(); // 0=Sun, 1=Mon...
+    const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+    periodFrom = toDateKey(addDays(today, mondayOffset));
+    periodLabel = 'This Week';
+  } else if (period === 'all') {
+    periodFrom = '2000-01-01';
+    periodLabel = 'All Time';
+  } else {
+    periodFrom = toDateKey(addDays(today, -28));
+    periodLabel = 'Last 28 Days';
+  }
+
   const future7 = toDateKey(addDays(today, 7));
 
-  const [allAppts, everyAppt] = await Promise.all([
-    getAppointmentsByDateRange(env.DB, past28, future7),
-    getAllAppointments(env.DB),
-  ]);
+  // For week/28: fetch range. For all: fetch everything.
+  const periodAppts = period === 'all'
+    ? await getAllAppointments(env.DB)
+    : await getAppointmentsByDateRange(env.DB, periodFrom, future7);
 
   // Helper: compute core stats from any appointment array
   function computeCoreStats(appts: any[]) {
@@ -956,179 +975,111 @@ export async function apiAdminGetStatistics(req: Request, env: Env): Promise<Res
     '1':'US/Canada','61':'Australia','81':'Japan','86':'China','91':'India','7':'Russia',
   };
 
-  // Compute all-time stats
-  const allTimeStats = computeCoreStats(everyAppt);
+  // Compute core stats for the requested period
+  const periodStats = computeCoreStats(periodAppts);
 
-  let total = 0, cancelled = 0, cancelledClient = 0, cancelledDoctor = 0;
-  let attended = 0, noShow = 0, pottersCount = 0, spinolaCount = 0;
-  const byDay: Record<string, number> = {};
-  const byHour: Record<number, number> = {};
-  const patientCounts: Record<string, number> = {};
-  const cancellerCounts: Record<string, number> = {};
-  let leadTimeSum = 0, leadTimeCount = 0;
+  // Time-bounded stats: only for 28-day period
+  let weeklyTrend: any[] | null = null;
+  let hourlyDistribution: number[] | null = null;
+  let utilization: number | null = null;
+  let upcomingLoad: any[] | null = null;
+  let trendDirection = '';
+  let trendPct = 0;
+  let byDay: Record<string, number> | null = null;
+  let sWeekly: any[] | null = null;
+  let sHourly: number[] | null = null;
 
-  for (const a of allAppts) {
-    total++;
-    if (a.status.includes('CANCELLED')) {
-      cancelled++;
-      if (a.status === 'CANCELLED_CLIENT') cancelledClient++;
-      if (a.status === 'CANCELLED_DOCTOR') cancelledDoctor++;
-      const key = a.full_name + '|' + a.email;
-      cancellerCounts[key] = (cancellerCounts[key] || 0) + 1;
-    }
-    if (a.status === 'ATTENDED') attended++;
-    if (a.status === 'NO_SHOW') noShow++;
-    if (a.clinic === 'spinola') spinolaCount++; else pottersCount++;
-
-    // Day of week distribution
-    try {
-      const d = parseDateKey(a.date_key);
-      const dow = dayOfWeekKey(d);
-      byDay[dow] = (byDay[dow] || 0) + 1;
-    } catch {}
-
+  if (period === '28') {
     // Hourly distribution
-    try {
-      const hour = parseTimeToMinutes(a.start_time) / 60 | 0;
-      byHour[hour] = (byHour[hour] || 0) + 1;
-    } catch {}
+    const byHour: Record<number, number> = {};
+    const _byDay: Record<string, number> = {};
+    for (const a of periodAppts) {
+      try { const hour = parseTimeToMinutes(a.start_time) / 60 | 0; byHour[hour] = (byHour[hour] || 0) + 1; } catch {}
+      try { const d = parseDateKey(a.date_key); const dow = dayOfWeekKey(d); _byDay[dow] = (_byDay[dow] || 0) + 1; } catch {}
+    }
+    hourlyDistribution = [];
+    for (let h = 7; h <= 20; h++) hourlyDistribution.push(byHour[h] || 0);
+    byDay = _byDay;
 
-    // Patient repeat counts
-    if (!a.status.includes('CANCELLED')) {
-      const key = a.full_name + '|' + a.email;
-      patientCounts[key] = (patientCounts[key] || 0) + 1;
+    // Weekly trend
+    weeklyTrend = [];
+    for (let w = 3; w >= 0; w--) {
+      const wStart = toDateKey(addDays(today, -w * 7 - 6));
+      const wEnd = toDateKey(addDays(today, -w * 7));
+      const wa = periodAppts.filter(a => a.date_key >= wStart && a.date_key <= wEnd);
+      weeklyTrend.push({ label: wStart.slice(5), booked: wa.filter(a => !a.status.includes('CANCELLED')).length, cancelled: wa.filter(a => a.status.includes('CANCELLED')).length });
+    }
+    const thisWeekBooked = weeklyTrend.length >= 1 ? weeklyTrend[weeklyTrend.length - 1].booked : 0;
+    const lastWeekBooked = weeklyTrend.length >= 2 ? weeklyTrend[weeklyTrend.length - 2].booked : 0;
+    trendDirection = thisWeekBooked > lastWeekBooked ? 'up' : thisWeekBooked < lastWeekBooked ? 'down' : '';
+    trendPct = lastWeekBooked > 0 ? Math.round(Math.abs(thisWeekBooked - lastWeekBooked) / lastWeekBooked * 100) : 0;
+
+    // Utilization
+    const offRows = await getDoctorOffRows(env.DB);
+    const extraRows = await getDoctorExtraRows(env.DB);
+    const extraMap = buildExtraMap(extraRows);
+    let totalSlots = 0, bookedSlots = 0;
+    for (let d = -28; d <= 0; d++) {
+      const dt = addDays(today, d);
+      const dk = toDateKey(dt);
+      const slots = buildSlotsForDate(dt, cfg.apptDurationMin, extraMap[dk] || null, cfg.workingHours);
+      totalSlots += slots.length;
+      bookedSlots += periodAppts.filter(a => a.date_key === dk && !a.status.includes('CANCELLED')).length;
+    }
+    utilization = totalSlots > 0 ? Math.round(bookedSlots / totalSlots * 100) : 0;
+
+    // Upcoming load
+    upcomingLoad = [];
+    for (let d = 0; d < 7; d++) {
+      const dt = addDays(today, d);
+      const dk = toDateKey(dt);
+      const dow = dayOfWeekKey(dt);
+      const slots = buildSlotsForDate(dt, cfg.apptDurationMin, extraMap[dk] || null, cfg.workingHours);
+      const dayAppts = periodAppts.filter(a => a.date_key === dk && !a.status.includes('CANCELLED'));
+      upcomingLoad.push({ dateKey: dk, dayLabel: dow, booked: dayAppts.length, capacity: slots.length });
     }
 
-    // Lead time
-    try {
-      const created = new Date(a.created_at.replace(' ', 'T'));
-      const apptDate = parseDateKey(a.date_key);
-      const diff = (apptDate.getTime() - created.getTime()) / 86400000;
-      if (diff >= 0) { leadTimeSum += diff; leadTimeCount++; }
-    } catch {}
-  }
-
-  const topPatients = Object.entries(patientCounts)
-    .sort((a, b) => b[1] - a[1]).slice(0, 10)
-    .map(([key, count]) => ({ name: key.split('|')[0], email: key.split('|')[1], count }));
-
-  const topCancellers = Object.entries(cancellerCounts)
-    .sort((a, b) => b[1] - a[1]).slice(0, 10)
-    .map(([key, count]) => ({ name: key.split('|')[0], email: key.split('|')[1], count }));
-
-  // Unique patients
-  const uniqueEmails = new Set(allAppts.filter(a => !a.status.includes('CANCELLED')).map(a => a.email));
-  const totalUniquePatients = uniqueEmails.size;
-  const repeatPatients = Object.values(patientCounts).filter(c => c > 1).length;
-
-  // Weekly trend (last 4 weeks)
-  const weeklyTrend: { label: string; booked: number; cancelled: number }[] = [];
-  for (let w = 3; w >= 0; w--) {
-    const wStart = toDateKey(addDays(today, -w * 7 - 6));
-    const wEnd = toDateKey(addDays(today, -w * 7));
-    const weekAppts = allAppts.filter(a => a.date_key >= wStart && a.date_key <= wEnd);
-    const booked = weekAppts.filter(a => !a.status.includes('CANCELLED')).length;
-    const wCancelled = weekAppts.filter(a => a.status.includes('CANCELLED')).length;
-    weeklyTrend.push({ label: wStart.slice(5), booked, cancelled: wCancelled });
-  }
-
-  // Trend direction
-  const thisWeekBooked = weeklyTrend.length >= 1 ? weeklyTrend[weeklyTrend.length - 1].booked : 0;
-  const lastWeekBooked = weeklyTrend.length >= 2 ? weeklyTrend[weeklyTrend.length - 2].booked : 0;
-  const trendDirection = thisWeekBooked > lastWeekBooked ? 'up' : thisWeekBooked < lastWeekBooked ? 'down' : '';
-  const trendPct = lastWeekBooked > 0 ? Math.round(Math.abs(thisWeekBooked - lastWeekBooked) / lastWeekBooked * 100) : 0;
-
-  // Hourly distribution as array (7am-8pm)
-  const hourlyDistribution: number[] = [];
-  for (let h = 7; h <= 20; h++) hourlyDistribution.push(byHour[h] || 0);
-
-  // Utilization: booked slots / total available slots
-  const offRows = await getDoctorOffRows(env.DB);
-  const extraRows = await getDoctorExtraRows(env.DB);
-  const extraMap = buildExtraMap(extraRows);
-  let totalSlots = 0;
-  let bookedSlots = 0;
-  for (let d = -28; d <= 0; d++) {
-    const dt = addDays(today, d);
-    const dk = toDateKey(dt);
-    const slots = buildSlotsForDate(dt, cfg.apptDurationMin, extraMap[dk] || null, cfg.workingHours);
-    totalSlots += slots.length;
-    const dayAppts = allAppts.filter(a => a.date_key === dk && !a.status.includes('CANCELLED'));
-    bookedSlots += dayAppts.length;
-  }
-  const utilization = totalSlots > 0 ? Math.round(bookedSlots / totalSlots * 100) : 0;
-
-  // Upcoming 7-day load
-  const upcomingLoad: { dateKey: string; dayLabel: string; booked: number; capacity: number }[] = [];
-  for (let d = 0; d < 7; d++) {
-    const dt = addDays(today, d);
-    const dk = toDateKey(dt);
-    const dow = dayOfWeekKey(dt);
-    const slots = buildSlotsForDate(dt, cfg.apptDurationMin, extraMap[dk] || null, cfg.workingHours);
-    const dayAppts = allAppts.filter(a => a.date_key === dk && !a.status.includes('CANCELLED'));
-    upcomingLoad.push({ dateKey: dk, dayLabel: dow, booked: dayAppts.length, capacity: slots.length });
-  }
-
-  // Busiest day
-  const dayApptCounts: Record<string, number> = {};
-  for (const a of allAppts) {
-    if (!a.status.includes('CANCELLED')) dayApptCounts[a.date_key] = (dayApptCounts[a.date_key] || 0) + 1;
-  }
-  let busiestDay: { dateKey: string; dayName: string; count: number } | null = null;
-  for (const [dk, count] of Object.entries(dayApptCounts)) {
-    if (!busiestDay || count > busiestDay.count) {
-      try { busiestDay = { dateKey: dk, dayName: dayOfWeekKey(parseDateKey(dk)), count }; } catch {}
+    // Spinola weekly + hourly
+    const spAppts = periodAppts.filter(a => a.clinic === 'spinola');
+    sWeekly = [];
+    for (let w = 3; w >= 0; w--) {
+      const ws = toDateKey(addDays(today, -w * 7 - 6));
+      const we = toDateKey(addDays(today, -w * 7));
+      const wa = spAppts.filter(a => a.date_key >= ws && a.date_key <= we);
+      sWeekly.push({ label: ws.slice(5), booked: wa.filter(a => !a.status.includes('CANCELLED')).length, cancelled: wa.filter(a => a.status.includes('CANCELLED')).length });
     }
-  }
-
-  // Compute 28-day core stats using the helper
-  const recentStats = computeCoreStats(allAppts);
-
-  // Spinola weekly trend + hourly (time-bounded, 28-day only)
-  const spinolaAppts28 = allAppts.filter(a => a.clinic === 'spinola');
-  const sWeekly: { label: string; booked: number; cancelled: number }[] = [];
-  for (let w = 3; w >= 0; w--) {
-    const ws = toDateKey(addDays(today, -w * 7 - 6));
-    const we = toDateKey(addDays(today, -w * 7));
-    const wa = spinolaAppts28.filter(a => a.date_key >= ws && a.date_key <= we);
-    sWeekly.push({ label: ws.slice(5), booked: wa.filter(a => !a.status.includes('CANCELLED')).length, cancelled: wa.filter(a => a.status.includes('CANCELLED')).length });
-  }
-  const sHourly: number[] = [];
-  for (let h = 7; h <= 20; h++) {
-    sHourly.push(spinolaAppts28.filter(a => !a.status.includes('CANCELLED') && (parseTimeToMinutes(a.start_time) / 60 | 0) === h).length);
+    sHourly = [];
+    for (let h = 7; h <= 20; h++) {
+      sHourly.push(spAppts.filter(a => !a.status.includes('CANCELLED') && (parseTimeToMinutes(a.start_time) / 60 | 0) === h).length);
+    }
   }
 
   return json({
     ok: true,
     stats: {
-      ...recentStats,
-      total,
-      cancelled,
-      cancelledClient,
-      cancelledDoctor,
-      cancelRate: total > 0 ? (cancelled / total * 100).toFixed(1) : '0',
-      attended,
-      noShow,
-      pottersCount: recentStats.locationSplit.potters,
-      spinolaCount: recentStats.locationSplit.spinola,
-      byDay,
-      byHour,
-      avgLeadTimeDays: leadTimeCount > 0 ? (leadTimeSum / leadTimeCount).toFixed(1) : '0',
-      totalBooked: total - cancelled,
+      ...periodStats,
+      total: periodStats.total,
+      cancelRate: periodStats.cancelRate,
+      attended: periodStats.attended,
+      noShow: periodStats.noShow,
+      pottersCount: periodStats.locationSplit.potters,
+      spinolaCount: periodStats.locationSplit.spinola,
+      totalBooked: periodStats.totalBooked,
       utilization,
       trendDirection,
       trendPct,
       weeklyTrend,
       hourlyDistribution,
       upcomingLoad,
-      period: { from: past28, to: todayKey },
+      byDay,
+      periodLabel,
+      period: { from: periodFrom, to: todayKey },
       generated: nowIso(tz),
       spinola: {
-        ...recentStats.spinola,
+        ...periodStats.spinola,
         weeklyTrend: sWeekly,
         hourlyDistribution: sHourly,
       },
-      allTime: allTimeStats,
     },
   });
 }

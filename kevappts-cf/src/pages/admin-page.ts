@@ -280,6 +280,11 @@ export function adminPage(sig: string): string {
     .add-block-btn{margin-left:50px;margin-top:4px;border:none;background:none;color:var(--blue);cursor:pointer;font-size:12px;font-weight:600;padding:4px 8px;border-radius:6px;}
     .add-block-btn:hover{background:rgba(37,99,235,0.06);}
 
+    /* Statistics tab - period toggle */
+    .stats-toggle{display:inline-flex;gap:0;border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-right:12px;}
+    .stats-toggle-btn{border:none;background:none;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;color:var(--muted);transition:all 0.15s ease;}
+    .stats-toggle-btn:hover{background:rgba(37,99,235,0.04);}
+    .stats-toggle-btn.active{background:#2563eb;color:#fff;}
     /* Statistics tab */
     .hero-stats{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;}
     .hero-card{background:var(--card);border-radius:14px;border:1px solid var(--line);padding:16px;flex:1;min-width:140px;text-align:center;}
@@ -629,9 +634,14 @@ export function adminPage(sig: string): string {
 
 <!-- STATISTICS TAB -->
 <div class="tab-content" id="tab-statistics" style="display:none;">
-  <div class="stats-refresh">
-    <span class="stats-period" id="statsPeriod">Last 28 days</span>
-    <button class="btn btn-sm btn-ghost" onclick="_statsLoaded=false;loadStatistics()">Refresh</button>
+  <div class="stats-refresh" style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;">
+    <div class="stats-toggle" id="statsPeriodToggle">
+      <button class="stats-toggle-btn" data-period="week">This Week</button>
+      <button class="stats-toggle-btn active" data-period="28">Last 28 Days</button>
+      <button class="stats-toggle-btn" data-period="all">All Time</button>
+    </div>
+    <span class="stats-period" id="statsPeriod" style="font-size:11px;color:var(--muted);"></span>
+    <button class="btn btn-sm btn-ghost" onclick="loadStatistics(_statsPeriod)">Refresh</button>
   </div>
 
   <!-- Hero metrics -->
@@ -663,7 +673,7 @@ export function adminPage(sig: string): string {
 
   <!-- Charts row -->
   <div class="stats-grid">
-    <div class="card">
+    <div class="card" id="weeklyTrendCard">
       <h3>Weekly Trend</h3>
       <div class="bar-chart" id="weeklyTrendChart"></div>
       <div class="legend">
@@ -671,7 +681,7 @@ export function adminPage(sig: string): string {
         <span><span class="legend-dot" style="background:#ef4444;"></span>Cancelled</span>
       </div>
     </div>
-    <div class="card">
+    <div class="card" id="peakHoursCard">
       <h3>Peak Hours</h3>
       <div class="heatmap" id="peakHoursMap"></div>
     </div>
@@ -679,11 +689,11 @@ export function adminPage(sig: string): string {
 
   <!-- Insights row -->
   <div class="stats-grid" style="margin-top:12px;">
-    <div class="card">
+    <div class="card" id="utilByDayCard">
       <h3>Utilization by Day</h3>
       <div id="utilByDay"></div>
     </div>
-    <div class="card">
+    <div class="card" id="upcomingLoadCard">
       <h3>Upcoming 7-Day Load</h3>
       <div id="upcomingLoadChart"></div>
     </div>
@@ -774,7 +784,7 @@ export function adminPage(sig: string): string {
         <h3>Direct vs Redirected</h3>
         <div id="spDirectSplitChart"></div>
       </div>
-      <div class="card">
+      <div class="card" id="spWeeklyTrendCard">
         <h3>Weekly Trend</h3>
         <div class="bar-chart" id="spWeeklyTrendChart"></div>
         <div class="legend">
@@ -785,7 +795,7 @@ export function adminPage(sig: string): string {
     </div>
 
     <div class="stats-grid" style="margin-top:12px;">
-      <div class="card">
+      <div class="card" id="spPeakHoursCard">
         <h3>Peak Hours</h3>
         <div class="heatmap" id="spPeakHoursMap"></div>
       </div>
@@ -1479,7 +1489,7 @@ function loadDashboard() {
       loadNotifyAppts();
 
       // Refresh stats if they were loaded
-      if (_statsLoaded) { _statsLoaded = false; loadStatistics(); }
+      if (Object.keys(_statsCache).length) { _statsCache = {}; loadStatistics(); }
 
 
       // Reset poll timer after manual load
@@ -3035,85 +3045,110 @@ function hidePatientHistory() {
 
 // ========== Statistics Tab ==========
 
-var _statsLoaded = false;
+var _statsCache = {};
+var _statsPeriod = '28';
 
-function loadStatistics() {
-  if (_statsLoaded) return;
+function loadStatistics(period) {
+  period = period || _statsPeriod;
+  _statsPeriod = period;
+  if (_statsCache[period]) { renderAllStats(_statsCache[period]); return; }
   showMsg('statsMsg', '', 'Loading statistics...');
 
-  google.script.run
-    .withSuccessHandler(function(res) {
+  apiCall('stats?period=' + encodeURIComponent(period))
+    .then(function(res) {
       if (!res || !res.ok) { showMsg('statsMsg', 'bad', res.reason || 'Failed.'); return; }
       showMsg('statsMsg', '', '');
-      _statsLoaded = true;
+      _statsCache[period] = res;
       renderAllStats(res);
     })
-    .withFailureHandler(function(err) {
+    .catch(function(err) {
       showMsg('statsMsg', 'bad', 'Error: ' + (err && err.message ? err.message : String(err)));
-    })
-    .apiAdminGetStatistics(SIG);
+    });
 }
 
+// Period toggle click handler
+document.getElementById('statsPeriodToggle').addEventListener('click', function(e) {
+  var btn = e.target.closest('.stats-toggle-btn');
+  if (!btn) return;
+  var period = btn.dataset.period;
+  _statsPeriod = period;
+  document.querySelectorAll('.stats-toggle-btn').forEach(function(b) { b.classList.remove('active'); });
+  btn.classList.add('active');
+  _statsCache = {}; // Clear cache on explicit switch
+  loadStatistics(period);
+});
+
 function renderAllStats(s) {
-  var at = s.allTime || {};
+  var pl = s.periodLabel || 'Last 28 Days';
+  var is28 = (_statsPeriod === '28');
   // Period label
-  document.getElementById('statsPeriod').textContent = s.period.from + ' to ' + s.period.to + ' (generated ' + s.generated + ')';
+  document.getElementById('statsPeriod').textContent = s.period.from + ' to ' + s.period.to;
 
   // Hero metrics
-  renderProgressRing(s.utilization);
-  document.getElementById('heroUtil').textContent = s.utilization + '%';
+  renderProgressRing(s.utilization || 0);
+  document.getElementById('heroUtil').textContent = (s.utilization != null ? s.utilization + '%' : 'N/A');
   document.getElementById('heroBooked').textContent = s.totalBooked;
-  // Trend arrow on appointments
   var trendArrow = '';
   if (s.trendDirection === 'up') trendArrow = '<span class="trend-arrow trend-up">&uarr;' + s.trendPct + '%</span>';
   else if (s.trendDirection === 'down') trendArrow = '<span class="trend-arrow trend-down">&darr;' + s.trendPct + '%</span>';
-  document.getElementById('heroBookedSub').innerHTML = 'Last 28 days ' + trendArrow + (at.totalBooked != null ? '<br><span style="font-size:11px;color:var(--muted);">All time: ' + at.totalBooked + '</span>' : '');
+  document.getElementById('heroBookedSub').innerHTML = pl + ' ' + trendArrow;
   document.getElementById('heroCancelRate').textContent = s.cancelRate + '%';
   var crEl = document.getElementById('heroCancelRate');
   crEl.style.color = s.cancelRate < 10 ? 'var(--good)' : s.cancelRate < 20 ? '#f59e0b' : 'var(--bad)';
-  if (at.cancelRate != null) crEl.insertAdjacentHTML('afterend', '<div id="heroCancelRateAll" style="font-size:11px;color:var(--muted);margin-top:2px;">All time: ' + at.cancelRate + '%</div>');
   document.getElementById('heroPatients').textContent = s.totalUniquePatients;
   document.getElementById('heroRepeat').textContent = s.repeatPatients + ' returning';
-  if (at.totalUniquePatients != null) {
-    document.getElementById('heroPatients').insertAdjacentHTML('afterend', '<div style="font-size:11px;color:var(--muted);margin-top:2px;">All time: ' + at.totalUniquePatients + ' (' + at.repeatPatients + ' returning)</div>');
+
+  // Time-bounded sections: hide when data is null (non-28-day periods)
+  var timeBounded = ['weeklyTrendCard','peakHoursCard','utilByDayCard','upcomingLoadCard'];
+  timeBounded.forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.style.display = is28 ? '' : 'none';
+  });
+
+  if (is28) {
+    renderWeeklyTrend(s.weeklyTrend);
+    renderPeakHours(s.hourlyDistribution);
+    renderUtilByDay(s.utilizationByDay);
+    renderUpcomingLoad(s.upcomingLoad);
   }
 
-  renderWeeklyTrend(s.weeklyTrend);
-  renderPeakHours(s.hourlyDistribution);
-  renderUtilByDay(s.utilizationByDay);
-  renderUpcomingLoad(s.upcomingLoad);
-  renderLocationSplit(s.locationSplit, at.locationSplit);
-  renderTopPatients(s.topPatients, at.topPatients);
-  renderCancelBreakdown(s, at);
-  renderBusiestDay(s.busiestDay, at.busiestDay);
-  renderLeadTime(s, at);
-  renderAttendance(s, at);
-  renderDoctorActions(s, at);
-  renderSourceBreakdown(s.sourceBreakdown, at.sourceBreakdown);
-  renderCountryBreakdown(s.countryBreakdown, at.countryBreakdown);
-  renderTopCancellers(s.topCancellers, at.topCancellers);
-  renderSpinolaStats(s.spinola, at.spinola);
+  renderLocationSplit(s.locationSplit);
+  renderTopPatients(s.topPatients);
+  renderCancelBreakdown(s);
+  renderBusiestDay(s.busiestDay);
+  renderLeadTime(s);
+  renderAttendance(s);
+  renderDoctorActions(s);
+  renderSourceBreakdown(s.sourceBreakdown);
+  renderCountryBreakdown(s.countryBreakdown);
+  renderTopCancellers(s.topCancellers);
+  renderSpinolaStats(s.spinola);
+
+  // Spinola time-bounded
+  var spTimeBounded = ['spWeeklyTrendCard','spPeakHoursCard'];
+  spTimeBounded.forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.style.display = is28 ? '' : 'none';
+  });
 }
 
-function renderLeadTime(s, at) {
+function renderLeadTime(s) {
   var el = document.getElementById('leadTimeChart');
   var html = '<div style="text-align:center;padding:12px 0;">';
   html += '<div style="font-size:42px;font-weight:900;color:#2563eb;">' + (s.avgLeadTimeDays || 0) + '</div>';
-  html += '<div style="font-size:14px;font-weight:700;margin-top:4px;">days average <span style="font-size:11px;color:var(--muted);font-weight:500;">Last 28 days</span></div>';
-  if (at && at.avgLeadTimeDays != null) html += '<div style="font-size:12px;color:var(--muted);margin-top:2px;">All time: ' + at.avgLeadTimeDays + ' days avg</div>';
+  html += '<div style="font-size:14px;font-weight:700;margin-top:4px;">days average</div>';
   html += '<div style="font-size:12px;color:var(--muted);margin-top:2px;">How far ahead patients book</div>';
   if (s.sameDayCancels > 0) {
     html += '<div style="margin-top:12px;padding:8px 12px;background:rgba(245,158,11,0.08);border-radius:10px;display:inline-block;">';
     html += '<span style="font-size:18px;font-weight:800;color:#b45309;">' + s.sameDayCancels + '</span>';
     html += '<span style="font-size:12px;color:#b45309;margin-left:6px;">same-day cancellations</span>';
-    if (at && at.sameDayCancels != null) html += '<span style="font-size:11px;color:var(--muted);margin-left:8px;">(All time: ' + at.sameDayCancels + ')</span>';
     html += '</div>';
   }
   html += '</div>';
   el.innerHTML = html;
 }
 
-function renderAttendance(s, at) {
+function renderAttendance(s) {
   var el = document.getElementById('attendanceChart');
   var attended = s.totalAttended || 0;
   var noShow = s.totalNoShow || 0;
@@ -3124,12 +3159,7 @@ function renderAttendance(s, at) {
     var noShowRate = s.noShowRate || 0;
     var noShowColor = noShowRate < 5 ? 'var(--good)' : noShowRate < 15 ? '#f59e0b' : 'var(--bad)';
     html += '<div style="font-size:36px;font-weight:900;color:' + noShowColor + ';">' + noShowRate + '%</div>';
-    html += '<div style="font-size:12px;color:var(--muted);margin-bottom:12px;">No-show rate <span style="font-size:10px;">(Last 28 days)</span></div>';
-    if (at && at.attended != null) {
-      var atTotal = at.attended + at.noShow;
-      var atRate = atTotal > 0 ? (at.noShow / atTotal * 100).toFixed(1) : '0';
-      html += '<div style="font-size:11px;color:var(--muted);margin-bottom:8px;">All time: ' + atRate + '% (' + at.attended + ' attended, ' + at.noShow + ' no-show)</div>';
-    }
+    html += '<div style="font-size:12px;color:var(--muted);margin-bottom:12px;">No-show rate</div>';
     html += '<div class="h-bar-row"><div class="h-bar-label" style="width:70px;">Attended</div>';
     var pctA = total > 0 ? Math.round(attended / total * 100) : 0;
     html += '<div class="h-bar-track"><div class="h-bar-fill" style="width:' + pctA + '%;background:var(--good);"></div></div>';
@@ -3250,7 +3280,7 @@ function renderUpcomingLoad(load) {
   el.innerHTML = html || '<div class="empty">No working days ahead.</div>';
 }
 
-function renderLocationSplit(split, atSplit) {
+function renderLocationSplit(split) {
   var el = document.getElementById('locationSplitChart');
   if (!split) { el.innerHTML = '<div class="empty">No data.</div>'; return; }
 
@@ -3260,20 +3290,17 @@ function renderLocationSplit(split, atSplit) {
   var pctP = Math.round(split.potters / total * 100);
   var pctS = 100 - pctP;
 
-  var html = '<div style="font-size:11px;color:var(--muted);margin-bottom:8px;">Last 28 days</div>';
+  var html = '';
   html += '<div class="h-bar-row"><div class="h-bar-label" style="width:60px;">Potter\\'s</div>';
   html += '<div class="h-bar-track"><div class="h-bar-fill" style="width:' + pctP + '%;background:#2563eb;"></div></div>';
   html += '<div class="h-bar-pct">' + split.potters + '</div></div>';
   html += '<div class="h-bar-row"><div class="h-bar-label" style="width:60px;">Spinola</div>';
   html += '<div class="h-bar-track"><div class="h-bar-fill" style="width:' + pctS + '%;background:#8b5cf6;"></div></div>';
   html += '<div class="h-bar-pct">' + split.spinola + '</div></div>';
-  if (atSplit) {
-    html += '<div style="margin-top:10px;font-size:11px;color:var(--muted);">All time: Potter\\'s ' + atSplit.potters + ' &bull; Spinola ' + atSplit.spinola + '</div>';
-  }
   el.innerHTML = html;
 }
 
-function renderTopPatients(patients, atPatients) {
+function renderTopPatients(patients) {
   var el = document.getElementById('topPatientsChart');
   if (!patients || !patients.length) { el.innerHTML = '<div class="empty">No patient data yet.</div>'; return; }
 
@@ -3289,15 +3316,14 @@ function renderTopPatients(patients, atPatients) {
   el.innerHTML = html;
 }
 
-function renderCancelBreakdown(s, at) {
+function renderCancelBreakdown(s) {
   var el = document.getElementById('cancelBreakdownChart');
   var cb = s.cancelBreakdown;
   var total = cb.byDoctor + cb.byPatient;
 
   var html = '<div style="margin-bottom:12px;">';
   html += '<div style="font-size:36px;font-weight:900;color:' + (s.cancelRate < 10 ? 'var(--good)' : s.cancelRate < 20 ? '#f59e0b' : 'var(--bad)') + ';">' + s.cancelRate + '%</div>';
-  html += '<div style="font-size:12px;color:var(--muted);">Overall cancel rate <span style="font-size:10px;">(Last 28 days)</span></div>';
-  if (at && at.cancelRate != null) html += '<div style="font-size:11px;color:var(--muted);margin-top:2px;">All time: ' + at.cancelRate + '%</div>';
+  html += '<div style="font-size:12px;color:var(--muted);">Overall cancel rate</div>';
   html += '</div>';
 
   if (total > 0) {
@@ -3313,35 +3339,31 @@ function renderCancelBreakdown(s, at) {
     html += '<div class="empty">No cancellations!</div>';
   }
   html += '<div style="margin-top:10px;font-size:12px;color:var(--muted);">Total cancelled: ' + s.totalCancelled + ' of ' + (s.totalBooked + s.totalCancelled) + '</div>';
-  if (at && at.cancelBreakdown) html += '<div style="font-size:11px;color:var(--muted);">All time: Doctor ' + at.cancelBreakdown.byDoctor + ' &bull; Patient ' + at.cancelBreakdown.byPatient + '</div>';
   el.innerHTML = html;
 }
 
-function renderBusiestDay(day, atDay) {
+function renderBusiestDay(day) {
   var el = document.getElementById('busiestDayChart');
   if (!day || !day.dateKey) { el.innerHTML = '<div class="empty">No data yet.</div>'; return; }
 
-  var html = '<div style="text-align:center;padding:12px 0;">'
+  el.innerHTML = '<div style="text-align:center;padding:12px 0;">'
     + '<div style="font-size:42px;font-weight:900;color:#2563eb;">' + day.count + '</div>'
     + '<div style="font-size:14px;font-weight:700;margin-top:4px;">' + day.dayName + ', ' + day.dateKey + '</div>'
-    + '<div style="font-size:12px;color:var(--muted);margin-top:2px;">Most appointments in a single day <span style="font-size:10px;">(Last 28 days)</span></div>';
-  if (atDay && atDay.dateKey) html += '<div style="font-size:11px;color:var(--muted);margin-top:6px;">All time: ' + atDay.count + ' on ' + atDay.dayName + ', ' + atDay.dateKey + '</div>';
-  html += '</div>';
-  el.innerHTML = html;
+    + '<div style="font-size:12px;color:var(--muted);margin-top:2px;">Most appointments in a single day</div>'
+    + '</div>';
 }
 
-function renderDoctorActions(s, at) {
+function renderDoctorActions(s) {
   var el = document.getElementById('doctorActionsChart');
   var cb = s.cancelBreakdown || {};
-  var atCb = (at && at.cancelBreakdown) || {};
-  var html = '<div style="font-size:11px;color:var(--muted);margin-bottom:8px;">Last 28 days' + (at ? ' (All time in parentheses)' : '') + '</div>';
+  var html = '';
 
   var items = [
-    { label: 'Cancelled by doctor', count: cb.byDoctor || 0, atCount: atCb.byDoctor || 0, color: '#f59e0b' },
-    { label: 'Cancelled by patient', count: cb.byPatient || 0, atCount: atCb.byPatient || 0, color: '#ef4444' },
-    { label: 'Redirected to Spinola', count: s.relocatedSpinola || 0, atCount: (at && at.relocatedSpinola) || 0, color: '#8b5cf6' },
-    { label: 'Pushed to next day', count: s.pushedNextDay || 0, atCount: 0, color: '#2563eb' },
-    { label: 'Pushed to next time', count: s.pushedSameDay || 0, atCount: 0, color: '#06b6d4' }
+    { label: 'Cancelled by doctor', count: cb.byDoctor || 0, color: '#f59e0b' },
+    { label: 'Cancelled by patient', count: cb.byPatient || 0, color: '#ef4444' },
+    { label: 'Redirected to Spinola', count: s.relocatedSpinola || 0, color: '#8b5cf6' },
+    { label: 'Pushed to next day', count: s.pushedNextDay || 0, color: '#2563eb' },
+    { label: 'Pushed to next time', count: s.pushedSameDay || 0, color: '#06b6d4' }
   ];
 
   var maxCount = 1;
@@ -3355,7 +3377,7 @@ function renderDoctorActions(s, at) {
     html += '<div class="h-bar-row">';
     html += '<div class="h-bar-label" style="width:140px;font-size:12px;">' + it.label + '</div>';
     html += '<div class="h-bar-track"><div class="h-bar-fill" style="width:' + pct + '%;background:' + it.color + ';"></div></div>';
-    html += '<div class="h-bar-pct">' + it.count + (at && it.atCount ? ' <span style="font-size:10px;color:var(--muted);">(' + it.atCount + ')</span>' : '') + '</div>';
+    html += '<div class="h-bar-pct">' + it.count + '</div>';
     html += '</div>';
   }
 
@@ -3363,12 +3385,12 @@ function renderDoctorActions(s, at) {
   el.innerHTML = html;
 }
 
-function renderSourceBreakdown(sources, atSources) {
+function renderSourceBreakdown(sources) {
   var el = document.getElementById('sourceChart');
   if (!sources || !sources.length) { el.innerHTML = '<div class="empty">No source data yet. Add ?loc=name to tablet URLs to start tracking.</div>'; return; }
   var maxCount = sources[0].count || 1;
   var colors = ['#2563eb','#10b981','#f59e0b','#8b5cf6','#ef4444','#06b6d4','#ec4899'];
-  var html = '<div style="font-size:11px;color:var(--muted);margin-bottom:8px;">Last 28 days</div>';
+  var html = '';
   for (var i = 0; i < sources.length; i++) {
     var s = sources[i];
     var pct = Math.round(s.count / maxCount * 100);
@@ -3379,22 +3401,17 @@ function renderSourceBreakdown(sources, atSources) {
     html += '<div class="h-bar-count">' + s.count + '</div>';
     html += '</div>';
   }
-  if (atSources && atSources.length) {
-    html += '<div style="margin-top:10px;font-size:11px;color:var(--muted);">All time: ';
-    html += atSources.map(function(s) { return esc(s.source) + ' ' + s.count; }).join(' &bull; ');
-    html += '</div>';
-  }
   el.innerHTML = html;
 }
 
-function renderCountryBreakdown(countries, atCountries) {
+function renderCountryBreakdown(countries) {
   var el = document.getElementById('countryChart');
   if (!countries || !countries.length) { el.innerHTML = '<div class="empty">No country data yet.</div>'; return; }
 
   var maxCount = countries[0].count || 1;
   var colors = ['#2563eb','#8b5cf6','#06b6d4','#10b981','#f59e0b','#ef4444','#ec4899','#6366f1','#14b8a6','#f97316'];
 
-  var html = '<div style="font-size:11px;color:var(--muted);margin-bottom:8px;">Last 28 days</div>';
+  var html = '';
   for (var i = 0; i < countries.length; i++) {
     var c = countries[i];
     var pct = Math.round(c.count / maxCount * 100);
@@ -3405,15 +3422,10 @@ function renderCountryBreakdown(countries, atCountries) {
     html += '<div class="h-bar-pct">' + c.count + '</div>';
     html += '</div>';
   }
-  if (atCountries && atCountries.length) {
-    html += '<div style="margin-top:10px;font-size:11px;color:var(--muted);">All time: ';
-    html += atCountries.map(function(c) { return esc(c.country) + ' ' + c.count; }).join(' &bull; ');
-    html += '</div>';
-  }
   el.innerHTML = html;
 }
 
-function renderTopCancellers(cancellers, atCancellers) {
+function renderTopCancellers(cancellers) {
   var el = document.getElementById('topCancellersChart');
   if (!cancellers || !cancellers.length) { el.innerHTML = '<div class="empty">No cancellation data yet.</div>'; return; }
 
@@ -3431,31 +3443,27 @@ function renderTopCancellers(cancellers, atCancellers) {
 
 // ── Spinola Clinic Stats ──
 
-function renderSpinolaStats(sp, atSp) {
+function renderSpinolaStats(sp) {
   if (!sp) return;
   document.getElementById('spHeroBooked').textContent = sp.totalBooked;
-  if (atSp && atSp.totalBooked != null) document.getElementById('spHeroBooked').insertAdjacentHTML('afterend', '<div style="font-size:11px;color:var(--muted);">All time: ' + atSp.totalBooked + '</div>');
   var crEl = document.getElementById('spHeroCancelRate');
   crEl.textContent = sp.cancelRate + '%';
   crEl.style.color = sp.cancelRate < 10 ? 'var(--good)' : sp.cancelRate < 20 ? '#f59e0b' : 'var(--bad)';
-  if (atSp && atSp.cancelRate != null) crEl.insertAdjacentHTML('afterend', '<div style="font-size:11px;color:var(--muted);">All time: ' + atSp.cancelRate + '%</div>');
   var nsEl = document.getElementById('spHeroNoShowRate');
   nsEl.textContent = sp.noShowRate + '%';
   nsEl.style.color = sp.noShowRate < 5 ? 'var(--good)' : sp.noShowRate < 15 ? '#f59e0b' : 'var(--bad)';
-  if (atSp && atSp.noShowRate != null) nsEl.insertAdjacentHTML('afterend', '<div style="font-size:11px;color:var(--muted);">All time: ' + atSp.noShowRate + '%</div>');
   document.getElementById('spHeroPatients').textContent = sp.uniquePatients;
-  if (atSp && atSp.uniquePatients != null) document.getElementById('spHeroPatients').insertAdjacentHTML('afterend', '<div style="font-size:11px;color:var(--muted);">All time: ' + atSp.uniquePatients + '</div>');
 
-  renderSpDirectSplit(sp, atSp);
+  renderSpDirectSplit(sp);
   renderSpWeeklyTrend(sp.weeklyTrend);
   renderSpPeakHours(sp.peakHours);
   renderSpTopPatients(sp.topPatients);
-  renderSpCancelBreakdown(sp, atSp);
+  renderSpCancelBreakdown(sp);
   renderSpTopCancellers(sp.topCancellers);
-  renderSpCountryBreakdown(sp.countryBreakdown, atSp ? atSp.countryBreakdown : null);
+  renderSpCountryBreakdown(sp.countryBreakdown);
 }
 
-function renderSpDirectSplit(sp, atSp) {
+function renderSpDirectSplit(sp) {
   var el = document.getElementById('spDirectSplitChart');
   var direct = sp.directBookings || 0;
   var redir = sp.relocatedBookings || 0;
@@ -3464,7 +3472,7 @@ function renderSpDirectSplit(sp, atSp) {
 
   var pctD = Math.round(direct / total * 100);
   var pctR = 100 - pctD;
-  var html = '<div style="font-size:11px;color:var(--muted);margin-bottom:8px;">Last 28 days</div>';
+  var html = '';
   html += '<div class="h-bar-row"><div class="h-bar-label" style="width:80px;">Direct</div>';
   html += '<div class="h-bar-track"><div class="h-bar-fill" style="width:' + pctD + '%;background:#8b5cf6;"></div></div>';
   html += '<div class="h-bar-pct">' + direct + '</div></div>';
@@ -3472,9 +3480,6 @@ function renderSpDirectSplit(sp, atSp) {
   html += '<div class="h-bar-track"><div class="h-bar-fill" style="width:' + pctR + '%;background:#2563eb;"></div></div>';
   html += '<div class="h-bar-pct">' + redir + '</div></div>';
   html += '<div style="margin-top:8px;font-size:11px;color:var(--muted);">Direct = booked via system &bull; Redirected = moved from Potter\\'s</div>';
-  if (atSp) {
-    html += '<div style="margin-top:6px;font-size:11px;color:var(--muted);">All time: Direct ' + (atSp.directBookings || 0) + ' &bull; Redirected ' + (atSp.relocatedBookings || 0) + '</div>';
-  }
   el.innerHTML = html;
 }
 
@@ -3546,16 +3551,14 @@ function renderSpTopPatients(patients) {
   el.innerHTML = html;
 }
 
-function renderSpCancelBreakdown(sp, atSp) {
+function renderSpCancelBreakdown(sp) {
   var el = document.getElementById('spCancelChart');
   if (!el) return;
   var cb = sp.cancelBreakdown || { byDoctor: 0, byPatient: 0 };
   var total = cb.byDoctor + cb.byPatient;
   var html = '<div style="margin-bottom:12px;">';
   html += '<div style="font-size:36px;font-weight:900;color:' + (sp.cancelRate < 10 ? 'var(--good)' : sp.cancelRate < 20 ? '#f59e0b' : 'var(--bad)') + ';">' + sp.cancelRate + '%</div>';
-  html += '<div style="font-size:12px;color:var(--muted);">Cancel rate <span style="font-size:10px;">(Last 28 days)</span></div>';
-  if (atSp && atSp.cancelRate != null) html += '<div style="font-size:11px;color:var(--muted);">All time: ' + atSp.cancelRate + '%</div>';
-  html += '</div>';
+  html += '<div style="font-size:12px;color:var(--muted);">Cancel rate</div></div>';
   if (total > 0) {
     var pctD = Math.round(cb.byDoctor / total * 100);
     var pctP = 100 - pctD;
@@ -3566,7 +3569,6 @@ function renderSpCancelBreakdown(sp, atSp) {
     html += '<div class="h-bar-track"><div class="h-bar-fill" style="width:' + pctP + '%;background:#ef4444;"></div></div>';
     html += '<div class="h-bar-pct">' + cb.byPatient + '</div></div>';
   } else { html += '<div class="empty">No cancellations yet.</div>'; }
-  if (atSp && atSp.cancelBreakdown) html += '<div style="margin-top:8px;font-size:11px;color:var(--muted);">All time: Doctor ' + atSp.cancelBreakdown.byDoctor + ' &bull; Patient ' + atSp.cancelBreakdown.byPatient + '</div>';
   el.innerHTML = html;
 }
 
@@ -3585,14 +3587,14 @@ function renderSpTopCancellers(cancellers) {
   el.innerHTML = html;
 }
 
-function renderSpCountryBreakdown(countries, atCountries) {
+function renderSpCountryBreakdown(countries) {
   var el = document.getElementById('spCountryChart');
   if (!countries || !countries.length) { el.innerHTML = '<div class="empty">No country data yet.</div>'; return; }
 
   var maxCount = countries[0].count || 1;
   var colors = ['#8b5cf6','#a78bfa','#c4b5fd','#7c3aed','#6d28d9','#5b21b6','#4c1d95','#ddd6fe','#ede9fe','#f5f3ff'];
 
-  var html = '<div style="font-size:11px;color:var(--muted);margin-bottom:8px;">Last 28 days</div>';
+  var html = '';
   for (var i = 0; i < countries.length; i++) {
     var c = countries[i];
     var pct = Math.round(c.count / maxCount * 100);
@@ -3601,11 +3603,6 @@ function renderSpCountryBreakdown(countries, atCountries) {
     html += '<div class="h-bar-label" style="width:90px;font-size:12px;">' + esc(c.country) + '</div>';
     html += '<div class="h-bar-track"><div class="h-bar-fill" style="width:' + pct + '%;background:' + color + ';"></div></div>';
     html += '<div class="h-bar-pct">' + c.count + '</div>';
-    html += '</div>';
-  }
-  if (atCountries && atCountries.length) {
-    html += '<div style="margin-top:8px;font-size:11px;color:var(--muted);">All time: ';
-    html += atCountries.map(function(c) { return esc(c.country) + ' ' + c.count; }).join(' &bull; ');
     html += '</div>';
   }
   el.innerHTML = html;
