@@ -12,7 +12,7 @@ import {
   getAppointmentByToken, getAppointmentById, insertAppointment, updateAppointmentStatus,
   getDoctorOffRows, buildDoctorOffMap, getDoctorExtraRows, buildExtraMap,
   addDoctorOff, deleteDoctorOff, addDoctorExtra, deleteDoctorExtra,
-  searchAppointments, getAppointmentsByDateRange, getPatientHistory,
+  searchAppointments, getAppointmentsByDateRange, getAllAppointments, getPatientHistory,
   slotBlockedByDoctorOff, doctorOffReason, findNextAvailableDay,
   setConfigValue, getTakenSlots, isReviewSent, markReviewSent,
   insertFollowUp, getFollowUps, isFollowUpSent, getReferrals,
@@ -808,7 +808,156 @@ export async function apiAdminGetStatistics(req: Request, env: Env): Promise<Res
   const past28 = toDateKey(addDays(today, -28));
   const future7 = toDateKey(addDays(today, 7));
 
-  const allAppts = await getAppointmentsByDateRange(env.DB, past28, future7);
+  const [allAppts, everyAppt] = await Promise.all([
+    getAppointmentsByDateRange(env.DB, past28, future7),
+    getAllAppointments(env.DB),
+  ]);
+
+  // Helper: compute core stats from any appointment array
+  function computeCoreStats(appts: any[]) {
+    let _total = 0, _cancelled = 0, _cancelledClient = 0, _cancelledDoctor = 0;
+    let _attended = 0, _noShow = 0, _pottersCount = 0, _spinolaCount = 0;
+    const _patientCounts: Record<string, number> = {};
+    const _cancellerCounts: Record<string, number> = {};
+    let _leadTimeSum = 0, _leadTimeCount = 0;
+
+    for (const a of appts) {
+      _total++;
+      if (a.status.includes('CANCELLED')) {
+        _cancelled++;
+        if (a.status === 'CANCELLED_CLIENT') _cancelledClient++;
+        if (a.status === 'CANCELLED_DOCTOR') _cancelledDoctor++;
+        const key = a.full_name + '|' + a.email;
+        _cancellerCounts[key] = (_cancellerCounts[key] || 0) + 1;
+      }
+      if (a.status === 'ATTENDED') _attended++;
+      if (a.status === 'NO_SHOW') _noShow++;
+      if (a.clinic === 'spinola') _spinolaCount++; else _pottersCount++;
+      if (!a.status.includes('CANCELLED')) {
+        const key = a.full_name + '|' + a.email;
+        _patientCounts[key] = (_patientCounts[key] || 0) + 1;
+      }
+      try {
+        const created = new Date(a.created_at.replace(' ', 'T'));
+        const apptDate = parseDateKey(a.date_key);
+        const diff = (apptDate.getTime() - created.getTime()) / 86400000;
+        if (diff >= 0) { _leadTimeSum += diff; _leadTimeCount++; }
+      } catch {}
+    }
+
+    const _uniqueEmails = new Set(appts.filter((a: any) => !a.status.includes('CANCELLED')).map((a: any) => a.email));
+    const _topPatients = Object.entries(_patientCounts).sort((a, b) => b[1] - a[1]).slice(0, 10)
+      .map(([k, c]) => ({ name: k.split('|')[0], email: k.split('|')[1], count: c }));
+    const _topCancellers = Object.entries(_cancellerCounts).sort((a, b) => b[1] - a[1]).slice(0, 10)
+      .map(([k, c]) => ({ name: k.split('|')[0], email: k.split('|')[1], count: c }));
+
+    const _sameDayCancels = appts.filter((a: any) => {
+      if (!a.status.includes('CANCELLED') || !a.cancelled_at) return false;
+      return a.cancelled_at.startsWith(a.date_key);
+    }).length;
+
+    // Country
+    const _countryCounts: Record<string, number> = {};
+    for (const a of appts) {
+      if (a.status.includes('CANCELLED')) continue;
+      const phone = String(a.phone || '').replace(/[^0-9]/g, '');
+      let country = 'Other';
+      for (const [prefix, name] of Object.entries(countryMap)) {
+        if (phone.startsWith(prefix)) { country = name; break; }
+      }
+      _countryCounts[country] = (_countryCounts[country] || 0) + 1;
+    }
+
+    // Source
+    const _sourceCounts: Record<string, number> = {};
+    for (const a of appts) {
+      if (a.status.includes('CANCELLED')) continue;
+      const src = (a as any).booking_source || 'direct';
+      _sourceCounts[src] = (_sourceCounts[src] || 0) + 1;
+    }
+
+    // Busiest day
+    const _dayApptCounts: Record<string, number> = {};
+    for (const a of appts) {
+      if (!a.status.includes('CANCELLED')) _dayApptCounts[a.date_key] = (_dayApptCounts[a.date_key] || 0) + 1;
+    }
+    let _busiestDay: { dateKey: string; dayName: string; count: number } | null = null;
+    for (const [dk, count] of Object.entries(_dayApptCounts)) {
+      if (!_busiestDay || count > _busiestDay.count) {
+        try { _busiestDay = { dateKey: dk, dayName: dayOfWeekKey(parseDateKey(dk)), count }; } catch {}
+      }
+    }
+
+    // Spinola sub-stats
+    const _spAppts = appts.filter((a: any) => a.clinic === 'spinola');
+    const _spCancelled = _spAppts.filter((a: any) => a.status.includes('CANCELLED')).length;
+    const _spNoShow = _spAppts.filter((a: any) => a.status === 'NO_SHOW').length;
+    const _spUniqueEmails = new Set(_spAppts.filter((a: any) => !a.status.includes('CANCELLED')).map((a: any) => a.email));
+    const _spDirect = _spAppts.filter((a: any) => a.status !== 'RELOCATED_SPINOLA' && !a.status.includes('CANCELLED')).length;
+    const _spRedirected = _spAppts.filter((a: any) => a.status === 'RELOCATED_SPINOLA').length;
+    const _spCancelledClient = _spAppts.filter((a: any) => a.status === 'CANCELLED_CLIENT').length;
+    const _spCancelledDoctor = _spAppts.filter((a: any) => a.status === 'CANCELLED_DOCTOR').length;
+    const _spPatCounts: Record<string, number> = {};
+    for (const a of _spAppts) { if (!a.status.includes('CANCELLED')) { const k = a.full_name + '|' + a.email; _spPatCounts[k] = (_spPatCounts[k] || 0) + 1; } }
+    const _spTopPat = Object.entries(_spPatCounts).sort((a, b) => b[1] - a[1]).slice(0, 10)
+      .map(([k, c]) => ({ name: k.split('|')[0], email: k.split('|')[1], count: c }));
+    const _spCancellerCounts: Record<string, number> = {};
+    for (const a of _spAppts) { if (a.status.includes('CANCELLED')) { const k = a.full_name + '|' + a.email; _spCancellerCounts[k] = (_spCancellerCounts[k] || 0) + 1; } }
+    const _spTopCancellers = Object.entries(_spCancellerCounts).sort((a, b) => b[1] - a[1]).slice(0, 10)
+      .map(([k, c]) => ({ name: k.split('|')[0], email: k.split('|')[1], count: c }));
+    const _spCountry: Record<string, number> = {};
+    for (const a of _spAppts) {
+      if (a.status.includes('CANCELLED')) continue;
+      const ph = String(a.phone || '').replace(/[^0-9]/g, '');
+      let cn = 'Other';
+      for (const [p, n] of Object.entries(countryMap)) { if (ph.startsWith(p)) { cn = n; break; } }
+      _spCountry[cn] = (_spCountry[cn] || 0) + 1;
+    }
+
+    return {
+      totalBooked: _total - _cancelled,
+      total: _total,
+      cancelled: _cancelled,
+      cancelRate: _total > 0 ? (_cancelled / _total * 100).toFixed(1) : '0',
+      attended: _attended,
+      noShow: _noShow,
+      totalUniquePatients: _uniqueEmails.size,
+      repeatPatients: Object.values(_patientCounts).filter(c => c > 1).length,
+      cancelBreakdown: { byDoctor: _cancelledDoctor, byPatient: _cancelledClient },
+      locationSplit: { potters: _pottersCount, spinola: _spinolaCount },
+      topPatients: _topPatients,
+      topCancellers: _topCancellers,
+      avgLeadTimeDays: _leadTimeCount > 0 ? (_leadTimeSum / _leadTimeCount).toFixed(1) : '0',
+      sameDayCancels: _sameDayCancels,
+      countryBreakdown: Object.entries(_countryCounts).sort((a, b) => b[1] - a[1]).map(([country, count]) => ({ country, count })),
+      sourceBreakdown: Object.entries(_sourceCounts).sort((a, b) => b[1] - a[1]).map(([source, count]) => ({ source, count })),
+      relocatedSpinola: _spRedirected,
+      busiestDay: _busiestDay,
+      spinola: {
+        totalBooked: _spinolaCount - _spCancelled,
+        cancelRate: _spinolaCount > 0 ? (_spCancelled / _spinolaCount * 100).toFixed(1) : '0',
+        noShowRate: _spinolaCount > 0 ? (_spNoShow / _spinolaCount * 100).toFixed(1) : '0',
+        uniquePatients: _spUniqueEmails.size,
+        directBookings: _spDirect,
+        relocatedBookings: _spRedirected,
+        cancelBreakdown: { byDoctor: _spCancelledDoctor, byPatient: _spCancelledClient },
+        topCancellers: _spTopCancellers,
+        topPatients: _spTopPat,
+        countryBreakdown: Object.entries(_spCountry).sort((a, b) => b[1] - a[1]).map(([country, count]) => ({ country, count })),
+      },
+    };
+  }
+
+  const countryMap: Record<string, string> = {
+    '356':'Malta','44':'UK','33':'France','49':'Germany','39':'Italy','34':'Spain',
+    '31':'Netherlands','32':'Belgium','46':'Sweden','47':'Norway','48':'Poland',
+    '36':'Hungary','420':'Czech','421':'Slovakia','43':'Austria','41':'Switzerland',
+    '351':'Portugal','30':'Greece','353':'Ireland','358':'Finland','45':'Denmark',
+    '1':'US/Canada','61':'Australia','81':'Japan','86':'China','91':'India','7':'Russia',
+  };
+
+  // Compute all-time stats
+  const allTimeStats = computeCoreStats(everyAppt);
 
   let total = 0, cancelled = 0, cancelledClient = 0, cancelledDoctor = 0;
   let attended = 0, noShow = 0, pottersCount = 0, spinolaCount = 0;
@@ -932,56 +1081,27 @@ export async function apiAdminGetStatistics(req: Request, env: Env): Promise<Res
     }
   }
 
-  // Country from phone prefix
-  const countryMap: Record<string, string> = {
-    '356':'Malta','44':'UK','33':'France','49':'Germany','39':'Italy','34':'Spain',
-    '31':'Netherlands','32':'Belgium','46':'Sweden','47':'Norway','48':'Poland',
-    '36':'Hungary','420':'Czech','421':'Slovakia','43':'Austria','41':'Switzerland',
-    '351':'Portugal','30':'Greece','353':'Ireland','358':'Finland','45':'Denmark',
-    '1':'US/Canada','61':'Australia','81':'Japan','86':'China','91':'India','7':'Russia',
-  };
-  const countryCounts: Record<string, number> = {};
-  for (const a of allAppts) {
-    if (a.status.includes('CANCELLED')) continue;
-    const phone = String(a.phone || '').replace(/[^0-9]/g, '');
-    let country = 'Other';
-    for (const [prefix, name] of Object.entries(countryMap)) {
-      if (phone.startsWith(prefix)) { country = name; break; }
-    }
-    countryCounts[country] = (countryCounts[country] || 0) + 1;
+  // Compute 28-day core stats using the helper
+  const recentStats = computeCoreStats(allAppts);
+
+  // Spinola weekly trend + hourly (time-bounded, 28-day only)
+  const spinolaAppts28 = allAppts.filter(a => a.clinic === 'spinola');
+  const sWeekly: { label: string; booked: number; cancelled: number }[] = [];
+  for (let w = 3; w >= 0; w--) {
+    const ws = toDateKey(addDays(today, -w * 7 - 6));
+    const we = toDateKey(addDays(today, -w * 7));
+    const wa = spinolaAppts28.filter(a => a.date_key >= ws && a.date_key <= we);
+    sWeekly.push({ label: ws.slice(5), booked: wa.filter(a => !a.status.includes('CANCELLED')).length, cancelled: wa.filter(a => a.status.includes('CANCELLED')).length });
   }
-  const countryBreakdown = Object.entries(countryCounts)
-    .sort((a, b) => b[1] - a[1])
-    .map(([country, count]) => ({ country, count }));
-
-  // Booking source breakdown
-  const sourceCounts: Record<string, number> = {};
-  for (const a of allAppts) {
-    if (a.status.includes('CANCELLED')) continue;
-    const src = (a as any).booking_source || 'direct';
-    sourceCounts[src] = (sourceCounts[src] || 0) + 1;
+  const sHourly: number[] = [];
+  for (let h = 7; h <= 20; h++) {
+    sHourly.push(spinolaAppts28.filter(a => !a.status.includes('CANCELLED') && (parseTimeToMinutes(a.start_time) / 60 | 0) === h).length);
   }
-  const sourceBreakdown = Object.entries(sourceCounts)
-    .sort((a, b) => b[1] - a[1])
-    .map(([source, count]) => ({ source, count }));
-
-  // Same-day cancellations
-  const sameDayCancels = allAppts.filter(a => {
-    if (!a.status.includes('CANCELLED') || !a.cancelled_at) return false;
-    return a.cancelled_at.startsWith(a.date_key);
-  }).length;
-
-  // Spinola sub-stats
-  const spinolaAppts = allAppts.filter(a => a.clinic === 'spinola');
-  const spinolaCancelled = spinolaAppts.filter(a => a.status.includes('CANCELLED')).length;
-  const spinolaNoShow = spinolaAppts.filter(a => a.status === 'NO_SHOW').length;
-  const spinolaUniqueEmails = new Set(spinolaAppts.filter(a => !a.status.includes('CANCELLED')).map(a => a.email));
-  const spinolaDirect = spinolaAppts.filter(a => a.status !== 'RELOCATED_SPINOLA' && !a.status.includes('CANCELLED')).length;
-  const spinolaRedirected = spinolaAppts.filter(a => a.status === 'RELOCATED_SPINOLA').length;
 
   return json({
     ok: true,
     stats: {
+      ...recentStats,
       total,
       cancelled,
       cancelledClient,
@@ -989,15 +1109,11 @@ export async function apiAdminGetStatistics(req: Request, env: Env): Promise<Res
       cancelRate: total > 0 ? (cancelled / total * 100).toFixed(1) : '0',
       attended,
       noShow,
-      pottersCount,
-      spinolaCount,
+      pottersCount: recentStats.locationSplit.potters,
+      spinolaCount: recentStats.locationSplit.spinola,
       byDay,
       byHour,
-      topPatients,
-      topCancellers,
       avgLeadTimeDays: leadTimeCount > 0 ? (leadTimeSum / leadTimeCount).toFixed(1) : '0',
-      totalUniquePatients,
-      repeatPatients,
       totalBooked: total - cancelled,
       utilization,
       trendDirection,
@@ -1005,74 +1121,14 @@ export async function apiAdminGetStatistics(req: Request, env: Env): Promise<Res
       weeklyTrend,
       hourlyDistribution,
       upcomingLoad,
-      busiestDay,
-      countryBreakdown,
-      relocatedSpinola: spinolaRedirected,
-      sameDayCancels,
-      sourceBreakdown,
-      locationSplit: { potters: pottersCount, spinola: spinolaCount },
-      cancelBreakdown: { byDoctor: cancelledDoctor, byPatient: cancelledClient },
       period: { from: past28, to: todayKey },
       generated: nowIso(tz),
-      spinola: (() => {
-        // Spinola weekly trend
-        const sWeekly: { label: string; booked: number; cancelled: number }[] = [];
-        for (let w = 3; w >= 0; w--) {
-          const ws = toDateKey(addDays(today, -w * 7 - 6));
-          const we = toDateKey(addDays(today, -w * 7));
-          const wa = spinolaAppts.filter(a => a.date_key >= ws && a.date_key <= we);
-          sWeekly.push({ label: ws.slice(5), booked: wa.filter(a => !a.status.includes('CANCELLED')).length, cancelled: wa.filter(a => a.status.includes('CANCELLED')).length });
-        }
-        // Spinola hourly
-        const sHourly: number[] = [];
-        for (let h = 7; h <= 20; h++) {
-          sHourly.push(spinolaAppts.filter(a => !a.status.includes('CANCELLED') && (parseTimeToMinutes(a.start_time) / 60 | 0) === h).length);
-        }
-        // Spinola top patients
-        const sPat: Record<string, number> = {};
-        for (const a of spinolaAppts) {
-          if (!a.status.includes('CANCELLED')) sPat[a.full_name + '|' + a.email] = (sPat[a.full_name + '|' + a.email] || 0) + 1;
-        }
-        const sTopPat = Object.entries(sPat).sort((a, b) => b[1] - a[1]).slice(0, 10)
-          .map(([k, c]) => ({ name: k.split('|')[0], email: k.split('|')[1], count: c }));
-        // Spinola country
-        const sCountry: Record<string, number> = {};
-        for (const a of spinolaAppts) {
-          if (a.status.includes('CANCELLED')) continue;
-          const ph = String(a.phone || '').replace(/[^0-9]/g, '');
-          let cn = 'Other';
-          for (const [p, n] of Object.entries(countryMap)) { if (ph.startsWith(p)) { cn = n; break; } }
-          sCountry[cn] = (sCountry[cn] || 0) + 1;
-        }
-        // Spinola cancellation breakdown
-        const sCancelledClient = spinolaAppts.filter(a => a.status === 'CANCELLED_CLIENT').length;
-        const sCancelledDoctor = spinolaAppts.filter(a => a.status === 'CANCELLED_DOCTOR').length;
-        // Spinola top cancellers
-        const sCancellerCounts: Record<string, number> = {};
-        for (const a of spinolaAppts) {
-          if (!a.status.includes('CANCELLED')) continue;
-          const key = a.full_name + '|' + a.email;
-          sCancellerCounts[key] = (sCancellerCounts[key] || 0) + 1;
-        }
-        const sTopCancellers = Object.entries(sCancellerCounts)
-          .sort((a, b) => b[1] - a[1]).slice(0, 10)
-          .map(([k, c]) => ({ name: k.split('|')[0], email: k.split('|')[1], count: c }));
-
-        return {
-          totalBooked: spinolaCount - spinolaCancelled,
-          cancelRate: spinolaCount > 0 ? (spinolaCancelled / spinolaCount * 100).toFixed(1) : '0',
-          noShowRate: spinolaCount > 0 ? (spinolaNoShow / spinolaCount * 100).toFixed(1) : '0',
-          uniquePatients: spinolaUniqueEmails.size,
-          directBookings: spinolaDirect,
-          relocatedBookings: spinolaRedirected,
-          cancelBreakdown: { byDoctor: sCancelledDoctor, byPatient: sCancelledClient },
-          topCancellers: sTopCancellers,
-          weeklyTrend: sWeekly,
-          hourlyDistribution: sHourly,
-          topPatients: sTopPat,
-          countryBreakdown: Object.entries(sCountry).sort((a, b) => b[1] - a[1]).map(([country, count]) => ({ country, count })),
-        };
-      })(),
+      spinola: {
+        ...recentStats.spinola,
+        weeklyTrend: sWeekly,
+        hourlyDistribution: sHourly,
+      },
+      allTime: allTimeStats,
     },
   });
 }
