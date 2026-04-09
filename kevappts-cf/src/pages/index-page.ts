@@ -941,6 +941,18 @@ export function indexPage(env: Env, bookingSource?: string): string {
     </div>
   </div>
 
+  <!-- Email warning modal -->
+  <div class="overlay" id="emailWarnOverlay" role="dialog" aria-modal="true">
+    <div class="modal">
+      <h3 style="font-size:18px;margin-bottom:12px;">Check your email</h3>
+      <p id="emailWarnText" style="font-size:15px;color:var(--text);line-height:1.5;"></p>
+      <div class="modalActions">
+        <button class="btn btnGhost" id="emailWarnYes">Yes, it's correct</button>
+        <button class="btn btnAccent" id="emailWarnNo">No, let me fix it</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Confirmation modal -->
   <div class="overlay" id="confirmOverlay" role="dialog" aria-modal="true" aria-labelledby="confirmModalTitle">
     <div class="modal">
@@ -2025,6 +2037,11 @@ export function indexPage(env: Env, bookingSource?: string): string {
       confirmText: document.getElementById('confirmText'),
       confirmOk: document.getElementById('confirmOk'),
 
+      emailWarnOverlay: document.getElementById('emailWarnOverlay'),
+      emailWarnText: document.getElementById('emailWarnText'),
+      emailWarnYes: document.getElementById('emailWarnYes'),
+      emailWarnNo: document.getElementById('emailWarnNo'),
+
       loadingOverlay: document.getElementById('loadingOverlay'),
       loadingTitle: document.getElementById('loadingTitle'),
       loadingDesc: document.getElementById('loadingDesc'),
@@ -2757,6 +2774,10 @@ export function indexPage(env: Env, bookingSource?: string): string {
       'live.con':'live.com','lve.com':'live.com','protonmal.com':'protonmail.com'
     };
 
+    function hasNonAsciiEmail(email) {
+      return /[^\x00-\x7F]/.test(email);
+    }
+
     function isValidEmail(email) {
       if (!email || email.indexOf('@') === -1) return false;
       var parts = email.split('@');
@@ -3402,18 +3423,7 @@ export function indexPage(env: Env, bookingSource?: string): string {
       }
     });
 
-    els.confirmBtn.addEventListener('click', () => {
-      hideMsg();
-      const err = validateForm();
-      if (err) {
-        showMsg('bad', err);
-        setStatus('bad', t('missingFields'));
-        // Shake the confirm button to draw attention
-        els.confirmBtn.classList.add('shake');
-        setTimeout(function() { els.confirmBtn.classList.remove('shake'); }, 600);
-        return;
-      }
-
+    function proceedWithBooking() {
       showLoading(t('confirmingTitle'), t('confirmingDesc'));
       setStatus('good', t('bookingStatus'));
 
@@ -3486,6 +3496,43 @@ export function indexPage(env: Env, bookingSource?: string): string {
           setStatus('bad', t('bookingError'));
           loadAvailability(false);
         });
+    }
+
+    // Email warning modal handlers
+    els.emailWarnYes.addEventListener('click', function() {
+      hideOverlay(els.emailWarnOverlay);
+      proceedWithBooking();
+    });
+    els.emailWarnNo.addEventListener('click', function() {
+      hideOverlay(els.emailWarnOverlay);
+      els.email.value = '';
+      els.email.focus();
+    });
+
+    els.confirmBtn.addEventListener('click', () => {
+      hideMsg();
+      const err = validateForm();
+      if (err) {
+        showMsg('bad', err);
+        setStatus('bad', t('missingFields'));
+        // Shake the confirm button to draw attention
+        els.confirmBtn.classList.add('shake');
+        setTimeout(function() { els.confirmBtn.classList.remove('shake'); }, 600);
+        return;
+      }
+
+      // Warn if email contains non-ASCII characters (e.g. ż, ħ, ü, ö, ß, ñ)
+      var email = els.email.value.trim();
+      if (hasNonAsciiEmail(email)) {
+        var badChars = email.match(/[^\x00-\x7F]/g);
+        var unique = badChars.filter(function(c, i) { return badChars.indexOf(c) === i; });
+        var charList = unique.map(function(c) { return '<b style="font-size:20px;color:var(--bad);">' + escHtml(c) + '</b>'; }).join('  ');
+        els.emailWarnText.innerHTML = 'Your email <b style="font-size:17px;word-break:break-all;">' + escHtml(email) + '</b> contains unusual characters: ' + charList + '<br><br>Most email providers don\'t support these characters. <b>Did you type it correctly?</b>';
+        showOverlay(els.emailWarnOverlay);
+        return;
+      }
+
+      proceedWithBooking();
     });
 
     els.clearBtn.addEventListener('click', function() {
