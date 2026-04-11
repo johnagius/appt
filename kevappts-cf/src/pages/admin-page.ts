@@ -3113,7 +3113,9 @@ function renderAllStats(s) {
     if (el) el.style.display = is28 ? '' : 'none';
   });
 
-  // Utilization by day — available for all periods
+  // Utilization by day — available for all periods (force card visible)
+  var utilCard = document.getElementById('utilByDayCard');
+  if (utilCard) utilCard.style.display = '';
   renderUtilByDay(s.utilizationByDay);
 
   if (is28) {
