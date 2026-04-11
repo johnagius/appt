@@ -1000,6 +1000,14 @@ export async function apiAdminGetStatistics(req: Request, env: Env): Promise<Res
     const dowSlots: Record<string, number> = {};
     const dowBooked: Record<string, number> = {};
 
+    // Pre-build booked-per-date map to avoid O(n*days) filtering
+    const bookedByDate: Record<string, number> = {};
+    for (const a of periodAppts) {
+      if (!a.status.includes('CANCELLED')) {
+        bookedByDate[a.date_key] = (bookedByDate[a.date_key] || 0) + 1;
+      }
+    }
+
     // Determine start date for slot iteration
     let iterStart: Date | null = null;
     if (period === 'all') {
@@ -1020,7 +1028,7 @@ export async function apiAdminGetStatistics(req: Request, env: Env): Promise<Res
         const dk = toDateKey(iterDate);
         const dow = dayOfWeekKey(iterDate);
         const slots = buildSlotsForDate(iterDate, cfg.apptDurationMin, extraMap[dk] || null, cfg.workingHours);
-        const dayBooked = periodAppts.filter(a => a.date_key === dk && !a.status.includes('CANCELLED')).length;
+        const dayBooked = bookedByDate[dk] || 0;
         totalSlots += slots.length;
         bookedSlots += dayBooked;
         dowSlots[dow] = (dowSlots[dow] || 0) + slots.length;
