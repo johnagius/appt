@@ -268,6 +268,7 @@ export default {
             // Set cookie so future visits don't need ?sig=
             const headers: Record<string, string> = {
               'Content-Type': 'text/html;charset=UTF-8',
+              'Cache-Control': 'no-cache, no-store, must-revalidate',
               'Set-Cookie': `admin_sig=${sig}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=31536000`,
             };
             const page = path === '/admin' ? adminPage(sig) : path === '/doctor' ? doctorPage(sig) : testPage(sig);
