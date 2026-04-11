@@ -991,17 +991,60 @@ export async function apiAdminGetStatistics(req: Request, env: Env): Promise<Res
   let sWeekly: any[] | null = null;
   let sHourly: number[] | null = null;
 
+  // Utilization + utilization by day — computed for ALL periods
+  const offRows = await getDoctorOffRows(env.DB);
+  const extraRows = await getDoctorExtraRows(env.DB);
+  const extraMap = buildExtraMap(extraRows);
+  {
+    let totalSlots = 0, bookedSlots = 0;
+    const dowSlots: Record<string, number> = {};
+    const dowBooked: Record<string, number> = {};
+
+    // Determine start date for slot iteration
+    let iterStart: Date | null = null;
+    if (period === 'all') {
+      let earliest = todayKey;
+      for (const a of periodAppts) {
+        if (a.date_key < earliest) earliest = a.date_key;
+      }
+      if (periodAppts.length > 0) iterStart = parseDateKey(earliest);
+    } else if (period === 'week') {
+      iterStart = parseDateKey(periodFrom);
+    } else {
+      iterStart = addDays(today, -28);
+    }
+
+    if (iterStart) {
+      let iterDate = new Date(iterStart.getTime());
+      while (toDateKey(iterDate) <= todayKey) {
+        const dk = toDateKey(iterDate);
+        const dow = dayOfWeekKey(iterDate);
+        const slots = buildSlotsForDate(iterDate, cfg.apptDurationMin, extraMap[dk] || null, cfg.workingHours);
+        const dayBooked = periodAppts.filter(a => a.date_key === dk && !a.status.includes('CANCELLED')).length;
+        totalSlots += slots.length;
+        bookedSlots += dayBooked;
+        dowSlots[dow] = (dowSlots[dow] || 0) + slots.length;
+        dowBooked[dow] = (dowBooked[dow] || 0) + dayBooked;
+        iterDate = addDays(iterDate, 1);
+      }
+    }
+    utilization = totalSlots > 0 ? Math.round(bookedSlots / totalSlots * 100) : 0;
+
+    const _byDay: Record<string, number> = {};
+    for (const dow of ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']) {
+      _byDay[dow] = (dowSlots[dow] || 0) > 0 ? Math.round((dowBooked[dow] || 0) / dowSlots[dow] * 100) : 0;
+    }
+    byDay = _byDay;
+  }
+
   if (period === '28') {
     // Hourly distribution
     const byHour: Record<number, number> = {};
-    const _byDay: Record<string, number> = {};
     for (const a of periodAppts) {
       try { const hour = parseTimeToMinutes(a.start_time) / 60 | 0; byHour[hour] = (byHour[hour] || 0) + 1; } catch {}
-      try { const d = parseDateKey(a.date_key); const dow = dayOfWeekKey(d); _byDay[dow] = (_byDay[dow] || 0) + 1; } catch {}
     }
     hourlyDistribution = [];
     for (let h = 7; h <= 20; h++) hourlyDistribution.push(byHour[h] || 0);
-    byDay = _byDay;
 
     // Weekly trend
     weeklyTrend = [];
@@ -1015,20 +1058,6 @@ export async function apiAdminGetStatistics(req: Request, env: Env): Promise<Res
     const lastWeekBooked = weeklyTrend.length >= 2 ? weeklyTrend[weeklyTrend.length - 2].booked : 0;
     trendDirection = thisWeekBooked > lastWeekBooked ? 'up' : thisWeekBooked < lastWeekBooked ? 'down' : '';
     trendPct = lastWeekBooked > 0 ? Math.round(Math.abs(thisWeekBooked - lastWeekBooked) / lastWeekBooked * 100) : 0;
-
-    // Utilization
-    const offRows = await getDoctorOffRows(env.DB);
-    const extraRows = await getDoctorExtraRows(env.DB);
-    const extraMap = buildExtraMap(extraRows);
-    let totalSlots = 0, bookedSlots = 0;
-    for (let d = -28; d <= 0; d++) {
-      const dt = addDays(today, d);
-      const dk = toDateKey(dt);
-      const slots = buildSlotsForDate(dt, cfg.apptDurationMin, extraMap[dk] || null, cfg.workingHours);
-      totalSlots += slots.length;
-      bookedSlots += periodAppts.filter(a => a.date_key === dk && !a.status.includes('CANCELLED')).length;
-    }
-    utilization = totalSlots > 0 ? Math.round(bookedSlots / totalSlots * 100) : 0;
 
     // Upcoming load
     upcomingLoad = [];

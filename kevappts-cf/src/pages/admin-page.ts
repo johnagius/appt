@@ -3107,16 +3107,18 @@ function renderAllStats(s) {
   document.getElementById('heroRepeat').textContent = s.repeatPatients + ' returning';
 
   // Time-bounded sections: hide when data is null (non-28-day periods)
-  var timeBounded = ['weeklyTrendCard','peakHoursCard','utilByDayCard','upcomingLoadCard'];
+  var timeBounded = ['weeklyTrendCard','peakHoursCard','upcomingLoadCard'];
   timeBounded.forEach(function(id) {
     var el = document.getElementById(id);
     if (el) el.style.display = is28 ? '' : 'none';
   });
 
+  // Utilization by day — available for all periods
+  renderUtilByDay(s.utilizationByDay);
+
   if (is28) {
     renderWeeklyTrend(s.weeklyTrend);
     renderPeakHours(s.hourlyDistribution);
-    renderUtilByDay(s.utilizationByDay);
     renderUpcomingLoad(s.upcomingLoad);
   }
 
