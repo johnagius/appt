@@ -393,10 +393,15 @@ export async function isFollowUpSent(db: D1Database, appointmentId: string): Pro
 
 export async function insertFollowUp(db: D1Database, data: {
   appointment_id: string; clinic: string; patient_name: string; email: string; phone: string; date_key: string; sent_at: string;
-}): Promise<void> {
-  await db.prepare(
-    'INSERT INTO follow_ups (appointment_id, clinic, patient_name, email, phone, date_key, sent_at, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+}): Promise<boolean> {
+  // INSERT OR IGNORE + UNIQUE index on appointment_id gives us an atomic
+  // "claim" — returns true only for the one call that actually inserts the row,
+  // false for any concurrent/retry call. The cron uses this to guarantee
+  // at-most-one follow-up email per booking.
+  const res = await db.prepare(
+    'INSERT OR IGNORE INTO follow_ups (appointment_id, clinic, patient_name, email, phone, date_key, sent_at, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
   ).bind(data.appointment_id, data.clinic, data.patient_name, data.email, data.phone, data.date_key, data.sent_at, 'sent').run();
+  return (res.meta?.changes ?? 0) > 0;
 }
 
 export async function updateFollowUpResponse(db: D1Database, appointmentId: string, response: string, responseAt: string, questionText?: string): Promise<void> {

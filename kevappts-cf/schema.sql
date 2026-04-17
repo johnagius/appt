@@ -90,7 +90,11 @@ CREATE TABLE IF NOT EXISTS follow_ups (
 );
 
 CREATE INDEX IF NOT EXISTS idx_followup_status ON follow_ups(status);
-CREATE INDEX IF NOT EXISTS idx_followup_appt ON follow_ups(appointment_id);
+-- Drop any pre-existing non-unique index so the UNIQUE version below takes effect
+-- in prod. Unique so INSERT OR IGNORE in the cron acts as an atomic claim —
+-- only one scheduled() run can create the row for a given appointment_id.
+DROP INDEX IF EXISTS idx_followup_appt;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_followup_appt ON follow_ups(appointment_id);
 
 CREATE TABLE IF NOT EXISTS referrals (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

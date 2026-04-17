@@ -39,6 +39,7 @@ new_classes = ["RealtimeHub"]
 
 # Cron triggers:
 # 1. Daily schedule email at 7am Malta time (5am UTC summer)
-# 2. Appointment reminders every 10 minutes
+# 2. Every 10 min — drives appointment reminders + the 2pm Malta follow-up fire
+#    (the scheduled() handler gates each job by Malta local time, so DST is handled)
 [triggers]
 crons = ["0 5 * * *", "*/10 * * * *"]
