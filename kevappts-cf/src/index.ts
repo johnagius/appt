@@ -25,7 +25,7 @@ import {
 } from './api/admin';
 import { verifyAdminSig, computeAdminSig } from './services/crypto';
 import { todayKeyLocal, nowIso, parseTimeToMinutes, toDateKey, todayLocal, addDays } from './services/utils';
-import { getActiveAppointmentsByDate, getAppointmentByToken, getAttendedAppointmentsByDate, isFollowUpSent, insertFollowUp } from './db/queries';
+import { getActiveAppointmentsByDate, getAppointmentByToken, getFollowUpEligibleAppointmentsByDate, isFollowUpSent, insertFollowUp } from './db/queries';
 import { sendDailyDoctorSchedule, sendReminderEmail, sendFollowUpEmail } from './services/email';
 import { indexPage } from './pages/index-page';
 import { cancelPage } from './pages/cancel-page';
@@ -336,11 +336,11 @@ export default {
       }
     } catch (e) { console.error('Reminder error:', e); }
 
-    // Post-visit follow-up emails (24h after attended appointments)
+    // Post-visit follow-up emails (24h after appointments that weren't cancelled / no-show)
     try {
       const yesterdayKey = toDateKey(addDays(todayLocal(tz), -1));
-      const attendedYesterday = await getAttendedAppointmentsByDate(env.DB, yesterdayKey);
-      for (const appt of attendedYesterday) {
+      const eligibleYesterday = await getFollowUpEligibleAppointmentsByDate(env.DB, yesterdayKey);
+      for (const appt of eligibleYesterday) {
         if (!appt.email) continue;
         const alreadySent = await isFollowUpSent(env.DB, appt.id);
         if (alreadySent) continue;

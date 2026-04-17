@@ -420,9 +420,12 @@ export async function getFollowUpByAppointmentId(db: D1Database, appointmentId: 
   return db.prepare('SELECT * FROM follow_ups WHERE appointment_id = ?').bind(appointmentId).first();
 }
 
-export async function getAttendedAppointmentsByDate(db: D1Database, dateKey: string): Promise<Appointment[]> {
+export async function getFollowUpEligibleAppointmentsByDate(db: D1Database, dateKey: string): Promise<Appointment[]> {
+  // Most patients never click "confirm attended", so treat BOOKED as eligible too.
+  // Relocations still saw a doctor, so they're included.
+  // Exclude CANCELLED_CLIENT, CANCELLED_DOCTOR, NO_SHOW.
   const result = await db.prepare(
-    "SELECT * FROM appointments WHERE date_key = ? AND status = 'ATTENDED' ORDER BY start_time"
+    "SELECT * FROM appointments WHERE date_key = ? AND status IN ('BOOKED', 'ATTENDED', 'RELOCATED_SPINOLA') ORDER BY start_time"
   ).bind(dateKey).all<Appointment>();
   return result.results;
 }
