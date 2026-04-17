@@ -25,7 +25,7 @@ import {
 } from './api/admin';
 import { verifyAdminSig, computeAdminSig } from './services/crypto';
 import { todayKeyLocal, nowIso, parseTimeToMinutes, toDateKey, todayLocal, addDays, nowMinutesLocal } from './services/utils';
-import { getActiveAppointmentsByDate, getAppointmentByToken, getFollowUpEligibleAppointmentsByDate, isFollowUpSent, insertFollowUp } from './db/queries';
+import { getActiveAppointmentsByDate, getAppointmentByToken, getFollowUpEligibleAppointmentsByDate, insertFollowUp } from './db/queries';
 import { sendDailyDoctorSchedule, sendReminderEmail, sendFollowUpEmail } from './services/email';
 import { indexPage } from './pages/index-page';
 import { cancelPage } from './pages/cancel-page';
@@ -336,32 +336,47 @@ export default {
       }
     } catch (e) { console.error('Reminder error:', e); }
 
-    // Post-visit follow-up emails — fire once per day at 14:00 Malta time.
+    // Post-visit follow-up emails — fire during the 14:00-14:59 Malta window.
     // 2pm feels more genuine than a middle-of-night email. Gate on Malta minutes
     // since midnight so DST is handled automatically (12:00 UTC summer / 13:00 UTC winter).
-    // The */10 cron gives us a 14:00-14:09 window, which matches this gate.
+    // Duplicate protection comes from the UNIQUE index on follow_ups.appointment_id
+    // plus INSERT OR IGNORE in insertFollowUp — running the block multiple times
+    // within the window is safe and gives us retry chances if Resend hiccups.
     const maltaMin = nowMinutesLocal(tz);
-    if (maltaMin >= 14 * 60 && maltaMin < 14 * 60 + 10) {
+    if (maltaMin >= 14 * 60 && maltaMin < 15 * 60) {
       try {
         const yesterdayKey = toDateKey(addDays(todayLocal(tz), -1));
         const eligibleYesterday = await getFollowUpEligibleAppointmentsByDate(env.DB, yesterdayKey);
         for (const appt of eligibleYesterday) {
           if (!appt.email) continue;
-          const alreadySent = await isFollowUpSent(env.DB, appt.id);
-          if (alreadySent) continue;
+          // Claim first, send second. insertFollowUp uses INSERT OR IGNORE
+          // against a UNIQUE index on appointment_id, so only one run per
+          // booking can ever pass this gate — even under concurrent cron fires.
+          let claimed: boolean;
           try {
-            await sendFollowUpEmail(env, appt);
-            await insertFollowUp(env.DB, {
+            claimed = await insertFollowUp(env.DB, {
               appointment_id: appt.id,
               clinic: appt.clinic || 'potters',
               patient_name: appt.full_name,
               email: appt.email,
-              phone: appt.phone,
+              phone: appt.phone || '',
               date_key: appt.date_key,
               sent_at: nowIso(tz),
             });
+          } catch (e) { console.error('Follow-up claim error:', appt.id, e); continue; }
+          if (!claimed) continue;
+          try {
+            await sendFollowUpEmail(env, appt);
             console.log('Follow-up sent:', appt.id, appt.full_name);
-          } catch (e) { console.error('Follow-up send error:', appt.id, e); }
+          } catch (e) {
+            // Send failed after we claimed the row — roll back the claim so a
+            // future run can retry. Without this, the patient would silently
+            // never receive a follow-up.
+            console.error('Follow-up send error:', appt.id, e);
+            try {
+              await env.DB.prepare('DELETE FROM follow_ups WHERE appointment_id = ?').bind(appt.id).run();
+            } catch (e2) { console.error('Follow-up rollback error:', appt.id, e2); }
+          }
         }
       } catch (e) { console.error('Follow-up cron error:', e); }
     }
