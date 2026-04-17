@@ -24,7 +24,7 @@ import {
   apiAdminCreateTestBooking, apiAdminPurgeTestData, apiAdminTestFollowUp, apiAdminGetFollowUps, apiAdminToggleFollowUpHandled, apiAdminGetReferrals,
 } from './api/admin';
 import { verifyAdminSig, computeAdminSig } from './services/crypto';
-import { todayKeyLocal, nowIso, parseTimeToMinutes, toDateKey, todayLocal, addDays } from './services/utils';
+import { todayKeyLocal, nowIso, parseTimeToMinutes, toDateKey, todayLocal, addDays, nowMinutesLocal } from './services/utils';
 import { getActiveAppointmentsByDate, getAppointmentByToken, getFollowUpEligibleAppointmentsByDate, isFollowUpSent, insertFollowUp } from './db/queries';
 import { sendDailyDoctorSchedule, sendReminderEmail, sendFollowUpEmail } from './services/email';
 import { indexPage } from './pages/index-page';
@@ -336,29 +336,35 @@ export default {
       }
     } catch (e) { console.error('Reminder error:', e); }
 
-    // Post-visit follow-up emails (24h after appointments that weren't cancelled / no-show)
-    try {
-      const yesterdayKey = toDateKey(addDays(todayLocal(tz), -1));
-      const eligibleYesterday = await getFollowUpEligibleAppointmentsByDate(env.DB, yesterdayKey);
-      for (const appt of eligibleYesterday) {
-        if (!appt.email) continue;
-        const alreadySent = await isFollowUpSent(env.DB, appt.id);
-        if (alreadySent) continue;
-        try {
-          await sendFollowUpEmail(env, appt);
-          await insertFollowUp(env.DB, {
-            appointment_id: appt.id,
-            clinic: appt.clinic || 'potters',
-            patient_name: appt.full_name,
-            email: appt.email,
-            phone: appt.phone,
-            date_key: appt.date_key,
-            sent_at: nowIso(tz),
-          });
-          console.log('Follow-up sent:', appt.id, appt.full_name);
-        } catch (e) { console.error('Follow-up send error:', appt.id, e); }
-      }
-    } catch (e) { console.error('Follow-up cron error:', e); }
+    // Post-visit follow-up emails — fire once per day at 14:00 Malta time.
+    // 2pm feels more genuine than a middle-of-night email. Gate on Malta minutes
+    // since midnight so DST is handled automatically (12:00 UTC summer / 13:00 UTC winter).
+    // The */10 cron gives us a 14:00-14:09 window, which matches this gate.
+    const maltaMin = nowMinutesLocal(tz);
+    if (maltaMin >= 14 * 60 && maltaMin < 14 * 60 + 10) {
+      try {
+        const yesterdayKey = toDateKey(addDays(todayLocal(tz), -1));
+        const eligibleYesterday = await getFollowUpEligibleAppointmentsByDate(env.DB, yesterdayKey);
+        for (const appt of eligibleYesterday) {
+          if (!appt.email) continue;
+          const alreadySent = await isFollowUpSent(env.DB, appt.id);
+          if (alreadySent) continue;
+          try {
+            await sendFollowUpEmail(env, appt);
+            await insertFollowUp(env.DB, {
+              appointment_id: appt.id,
+              clinic: appt.clinic || 'potters',
+              patient_name: appt.full_name,
+              email: appt.email,
+              phone: appt.phone,
+              date_key: appt.date_key,
+              sent_at: nowIso(tz),
+            });
+            console.log('Follow-up sent:', appt.id, appt.full_name);
+          } catch (e) { console.error('Follow-up send error:', appt.id, e); }
+        }
+      } catch (e) { console.error('Follow-up cron error:', e); }
+    }
   },
 };
 
