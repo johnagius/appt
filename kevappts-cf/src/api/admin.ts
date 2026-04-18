@@ -111,8 +111,8 @@ export async function apiAdminGetDashboard(req: Request, env: Env): Promise<Resp
     ok: true,
     todayKey,
     tomorrowKey,
-    todayAppointments: todayAppts.filter(a => a.clinic !== 'spinola'),
-    tomorrowAppointments: tomorrowAppts.filter(a => a.clinic !== 'spinola'),
+    todayAppointments: todayAppts.filter(a => a.clinic !== 'spinola' && a.clinic !== 'linda'),
+    tomorrowAppointments: tomorrowAppts.filter(a => a.clinic !== 'spinola' && a.clinic !== 'linda'),
     doctorOffEntries: futureOffRows,
     extraSlotEntries: futureExtraRows,
     workingHours: cfg.workingHours,
@@ -132,8 +132,8 @@ export async function apiAdminGetDateAppointments(req: Request, env: Env): Promi
   if (!dateKey) return json({ ok: false, reason: 'Missing date.' }, 400);
 
   const appts = await getNonCancelledAppointmentsByDate(env.DB, dateKey);
-  // Doctor page is for Potter's only — exclude direct Spinola bookings
-  const pottersOnly = appts.filter(a => a.clinic !== 'spinola');
+  // Doctor page is for Dr Kevin only — exclude Spinola and Linda bookings.
+  const pottersOnly = appts.filter(a => a.clinic !== 'spinola' && a.clinic !== 'linda');
   return json({ ok: true, dateKey, appointments: pottersOnly });
 }
 
@@ -828,9 +828,12 @@ export async function apiAdminGetStatistics(req: Request, env: Env): Promise<Res
   const future7 = toDateKey(addDays(today, 7));
 
   // For week/28: fetch range. For all: fetch everything.
-  const periodAppts = period === 'all'
+  const rawPeriodAppts = period === 'all'
     ? await getAllAppointments(env.DB)
     : await getAppointmentsByDateRange(env.DB, periodFrom, future7);
+  // Exclude Linda's physio bookings from Kevin/Spinola statistics — they have
+  // their own admin tab that queries clinic='linda' directly.
+  const periodAppts = rawPeriodAppts.filter(a => a.clinic !== 'linda');
 
   // Helper: compute core stats from any appointment array
   function computeCoreStats(appts: any[]) {
@@ -1384,7 +1387,9 @@ export async function apiAdminGetFollowUps(req: Request, env: Env): Promise<Resp
 
   const url = new URL(req.url);
   const status = (url.searchParams.get('status') || '').trim() || undefined;
-  const followUps = await getFollowUps(env.DB, status);
+  const all = await getFollowUps(env.DB, status);
+  // Kevin's follow-ups tab should not see Linda's physio follow-ups.
+  const followUps = all.filter((f: any) => f.clinic !== 'linda');
   return json({ ok: true, followUps });
 }
 
@@ -1409,4 +1414,128 @@ export async function apiAdminToggleFollowUpHandled(req: Request, env: Env): Pro
   const newStatus = handled ? 'handled' : 'responded';
   await env.DB.prepare('UPDATE follow_ups SET status = ? WHERE id = ?').bind(newStatus, id).run();
   return json({ ok: true });
+}
+
+// ─── Linda (Physiotherapy) admin ─────────────────────────────
+// All four handlers below scope strictly to clinic='linda'. They read only
+// from the appointments / follow_ups / review_sent tables and never touch
+// Kevin's or Spinola's data or endpoints.
+
+export async function apiAdminGetLindaStats(req: Request, env: Env): Promise<Response> {
+  const deny = await requireAdmin(req, env);
+  if (deny) return deny;
+
+  const rows = await env.DB.prepare(
+    "SELECT status, date_key, start_time, full_name, email, phone FROM appointments WHERE clinic = 'linda' ORDER BY date_key, start_time"
+  ).all<{ status: string; date_key: string; start_time: string; full_name: string; email: string; phone: string }>();
+
+  const appts = rows.results;
+  let total = 0, booked = 0, cancelled = 0, attended = 0, noShow = 0;
+  const byDate: Record<string, number> = {};
+  const upcoming: any[] = [];
+  const tz = env.TIMEZONE;
+  const todayKey = toDateKey(todayLocal(tz));
+
+  for (const a of appts) {
+    total++;
+    if (a.status === 'BOOKED') booked++;
+    if (a.status.includes('CANCELLED')) cancelled++;
+    if (a.status === 'ATTENDED') attended++;
+    if (a.status === 'NO_SHOW') noShow++;
+    if (!a.status.includes('CANCELLED')) {
+      byDate[a.date_key] = (byDate[a.date_key] || 0) + 1;
+    }
+    if (a.status === 'BOOKED' && a.date_key >= todayKey) {
+      upcoming.push({
+        dateKey: a.date_key, startTime: a.start_time,
+        fullName: a.full_name, email: a.email, phone: a.phone,
+      });
+    }
+  }
+
+  return json({
+    ok: true,
+    totals: { total, booked, cancelled, attended, noShow },
+    byDate,
+    upcoming,
+  });
+}
+
+export async function apiAdminGetLindaAppointments(req: Request, env: Env): Promise<Response> {
+  const deny = await requireAdmin(req, env);
+  if (deny) return deny;
+
+  const rows = await env.DB.prepare(
+    "SELECT * FROM appointments WHERE clinic = 'linda' ORDER BY date_key DESC, start_time"
+  ).all<Appointment>();
+  return json({ ok: true, appointments: rows.results });
+}
+
+export async function apiAdminGetLindaReviewPatients(req: Request, env: Env): Promise<Response> {
+  const deny = await requireAdmin(req, env);
+  if (deny) return deny;
+
+  const tz = env.TIMEZONE;
+  const url = new URL(req.url);
+  const dateKey = (url.searchParams.get('date') || '').trim() || toDateKey(todayLocal(tz));
+
+  const rows = await env.DB.prepare(
+    "SELECT * FROM appointments WHERE clinic = 'linda' AND date_key = ?"
+  ).bind(dateKey).all<Appointment>();
+
+  const patients: any[] = [];
+  for (const a of rows.results) {
+    if (!a.email || a.status.includes('CANCELLED')) continue;
+    const reviewSent = await isReviewSent(env.DB, a.id);
+    patients.push({
+      appointmentId: a.id,
+      fullName: a.full_name,
+      email: a.email,
+      startTime: a.start_time,
+      serviceName: a.service_name,
+      status: a.status,
+      reviewSent,
+    });
+  }
+  return json({ ok: true, patients, dateKey });
+}
+
+export async function apiAdminSendLindaReviewRequests(req: Request, env: Env): Promise<Response> {
+  const deny = await requireAdmin(req, env);
+  if (deny) return deny;
+
+  const tz = env.TIMEZONE;
+  const payload: any = await req.json();
+  const appointmentIds: string[] = payload.appointmentIds || [];
+  const teamNames: string[] = payload.teamNames || [env.LINDA_DOCTOR_NAME || 'Linda'];
+  const dateKey = (payload.dateKey || '').trim() || toDateKey(todayLocal(tz));
+
+  if (!appointmentIds.length) return json({ ok: false, reason: 'No patients selected.' }, 400);
+
+  const rows = await env.DB.prepare(
+    "SELECT * FROM appointments WHERE clinic = 'linda' AND date_key = ?"
+  ).bind(dateKey).all<Appointment>();
+
+  const idSet = new Set(appointmentIds);
+  let sent = 0;
+  for (const a of rows.results) {
+    if (!idSet.has(a.id) || !a.email) continue;
+    try {
+      await sendReviewRequestEmail(env, a, 'linda', teamNames);
+      await markReviewSent(env.DB, a.id, nowIso(tz));
+      sent++;
+    } catch (e) { console.error('Linda review send error:', a.id, e); }
+  }
+
+  return json({ ok: true, message: `Review request sent to ${sent} patient(s).`, sent });
+}
+
+export async function apiAdminGetLindaFollowUps(req: Request, env: Env): Promise<Response> {
+  const deny = await requireAdmin(req, env);
+  if (deny) return deny;
+
+  const url = new URL(req.url);
+  const status = (url.searchParams.get('status') || '').trim() || undefined;
+  const followUps = await getFollowUps(env.DB, status, 'linda');
+  return json({ ok: true, followUps });
 }

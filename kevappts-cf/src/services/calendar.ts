@@ -38,7 +38,9 @@ export async function createCalendarEvent(env: Env, appt: Appointment): Promise<
 
   const calId = appt.clinic === 'spinola'
     ? env.GOOGLE_SPINOLA_CALENDAR_ID
-    : env.GOOGLE_CALENDAR_ID;
+    : appt.clinic === 'linda'
+      ? env.LINDA_CALENDAR_ID
+      : env.GOOGLE_CALENDAR_ID;
   if (!calId) return '';
 
   try {
@@ -84,12 +86,14 @@ export async function createCalendarEvent(env: Env, appt: Appointment): Promise<
 }
 
 /** Delete a calendar event (on cancellation). */
-export async function deleteCalendarEvent(env: Env, eventId: string, clinic: 'potters' | 'spinola' = 'potters'): Promise<void> {
+export async function deleteCalendarEvent(env: Env, eventId: string, clinic: 'potters' | 'spinola' | 'linda' = 'potters'): Promise<void> {
   if (!eventId || !env.GOOGLE_REFRESH_TOKEN || !env.GOOGLE_CLIENT_ID) return;
 
   const calId = clinic === 'spinola'
     ? env.GOOGLE_SPINOLA_CALENDAR_ID
-    : env.GOOGLE_CALENDAR_ID;
+    : clinic === 'linda'
+      ? env.LINDA_CALENDAR_ID
+      : env.GOOGLE_CALENDAR_ID;
   if (!calId) return;
 
   try {

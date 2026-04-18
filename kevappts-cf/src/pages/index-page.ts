@@ -159,6 +159,33 @@ export function indexPage(env: Env, bookingSource?: string): string {
       .topRow .topCard.pickCard{ grid-column: auto; }
     }
 
+    /* When Summary + Clinic Hours are hidden, let the Services/Date card span full width */
+    body.compact-top .topRow{ grid-template-columns: 1fr; }
+    body.compact-top .topRow .topCard.pickCard{ grid-column: auto; }
+
+    /* Physiotherapy CTA at bottom of page */
+    .physioCta{
+      margin: 18px 0 10px 0;
+      text-align:center;
+    }
+    .physioCta a{
+      display:inline-block;
+      background:#10b981;
+      color:#fff;
+      text-decoration:none;
+      padding:16px 28px;
+      border-radius:999px;
+      font-weight:800;
+      font-size:16px;
+      box-shadow:0 2px 8px rgba(16,185,129,.25);
+    }
+    .physioCta a:hover{ background:#059669; }
+    .physioCta .sub{
+      color: var(--muted);
+      font-size:13px;
+      margin:8px 0 0 0;
+    }
+
     .topCard{
       padding:12px;
     }
@@ -797,20 +824,24 @@ export function indexPage(env: Env, bookingSource?: string): string {
 
     <!-- TOP: 3 columns -->
     <div class="topRow">
-      <!-- Summary -->
-      <div class="card topCard">
-        <p class="topTitle" data-i18n="summary">Summary</p>
-        <p class="topLine" id="sumService">Service: Clinic Consultation (10 mins)</p>
-        <p class="topLine" id="sumDate">Date: —</p>
-        <p class="topLine" id="sumTime">Time: —</p>
-        <p class="topLine" id="sumLoc">Location: Potter’s Pharmacy Clinic</p>
-      </div>
+      <!-- Summary + Clinic hours hidden for the time being. Delete the wrapper
+           div (id="hiddenTopCards") to restore both cards. -->
+      <div id="hiddenTopCards" style="display:none;">
+        <!-- Summary -->
+        <div class="card topCard">
+          <p class="topTitle" data-i18n="summary">Summary</p>
+          <p class="topLine" id="sumService">Service: Clinic Consultation (10 mins)</p>
+          <p class="topLine" id="sumDate">Date: —</p>
+          <p class="topLine" id="sumTime">Time: —</p>
+          <p class="topLine" id="sumLoc">Location: Potter’s Pharmacy Clinic</p>
+        </div>
 
-      <!-- Clinic hours -->
-      <div class="card topCard">
-        <p class="topTitle" data-i18n="clinicHours">Clinic hours</p>
-        <div id="clinicHoursInfo"></div>
-        <p class="topLine" id="slotInfoLine" data-i18n="slotInfo">Slots are {duration} minutes each.</p>
+        <!-- Clinic hours -->
+        <div class="card topCard">
+          <p class="topTitle" data-i18n="clinicHours">Clinic hours</p>
+          <div id="clinicHoursInfo"></div>
+          <p class="topLine" id="slotInfoLine" data-i18n="slotInfo">Slots are {duration} minutes each.</p>
+        </div>
       </div>
 
       <!-- Services + Date moved into the empty third column -->
@@ -928,6 +959,12 @@ export function indexPage(env: Env, bookingSource?: string): string {
       </div>
 
       <div id="resultMsg" class="msg"></div>
+
+      <!-- Physiotherapy CTA — date-gated, auto-hides after 7 May 2026 -->
+      <div id="physioLinkWrap" class="physioCta" style="display:none;">
+        <a href="/physio" id="physioLinkBtn">Physiotherapy Bookings Here</a>
+        <p class="sub">Linda — Physiotherapist · 24 April – 7 May 2026 · Potter's Clinic</p>
+      </div>
     </div>
 
   </div>
@@ -3833,6 +3870,21 @@ export function indexPage(env: Env, bookingSource?: string): string {
     }
 
     init();
+
+    // Hide Summary + Clinic Hours cards "for the time being" and let the
+    // Services/Date card fill the row. The topmost card wrapper is already
+    // display:none in the HTML; this just collapses the grid to 1 column.
+    document.body.classList.add('compact-top');
+
+    // Physiotherapy CTA — show the button only before 8 May 2026 Malta time.
+    // Malta is UTC+2 during Apr–May (CEST) so no DST risk inside this window.
+    try {
+      var physioCutoff = new Date('2026-05-08T00:00:00+02:00').getTime();
+      if (Date.now() < physioCutoff) {
+        var pw = document.getElementById('physioLinkWrap');
+        if (pw) pw.style.display = 'block';
+      }
+    } catch (e) { /* no-op */ }
 
     // Show reload button only in PWA/standalone mode (no browser chrome)
     if (window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches) {

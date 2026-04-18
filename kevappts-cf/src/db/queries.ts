@@ -414,11 +414,15 @@ export async function updateFollowUpResponse(db: D1Database, appointmentId: stri
   }
 }
 
-export async function getFollowUps(db: D1Database, status?: string): Promise<any[]> {
-  if (status) {
-    return (await db.prepare('SELECT * FROM follow_ups WHERE status = ? ORDER BY sent_at DESC').bind(status).all()).results;
-  }
-  return (await db.prepare('SELECT * FROM follow_ups ORDER BY sent_at DESC LIMIT 100').all()).results;
+export async function getFollowUps(db: D1Database, status?: string, clinic?: string): Promise<any[]> {
+  const clauses: string[] = [];
+  const binds: string[] = [];
+  if (status) { clauses.push('status = ?'); binds.push(status); }
+  if (clinic) { clauses.push('clinic = ?'); binds.push(clinic); }
+  const where = clauses.length ? ' WHERE ' + clauses.join(' AND ') : '';
+  const limit = clauses.length ? '' : ' LIMIT 100';
+  const sql = 'SELECT * FROM follow_ups' + where + ' ORDER BY sent_at DESC' + limit;
+  return (await db.prepare(sql).bind(...binds).all()).results;
 }
 
 export async function getFollowUpByAppointmentId(db: D1Database, appointmentId: string): Promise<any> {
