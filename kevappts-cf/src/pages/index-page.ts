@@ -850,6 +850,10 @@ export function indexPage(env: Env, bookingSource?: string): string {
           <div>
             <div class="sectionTitle" data-i18n="services">Services</div>
             <div id="services"></div>
+            <!-- Physiotherapy CTA — shown only when Linda is enabled + has available dates -->
+            <div id="physioLinkWrap" class="physioCta" style="display:none;margin-top:10px;">
+              <a href="/physio" id="physioLinkBtn">Physiotherapy Bookings Here</a>
+            </div>
           </div>
 
           <div>
@@ -959,12 +963,6 @@ export function indexPage(env: Env, bookingSource?: string): string {
       </div>
 
       <div id="resultMsg" class="msg"></div>
-
-      <!-- Physiotherapy CTA — date-gated, auto-hides after 7 May 2026 -->
-      <div id="physioLinkWrap" class="physioCta" style="display:none;">
-        <a href="/physio" id="physioLinkBtn">Physiotherapy Bookings Here</a>
-        <p class="sub">Linda — Physiotherapist · 24 April – 7 May 2026 · Potter's Clinic</p>
-      </div>
     </div>
 
   </div>
