@@ -17,8 +17,6 @@ export interface Env {
   SPINOLA_LOCATION: string;
   SPINOLA_DOCTOR_NAME: string;
   SPINOLA_LOCATION_DETAILS: string;
-  EMAIL_FROM: string;
-  APP_BASE_URL: string;
 }
 
 export interface Appointment {
