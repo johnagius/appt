@@ -192,6 +192,36 @@ export async function sendSpinolaConfirmationEmail(env: Env, appt: Appointment):
   await sendEmail(env, appt.email, subject, html);
 }
 
+// ─── 2b. Linda (Physiotherapy) Booking Confirmation ───────
+
+export async function sendLindaConfirmationEmail(env: Env, appt: Appointment): Promise<void> {
+  if (!appt.email) return;
+  const cancelUrl = await buildCancelLink(env, appt.token);
+  const rescheduleUrl = await buildRescheduleLink(env, appt.token);
+  const physioName = env.LINDA_DOCTOR_NAME || 'Linda';
+  const location = appt.location || env.LINDA_LOCATION || "Potter's Clinic";
+
+  const subject = `Appointment Confirmed - ${physioName} Physiotherapy (${appt.date_key} ${appt.start_time})`;
+  const html = `
+<div style="font-family:Arial,sans-serif;line-height:1.4;color:#111827;">
+  <h2 style="margin:0 0 10px 0;">Physiotherapy Appointment Confirmed</h2>
+  <p style="margin:0 0 10px 0;">Your appointment with <b>${escapeHtml(physioName)}</b>, Physiotherapist, has been confirmed.</p>
+  <table style="border-collapse:collapse;width:100%;max-width:520px;">
+    <tr><td style="padding:6px 0;color:#6b7280;">Service</td><td style="padding:6px 0;"><b>${escapeHtml(appt.service_name)}</b></td></tr>
+    <tr><td style="padding:6px 0;color:#6b7280;">Physiotherapist</td><td style="padding:6px 0;"><b>${escapeHtml(physioName)}</b></td></tr>
+    <tr><td style="padding:6px 0;color:#6b7280;">Date</td><td style="padding:6px 0;"><b>${escapeHtml(appt.date_key)}</b></td></tr>
+    <tr><td style="padding:6px 0;color:#6b7280;">Time</td><td style="padding:6px 0;"><b>${escapeHtml(appt.start_time)} - ${escapeHtml(appt.end_time)}</b></td></tr>
+    <tr><td style="padding:6px 0;color:#6b7280;">Location</td><td style="padding:6px 0;"><b>${escapeHtml(location)}</b></td></tr>
+  </table>
+  ${getMapHtml(location)}
+  ${buildManageSection(cancelUrl, rescheduleUrl)}
+  ${buildCalendarLinks(appt)}
+  ${buildFooter(appt)}
+</div>`;
+
+  await sendEmail(env, appt.email, subject, html);
+}
+
 // ─── 3. Doctor New Booking Notification ───────────────────
 
 export async function sendDoctorBookingEmail(env: Env, appt: Appointment, dayList: Appointment[]): Promise<void> {
@@ -463,22 +493,25 @@ export async function sendCustomNotificationEmail(env: Env, appt: Appointment, c
 
 // ─── 10. Google Review Request ────────────────────────────
 
-export async function sendReviewRequestEmail(env: Env, appt: Appointment, location: 'potters' | 'spinola', teamNames: string[]): Promise<void> {
+export async function sendReviewRequestEmail(env: Env, appt: Appointment, location: 'potters' | 'spinola' | 'linda', teamNames: string[]): Promise<void> {
   if (!appt.email) return;
 
   const firstName = (appt.full_name || '').split(' ')[0] || 'there';
   const isPotters = location === 'potters';
-  const placeName = isPotters ? "Potter's Pharmacy" : 'Spinola Clinic';
-  const reviewUrl = isPotters
-    ? 'https://search.google.com/local/writereview?placeid=ChIJ3dCu7mtFDhMRYBPbRR0pgtE'
-    : 'https://search.google.com/local/writereview?placeid=ChIJ3dCu7mtFDhMRYBPbRR0pgtE'; // TODO: Replace with actual Spinola place ID when available
+  const isLinda = location === 'linda';
+  const placeName = isPotters
+    ? "Potter's Pharmacy"
+    : isLinda
+      ? `${env.LINDA_DOCTOR_NAME || 'Linda'} — Physiotherapy`
+      : 'Spinola Clinic';
+  const reviewUrl = 'https://search.google.com/local/writereview?placeid=ChIJ3dCu7mtFDhMRYBPbRR0pgtE';
 
   let teamLine = '';
   if (teamNames.length === 1) teamLine = teamNames[0];
   else if (teamNames.length === 2) teamLine = teamNames[0] + ' &amp; ' + teamNames[1];
   else if (teamNames.length >= 3) teamLine = teamNames.slice(0, -1).join(', ') + ' &amp; ' + teamNames[teamNames.length - 1];
 
-  const accentColor = isPotters ? '#2563eb' : '#8b5cf6';
+  const accentColor = isPotters ? '#2563eb' : isLinda ? '#10b981' : '#8b5cf6';
 
   const subject = `We'd love your feedback - ${placeName}`;
   const html = `<!DOCTYPE html>
@@ -524,7 +557,11 @@ export async function sendFollowUpEmail(env: Env, appt: Appointment): Promise<vo
 
   const firstName = (appt.full_name || '').split(' ')[0] || 'there';
   const clinic = appt.clinic || 'potters';
-  const doctorName = clinic === 'spinola' ? (env.SPINOLA_DOCTOR_NAME || 'Dr James') : 'Dr Kevin';
+  const doctorName = clinic === 'spinola'
+    ? (env.SPINOLA_DOCTOR_NAME || 'Dr James')
+    : clinic === 'linda'
+      ? (env.LINDA_DOCTOR_NAME || 'Linda')
+      : 'Dr Kevin';
   const baseUrl = getBaseUrl(env);
   const sig = await computeSig('followup|' + appt.id, env.SIGNING_SECRET);
   const responseBase = baseUrl + '/followup?id=' + encodeURIComponent(appt.id) + '&sig=' + encodeURIComponent(sig) + '&c=' + clinic;

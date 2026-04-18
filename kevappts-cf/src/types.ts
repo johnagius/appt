@@ -17,6 +17,9 @@ export interface Env {
   SPINOLA_LOCATION: string;
   SPINOLA_DOCTOR_NAME: string;
   SPINOLA_LOCATION_DETAILS: string;
+  LINDA_CALENDAR_ID: string;
+  LINDA_DOCTOR_NAME: string;
+  LINDA_LOCATION: string;
 }
 
 export interface Appointment {

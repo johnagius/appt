@@ -10,6 +10,8 @@ CLINIC_NAME = "Potter's Pharmacy Clinic"
 SPINOLA_LOCATION = "Spinola Clinic"
 SPINOLA_DOCTOR_NAME = "Dr James"
 SPINOLA_LOCATION_DETAILS = "Near McDonald's, Love Statue, near bus stop, in Spinola"
+LINDA_DOCTOR_NAME = "Linda"
+LINDA_LOCATION = "Potter's Clinic"
 
 # Secrets (set via `wrangler secret put`):
 # SIGNING_SECRET          — HMAC key for cancel/action links (reuse from GAS)
@@ -21,6 +23,8 @@ SPINOLA_LOCATION_DETAILS = "Near McDonald's, Love Statue, near bus stop, in Spin
 # GOOGLE_REFRESH_TOKEN    — OAuth2 refresh token (one-time setup)
 # GOOGLE_CALENDAR_ID      — Potter's Google Calendar ID
 # GOOGLE_SPINOLA_CALENDAR_ID — Spinola Google Calendar ID
+# LINDA_CALENDAR_ID       — Linda's (physiotherapy) Google Calendar ID
+#   value: a18cc8ed238199dd6f03ca81085c202a5f032850f65782631aed5a3fb5fa431a@group.calendar.google.com
 
 [[d1_databases]]
 binding = "DB"

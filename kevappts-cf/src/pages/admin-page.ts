@@ -400,6 +400,7 @@ export function adminPage(sig: string): string {
     <div class="tab" data-tab="reviews" onclick="switchTab('reviews')">Reviews</div>
     <div class="tab" data-tab="followups" onclick="switchTab('followups')">Follow-ups</div>
     <div class="tab" data-tab="referrals" onclick="switchTab('referrals')">Referrals</div>
+    <div class="tab" data-tab="linda" onclick="switchTab('linda')" style="background:#ecfdf5;color:#065f46;">Linda</div>
     <div class="tab" data-tab="settings" onclick="switchTab('settings')">Settings</div>
   </div>
 
@@ -922,6 +923,41 @@ export function adminPage(sig: string): string {
   </div>
 </div>
 
+<!-- LINDA (PHYSIOTHERAPY) TAB -->
+<div class="tab-content" id="tab-linda" style="display:none;">
+  <div class="card" style="padding:18px;margin-bottom:14px;background:#ecfdf5;border-left:4px solid #10b981;">
+    <h3 style="margin:0 0 4px 0;font-size:16px;font-weight:900;color:#065f46;">Linda &mdash; Physiotherapist</h3>
+    <p style="margin:0;color:#065f46;font-size:13px;">Potter's Clinic &middot; 24 April – 7 May 2026 &middot; 30-min sessions</p>
+  </div>
+
+  <div class="card" style="padding:18px;margin-bottom:14px;">
+    <h3 style="margin:0 0 10px 0;font-size:15px;font-weight:800;">Statistics</h3>
+    <div id="lindaStats"><div class="empty">Loading...</div></div>
+  </div>
+
+  <div class="card" style="padding:18px;margin-bottom:14px;">
+    <h3 style="margin:0 0 10px 0;font-size:15px;font-weight:800;">Upcoming Appointments</h3>
+    <div id="lindaUpcoming"><div class="empty">Loading...</div></div>
+  </div>
+
+  <div class="card" style="padding:18px;margin-bottom:14px;">
+    <h3 style="margin:0 0 6px 0;font-size:15px;font-weight:800;">Reviews</h3>
+    <p style="margin:0 0 10px 0;color:#6b7280;font-size:13px;">Send Google review requests to Linda's patients from a selected date.</p>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;">
+      <label style="font-size:13px;color:#374151;">Date:</label>
+      <input type="date" id="lindaReviewDate" min="2026-04-24" max="2026-05-07" style="padding:6px;border:1px solid #e5e7eb;border-radius:6px;">
+      <button class="btn" onclick="loadLindaReviews()">Load patients</button>
+    </div>
+    <div id="lindaReviewList"><div class="empty">Pick a date and click Load.</div></div>
+    <button class="btn btn-primary" id="lindaReviewSendBtn" style="display:none;margin-top:10px;" onclick="sendLindaReviews()">Send Review Requests</button>
+  </div>
+
+  <div class="card" style="padding:18px;">
+    <h3 style="margin:0 0 10px 0;font-size:15px;font-weight:800;">Follow-ups</h3>
+    <div id="lindaFollowUps"><div class="empty">Loading...</div></div>
+  </div>
+</div>
+
 <!-- Patient History modal -->
 <div class="overlay" id="patientOverlay">
   <div class="patient-modal">
@@ -1297,6 +1333,124 @@ function switchTab(name) {
   if (name === 'reviews') loadReviewPatients();
   if (name === 'followups') loadAdminFollowUps();
   if (name === 'referrals') loadReferrals();
+  if (name === 'linda') loadLindaData();
+}
+
+// ─── Linda (Physiotherapy) admin ─────────────────────────────
+async function loadLindaData() {
+  loadLindaStats();
+  loadLindaFollowUps();
+  // Default reviews date to today if within window
+  var di = document.getElementById('lindaReviewDate');
+  if (di && !di.value) {
+    var today = new Date().toISOString().slice(0, 10);
+    if (today >= '2026-04-24' && today <= '2026-05-07') di.value = today;
+    else di.value = '2026-04-24';
+  }
+}
+
+async function loadLindaStats() {
+  var el = document.getElementById('lindaStats');
+  var up = document.getElementById('lindaUpcoming');
+  try {
+    var res = await apiCall('linda-stats');
+    if (!res || !res.ok) { el.innerHTML = '<div class="empty">Failed to load.</div>'; return; }
+    var t = res.totals;
+    el.innerHTML =
+      '<div class="stats-row" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px;">' +
+        '<div class="stat"><div class="num">' + t.total + '</div><div class="label">Total</div></div>' +
+        '<div class="stat"><div class="num">' + t.booked + '</div><div class="label">Booked</div></div>' +
+        '<div class="stat"><div class="num">' + t.attended + '</div><div class="label">Attended</div></div>' +
+        '<div class="stat"><div class="num">' + t.cancelled + '</div><div class="label">Cancelled</div></div>' +
+        '<div class="stat"><div class="num">' + t.noShow + '</div><div class="label">No-Show</div></div>' +
+      '</div>';
+
+    if (!res.upcoming || !res.upcoming.length) {
+      up.innerHTML = '<div class="empty">No upcoming appointments.</div>';
+    } else {
+      var html = '<div class="table-wrap"><table><thead><tr><th>Date</th><th>Time</th><th>Name</th><th>Email</th><th>Phone</th></tr></thead><tbody>';
+      res.upcoming.forEach(function(a){
+        html += '<tr><td>' + esc(a.dateKey) + '</td><td>' + esc(a.startTime) + '</td><td>' + esc(a.fullName) + '</td><td>' + esc(a.email) + '</td><td>' + esc(a.phone) + '</td></tr>';
+      });
+      html += '</tbody></table></div>';
+      up.innerHTML = html;
+    }
+  } catch (e) {
+    el.innerHTML = '<div class="empty">Error loading stats.</div>';
+  }
+}
+
+async function loadLindaReviews() {
+  var dateInput = document.getElementById('lindaReviewDate');
+  var date = dateInput.value;
+  var list = document.getElementById('lindaReviewList');
+  var btn = document.getElementById('lindaReviewSendBtn');
+  if (!date) { list.innerHTML = '<div class="empty">Please pick a date.</div>'; btn.style.display = 'none'; return; }
+  list.innerHTML = '<div class="empty">Loading...</div>';
+  try {
+    var res = await apiCall('linda-reviews?date=' + encodeURIComponent(date));
+    if (!res || !res.ok || !res.patients || !res.patients.length) {
+      list.innerHTML = '<div class="empty">No patients to review on this date.</div>';
+      btn.style.display = 'none';
+      return;
+    }
+    var html = '<div class="table-wrap"><table><thead><tr><th><input type="checkbox" onchange="toggleLinda(this)"></th><th>Time</th><th>Name</th><th>Email</th><th>Sent?</th></tr></thead><tbody>';
+    res.patients.forEach(function(p){
+      var disabled = p.reviewSent ? 'disabled' : '';
+      html += '<tr><td><input type="checkbox" class="linda-cb" data-id="' + esc(p.appointmentId) + '" ' + disabled + '></td>' +
+        '<td>' + esc(p.startTime) + '</td>' +
+        '<td>' + esc(p.fullName) + '</td>' +
+        '<td>' + esc(p.email) + '</td>' +
+        '<td>' + (p.reviewSent ? 'Yes' : 'No') + '</td></tr>';
+    });
+    html += '</tbody></table></div>';
+    list.innerHTML = html;
+    btn.style.display = 'inline-block';
+  } catch (e) {
+    list.innerHTML = '<div class="empty">Error loading patients.</div>';
+  }
+}
+
+function toggleLinda(master) {
+  var cbs = document.querySelectorAll('#lindaReviewList .linda-cb:not([disabled])');
+  for (var i = 0; i < cbs.length; i++) cbs[i].checked = master.checked;
+}
+
+async function sendLindaReviews() {
+  var boxes = document.querySelectorAll('#lindaReviewList .linda-cb:checked');
+  var ids = Array.prototype.slice.call(boxes).map(function(b){ return b.getAttribute('data-id'); });
+  if (!ids.length) { showMsg('globalMsg', 'bad', 'Select at least one patient.'); return; }
+  var date = document.getElementById('lindaReviewDate').value;
+  try {
+    var res = await apiCall('linda-reviews/send', { body: { appointmentIds: ids, dateKey: date } });
+    if (res && res.ok) {
+      showMsg('globalMsg', 'good', res.message || ('Sent ' + res.sent + ' review request(s).'));
+      loadLindaReviews();
+    } else {
+      showMsg('globalMsg', 'bad', (res && res.reason) || 'Failed to send.');
+    }
+  } catch (e) {
+    showMsg('globalMsg', 'bad', 'Network error.');
+  }
+}
+
+async function loadLindaFollowUps() {
+  var el = document.getElementById('lindaFollowUps');
+  try {
+    var res = await apiCall('linda-follow-ups');
+    if (!res || !res.ok || !res.followUps || !res.followUps.length) {
+      el.innerHTML = '<div class="empty">No follow-ups yet.</div>';
+      return;
+    }
+    var html = '<div class="table-wrap"><table><thead><tr><th>Date</th><th>Patient</th><th>Email</th><th>Response</th><th>Status</th></tr></thead><tbody>';
+    res.followUps.forEach(function(f){
+      html += '<tr><td>' + esc(f.date_key) + '</td><td>' + esc(f.patient_name) + '</td><td>' + esc(f.email) + '</td><td>' + esc(f.response || '') + '</td><td>' + esc(f.status) + '</td></tr>';
+    });
+    html += '</tbody></table></div>';
+    el.innerHTML = html;
+  } catch (e) {
+    el.innerHTML = '<div class="empty">Error loading follow-ups.</div>';
+  }
 }
 
 function getStatusBadge(status) {

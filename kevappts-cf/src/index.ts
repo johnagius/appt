@@ -13,6 +13,7 @@
 import type { Env } from './types';
 import { RealtimeHub } from './realtime';
 import { apiPoll, apiInit, apiGetDates, apiGetAvailability, apiGetSpinolaAvailability, apiBook, apiBookSpinola } from './api/public';
+import { apiPhysioInit, apiPhysioAvailability, apiPhysioBook } from './api/physio';
 import { apiGetCancelInfo, apiCancelAppointment, apiDoctorAction, apiGetRescheduleInfo, apiGetRescheduleSlots, apiRescheduleAppointment, apiFollowUpResponse } from './api/cancel';
 import {
   apiAdminGetDashboard, apiAdminGetDateAppointments, apiAdminMarkDoctorOff,
@@ -22,6 +23,7 @@ import {
   apiAdminGetSettings, apiAdminSaveSettings, apiAdminGetStatistics,
   apiAdminMarkAttendance, apiAdminGetPatientHistory, apiAdminDoctorOffDates,
   apiAdminCreateTestBooking, apiAdminPurgeTestData, apiAdminTestFollowUp, apiAdminGetFollowUps, apiAdminToggleFollowUpHandled, apiAdminGetReferrals,
+  apiAdminGetLindaStats, apiAdminGetLindaReviewPatients, apiAdminSendLindaReviewRequests, apiAdminGetLindaFollowUps, apiAdminGetLindaAppointments,
 } from './api/admin';
 import { verifyAdminSig, computeAdminSig } from './services/crypto';
 import { todayKeyLocal, nowIso, parseTimeToMinutes, toDateKey, todayLocal, addDays, nowMinutesLocal } from './services/utils';
@@ -34,6 +36,7 @@ import { adminPage } from './pages/admin-page';
 import { doctorPage } from './pages/doctor-page';
 import { reschedulePage } from './pages/reschedule-page';
 import { followupPage } from './pages/followup-page';
+import { physioPage } from './pages/physio-page';
 
 export { RealtimeHub };
 
@@ -103,6 +106,11 @@ export default {
       if (path === '/api/book' && method === 'POST') return apiBook(request, env);
       if (path === '/api/book-spinola' && method === 'POST') return apiBookSpinola(request, env);
 
+      // ─── Linda (Physiotherapy) Public API ─────────
+      if (path === '/api/physio-init' && method === 'GET') return apiPhysioInit(env);
+      if (path === '/api/physio-availability' && method === 'GET') return apiPhysioAvailability(request, env);
+      if (path === '/api/physio-book' && method === 'POST') return apiPhysioBook(request, env);
+
       // ─── Cancel / Action API ───────────────────────
       if (path === '/api/cancel-info' && method === 'GET') return apiGetCancelInfo(request, env);
       if (path === '/api/cancel' && method === 'POST') return apiCancelAppointment(request, env);
@@ -157,6 +165,13 @@ export default {
         if (adminPath === 'follow-ups' && method === 'GET') return apiAdminGetFollowUps(request, env);
         if (adminPath === 'follow-up-handled' && method === 'POST') return apiAdminToggleFollowUpHandled(request, env);
         if (adminPath === 'referrals' && method === 'GET') return apiAdminGetReferrals(request, env);
+
+        // ─── Linda (Physiotherapy) admin ────────────
+        if (adminPath === 'linda-stats' && method === 'GET') return apiAdminGetLindaStats(request, env);
+        if (adminPath === 'linda-reviews' && method === 'GET') return apiAdminGetLindaReviewPatients(request, env);
+        if (adminPath === 'linda-reviews/send' && method === 'POST') return apiAdminSendLindaReviewRequests(request, env);
+        if (adminPath === 'linda-follow-ups' && method === 'GET') return apiAdminGetLindaFollowUps(request, env);
+        if (adminPath === 'linda-appointments' && method === 'GET') return apiAdminGetLindaAppointments(request, env);
 
         // Test broadcast — manually trigger a WebSocket notification
         if (adminPath === 'test-broadcast' && method === 'POST') {
@@ -252,6 +267,7 @@ export default {
           }
           return html('<div style="font-family:Arial,sans-serif;max-width:500px;margin:60px auto;text-align:center;"><h1>Appointment Not Found</h1><p>This link may have expired or the appointment was already cancelled.</p></div>');
         }
+        if (path === '/physio') return html(physioPage(env));
         if (path === '/cancel') return html(cancelPage());
         if (path === '/reschedule') return html(reschedulePage());
         if (path === '/followup') return html(followupPage());
@@ -301,7 +317,9 @@ export default {
     if (hour === 5 && minute < 5) {
       try {
         const active = await getActiveAppointmentsByDate(env.DB, todayKey);
-        await sendDailyDoctorSchedule(env, todayKey, active);
+        // Exclude Linda's physio bookings from Dr Kevin's daily schedule email.
+        const kevinDay = active.filter(a => a.clinic !== 'linda');
+        await sendDailyDoctorSchedule(env, todayKey, kevinDay);
       } catch (e) { console.error('Daily schedule error:', e); }
     }
 
