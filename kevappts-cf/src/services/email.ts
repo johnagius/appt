@@ -7,45 +7,23 @@ import { escapeHtml } from './utils';
 import { computeSig, computeAdminSig } from './crypto';
 
 async function sendEmail(env: Env, to: string, subject: string, html: string): Promise<void> {
-  const body = JSON.stringify({
-    from: env.EMAIL_FROM,
-    to: [to],
-    subject,
-    html,
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${env.RESEND_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from: "Potter's Pharmacy <noreply@swiftdataautomation.com>",
+      to: [to],
+      subject,
+      html,
+    }),
   });
-
-  const backoffs = [0, 500, 1500];
-  for (let attempt = 0; attempt < backoffs.length; attempt++) {
-    if (backoffs[attempt] > 0) {
-      await new Promise(r => setTimeout(r, backoffs[attempt]));
-    }
-    const ctrl = new AbortController();
-    const timeout = setTimeout(() => ctrl.abort(), 10_000);
-    try {
-      const res = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${env.RESEND_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body,
-        signal: ctrl.signal,
-      });
-      clearTimeout(timeout);
-      if (res.ok) return;
-      const text = await res.text();
-      // 4xx (except 429) won't succeed on retry — log and bail.
-      if (res.status < 500 && res.status !== 429) {
-        console.error('Resend error (no retry):', res.status, text);
-        return;
-      }
-      console.error(`Resend error attempt ${attempt + 1}:`, res.status, text);
-    } catch (err) {
-      clearTimeout(timeout);
-      console.error(`Resend fetch failed attempt ${attempt + 1}:`, err);
-    }
+  if (!res.ok) {
+    const text = await res.text();
+    console.error('Resend error:', res.status, text);
   }
-  console.error('Resend: giving up after retries for', to);
 }
 
 function getMapUrl(location: string): string {
@@ -68,15 +46,14 @@ function getMapHtml(location: string): string {
 }
 
 function getBaseUrl(env: Env): string {
-  return env.APP_BASE_URL;
+  return 'https://kevappts.labrint.workers.dev';
 }
 
 import { generateReferralCode } from '../db/queries';
 
-function buildFooter(env: Env, appt: Appointment): string {
+function buildFooter(appt: Appointment): string {
   const code = generateReferralCode(appt.email);
-  const base = getBaseUrl(env);
-  const referralUrl = base + '/?ref=' + code;
+  const referralUrl = 'https://kevappts.labrint.workers.dev/?ref=' + code;
   const shareText = encodeURIComponent(
     'I saw Dr Kevin at Potter\u2019s Pharmacy in St Julian\u2019s \u2014 really recommend. You can book here: ' + referralUrl
   );
@@ -86,7 +63,7 @@ function buildFooter(env: Env, appt: Appointment): string {
   <div style="margin-top:20px;">
     <table style="border-collapse:collapse;width:100%;"><tr>
       <td style="padding:4px 4px 4px 0;width:50%;">
-        <a href="${base}/" style="display:block;text-align:center;background:#2563eb;color:#fff;text-decoration:none;padding:12px 8px;border-radius:999px;font-weight:700;font-size:14px;">Book an Appointment</a>
+        <a href="https://kevappts.labrint.workers.dev/" style="display:block;text-align:center;background:#2563eb;color:#fff;text-decoration:none;padding:12px 8px;border-radius:999px;font-weight:700;font-size:14px;">Book an Appointment</a>
       </td>
       <td style="padding:4px 0 4px 4px;width:50%;">
         <a href="${whatsappUrl}" target="_blank" style="display:block;text-align:center;background:#25D366;color:#fff;text-decoration:none;padding:12px 8px;border-radius:999px;font-weight:700;font-size:14px;">Share with a friend</a>
@@ -95,7 +72,7 @@ function buildFooter(env: Env, appt: Appointment): string {
   </div>`;
 }
 
-function buildCalendarLinks(env: Env, appt: Appointment): string {
+function buildCalendarLinks(appt: Appointment): string {
   const dtStart = appt.date_key.replace(/-/g, '') + 'T' + appt.start_time.replace(':', '') + '00';
   const dtEnd = appt.date_key.replace(/-/g, '') + 'T' + appt.end_time.replace(':', '') + '00';
   const title = encodeURIComponent('Doctor Appointment - ' + appt.service_name);
@@ -105,7 +82,7 @@ function buildCalendarLinks(env: Env, appt: Appointment): string {
   const googleUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${dtStart}/${dtEnd}&location=${loc}&details=${details}`;
 
   const shareText = encodeURIComponent(
-    `I have a doctor's appointment:\n${appt.service_name}\n${appt.date_key} at ${appt.start_time}\n${appt.location}\n\nBook your own appointment: ${getBaseUrl(env)}/`
+    `I have a doctor's appointment:\n${appt.service_name}\n${appt.date_key} at ${appt.start_time}\n${appt.location}\n\nBook your own appointment: https://kevappts.labrint.workers.dev/`
   );
   const whatsappUrl = `https://wa.me/?text=${shareText}`;
 
@@ -178,8 +155,8 @@ export async function sendClientConfirmationEmail(env: Env, appt: Appointment): 
   </table>
   ${getMapHtml(appt.location)}
   ${buildManageSection(cancelUrl, rescheduleUrl)}
-  ${buildCalendarLinks(env, appt)}
-  ${buildFooter(env, appt)}
+  ${buildCalendarLinks(appt)}
+  ${buildFooter(appt)}
 </div>`;
 
   await sendEmail(env, appt.email, subject, html);
@@ -208,8 +185,8 @@ export async function sendSpinolaConfirmationEmail(env: Env, appt: Appointment):
   </table>
   ${getMapHtml(spinolaLocation)}
   ${buildManageSection(cancelUrl, rescheduleUrl)}
-  ${buildCalendarLinks(env, appt)}
-  ${buildFooter(env, appt)}
+  ${buildCalendarLinks(appt)}
+  ${buildFooter(appt)}
 </div>`;
 
   await sendEmail(env, appt.email, subject, html);
@@ -291,7 +268,7 @@ export async function sendClientCancelledEmail(env: Env, appt: Appointment, mess
     <tr><td style="padding:6px 0;color:#6b7280;">Time</td><td style="padding:6px 0;"><b>${escapeHtml(appt.start_time)} - ${escapeHtml(appt.end_time)}</b></td></tr>
     <tr><td style="padding:6px 0;color:#6b7280;">Location</td><td style="padding:6px 0;"><b>${escapeHtml(appt.location)}</b></td></tr>
   </table>
-  ${buildFooter(env, appt)}
+  ${buildFooter(appt)}
 </div>`;
 
   await sendEmail(env, appt.email, subject, html);
@@ -340,7 +317,7 @@ export async function sendRedirectToSpinolaEmail(env: Env, appt: Appointment, sp
   </table>
   ${getMapHtml(spinolaLocation)}
   ${buildManageSection(cancelUrl, rescheduleUrl)}
-  ${buildFooter(env, appt)}
+  ${buildFooter(appt)}
 </div>`;
 
   await sendEmail(env, appt.email, subject, html);
@@ -367,7 +344,7 @@ export async function sendAppointmentPushedEmail(env: Env, appt: Appointment, ne
   </table>
   <p style="margin:14px 0 0 0;color:#6b7280;font-size:12px;">If this new time does not work for you, use the buttons below.</p>
   ${buildManageSection(cancelUrl, rescheduleUrl)}
-  ${buildFooter(env, appt)}
+  ${buildFooter(appt)}
 </div>`;
 
   await sendEmail(env, appt.email, subject, html);
@@ -410,7 +387,7 @@ export async function sendReminderEmail(env: Env, appt: Appointment): Promise<vo
     </tr></table>
   </div>
   <p style="margin:14px 0 0 0;color:#6b7280;font-size:12px;">Please confirm, reschedule or cancel so the doctor can prepare accordingly.</p>
-  ${buildFooter(env, appt)}
+  ${buildFooter(appt)}
 </div>`;
 
   await sendEmail(env, appt.email, subject, html);
@@ -478,7 +455,7 @@ export async function sendCustomNotificationEmail(env: Env, appt: Appointment, c
     <tr><td style="padding:6px 0;color:#6b7280;">Time</td><td style="padding:6px 0;"><b>${escapeHtml(appt.start_time)} - ${escapeHtml(appt.end_time)}</b></td></tr>
     <tr><td style="padding:6px 0;color:#6b7280;">Location</td><td style="padding:6px 0;"><b>${escapeHtml(appt.location)}</b></td></tr>
   </table>
-  ${buildFooter(env, appt)}
+  ${buildFooter(appt)}
 </div>`;
 
   await sendEmail(env, appt.email, subject, html);

@@ -11,17 +11,6 @@ SPINOLA_LOCATION = "Spinola Clinic"
 SPINOLA_DOCTOR_NAME = "Dr James"
 SPINOLA_LOCATION_DETAILS = "Near McDonald's, Love Statue, near bus stop, in Spinola"
 
-# Email sender + link base URL.
-# Current (safe) values match previous hardcoded strings — deploying as-is changes nothing.
-# To fix Resend deliverability flags, after (1) binding book.swiftdataautomation.com to
-# this Worker in Cloudflare dashboard and (2) setting up Cloudflare Email Routing to
-# forward appointments@swiftdataautomation.com to the clinic inbox, swap the two lines
-# below to the commented target values and redeploy.
-EMAIL_FROM = "Potter's Pharmacy <noreply@swiftdataautomation.com>"
-# EMAIL_FROM = "Potter's Pharmacy <appointments@swiftdataautomation.com>"
-APP_BASE_URL = "https://kevappts.labrint.workers.dev"
-# APP_BASE_URL = "https://book.swiftdataautomation.com"
-
 # Secrets (set via `wrangler secret put`):
 # SIGNING_SECRET          — HMAC key for cancel/action links (reuse from GAS)
 # ADMIN_SECRET            — HMAC key for admin panel (reuse from GAS)
