@@ -250,6 +250,11 @@ export async function apiGetRescheduleInfo(req: Request, env: Env): Promise<Resp
   const appt = await getAppointmentByToken(env.DB, token);
   if (!appt) return json({ ok: false, reason: 'Appointment not found.' });
 
+  // Physiotherapy (Linda) sessions cannot be rescheduled online — cancel + rebook.
+  if (appt.clinic === 'linda') {
+    return json({ ok: false, reason: 'To change your physiotherapy appointment, please cancel it using the link in your confirmation email and book a new time.' });
+  }
+
   return json({
     ok: true,
     appointment: {
@@ -282,6 +287,11 @@ export async function apiGetRescheduleSlots(req: Request, env: Env): Promise<Res
 
   const appt = await getAppointmentByToken(env.DB, token);
   if (!appt) return json({ ok: false, reason: 'Appointment not found.' });
+
+  // Physiotherapy (Linda) sessions cannot be rescheduled online — cancel + rebook.
+  if (appt.clinic === 'linda') {
+    return json({ ok: false, reason: 'Please cancel and rebook from the physiotherapy page.' });
+  }
 
   const cfg = await getConfig(env.DB);
   const tz = env.TIMEZONE;
@@ -355,6 +365,11 @@ export async function apiRescheduleAppointment(req: Request, env: Env): Promise<
   const appt = await getAppointmentByToken(env.DB, token);
   if (!appt) return json({ ok: false, reason: 'Appointment not found.' });
   if (!isActive(appt.status)) return json({ ok: false, reason: 'This appointment is no longer active.' });
+
+  // Physiotherapy (Linda) sessions cannot be rescheduled online.
+  if (appt.clinic === 'linda') {
+    return json({ ok: false, reason: 'Physiotherapy appointments cannot be rescheduled. Please cancel and book a new time.' });
+  }
 
   if (!newDateKey || !newStartTime) return json({ ok: false, reason: 'Please select a date and time.' }, 400);
 
