@@ -1,9 +1,9 @@
 /**
- * Linda (Physiotherapy) — isolated constants and helpers.
+ * Linda (Physiotherapy) — admin-editable config loaded from the `config` table.
  *
- * Linda's bookings live on the shared appointments table with clinic='linda'.
- * The two-week availability window and 30-min slots are defined here so that
- * no Kevin/Spinola code path accidentally inherits Linda's schedule.
+ * All Linda-specific logic (window, hours, slot duration, enabled flag)
+ * comes from D1 so the admin panel can edit it. Falls back to sensible
+ * defaults if a key is missing.
  */
 import type { Slot, WorkingHours, DateOption } from '../types';
 import {
@@ -11,11 +11,11 @@ import {
   todayLocal, toDateKey,
 } from './utils';
 
-export const LINDA_WINDOW_START = '2026-04-24';
-export const LINDA_WINDOW_END = '2026-05-07';
-export const LINDA_SLOT_MIN = 30;
-
-export const LINDA_HOURS: WorkingHours = {
+// Defaults only apply if a config key is missing (shouldn't happen after schema seed).
+const DEFAULT_WINDOW_START = '2026-04-24';
+const DEFAULT_WINDOW_END = '2026-05-07';
+const DEFAULT_SLOT_MIN = 30;
+const DEFAULT_HOURS: WorkingHours = {
   MON: [{ start: '09:30', end: '13:00' }, { start: '16:00', end: '18:30' }],
   TUE: [{ start: '09:30', end: '13:00' }, { start: '16:00', end: '18:30' }],
   WED: [{ start: '09:30', end: '13:00' }, { start: '16:00', end: '18:30' }],
@@ -25,34 +25,66 @@ export const LINDA_HOURS: WorkingHours = {
   SUN: [],
 };
 
-export function isInLindaWindow(dateKey: string): boolean {
-  return dateKey >= LINDA_WINDOW_START && dateKey <= LINDA_WINDOW_END;
+export interface LindaConfig {
+  enabled: boolean;
+  windowStart: string;  // YYYY-MM-DD
+  windowEnd: string;
+  slotMin: number;
+  hours: WorkingHours;
 }
 
-export function buildLindaSlots(dateKey: string): Slot[] {
+export async function loadLindaConfig(db: D1Database): Promise<LindaConfig> {
+  const rows = await db.prepare(
+    "SELECT key, value FROM config WHERE key LIKE 'LINDA_%'"
+  ).all<{ key: string; value: string }>();
+
+  const map: Record<string, string> = {};
+  for (const r of rows.results) map[r.key] = r.value;
+
+  let hours: WorkingHours = DEFAULT_HOURS;
+  try { if (map['LINDA_HOURS']) hours = JSON.parse(map['LINDA_HOURS']); } catch {}
+
+  const slotMin = parseInt(map['LINDA_SLOT_MIN'] || String(DEFAULT_SLOT_MIN), 10) || DEFAULT_SLOT_MIN;
+
+  return {
+    enabled: map['LINDA_ENABLED'] === '1' || map['LINDA_ENABLED'] === 'true',
+    windowStart: map['LINDA_WINDOW_START'] || DEFAULT_WINDOW_START,
+    windowEnd: map['LINDA_WINDOW_END'] || DEFAULT_WINDOW_END,
+    slotMin,
+    hours,
+  };
+}
+
+export function isInLindaWindow(dateKey: string, cfg: LindaConfig): boolean {
+  return dateKey >= cfg.windowStart && dateKey <= cfg.windowEnd;
+}
+
+export function buildLindaSlots(dateKey: string, cfg: LindaConfig): Slot[] {
   const d = parseDateKey(dateKey);
   const dow = dayOfWeekKey(d);
-  if (!LINDA_HOURS[dow] || LINDA_HOURS[dow].length === 0) return [];
-  return buildSlotsForDate(d, LINDA_SLOT_MIN, null, LINDA_HOURS);
+  if (!cfg.hours[dow] || cfg.hours[dow].length === 0) return [];
+  return buildSlotsForDate(d, cfg.slotMin, null, cfg.hours);
 }
 
-export function buildLindaDateOptions(tz: string): DateOption[] {
+export function buildLindaDateOptions(tz: string, cfg: LindaConfig): DateOption[] {
   const today = todayLocal(tz);
-  const start = parseDateKey(LINDA_WINDOW_START);
-  const end = parseDateKey(LINDA_WINDOW_END);
+  const start = parseDateKey(cfg.windowStart);
+  const end = parseDateKey(cfg.windowEnd);
   const out: DateOption[] = [];
+
+  if (end.getTime() < start.getTime()) return out;
 
   let d = new Date(Math.max(today.getTime(), start.getTime()));
   while (d.getTime() <= end.getTime()) {
     const dk = toDateKey(d);
     const dow = dayOfWeekKey(d);
-    const hasHours = LINDA_HOURS[dow] && LINDA_HOURS[dow].length > 0;
+    const hasHours = cfg.hours[dow] && cfg.hours[dow].length > 0;
 
     out.push({
       dateKey: dk,
       label: formatDateLabel(d, tz),
       disabled: !hasHours,
-      reason: hasHours ? '' : 'Closed (weekend)',
+      reason: hasHours ? '' : 'Closed',
       spinolaOnly: false,
     });
     d = addDays(d, 1);

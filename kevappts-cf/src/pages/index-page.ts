@@ -3876,15 +3876,22 @@ export function indexPage(env: Env, bookingSource?: string): string {
     // display:none in the HTML; this just collapses the grid to 1 column.
     document.body.classList.add('compact-top');
 
-    // Physiotherapy CTA — show the button only before 8 May 2026 Malta time.
-    // Malta is UTC+2 during Apr–May (CEST) so no DST risk inside this window.
-    try {
-      var physioCutoff = new Date('2026-05-08T00:00:00+02:00').getTime();
-      if (Date.now() < physioCutoff) {
-        var pw = document.getElementById('physioLinkWrap');
-        if (pw) pw.style.display = 'block';
-      }
-    } catch (e) { /* no-op */ }
+    // Physiotherapy CTA — show only when Linda is enabled AND within her window.
+    // The server returns { ok:true, config:{ enabled, windowStart, windowEnd }, dateOptions:[...] }.
+    // If disabled or no available dates, the button stays hidden.
+    (function(){
+      try {
+        fetch('/api/physio-init').then(function(r){ return r.json(); }).then(function(data){
+          if (!data || !data.ok) return;
+          var enabled = data.config && data.config.enabled;
+          var hasDates = Array.isArray(data.dateOptions) && data.dateOptions.some(function(d){ return !d.disabled; });
+          if (enabled && hasDates) {
+            var pw = document.getElementById('physioLinkWrap');
+            if (pw) pw.style.display = 'block';
+          }
+        }).catch(function(){});
+      } catch (e) { /* no-op */ }
+    })();
 
     // Show reload button only in PWA/standalone mode (no browser chrome)
     if (window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches) {

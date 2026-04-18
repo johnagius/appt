@@ -24,6 +24,7 @@ import {
   sendFollowUpEmail,
 } from '../services/email';
 import { createCalendarEvent, deleteCalendarEvent } from '../services/calendar';
+import { loadLindaConfig } from '../services/linda';
 
 function json(data: any, status = 200): Response {
   return new Response(JSON.stringify(data), {
@@ -1538,4 +1539,51 @@ export async function apiAdminGetLindaFollowUps(req: Request, env: Env): Promise
   const status = (url.searchParams.get('status') || '').trim() || undefined;
   const followUps = await getFollowUps(env.DB, status, 'linda');
   return json({ ok: true, followUps });
+}
+
+// ─── Linda Config (availability) ────────────────────────────
+
+export async function apiAdminGetLindaConfig(req: Request, env: Env): Promise<Response> {
+  const deny = await requireAdmin(req, env);
+  if (deny) return deny;
+  const cfg = await loadLindaConfig(env.DB);
+  return json({ ok: true, config: cfg });
+}
+
+export async function apiAdminSaveLindaConfig(req: Request, env: Env): Promise<Response> {
+  const deny = await requireAdmin(req, env);
+  if (deny) return deny;
+
+  const body: any = await req.json();
+  const enabled = body.enabled === true || body.enabled === '1' || body.enabled === 1;
+  const windowStart = String(body.windowStart || '').trim();
+  const windowEnd = String(body.windowEnd || '').trim();
+  const slotMin = parseInt(String(body.slotMin || '30'), 10) || 30;
+
+  // hours: expect a WorkingHours-shaped object; we validate loosely.
+  const hoursRaw = body.hours;
+  if (!hoursRaw || typeof hoursRaw !== 'object') {
+    return json({ ok: false, reason: 'Missing hours object.' }, 400);
+  }
+  const validDays = ['MON','TUE','WED','THU','FRI','SAT','SUN'];
+  const hours: Record<string, any[]> = {};
+  for (const d of validDays) {
+    const arr = Array.isArray(hoursRaw[d]) ? hoursRaw[d] : [];
+    hours[d] = arr.filter((w: any) => w && typeof w.start === 'string' && typeof w.end === 'string')
+      .map((w: any) => ({ start: w.start, end: w.end }));
+  }
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(windowStart)) return json({ ok: false, reason: 'Invalid start date.' }, 400);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(windowEnd)) return json({ ok: false, reason: 'Invalid end date.' }, 400);
+  if (windowEnd < windowStart) return json({ ok: false, reason: 'End date must be on or after start date.' }, 400);
+  if (slotMin < 5 || slotMin > 240) return json({ ok: false, reason: 'Slot duration must be 5–240 minutes.' }, 400);
+
+  await setConfigValue(env.DB, 'LINDA_ENABLED', enabled ? '1' : '0');
+  await setConfigValue(env.DB, 'LINDA_WINDOW_START', windowStart);
+  await setConfigValue(env.DB, 'LINDA_WINDOW_END', windowEnd);
+  await setConfigValue(env.DB, 'LINDA_SLOT_MIN', String(slotMin));
+  await setConfigValue(env.DB, 'LINDA_HOURS', JSON.stringify(hours));
+  await bumpVersion(env.DB);
+
+  return json({ ok: true, message: 'Linda availability saved.', config: await loadLindaConfig(env.DB) });
 }

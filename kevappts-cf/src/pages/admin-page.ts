@@ -925,9 +925,57 @@ export function adminPage(sig: string): string {
 
 <!-- LINDA (PHYSIOTHERAPY) TAB -->
 <div class="tab-content" id="tab-linda" style="display:none;">
-  <div class="card" style="padding:18px;margin-bottom:14px;background:#ecfdf5;border-left:4px solid #10b981;">
+  <div class="card" id="lindaIntroCard" style="padding:18px;margin-bottom:14px;background:#ecfdf5;border-left:4px solid #10b981;">
     <h3 style="margin:0 0 4px 0;font-size:16px;font-weight:900;color:#065f46;">Linda &mdash; Physiotherapist</h3>
-    <p style="margin:0;color:#065f46;font-size:13px;">Potter's Clinic &middot; 24 April – 7 May 2026 &middot; 30-min sessions</p>
+    <p style="margin:0;color:#065f46;font-size:13px;" id="lindaIntroLine">Potter's Clinic</p>
+  </div>
+
+  <!-- Availability editor -->
+  <div class="card" style="padding:18px;margin-bottom:14px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
+      <h3 style="margin:0;font-size:15px;font-weight:800;">Linda Availability</h3>
+      <label style="display:flex;align-items:center;gap:8px;font-size:14px;font-weight:700;cursor:pointer;">
+        <input type="checkbox" id="lindaEnabled" style="width:18px;height:18px;cursor:pointer;">
+        <span id="lindaEnabledLabel">Enabled</span>
+      </label>
+    </div>
+    <p style="margin:0 0 12px 0;color:#6b7280;font-size:13px;">Turn Linda on/off, set the date range she's available, and edit her Mon–Fri working hours. The button on the main booking page is shown only while she's enabled and inside the window.</p>
+
+    <div class="form-row">
+      <div class="form-group"><label>Start date</label><input type="date" id="lindaWinStart"></div>
+      <div class="form-group"><label>End date</label><input type="date" id="lindaWinEnd"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Slot duration (minutes)</label>
+        <select id="lindaSlotMin">
+          <option value="15">15</option><option value="20">20</option><option value="30">30</option><option value="45">45</option><option value="60">60</option>
+        </select>
+      </div>
+    </div>
+
+    <div style="margin-top:14px;padding:12px;border:1px solid #e5e7eb;border-radius:10px;background:#f9fafb;">
+      <p style="margin:0 0 8px 0;font-size:13px;font-weight:700;">Weekday hours (Mon–Fri)</p>
+      <p style="margin:0 0 10px 0;font-size:12px;color:#6b7280;">Leave morning or afternoon blank to skip that block. Weekends stay closed by default.</p>
+      <div class="form-row">
+        <div class="form-group"><label>Morning start</label><input type="time" id="lindaMorningStart" step="1800"></div>
+        <div class="form-group"><label>Morning end</label><input type="time" id="lindaMorningEnd" step="1800"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Afternoon start</label><input type="time" id="lindaAfternoonStart" step="1800"></div>
+        <div class="form-group"><label>Afternoon end</label><input type="time" id="lindaAfternoonEnd" step="1800"></div>
+      </div>
+      <label style="display:flex;align-items:center;gap:8px;margin-top:8px;font-size:13px;cursor:pointer;">
+        <input type="checkbox" id="lindaIncludeSat" style="cursor:pointer;">
+        <span>Also open on Saturdays (same hours)</span>
+      </label>
+    </div>
+
+    <div style="margin-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+      <button class="btn btn-primary" onclick="saveLindaConfig()">Save availability</button>
+      <button class="btn btn-ghost" onclick="loadLindaConfig()">Reset</button>
+      <span id="lindaCfgMsg" style="font-size:13px;"></span>
+    </div>
   </div>
 
   <div class="card" style="padding:18px;margin-bottom:14px;">
@@ -1338,14 +1386,97 @@ function switchTab(name) {
 
 // ─── Linda (Physiotherapy) admin ─────────────────────────────
 async function loadLindaData() {
+  loadLindaConfig();
   loadLindaStats();
   loadLindaFollowUps();
-  // Default reviews date to today if within window
-  var di = document.getElementById('lindaReviewDate');
-  if (di && !di.value) {
-    var today = new Date().toISOString().slice(0, 10);
-    if (today >= '2026-04-24' && today <= '2026-05-07') di.value = today;
-    else di.value = '2026-04-24';
+}
+
+// ── Linda config (availability editor) ──
+async function loadLindaConfig() {
+  try {
+    var res = await apiCall('linda-config');
+    if (!res || !res.ok || !res.config) return;
+    var c = res.config;
+    document.getElementById('lindaEnabled').checked = !!c.enabled;
+    document.getElementById('lindaEnabledLabel').textContent = c.enabled ? 'Enabled' : 'Disabled';
+    document.getElementById('lindaWinStart').value = c.windowStart || '';
+    document.getElementById('lindaWinEnd').value = c.windowEnd || '';
+    var slot = document.getElementById('lindaSlotMin');
+    slot.value = String(c.slotMin || 30);
+    // Extract morning/afternoon blocks from MON (assumed representative)
+    var mon = (c.hours && c.hours.MON) || [];
+    var morning = mon[0] || { start: '', end: '' };
+    var afternoon = mon[1] || { start: '', end: '' };
+    document.getElementById('lindaMorningStart').value = morning.start || '';
+    document.getElementById('lindaMorningEnd').value = morning.end || '';
+    document.getElementById('lindaAfternoonStart').value = afternoon.start || '';
+    document.getElementById('lindaAfternoonEnd').value = afternoon.end || '';
+    document.getElementById('lindaIncludeSat').checked = !!(c.hours && c.hours.SAT && c.hours.SAT.length);
+
+    // Update intro banner
+    var intro = document.getElementById('lindaIntroLine');
+    if (intro) {
+      var line = 'Potter\\u2019s Clinic \\u00b7 ' + (c.windowStart || '?') + ' \\u2013 ' + (c.windowEnd || '?') + ' \\u00b7 ' + (c.slotMin || 30) + '-min sessions';
+      if (!c.enabled) line += ' \\u00b7 DISABLED';
+      intro.textContent = line;
+    }
+
+    // Keep review-date picker bounded by configured window
+    var di = document.getElementById('lindaReviewDate');
+    if (di) {
+      if (c.windowStart) di.min = c.windowStart;
+      if (c.windowEnd) di.max = c.windowEnd;
+      if (!di.value && c.windowStart) {
+        var today = new Date().toISOString().slice(0, 10);
+        di.value = (today >= c.windowStart && today <= c.windowEnd) ? today : c.windowStart;
+      }
+    }
+  } catch (e) { /* no-op */ }
+}
+
+async function saveLindaConfig() {
+  var msgEl = document.getElementById('lindaCfgMsg');
+  msgEl.textContent = 'Saving...';
+  msgEl.style.color = '#6b7280';
+
+  var ms = document.getElementById('lindaMorningStart').value;
+  var me = document.getElementById('lindaMorningEnd').value;
+  var as = document.getElementById('lindaAfternoonStart').value;
+  var ae = document.getElementById('lindaAfternoonEnd').value;
+  var blocks = [];
+  if (ms && me) blocks.push({ start: ms, end: me });
+  if (as && ae) blocks.push({ start: as, end: ae });
+
+  var weekdayBlocks = blocks;
+  var satBlocks = document.getElementById('lindaIncludeSat').checked ? blocks : [];
+
+  var hours = {
+    MON: weekdayBlocks, TUE: weekdayBlocks, WED: weekdayBlocks,
+    THU: weekdayBlocks, FRI: weekdayBlocks, SAT: satBlocks, SUN: [],
+  };
+
+  var body = {
+    enabled: document.getElementById('lindaEnabled').checked,
+    windowStart: document.getElementById('lindaWinStart').value,
+    windowEnd: document.getElementById('lindaWinEnd').value,
+    slotMin: parseInt(document.getElementById('lindaSlotMin').value, 10) || 30,
+    hours: hours,
+  };
+
+  try {
+    var res = await apiCall('linda-config', { body: body });
+    if (res && res.ok) {
+      msgEl.textContent = 'Saved.';
+      msgEl.style.color = '#059669';
+      loadLindaConfig();
+      loadLindaStats();
+    } else {
+      msgEl.textContent = (res && res.reason) || 'Save failed.';
+      msgEl.style.color = '#dc2626';
+    }
+  } catch (e) {
+    msgEl.textContent = 'Network error.';
+    msgEl.style.color = '#dc2626';
   }
 }
 

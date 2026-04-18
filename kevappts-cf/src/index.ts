@@ -24,6 +24,7 @@ import {
   apiAdminMarkAttendance, apiAdminGetPatientHistory, apiAdminDoctorOffDates,
   apiAdminCreateTestBooking, apiAdminPurgeTestData, apiAdminTestFollowUp, apiAdminGetFollowUps, apiAdminToggleFollowUpHandled, apiAdminGetReferrals,
   apiAdminGetLindaStats, apiAdminGetLindaReviewPatients, apiAdminSendLindaReviewRequests, apiAdminGetLindaFollowUps, apiAdminGetLindaAppointments,
+  apiAdminGetLindaConfig, apiAdminSaveLindaConfig,
 } from './api/admin';
 import { verifyAdminSig, computeAdminSig } from './services/crypto';
 import { todayKeyLocal, nowIso, parseTimeToMinutes, toDateKey, todayLocal, addDays, nowMinutesLocal } from './services/utils';
@@ -172,6 +173,8 @@ export default {
         if (adminPath === 'linda-reviews/send' && method === 'POST') return apiAdminSendLindaReviewRequests(request, env);
         if (adminPath === 'linda-follow-ups' && method === 'GET') return apiAdminGetLindaFollowUps(request, env);
         if (adminPath === 'linda-appointments' && method === 'GET') return apiAdminGetLindaAppointments(request, env);
+        if (adminPath === 'linda-config' && method === 'GET') return apiAdminGetLindaConfig(request, env);
+        if (adminPath === 'linda-config' && method === 'POST') return apiAdminSaveLindaConfig(request, env);
 
         // Test broadcast — manually trigger a WebSocket notification
         if (adminPath === 'test-broadcast' && method === 'POST') {

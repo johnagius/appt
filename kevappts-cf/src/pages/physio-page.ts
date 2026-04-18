@@ -146,6 +146,11 @@ export function physioPage(env: Env): string {
     try {
       var res = await fetch('/api/physio-init');
       var data = await res.json();
+      if (data && data.config && data.config.enabled === false) {
+        showMsg('Physiotherapy bookings are not currently open. Please check back later.', 'err');
+        $('submitBtn').disabled = true;
+        return;
+      }
       state.dateOptions = data.dateOptions || [];
       renderDateOptions(state.dateOptions);
       if (data.initialSlots && data.initialSlots.ok) {

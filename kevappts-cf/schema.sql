@@ -124,3 +124,10 @@ INSERT OR IGNORE INTO config (key, value) VALUES ('WORKING_HOURS', '{"MON":[{"st
 INSERT OR IGNORE INTO config (key, value) VALUES ('SPINOLA_WORKING_HOURS', '{"MON":[{"start":"09:00","end":"14:00"},{"start":"16:00","end":"19:00"}],"TUE":[{"start":"09:00","end":"14:00"},{"start":"16:00","end":"19:00"}],"WED":[{"start":"09:00","end":"14:00"},{"start":"16:00","end":"19:00"}],"THU":[{"start":"09:00","end":"14:00"},{"start":"16:00","end":"19:00"}],"FRI":[{"start":"09:00","end":"14:00"},{"start":"16:00","end":"19:00"}],"SAT":[{"start":"09:30","end":"13:00"},{"start":"16:00","end":"19:00"}],"SUN":[{"start":"10:00","end":"12:00"}]}');
 INSERT OR IGNORE INTO config (key, value) VALUES ('POTTERS_LOCATION', 'Potter''s Pharmacy Clinic');
 INSERT OR IGNORE INTO config (key, value) VALUES ('SPINOLA_LOCATION', 'Spinola Clinic');
+
+-- Linda (physiotherapy) admin-editable config
+INSERT OR IGNORE INTO config (key, value) VALUES ('LINDA_ENABLED', '1');
+INSERT OR IGNORE INTO config (key, value) VALUES ('LINDA_WINDOW_START', '2026-04-24');
+INSERT OR IGNORE INTO config (key, value) VALUES ('LINDA_WINDOW_END', '2026-05-07');
+INSERT OR IGNORE INTO config (key, value) VALUES ('LINDA_SLOT_MIN', '30');
+INSERT OR IGNORE INTO config (key, value) VALUES ('LINDA_HOURS', '{"MON":[{"start":"09:30","end":"13:00"},{"start":"16:00","end":"18:30"}],"TUE":[{"start":"09:30","end":"13:00"},{"start":"16:00","end":"18:30"}],"WED":[{"start":"09:30","end":"13:00"},{"start":"16:00","end":"18:30"}],"THU":[{"start":"09:30","end":"13:00"},{"start":"16:00","end":"18:30"}],"FRI":[{"start":"09:30","end":"13:00"},{"start":"16:00","end":"18:30"}],"SAT":[],"SUN":[]}');
