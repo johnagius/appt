@@ -26,17 +26,19 @@ user can click it directly to trigger the browser download):
 
 ### One-shot Windows deploy command
 
-Chained with `&&`, uses the latest wrangler. Replace paths only if the project
-moves:
+Chained with `&&`, uses the latest wrangler, and **every wrangler command
+includes `--yes` / `-y` so no interactive prompts can stall the chain**.
+Replace paths only if the project moves:
 
 ```cmd
-cd /d "C:\Users\Potte\Downloads\appt-main\appt-main\kevappts-cf" && npm install && npm install -D wrangler@latest && npx wrangler d1 execute kevappts-db --remote --file=schema.sql && npx wrangler deploy
+cd /d "C:\Users\Potte\Downloads\appt-main\appt-main\kevappts-cf" && npm install && npm install -D wrangler@latest && npx wrangler d1 execute kevappts-db --remote --file=schema.sql --yes && npx wrangler deploy --yes
 ```
 
 Notes for the user:
 - If wrangler isn't logged in yet, run `npx wrangler login` once first (opens a
   browser, can't be chained).
-- The `LINDA_CALENDAR_ID` secret only needs to be set once (the first deploy):
+- The `LINDA_CALENDAR_ID` secret only needs to be set once (the first deploy).
+  Pipe the value to avoid the interactive prompt:
   ```cmd
   echo a18cc8ed238199dd6f03ca81085c202a5f032850f65782631aed5a3fb5fa431a@group.calendar.google.com| npx wrangler secret put LINDA_CALENDAR_ID
   ```
