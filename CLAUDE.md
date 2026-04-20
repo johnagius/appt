@@ -31,7 +31,7 @@ includes `--yes` / `-y` so no interactive prompts can stall the chain**.
 Replace paths only if the project moves:
 
 ```cmd
-cd /d "C:\Users\Potte\Downloads\appt-main\appt-main\kevappts-cf" && npm install && npm install -D wrangler@latest && npx wrangler d1 execute kevappts-db --remote --file=schema.sql --yes && npx wrangler deploy --yes
+cd /d "C:\Users\Potte\Downloads\appt-main\appt-main\kevappts-cf" && npm install && npm install -D wrangler@latest && npx wrangler d1 execute kevappts-db --remote --file=schema.sql --yes && npx wrangler deploy
 ```
 
 Notes for the user:
@@ -44,6 +44,8 @@ Notes for the user:
   ```
 - The `d1 execute` step is safe to re-run (idempotent `INSERT OR IGNORE` seeds);
   skip it if no schema/config changes are included in the update.
+- Note: `wrangler deploy` does NOT accept `--yes` (it deploys without asking
+  by default). Only `d1 execute` needs the `--yes` flag.
 
 ## 3. Include a short "What changed" summary
 
