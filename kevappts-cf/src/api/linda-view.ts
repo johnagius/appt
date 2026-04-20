@@ -91,6 +91,46 @@ export async function apiLindaSearch(req: Request, env: Env): Promise<Response> 
   return json({ ok: true, results: rows.results });
 }
 
+// ─── /api/linda-week ───────────────────────────────────────
+// Returns all Linda appointments + extra-hours for the 7 days
+// starting at `start` (ISO date). Used by the Week tab.
+
+export async function apiLindaWeek(req: Request, env: Env): Promise<Response> {
+  if (!await isLindaAuthed(req, env)) return json({ ok: false, reason: 'Access denied.' }, 403);
+  const url = new URL(req.url);
+  const start = (url.searchParams.get('start') || '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(start)) return json({ ok: false, reason: 'Invalid start.' }, 400);
+
+  // Compute end = start + 6 days.
+  const [y, m, d] = start.split('-').map(Number);
+  const startD = new Date(y, m - 1, d);
+  const endD = new Date(y, m - 1, d + 6);
+  const end = endD.getFullYear() + '-' + String(endD.getMonth() + 1).padStart(2, '0') + '-' + String(endD.getDate()).padStart(2, '0');
+
+  const cfg = await loadLindaConfig(env.DB);
+
+  const apptRows = await env.DB.prepare(
+    "SELECT id, date_key, start_time, end_time, full_name, email, phone, comments, status " +
+    "FROM appointments WHERE clinic = 'linda' AND date_key >= ? AND date_key <= ? ORDER BY date_key, start_time"
+  ).bind(start, end).all<any>();
+
+  const extraRows = await env.DB.prepare(
+    "SELECT id, date_key, start_time, end_time FROM linda_extra " +
+    "WHERE date_key >= ? AND date_key <= ? ORDER BY date_key, start_time"
+  ).bind(start, end).all<any>();
+
+  // Base weekly hours (JSON) passed through so the client can shade working windows.
+  return json({
+    ok: true,
+    start, end,
+    appointments: apptRows.results,
+    extras: extraRows.results,
+    baseHours: cfg.hours,
+    slotMin: cfg.slotMin,
+    enabled: cfg.enabled,
+  });
+}
+
 // ─── /api/linda-clients-autocomplete ───────────────────────
 // Returns up to 8 distinct patients (from appointments.clinic='linda')
 // matching the query across name/email/phone.
