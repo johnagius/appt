@@ -91,6 +91,39 @@ export async function apiLindaSearch(req: Request, env: Env): Promise<Response> 
   return json({ ok: true, results: rows.results });
 }
 
+// ─── /api/linda-patient-history ────────────────────────────
+// All Linda appointments for a given patient (keyed by email OR phone),
+// plus simple stats. Limit 200.
+
+export async function apiLindaPatientHistory(req: Request, env: Env): Promise<Response> {
+  if (!await isLindaAuthed(req, env)) return json({ ok: false, reason: 'Access denied.' }, 403);
+  const url = new URL(req.url);
+  const email = (url.searchParams.get('email') || '').trim();
+  const phone = (url.searchParams.get('phone') || '').trim();
+  if (!email && !phone) return json({ ok: false, reason: 'Missing email or phone.' }, 400);
+
+  const rows = await env.DB.prepare(
+    "SELECT id, date_key, start_time, end_time, full_name, email, phone, comments, status " +
+    "FROM appointments WHERE clinic = 'linda' AND (email = ? OR phone = ?) " +
+    "ORDER BY date_key DESC, start_time DESC LIMIT 200"
+  ).bind(email, phone).all<any>();
+
+  const appts = rows.results;
+  let total = 0, attended = 0, noShow = 0, cancelled = 0, upcoming = 0;
+  const todayKey = todayKeyLocal(env.TIMEZONE);
+  let lastVisit = '';
+  for (const a of appts) {
+    total++;
+    if (a.status === 'ATTENDED') attended++;
+    else if (a.status === 'NO_SHOW') noShow++;
+    else if (String(a.status).includes('CANCELLED')) cancelled++;
+    if (a.date_key >= todayKey && !String(a.status).includes('CANCELLED')) upcoming++;
+    if (a.date_key < todayKey && a.status === 'ATTENDED' && (!lastVisit || a.date_key > lastVisit)) lastVisit = a.date_key;
+  }
+
+  return json({ ok: true, appointments: appts, stats: { total, attended, noShow, cancelled, upcoming, lastVisit } });
+}
+
 // ─── /api/linda-slots ──────────────────────────────────────
 // Returns all slots for a date with availability + whether the date is
 // "working" (base hours or extras). Used by the Book and Reschedule modals.
@@ -481,7 +514,8 @@ function lindaMainPage(env: Env): string {
   .status-ATTENDED{background:#e0e7ff;color:#3730a3;}
   .status-NO_SHOW{background:#fff7ed;color:#9a3412;}
   .status-CANCELLED{background:#fef2f2;color:#991b1b;text-decoration:line-through;}
-  .appt-name{font-size:16px;font-weight:700;margin:0 0 6px 0;}
+  .appt-name{font-size:16px;font-weight:700;margin:0 0 6px 0;color:var(--accent);text-decoration:underline;text-underline-offset:3px;cursor:pointer;}
+  .appt-name:active{opacity:.7;}
   .contact-row{display:flex;flex-direction:column;gap:8px;margin-top:10px;}
   .contact-btn{display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:10px;text-decoration:none;font-weight:700;font-size:15px;min-height:48px;word-break:break-all;line-height:1.3;}
   .contact-btn .icon{flex:0 0 auto;font-size:18px;}
@@ -580,6 +614,22 @@ function lindaMainPage(env: Env): string {
     .sheet-input,.slot-btn{background:#0f172a;color:#e2e8f0;border-color:#334155;}
     .slot-btn.dis{background:#0f172a;color:#475569;}
     .open-prompt{background:#422006;border-color:#92400e;color:#fde68a;}
+  }
+
+  /* Patient history drawer */
+  .ph-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+  .ph-name{margin:0;font-size:18px;font-weight:900;}
+  .ph-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:12px;}
+  .ph-stat{background:#f3f4f6;border-radius:10px;padding:10px;text-align:center;}
+  .ph-stat .num{font-size:18px;font-weight:900;}
+  .ph-stat .label{font-size:10px;color:var(--muted);font-weight:800;text-transform:uppercase;letter-spacing:.4px;margin-top:2px;}
+  .ph-last{font-size:13px;color:var(--muted);margin-bottom:10px;}
+  .ph-item{background:#f9fafb;border-radius:10px;padding:10px 12px;margin-bottom:6px;font-size:14px;display:flex;justify-content:space-between;gap:10px;}
+  .ph-item .when{font-weight:700;}
+  .ph-item .st{font-size:11px;font-weight:800;padding:2px 8px;border-radius:999px;text-transform:uppercase;letter-spacing:.3px;white-space:nowrap;}
+  @media (prefers-color-scheme: dark){
+    .ph-stat{background:#0f172a;}
+    .ph-item{background:#0f172a;}
   }
 
   /* Inline calendar (replaces ugly dd/mm/yyyy native input) */
@@ -739,6 +789,17 @@ function lindaMainPage(env: Env): string {
   <div id="bfMsg"></div>
 </div>
 
+<div class="sheet-overlay" id="phOverlay" onclick="closePatientHistory()"></div>
+<div class="sheet" id="phSheet" role="dialog" aria-modal="true">
+  <div class="sheet-head">
+    <h3 class="ph-name" id="phName">Patient</h3>
+    <button class="sheet-close" onclick="closePatientHistory()" aria-label="Close">×</button>
+  </div>
+  <div class="ph-last" id="phLast"></div>
+  <div class="ph-stats" id="phStats"></div>
+  <div id="phAppts"></div>
+</div>
+
 <div class="cal-overlay" id="calOverlay" onclick="closeCal()"></div>
 <div class="cal-sheet" id="calSheet" role="dialog" aria-modal="true">
   <div class="cal-head">
@@ -824,7 +885,8 @@ function lindaMainPage(env: Env): string {
       html +=     '<div class="appt-time">' + time + '</div>';
       html +=     '<div class="appt-status ' + statusCls + '">' + statusTxt + '</div>';
       html +=   '</div>';
-      html +=   '<div class="appt-name">' + esc(a.full_name || 'No name') + '</div>';
+      var patientQuery = JSON.stringify({ email: a.email || '', phone: a.phone || '', name: a.full_name || '' }).replace(/'/g, '&#39;');
+      html +=   "<div class=\\"appt-name\\" onclick='openPatientHistory(" + patientQuery + ")'>" + esc(a.full_name || 'No name') + '</div>';
       if (a.service_name) html += '<div style="font-size:13px;color:var(--muted);">' + esc(a.service_name) + '</div>';
       html +=   '<div class="contact-row">';
       if (tel) html += '<a class="contact-btn call" href="tel:' + esc(tel) + '"><span class="icon">📞</span><span class="val">' + esc(a.phone) + '</span></a>';
@@ -1028,6 +1090,47 @@ function lindaMainPage(env: Env): string {
       if (res.status === 403) { window.location.reload(); return; }
       loadExtras();
     } catch(e){}
+  };
+
+  // ── Patient history drawer ──
+  window.closePatientHistory = function(){
+    $('phOverlay').classList.remove('show');
+    $('phSheet').classList.remove('show');
+  };
+  window.openPatientHistory = async function(patient){
+    $('phName').textContent = patient.name || 'Patient';
+    $('phStats').innerHTML = '';
+    $('phLast').textContent = 'Loading…';
+    $('phAppts').innerHTML = '';
+    $('phOverlay').classList.add('show');
+    $('phSheet').classList.add('show');
+    try {
+      var url = '/api/linda-patient-history?email=' + encodeURIComponent(patient.email || '') + '&phone=' + encodeURIComponent(patient.phone || '');
+      var res = await fetch(url);
+      if (res.status === 403) { window.location.reload(); return; }
+      var data = await res.json();
+      if (!data.ok) { $('phLast').textContent = data.reason || 'Failed to load.'; return; }
+      var s = data.stats;
+      $('phStats').innerHTML =
+        '<div class="ph-stat"><div class="num">' + s.total + '</div><div class="label">Total</div></div>' +
+        '<div class="ph-stat"><div class="num">' + s.attended + '</div><div class="label">Attended</div></div>' +
+        '<div class="ph-stat"><div class="num">' + s.noShow + '</div><div class="label">No-show</div></div>' +
+        '<div class="ph-stat"><div class="num">' + s.upcoming + '</div><div class="label">Upcoming</div></div>';
+      $('phLast').textContent = s.lastVisit ? 'Last visit: ' + fmtDay(s.lastVisit) : (s.upcoming ? 'No past visits yet.' : 'No visits on record.');
+      var html = '';
+      for (var i = 0; i < data.appointments.length; i++){
+        var a = data.appointments[i];
+        var cls = statusClass(a.status);
+        var lbl = statusLabel(a.status);
+        html += '<div class="ph-item" onclick="closePatientHistory();jumpToDate(\\'' + esc(a.date_key) + '\\')">';
+        html +=   '<div><div class="when">' + esc(formatNiceShort(a.date_key)) + '</div><div style="font-size:12px;color:var(--muted);">' + esc(a.start_time) + '</div></div>';
+        html +=   '<div class="st ' + cls + '">' + esc(lbl) + '</div>';
+        html += '</div>';
+      }
+      $('phAppts').innerHTML = html || '<div style="color:var(--muted);font-size:13px;text-align:center;padding:12px;">No appointments.</div>';
+    } catch (e) {
+      $('phLast').textContent = 'Network error.';
+    }
   };
 
   // ── Inline calendar picker (replaces dd/mm/yyyy native inputs) ──
