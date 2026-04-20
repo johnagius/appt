@@ -14,7 +14,10 @@ import type { Env, Appointment } from '../types';
 import { computeLindaSig, verifyLindaSig, verifyAdminSig } from '../services/crypto';
 import { todayKeyLocal, nowIso, nowMinutesLocal, parseTimeToMinutes, toDateKey, todayLocal } from '../services/utils';
 import { buildLindaSlots, getLindaExtrasForDate, loadLindaConfig } from '../services/linda';
-import { getTakenSlots, bumpVersion } from '../db/queries';
+import { getTakenSlots, bumpVersion, getAppointmentById, isSlotTaken, updateAppointmentStatus, insertAppointment, getOrCreateClient } from '../db/queries';
+import { generateId } from '../services/crypto';
+import { createCalendarEvent, deleteCalendarEvent } from '../services/calendar';
+import { sendAppointmentPushedEmail, sendLindaConfirmationEmail, sendDoctorBookingEmail } from '../services/email';
 
 function json(data: any, status = 200): Response {
   return new Response(JSON.stringify(data), {
@@ -162,6 +165,87 @@ export async function apiLindaDeleteExtra(req: Request, env: Env): Promise<Respo
   await env.DB.prepare('DELETE FROM linda_extra WHERE id = ?').bind(id).run();
   await bumpVersion(env.DB);
   return json({ ok: true });
+}
+
+// ─── POST /api/linda-reschedule ────────────────────────────
+// Body: { appointmentId, dateKey, startTime }
+// Moves a Linda appointment to a new date/time; updates calendar + emails patient.
+
+export async function apiLindaReschedule(req: Request, env: Env): Promise<Response> {
+  if (!await isLindaAuthed(req, env)) return json({ ok: false, reason: 'Access denied.' }, 403);
+  const body: any = await req.json();
+  const appointmentId = String(body.appointmentId || '').trim();
+  const dateKey = String(body.dateKey || '').trim();
+  const startTime = String(body.startTime || '').trim();
+
+  if (!appointmentId || !dateKey || !startTime) return json({ ok: false, reason: 'Missing fields.' }, 400);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) return json({ ok: false, reason: 'Invalid date.' }, 400);
+  if (!/^\d{2}:\d{2}$/.test(startTime)) return json({ ok: false, reason: 'Invalid time.' }, 400);
+
+  const appt = await getAppointmentById(env.DB, appointmentId);
+  if (!appt) return json({ ok: false, reason: 'Appointment not found.' }, 404);
+  if (appt.clinic !== 'linda') return json({ ok: false, reason: "Not a Linda appointment." }, 400);
+  if (appt.status.includes('CANCELLED')) return json({ ok: false, reason: 'Appointment is cancelled.' }, 400);
+
+  const cfg = await loadLindaConfig(env.DB);
+  const extras = await getLindaExtrasForDate(env.DB, dateKey);
+  const slots = buildLindaSlots(dateKey, cfg, extras);
+  const slotFound = slots.find(s => s.start === startTime);
+  if (!slotFound) return json({ ok: false, reason: 'That slot is not in Linda\u2019s hours for this date.' }, 400);
+
+  // Don't bump into the same appointment itself; only reject if a DIFFERENT booking has it.
+  if (await isSlotTaken(env.DB, dateKey, startTime, 'linda')) {
+    const existing = await env.DB.prepare(
+      "SELECT id FROM appointments WHERE clinic='linda' AND date_key=? AND start_time=? AND status='BOOKED'"
+    ).bind(dateKey, startTime).first<{ id: string }>();
+    if (existing && existing.id !== appointmentId) {
+      return json({ ok: false, reason: 'That slot is already taken.' }, 400);
+    }
+  }
+
+  const now = nowIso(env.TIMEZONE);
+  const oldCalEventId = appt.calendar_event_id;
+  const oldDate = appt.date_key;
+
+  await env.DB.prepare(
+    'UPDATE appointments SET date_key = ?, start_time = ?, end_time = ?, updated_at = ?, calendar_event_id = ? WHERE id = ?'
+  ).bind(dateKey, startTime, slotFound.end, now, '', appointmentId).run();
+  await bumpVersion(env.DB);
+
+  // Broadcast so the /linda page and public physio page refresh.
+  try {
+    const doId = env.REALTIME.idFromName('global');
+    const stub = env.REALTIME.get(doId);
+    await stub.fetch('http://internal/broadcast', {
+      method: 'POST',
+      body: JSON.stringify({ type: 'slots_updated', dateKey, clinic: 'linda' }),
+    });
+    if (oldDate !== dateKey) {
+      await stub.fetch('http://internal/broadcast', {
+        method: 'POST',
+        body: JSON.stringify({ type: 'slots_updated', dateKey: oldDate, clinic: 'linda' }),
+      });
+    }
+  } catch {}
+
+  const ctx = (globalThis as any).__ctx;
+  if (ctx?.waitUntil) {
+    ctx.waitUntil((async () => {
+      if (oldCalEventId) {
+        try { await deleteCalendarEvent(env, oldCalEventId, 'linda'); } catch {}
+      }
+      const updated = { ...appt, date_key: dateKey, start_time: startTime, end_time: slotFound.end };
+      try {
+        const newEventId = await createCalendarEvent(env, updated);
+        if (newEventId) {
+          await env.DB.prepare('UPDATE appointments SET calendar_event_id = ? WHERE id = ?').bind(newEventId, appointmentId).run();
+        }
+      } catch (e) { console.error('Linda reschedule cal error:', e); }
+      try { await sendAppointmentPushedEmail(env, appt, dateKey, startTime, slotFound.end); } catch (e) { console.error('Linda reschedule email error:', e); }
+    })());
+  }
+
+  return json({ ok: true, appointmentId, dateKey, startTime, endTime: slotFound.end });
 }
 
 // ─── POST /linda/login ─────────────────────────────────────
