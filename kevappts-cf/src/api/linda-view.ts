@@ -502,6 +502,37 @@ export async function apiLindaNewBooking(req: Request, env: Env): Promise<Respon
   return json({ ok: true, appointmentId: appt.id, dateKey, startTime, endTime: slotFound.end });
 }
 
+// ─── POST /api/linda-mark-status ───────────────────────────
+// Body: { appointmentId, status: 'ATTENDED' | 'NO_SHOW' | 'BOOKED' }
+// Lets Linda mark a past appointment's outcome without leaving /linda.
+
+export async function apiLindaMarkStatus(req: Request, env: Env): Promise<Response> {
+  if (!await isLindaAuthed(req, env)) return json({ ok: false, reason: 'Access denied.' }, 403);
+  const body: any = await req.json();
+  const appointmentId = String(body.appointmentId || '').trim();
+  const status = String(body.status || '').trim();
+  if (!appointmentId) return json({ ok: false, reason: 'Missing id.' }, 400);
+  if (!['ATTENDED','NO_SHOW','BOOKED'].includes(status)) return json({ ok: false, reason: 'Invalid status.' }, 400);
+
+  const appt = await getAppointmentById(env.DB, appointmentId);
+  if (!appt) return json({ ok: false, reason: 'Not found.' }, 404);
+  if (appt.clinic !== 'linda') return json({ ok: false, reason: 'Not a Linda appointment.' }, 400);
+
+  const now = nowIso(env.TIMEZONE);
+  await updateAppointmentStatus(env.DB, appt.id, { status }, now);
+  await bumpVersion(env.DB);
+
+  try {
+    const doId = env.REALTIME.idFromName('global');
+    const stub = env.REALTIME.get(doId);
+    await stub.fetch('http://internal/broadcast', {
+      method: 'POST',
+      body: JSON.stringify({ type: 'slots_updated', dateKey: appt.date_key, clinic: 'linda' }),
+    });
+  } catch {}
+  return json({ ok: true });
+}
+
 // ─── POST /api/linda-cancel ────────────────────────────────
 // Cancels one Linda appointment. Body: { appointmentId, reason?, rebook? }
 // If rebook=true, the patient email invites them to book a new time;
@@ -792,6 +823,9 @@ function lindaMainPage(env: Env): string {
   .action-btn.reschedule{border-color:#f59e0b;color:#92400e;background:#fffbeb;}
   .action-btn.clone,.action-btn.next-session{border-color:#2563eb;color:#1e40af;background:#eff6ff;}
   .action-btn.cancel{border-color:#ef4444;color:#991b1b;background:#fef2f2;}
+  .action-btn.attended{border-color:#3730a3;color:#312e81;background:#eef2ff;}
+  .action-btn.noshow{border-color:#9a3412;color:#7c2d12;background:#fff7ed;}
+  .action-btn.reopen{border-color:#6b7280;color:#374151;background:#f9fafb;}
 
   /* Day-wide actions row */
   .day-actions{display:flex;gap:8px;padding:0 12px 6px;flex-wrap:wrap;}
@@ -1335,12 +1369,25 @@ function lindaMainPage(env: Env): string {
       if (a.comments && a.comments.trim()){
         html += '<div class="comments"><div class="comments-label">Note from patient</div>' + esc(a.comments) + '</div>';
       }
-      if (!a.status || a.status.indexOf('CANCELLED') < 0){
+      var cancelled = a.status && a.status.indexOf('CANCELLED') >= 0;
+      if (!cancelled){
         var nextPayload = esc(JSON.stringify({ id: a.id, fullName: a.full_name, email: a.email, phone: a.phone, comments: a.comments || '' }));
         html += '<div class="action-row">';
         html +=   '<button class="action-btn reschedule" onclick="openReschedule(\\'' + esc(a.id) + '\\')">Reschedule</button>';
         html +=   '<button class="action-btn next-session" data-patient="' + nextPayload + '" onclick="openScheduleNextFromEl(this)">Schedule Next Session</button>';
         html += '</div>';
+        // Attended / No-show — hide once already marked; show a tiny Reopen
+        // link instead so she can undo if she tapped by mistake.
+        if (a.status === 'ATTENDED' || a.status === 'NO_SHOW'){
+          html += '<div class="action-row" style="margin-top:6px;">';
+          html +=   '<button class="action-btn reopen" onclick="markStatus(\\'' + esc(a.id) + '\\',\\'BOOKED\\')">Undo \u2014 reopen booking</button>';
+          html += '</div>';
+        } else {
+          html += '<div class="action-row" style="margin-top:6px;">';
+          html +=   '<button class="action-btn attended" onclick="markStatus(\\'' + esc(a.id) + '\\',\\'ATTENDED\\')">\u2713 Attended</button>';
+          html +=   '<button class="action-btn noshow" onclick="markStatus(\\'' + esc(a.id) + '\\',\\'NO_SHOW\\')">No-show</button>';
+          html += '</div>';
+        }
         var cancelInfo = esc(JSON.stringify({ id: a.id, name: a.full_name || 'this patient', dateKey: a.date_key, startTime: a.start_time }));
         html += '<div class="action-row" style="margin-top:6px;">';
         html +=   '<button class="action-btn cancel" data-appt="' + cancelInfo + '" onclick="cancelOneFromEl(this)">Cancel</button>';
@@ -1939,6 +1986,18 @@ function lindaMainPage(env: Env): string {
       var res = await fetch('/api/linda-cancel', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ appointmentId: info.id, rebook: invite, reason: 'Cancelled by Linda' }),
+      });
+      if (res.status === 403) { window.location.reload(); return; }
+      var data = await res.json();
+      if (data.ok) { load(); if ($('pane-week').style.display !== 'none') loadWeek(); }
+      else alert(data.reason || 'Failed');
+    } catch(e){ alert('Network error'); }
+  };
+  window.markStatus = async function(id, status){
+    try {
+      var res = await fetch('/api/linda-mark-status', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ appointmentId: id, status: status }),
       });
       if (res.status === 403) { window.location.reload(); return; }
       var data = await res.json();
