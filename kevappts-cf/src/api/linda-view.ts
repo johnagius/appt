@@ -460,7 +460,7 @@ function lindaMainPage(env: Env): string {
   .action-btn{flex:1 1 0;padding:10px;border:1px solid var(--line);background:#fff;color:var(--text);border-radius:10px;font-size:13px;font-weight:800;cursor:pointer;min-height:40px;}
   .action-btn:active{background:#f3f4f6;}
   .action-btn.reschedule{border-color:#f59e0b;color:#92400e;background:#fffbeb;}
-  .action-btn.clone{border-color:#2563eb;color:#1e40af;background:#eff6ff;}
+  .action-btn.clone,.action-btn.next-session{border-color:#2563eb;color:#1e40af;background:#eff6ff;}
 
   .empty{padding:30px 20px;text-align:center;color:var(--muted);font-size:15px;background:#fff;border-radius:14px;margin:0 12px;border:1px dashed var(--line);}
   .emptyEmoji{font-size:40px;margin-bottom:8px;}
@@ -724,7 +724,7 @@ function lindaMainPage(env: Env): string {
         var payload = JSON.stringify({ id: a.id, fullName: a.full_name, email: a.email, phone: a.phone, comments: a.comments || '' }).replace(/'/g, '&#39;');
         html += '<div class="action-row">';
         html +=   '<button class="action-btn reschedule" onclick="openReschedule(\\'' + esc(a.id) + '\\')">Reschedule</button>';
-        html +=   "<button class=\\"action-btn clone\\" onclick='openClone(" + payload + ")'>Clone</button>";
+        html +=   "<button class=\\"action-btn next-session\\" onclick='openScheduleNext(" + payload + ")'>Schedule Next Session</button>";
         html += '</div>';
       }
       html += '</div>';
@@ -977,13 +977,15 @@ function lindaMainPage(env: Env): string {
     loadSheetSlots();
   };
 
-  window.openClone = function(patient){
-    // Opens the new-booking sheet prefilled with this patient's details, on
-    // tomorrow by default so she's less likely to pick a same-day conflict.
+  // Schedule Next Session — prefills the Book sheet with this patient's
+  // details and defaults to tomorrow, so Linda can quickly book their
+  // follow-up appointment.
+  window.openScheduleNext = function(patient){
     var d = parseKey(state.dateKey);
     d.setDate(d.getDate() + 1);
     openBookSheet({ fullName: patient.fullName, email: patient.email, phone: patient.phone, comments: '' });
     $('bfDate').value = toKey(d);
+    $('sheetTitle').textContent = 'Schedule next session';
     loadSheetSlots();
   };
 
