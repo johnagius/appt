@@ -38,7 +38,7 @@ import { doctorPage } from './pages/doctor-page';
 import { reschedulePage } from './pages/reschedule-page';
 import { followupPage } from './pages/followup-page';
 import { physioPage } from './pages/physio-page';
-import { apiLindaGetDay, apiLindaNextDay, apiLindaSlots, apiLindaListExtras, apiLindaAddExtra, apiLindaDeleteExtra, apiLindaReschedule, apiLindaNewBooking, apiLindaSearch, apiLindaPatientHistory, handleLindaLogin, lindaRoute } from './api/linda-view';
+import { apiLindaGetDay, apiLindaNextDay, apiLindaSlots, apiLindaListExtras, apiLindaAddExtra, apiLindaDeleteExtra, apiLindaReschedule, apiLindaNewBooking, apiLindaSearch, apiLindaPatientHistory, apiLindaClientsAutocomplete, handleLindaLogin, lindaRoute } from './api/linda-view';
 
 export { RealtimeHub };
 
@@ -122,6 +122,7 @@ export default {
       if (path === '/api/linda-new-booking' && method === 'POST') return apiLindaNewBooking(request, env);
       if (path === '/api/linda-search' && method === 'GET') return apiLindaSearch(request, env);
       if (path === '/api/linda-patient-history' && method === 'GET') return apiLindaPatientHistory(request, env);
+      if (path === '/api/linda-clients-autocomplete' && method === 'GET') return apiLindaClientsAutocomplete(request, env);
 
       // ─── Linda private page + login ──────────────
       if (path === '/linda' && method === 'GET') return lindaRoute(request, env);

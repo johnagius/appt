@@ -91,6 +91,26 @@ export async function apiLindaSearch(req: Request, env: Env): Promise<Response> 
   return json({ ok: true, results: rows.results });
 }
 
+// ─── /api/linda-clients-autocomplete ───────────────────────
+// Returns up to 8 distinct patients (from appointments.clinic='linda')
+// matching the query across name/email/phone.
+
+export async function apiLindaClientsAutocomplete(req: Request, env: Env): Promise<Response> {
+  if (!await isLindaAuthed(req, env)) return json({ ok: false, reason: 'Access denied.' }, 403);
+  const url = new URL(req.url);
+  const q = (url.searchParams.get('q') || '').trim();
+  if (q.length < 2) return json({ ok: true, results: [] });
+  const pat = '%' + q + '%';
+  const rows = await env.DB.prepare(
+    "SELECT full_name, email, phone FROM appointments " +
+    "WHERE clinic = 'linda' AND (full_name LIKE ? OR email LIKE ? OR phone LIKE ?) " +
+    "GROUP BY email, phone " +
+    "ORDER BY MAX(date_key) DESC LIMIT 8"
+  ).bind(pat, pat, pat).all<{ full_name: string; email: string; phone: string }>();
+
+  return json({ ok: true, results: rows.results.map(r => ({ fullName: r.full_name, email: r.email, phone: r.phone })) });
+}
+
 // ─── /api/linda-patient-history ────────────────────────────
 // All Linda appointments for a given patient (keyed by email OR phone),
 // plus simple stats. Limit 200.
@@ -616,6 +636,20 @@ function lindaMainPage(env: Env): string {
     .open-prompt{background:#422006;border-color:#92400e;color:#fde68a;}
   }
 
+  /* Autocomplete dropdown */
+  .ac-wrap{position:relative;}
+  .ac-list{position:absolute;left:0;right:0;top:100%;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,0.1);z-index:10;max-height:240px;overflow-y:auto;margin-top:4px;display:none;}
+  .ac-list.show{display:block;}
+  .ac-item{padding:10px 12px;cursor:pointer;border-bottom:1px solid #f3f4f6;}
+  .ac-item:last-child{border-bottom:none;}
+  .ac-item:active{background:#f3f4f6;}
+  .ac-item .name{font-weight:700;font-size:14px;}
+  .ac-item .dim{font-size:12px;color:var(--muted);margin-top:2px;}
+  @media (prefers-color-scheme: dark){
+    .ac-list{background:#1e293b;border-color:#334155;}
+    .ac-item{border-color:#334155;}
+  }
+
   /* Patient history drawer */
   .ph-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
   .ph-name{margin:0;font-size:18px;font-weight:900;}
@@ -751,7 +785,10 @@ function lindaMainPage(env: Env): string {
 
   <div class="sheet-section" id="sheetPatientSection">
     <div class="sheet-label">Patient</div>
-    <input class="sheet-input" id="bfName" placeholder="Full name" style="margin-bottom:8px;">
+    <div class="ac-wrap">
+      <input class="sheet-input" id="bfName" placeholder="Full name (start typing to match)" autocomplete="off" style="margin-bottom:8px;">
+      <div class="ac-list" id="bfAcList"></div>
+    </div>
     <div class="sheet-row">
       <input class="sheet-input" id="bfPhone" type="tel" placeholder="Phone" inputmode="tel">
       <input class="sheet-input" id="bfEmail" type="email" placeholder="Email" inputmode="email">
@@ -1330,6 +1367,43 @@ function lindaMainPage(env: Env): string {
     $('bfSubmit').disabled = !(dk && hasSlot && hasPatient);
   }
   ['bfName','bfPhone','bfEmail'].forEach(function(id){ $(id).addEventListener('input', updateSheetSubmit); });
+
+  // ── Patient autocomplete on the Name input ──
+  var acTimer = null;
+  function closeAc(){ $('bfAcList').classList.remove('show'); $('bfAcList').innerHTML = ''; }
+  $('bfName').addEventListener('input', function(e){
+    var q = e.target.value.trim();
+    if (acTimer) clearTimeout(acTimer);
+    if (q.length < 2) { closeAc(); return; }
+    acTimer = setTimeout(async function(){
+      try {
+        var res = await fetch('/api/linda-clients-autocomplete?q=' + encodeURIComponent(q));
+        if (res.status === 403) { window.location.reload(); return; }
+        var data = await res.json();
+        if (!data.ok || !data.results || !data.results.length) { closeAc(); return; }
+        var html = '';
+        for (var i = 0; i < data.results.length; i++){
+          var r = data.results[i];
+          var p = JSON.stringify(r).replace(/'/g, '&#39;');
+          html += "<div class=\\"ac-item\\" onclick='pickAc(" + p + ")'>";
+          html +=   '<div class="name">' + esc(r.fullName || 'Unknown') + '</div>';
+          html +=   '<div class="dim">' + [r.phone, r.email].filter(Boolean).map(esc).join(' · ') + '</div>';
+          html += '</div>';
+        }
+        $('bfAcList').innerHTML = html;
+        $('bfAcList').classList.add('show');
+      } catch(e){}
+    }, 220);
+  });
+  window.pickAc = function(r){
+    $('bfName').value = r.fullName || '';
+    $('bfPhone').value = r.phone || '';
+    $('bfEmail').value = r.email || '';
+    closeAc();
+    updateSheetSubmit();
+  };
+  // Close autocomplete when user leaves the name field.
+  $('bfName').addEventListener('blur', function(){ setTimeout(closeAc, 150); });
 
   function setBfMsg(text, kind){
     $('bfMsg').innerHTML = text ? ('<div class="sheet-msg ' + (kind || '') + '">' + esc(text) + '</div>') : '';
