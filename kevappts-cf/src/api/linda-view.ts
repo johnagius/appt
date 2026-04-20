@@ -686,9 +686,84 @@ function lindaMainPage(env: Env): string {
     if (!isDay) { loadExtras(); }
   };
 
-  // Placeholder — wired in next commit.
-  function loadExtras(){ $('extraList').innerHTML = '<div class="empty" style="margin:0;border:none;padding:20px 0;">Coming in next commit…</div>'; }
-  window.saveAvail = function(){ alert('Wired in next commit'); };
+  // ── Availability tab: load, add, delete ──
+  function formatNiceShort(k){
+    try {
+      var d = parseKey(k);
+      return d.toLocaleDateString(undefined, { weekday:'short', day:'numeric', month:'short' });
+    } catch(e){ return k; }
+  }
+
+  async function loadExtras(){
+    var el = $('extraList');
+    el.innerHTML = '<div class="empty" style="margin:0;border:none;padding:20px 0;">Loading…</div>';
+    try {
+      var res = await fetch('/api/linda-extras');
+      if (res.status === 403) { window.location.reload(); return; }
+      var data = await res.json();
+      if (!data.ok) { el.innerHTML = '<div class="err" style="margin:0;">' + esc(data.reason || 'Failed') + '</div>'; return; }
+      if (!data.extras || !data.extras.length) {
+        el.innerHTML = '<div class="empty" style="margin:0;border:none;padding:20px 0;">🌱 Nothing extra open yet. Use the form above to add hours.</div>';
+        return;
+      }
+      var html = '';
+      for (var i = 0; i < data.extras.length; i++){
+        var x = data.extras[i];
+        html += '<div class="extra-row">';
+        html +=   '<div>';
+        html +=     '<div class="extra-when">' + esc(formatNiceShort(x.date_key)) + ' · ' + esc(x.start_time) + '–' + esc(x.end_time) + '</div>';
+        if (x.reason) html += '<div class="extra-dim">' + esc(x.reason) + '</div>';
+        html +=   '</div>';
+        html +=   '<button class="extra-del" onclick="deleteExtra(' + x.id + ')">Remove</button>';
+        html += '</div>';
+      }
+      el.innerHTML = html;
+    } catch (e) {
+      el.innerHTML = '<div class="err" style="margin:0;">Network error.</div>';
+    }
+  }
+
+  function setAvMsg(text, kind){
+    var m = $('avMsg');
+    m.textContent = text || '';
+    m.className = 'avail-msg' + (kind ? ' ' + kind : '');
+  }
+
+  window.saveAvail = async function(){
+    var dateFrom = $('avDateFrom').value;
+    var dateTo = $('avDateTo').value;
+    var start = $('avStart').value;
+    var end = $('avEnd').value;
+    if (!dateFrom) { setAvMsg('Pick a start date.', 'bad'); return; }
+    if (!start || !end) { setAvMsg('Pick a start and end time.', 'bad'); return; }
+    setAvMsg('Saving…', '');
+    try {
+      var res = await fetch('/api/linda-extras', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dateKey: dateFrom, dateKeyEnd: dateTo || undefined, startTime: start, endTime: end }),
+      });
+      if (res.status === 403) { window.location.reload(); return; }
+      var data = await res.json();
+      if (data.ok) {
+        setAvMsg('Opened ' + data.added + ' day' + (data.added === 1 ? '' : 's') + '.', 'ok');
+        loadExtras();
+      } else {
+        setAvMsg(data.reason || 'Failed', 'bad');
+      }
+    } catch (e) {
+      setAvMsg('Network error', 'bad');
+    }
+  };
+
+  window.deleteExtra = async function(id){
+    if (!confirm('Remove this extra availability?')) return;
+    try {
+      var res = await fetch('/api/linda-extras?id=' + id, { method: 'DELETE' });
+      if (res.status === 403) { window.location.reload(); return; }
+      loadExtras();
+    } catch(e){}
+  };
 
   // ── Idle overlay: hides content + stops network after 2 min inactivity ──
   function resetIdle(){
