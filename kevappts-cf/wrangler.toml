@@ -25,6 +25,7 @@ LINDA_LOCATION = "Potter's Clinic"
 # GOOGLE_SPINOLA_CALENDAR_ID — Spinola Google Calendar ID
 # LINDA_CALENDAR_ID       — Linda's (physiotherapy) Google Calendar ID
 #   value: a18cc8ed238199dd6f03ca81085c202a5f032850f65782631aed5a3fb5fa431a@group.calendar.google.com
+# LINDA_PASSWORD          — Password Linda uses to log in at /linda
 
 [[d1_databases]]
 binding = "DB"

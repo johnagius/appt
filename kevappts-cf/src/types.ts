@@ -20,6 +20,7 @@ export interface Env {
   LINDA_CALENDAR_ID: string;
   LINDA_DOCTOR_NAME: string;
   LINDA_LOCATION: string;
+  LINDA_PASSWORD: string;
 }
 
 export interface Appointment {

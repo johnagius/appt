@@ -181,6 +181,16 @@ export async function apiPhysioBook(req: Request, env: Env): Promise<Response> {
   await insertAppointment(env.DB, appt);
   await bumpVersion(env.DB);
 
+  // Broadcast so Linda's /linda page and admin panels refresh immediately.
+  try {
+    const doId = env.REALTIME.idFromName('global');
+    const stub = env.REALTIME.get(doId);
+    await stub.fetch('http://internal/broadcast', {
+      method: 'POST',
+      body: JSON.stringify({ type: 'slots_updated', dateKey, clinic: 'linda' }),
+    });
+  } catch (e) { console.error('Linda broadcast error:', e); }
+
   const ctx = (globalThis as any).__ctx;
   if (ctx?.waitUntil) {
     ctx.waitUntil((async () => {

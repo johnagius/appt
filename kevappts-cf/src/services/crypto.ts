@@ -79,6 +79,16 @@ export async function verifyAdminSig(sig: string, secret: string): Promise<boole
   return safeEqual(expected, sig);
 }
 
+export async function computeLindaSig(secret: string): Promise<string> {
+  return computeSig('linda_access', secret);
+}
+
+export async function verifyLindaSig(sig: string, secret: string): Promise<boolean> {
+  if (!sig) return false;
+  const expected = await computeLindaSig(secret);
+  return safeEqual(expected, sig);
+}
+
 export async function verifyRescheduleSig(token: string, sig: string, secret: string): Promise<boolean> {
   if (!token || !sig) return false;
   const expected = await computeSig('reschedule|' + token, secret);
