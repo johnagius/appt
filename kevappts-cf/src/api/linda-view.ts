@@ -525,6 +525,16 @@ function lindaMainPage(env: Env): string {
   .dayLabel{padding:10px 14px 4px;font-size:14px;color:var(--muted);font-weight:700;}
   .summary{padding:0 14px 10px;font-size:13px;color:var(--muted);}
 
+  /* Next-up banner */
+  .next-up{margin:8px 12px 4px;padding:12px 14px;background:linear-gradient(135deg,#10b981,#059669);color:#fff;border-radius:14px;display:flex;align-items:center;gap:12px;box-shadow:0 4px 14px rgba(16,185,129,0.3);}
+  .next-up .icon{font-size:28px;}
+  .next-up .meta{flex:1 1 auto;min-width:0;}
+  .next-up .line1{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;opacity:.9;}
+  .next-up .line2{font-size:15px;font-weight:800;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .next-up .line3{font-size:12px;font-weight:700;margin-top:2px;opacity:.9;}
+  .next-up.soon{background:linear-gradient(135deg,#f59e0b,#d97706);box-shadow:0 4px 14px rgba(245,158,11,0.35);}
+  .next-up.now{background:linear-gradient(135deg,#dc2626,#b91c1c);box-shadow:0 4px 14px rgba(220,38,38,0.35);}
+
   .list{padding:0 12px 80px;}
   .appt{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,0.03);}
   .appt-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;gap:8px;}
@@ -745,6 +755,7 @@ function lindaMainPage(env: Env): string {
     <button class="today-btn" onclick="goToday()">Today</button>
   </div>
   <div class="dayLabel" id="dayLabel"></div>
+  <div id="nextUp"></div>
   <div class="summary" id="summary"></div>
   <div class="list" id="list"><div class="empty">Loading…</div></div>
   </div>
@@ -863,7 +874,7 @@ function lindaMainPage(env: Env): string {
 <script>
 (function(){
   var IDLE_MS = 120000; // 2 min
-  var state = { dateKey: '', idle: false };
+  var state = { dateKey: '', idle: false, appointments: [] };
   var idleTimer = null;
 
   function $(id){ return document.getElementById(id); }
@@ -894,6 +905,41 @@ function lindaMainPage(env: Env): string {
     if (s.indexOf('CANCELLED') >= 0) return 'status-CANCELLED';
     return 'status-' + s;
   }
+  function renderNextUp(){
+    var el = $('nextUp');
+    if (!el) return;
+    // Only show when viewing today.
+    if (state.dateKey !== today()){
+      el.innerHTML = '';
+      return;
+    }
+    var now = new Date();
+    var nowMin = now.getHours() * 60 + now.getMinutes();
+    var next = null;
+    for (var i = 0; i < (state.appointments || []).length; i++){
+      var a = state.appointments[i];
+      if (!a.status || String(a.status).indexOf('CANCELLED') >= 0) continue;
+      var p = a.start_time.split(':');
+      var mins = parseInt(p[0], 10) * 60 + parseInt(p[1], 10);
+      if (mins + 15 < nowMin) continue; // 15-min grace after start
+      if (!next || mins < next._mins) { next = a; next._mins = mins; }
+    }
+    if (!next){ el.innerHTML = ''; return; }
+    var delta = next._mins - nowMin;
+    var label, cls = 'next-up';
+    if (delta <= 0) { label = 'happening now'; cls += ' now'; }
+    else if (delta < 60) { label = 'in ' + delta + ' min'; if (delta <= 30) cls += ' soon'; }
+    else { var h = Math.floor(delta/60), m = delta%60; label = 'in ' + h + 'h' + (m ? ' ' + m + 'm' : ''); }
+    el.innerHTML = '<div class="' + cls + '"><div class="icon">\u23F1</div><div class="meta">' +
+      '<div class="line1">Next up</div>' +
+      '<div class="line2">' + esc(next.start_time) + ' \u2014 ' + esc(next.full_name || 'No name') + '</div>' +
+      '<div class="line3">' + esc(label) + '</div>' +
+    '</div></div>';
+  }
+
+  // Re-render the next-up banner every 30s so the countdown ticks.
+  setInterval(function(){ if (!state.idle) renderNextUp(); }, 30000);
+
   function statusLabel(s){
     if (!s) return 'Booked';
     if (s.indexOf('CANCELLED') >= 0) return 'Cancelled';
@@ -903,8 +949,10 @@ function lindaMainPage(env: Env): string {
   }
 
   function renderAppts(list){
+    state.appointments = list;
     var el = $('list');
     $('summary').textContent = list.length + ' appointment' + (list.length === 1 ? '' : 's');
+    renderNextUp();
     if (!list.length){
       el.innerHTML = '<div class="empty"><div class="emptyEmoji">🌿</div>No appointments on this day.</div>';
       return;
