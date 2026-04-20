@@ -357,7 +357,7 @@ export async function apiLindaReschedule(req: Request, env: Env): Promise<Respon
   const extras = await getLindaExtrasForDate(env.DB, dateKey);
   const slots = buildLindaSlots(dateKey, cfg, extras);
   const slotFound = slots.find(s => s.start === startTime);
-  if (!slotFound) return json({ ok: false, reason: 'That slot is not in Linda\u2019s hours for this date.' }, 400);
+  if (!slotFound) return json({ ok: false, reason: "No hours set for this date \u2014 open availability for it first." }, 400);
 
   // Don't bump into the same appointment itself; only reject if a DIFFERENT booking has it.
   if (await isSlotTaken(env.DB, dateKey, startTime, 'linda')) {
@@ -438,7 +438,7 @@ export async function apiLindaNewBooking(req: Request, env: Env): Promise<Respon
   const extras = await getLindaExtrasForDate(env.DB, dateKey);
   const slots = buildLindaSlots(dateKey, cfg, extras);
   const slotFound = slots.find(s => s.start === startTime);
-  if (!slotFound) return json({ ok: false, reason: 'Not a valid slot for this date. Open availability first.' }, 400);
+  if (!slotFound) return json({ ok: false, reason: "No hours set for this date \u2014 open availability for it first." }, 400);
 
   if (await isSlotTaken(env.DB, dateKey, startTime, 'linda')) {
     return json({ ok: false, reason: 'That slot is already taken.' }, 400);
@@ -1281,6 +1281,12 @@ function lindaMainPage(env: Env): string {
 
   // ── Tab switching ──
   window.setTab = function(which){
+    // Switching tabs clears any in-flight search so panes don't render on top
+    // of each other and the Day list isn't hidden behind search results.
+    if ($('searchInput').value){
+      $('searchInput').value = '';
+      runSearch('');
+    }
     $('pane-day').style.display = which === 'day' ? '' : 'none';
     $('pane-week').style.display = which === 'week' ? '' : 'none';
     $('pane-avail').style.display = which === 'avail' ? '' : 'none';
@@ -1503,6 +1509,14 @@ function lindaMainPage(env: Env): string {
     } catch(e){ return k; }
   }
 
+  // Cap the picker to a sane range so Linda can't accidentally pick 2050.
+  function calBounds(){
+    var now = new Date();
+    var min = new Date(now.getFullYear() - 1, now.getMonth(), 1);
+    var max = new Date(now.getFullYear() + 2, now.getMonth(), 1);
+    return { minK: toKey(min), maxK: toKey(max) };
+  }
+
   function renderCalGrid(){
     $('calTitle').textContent = MONTH_NAMES[cal.month] + ' ' + cal.year;
     var first = new Date(cal.year, cal.month, 1);
@@ -1512,6 +1526,7 @@ function lindaMainPage(env: Env): string {
     var daysInPrev = new Date(cal.year, cal.month, 0).getDate();
     var todayK = today();
     var selK = cal.targetHidden ? $(cal.targetHidden).value : '';
+    var bounds = calBounds();
     var html = '';
     // Previous-month trailing days
     for (var i = 0; i < startOffset; i++){
@@ -1526,7 +1541,10 @@ function lindaMainPage(env: Env): string {
       if (dayOfWeek === 0 || dayOfWeek === 6) classes += ' weekend';
       if (dk === todayK) classes += ' today';
       if (dk === selK) classes += ' sel';
-      html += '<button class="' + classes + '" onclick="calPick(\\'' + dk + '\\')">' + d + '</button>';
+      var outOfBounds = dk < bounds.minK || dk > bounds.maxK;
+      if (outOfBounds) classes += ' disabled';
+      var onclick = outOfBounds ? '' : ' onclick="calPick(\\'' + dk + '\\')"';
+      html += '<button class="' + classes + '"' + onclick + (outOfBounds ? ' disabled' : '') + '>' + d + '</button>';
     }
     // Fill trailing cells to complete the 6-row grid (optional tidy).
     var total = startOffset + daysInMonth;
