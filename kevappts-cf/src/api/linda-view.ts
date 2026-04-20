@@ -640,7 +640,7 @@ function lindaMainPage(env: Env): string {
   .next-up.soon{background:linear-gradient(135deg,#f59e0b,#d97706);box-shadow:0 4px 14px rgba(245,158,11,0.35);}
   .next-up.now{background:linear-gradient(135deg,#dc2626,#b91c1c);box-shadow:0 4px 14px rgba(220,38,38,0.35);}
 
-  .list{padding:0 12px 80px;}
+  .list{padding:0 12px 110px;}
   .appt{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,0.03);animation:fadeUp .32s var(--ease) both;}
   .list .appt:nth-child(1){animation-delay:.02s}
   .list .appt:nth-child(2){animation-delay:.05s}
@@ -682,7 +682,7 @@ function lindaMainPage(env: Env): string {
   .searchBar{padding:10px 12px;background:#fff;border-bottom:1px solid var(--line);display:flex;gap:8px;align-items:center;}
   .searchBar input{flex:1 1 auto;padding:12px;border:1px solid var(--line);border-radius:10px;font-size:15px;min-height:44px;background:#fff;color:var(--text);}
   .searchBar .clear{background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;padding:4px 8px;min-width:32px;}
-  .searchResults{padding:0 12px 80px;}
+  .searchResults{padding:0 12px 110px;}
   .srow{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:8px;cursor:pointer;animation:fadeUp .25s var(--ease) both;}
   .srow:active{background:#f3f4f6;}
   .srow-main{font-size:15px;font-weight:800;}
@@ -695,7 +695,7 @@ function lindaMainPage(env: Env): string {
   #pane-day,#pane-week,#pane-avail{animation:fadeIn .22s ease both;}
 
   /* Availability tab */
-  .avail-wrap{padding:12px;padding-bottom:80px;}
+  .avail-wrap{padding:12px;padding-bottom:110px;}
   .avail-card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px;}
   .avail-card h3{margin:0 0 8px 0;font-size:15px;font-weight:900;}
   .avail-card .hint{margin:0 0 12px 0;font-size:13px;color:var(--muted);line-height:1.5;}
@@ -726,7 +726,7 @@ function lindaMainPage(env: Env): string {
   .weekBar .nav{min-width:40px;height:40px;border:1px solid var(--line);background:#fff;border-radius:10px;font-size:18px;font-weight:800;cursor:pointer;color:var(--text);}
   .weekBar .weekLabel{flex:1 1 auto;text-align:center;font-size:14px;font-weight:800;}
   .weekBar .today-btn{height:40px;padding:0 12px;border:1px solid var(--accent);background:#ecfdf5;color:#065f46;border-radius:10px;font-size:12px;font-weight:800;cursor:pointer;}
-  .wg-wrap{overflow-x:auto;overflow-y:auto;max-height:calc(100vh - 160px);padding-bottom:80px;}
+  .wg-wrap{overflow-x:auto;overflow-y:auto;max-height:calc(100vh - 160px);padding-bottom:110px;}
   .wg-grid{display:grid;grid-template-columns:44px repeat(7, minmax(100px, 1fr));position:relative;background:#fff;}
   .wg-head{position:sticky;top:0;background:#fff;z-index:2;border-bottom:1px solid var(--line);padding:6px 4px;text-align:center;font-size:12px;font-weight:800;color:var(--text);}
   .wg-head .dnum{font-size:16px;}
@@ -753,10 +753,24 @@ function lindaMainPage(env: Env): string {
     .wg-hour-lbl{border-color:#334155;}
   }
 
-  /* FAB */
-  .fab{position:fixed;right:16px;bottom:16px;background:var(--accent);color:#fff;border:none;border-radius:999px;padding:14px 20px;font-size:15px;font-weight:800;box-shadow:0 6px 20px rgba(16,185,129,0.4);cursor:pointer;z-index:20;min-height:52px;animation:scalePop .35s var(--ease-spring) both;transition:transform .2s var(--ease),box-shadow .2s ease,background-color .2s ease;}
-  .fab:hover{transform:translateY(-1px);box-shadow:0 8px 24px rgba(16,185,129,0.5);}
-  .fab:active{transform:scale(.95);background:#059669;}
+  /* FAB — prominent, bottom-right, subtly breathing so it's easy to spot */
+  @keyframes fabBreathe{
+    0%,100%{box-shadow:0 8px 28px rgba(16,185,129,0.55),0 0 0 0 rgba(16,185,129,0.55);}
+    50%{box-shadow:0 10px 32px rgba(16,185,129,0.65),0 0 0 10px rgba(16,185,129,0);}
+  }
+  .fab{
+    position:fixed;right:20px;bottom:20px;
+    background:linear-gradient(135deg,#10b981,#059669);
+    color:#fff;border:none;border-radius:999px;
+    padding:16px 26px;font-size:17px;font-weight:900;letter-spacing:.3px;
+    cursor:pointer;z-index:20;min-height:60px;
+    display:inline-flex;align-items:center;gap:8px;
+    animation:scalePop .35s var(--ease-spring) both,fabBreathe 2.6s ease-in-out .4s infinite;
+    transition:transform .2s var(--ease),box-shadow .2s ease,background-color .2s ease;
+  }
+  .fab .fab-plus{font-size:22px;line-height:1;margin-right:2px;}
+  .fab:hover{transform:translateY(-2px) scale(1.03);}
+  .fab:active{transform:scale(.95);}
 
   /* Modal / sheet */
   .sheet-overlay{position:fixed;inset:0;background:rgba(17,24,39,0);display:none;z-index:60;transition:background-color .28s ease;}
@@ -935,8 +949,8 @@ function lindaMainPage(env: Env): string {
       <div class="avail-row"><label>Start</label><input type="time" id="avStart" step="1800" value="09:30"></div>
       <div class="avail-row"><label>End</label><input type="time" id="avEnd" step="1800" value="13:00"></div>
       <div style="font-size:12px;color:var(--muted);font-weight:800;text-transform:uppercase;letter-spacing:.4px;margin:12px 0 4px;">Evening (optional)</div>
-      <div class="avail-row"><label>Start</label><input type="time" id="avEveningStart" step="1800" placeholder="e.g. 16:00"></div>
-      <div class="avail-row"><label>End</label><input type="time" id="avEveningEnd" step="1800" placeholder="e.g. 18:30"></div>
+      <div class="avail-row"><label>Start</label><input type="time" id="avEveningStart" step="1800" value="16:00"></div>
+      <div class="avail-row"><label>End</label><input type="time" id="avEveningEnd" step="1800" value="19:00"></div>
       <button class="avail-save" onclick="saveAvail()">Open these hours</button>
       <div class="avail-msg" id="avMsg"></div>
     </div>
@@ -967,7 +981,7 @@ function lindaMainPage(env: Env): string {
   </div>
 </div>
 
-<button class="fab" id="fabBook" onclick="openBookSheet()">+ Book</button>
+<button class="fab" id="fabBook" onclick="openBookSheet()"><span class="fab-plus">＋</span>New Booking</button>
 
 <div class="sheet-overlay" id="sheetOverlay" onclick="closeSheet()"></div>
 <div class="sheet" id="sheet" role="dialog" aria-modal="true">
@@ -1008,8 +1022,8 @@ function lindaMainPage(env: Env): string {
       </div>
       <div style="font-size:11px;font-weight:800;text-transform:uppercase;margin-top:8px;opacity:.8;">Evening (optional)</div>
       <div class="sheet-row" style="margin-top:4px;">
-        <input class="sheet-input" type="time" id="bfOpenEveningStart" step="1800" placeholder="16:00">
-        <input class="sheet-input" type="time" id="bfOpenEveningEnd" step="1800" placeholder="18:30">
+        <input class="sheet-input" type="time" id="bfOpenEveningStart" step="1800" value="16:00">
+        <input class="sheet-input" type="time" id="bfOpenEveningEnd" step="1800" value="19:00">
       </div>
       <button onclick="quickOpenDate()" style="margin-top:10px;">Open this day</button>
     </div>
