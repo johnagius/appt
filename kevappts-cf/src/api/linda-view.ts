@@ -12,7 +12,9 @@
  */
 import type { Env, Appointment } from '../types';
 import { computeLindaSig, verifyLindaSig, verifyAdminSig } from '../services/crypto';
-import { todayKeyLocal } from '../services/utils';
+import { todayKeyLocal, nowIso, nowMinutesLocal, parseTimeToMinutes, toDateKey, todayLocal } from '../services/utils';
+import { buildLindaSlots, getLindaExtrasForDate, loadLindaConfig } from '../services/linda';
+import { getTakenSlots, bumpVersion } from '../db/queries';
 
 function json(data: any, status = 200): Response {
   return new Response(JSON.stringify(data), {
@@ -67,6 +69,99 @@ export async function apiLindaNextDay(req: Request, env: Env): Promise<Response>
 
   const dateKey = row?.dk || todayKey;
   return json({ ok: true, dateKey, todayKey });
+}
+
+// ─── /api/linda-slots ──────────────────────────────────────
+// Returns all slots for a date with availability + whether the date is
+// "working" (base hours or extras). Used by the Book and Reschedule modals.
+
+export async function apiLindaSlots(req: Request, env: Env): Promise<Response> {
+  if (!await isLindaAuthed(req, env)) return json({ ok: false, reason: 'Access denied.' }, 403);
+
+  const url = new URL(req.url);
+  const dateKey = (url.searchParams.get('date') || '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) return json({ ok: false, reason: 'Invalid date.' }, 400);
+
+  const cfg = await loadLindaConfig(env.DB);
+  const extras = await getLindaExtrasForDate(env.DB, dateKey);
+  const baseSlots = buildLindaSlots(dateKey, cfg, extras);
+
+  const tz = env.TIMEZONE;
+  const todayKey = todayKeyLocal(tz);
+  const nowMin = nowMinutesLocal(tz);
+
+  const taken = await getTakenSlots(env.DB, dateKey, 'linda');
+  const slots = baseSlots.map(s => {
+    const startMin = parseTimeToMinutes(s.start);
+    const past = dateKey === todayKey ? startMin < nowMin : false;
+    const isTaken = taken.has(s.start);
+    return { start: s.start, end: s.end, available: !past && !isTaken, taken: isTaken, past };
+  });
+
+  const isWorkingDay = baseSlots.length > 0;
+  return json({ ok: true, dateKey, slots, isWorkingDay, extras });
+}
+
+// ─── /api/linda-extras ─────────────────────────────────────
+// List upcoming ad-hoc availability Linda has added.
+
+export async function apiLindaListExtras(req: Request, env: Env): Promise<Response> {
+  if (!await isLindaAuthed(req, env)) return json({ ok: false, reason: 'Access denied.' }, 403);
+  const todayKey = todayKeyLocal(env.TIMEZONE);
+  const rows = await env.DB.prepare(
+    'SELECT id, date_key, start_time, end_time, reason FROM linda_extra WHERE date_key >= ? ORDER BY date_key, start_time'
+  ).bind(todayKey).all<{ id: number; date_key: string; start_time: string; end_time: string; reason: string }>();
+  return json({ ok: true, extras: rows.results });
+}
+
+// Add an extra availability window. Body: { dateKey, startTime, endTime, reason? }
+// If dateKey is a date range (dateKeyEnd provided), inserts one row per day.
+
+export async function apiLindaAddExtra(req: Request, env: Env): Promise<Response> {
+  if (!await isLindaAuthed(req, env)) return json({ ok: false, reason: 'Access denied.' }, 403);
+  const body: any = await req.json();
+  const dateKey = String(body.dateKey || '').trim();
+  const dateKeyEnd = String(body.dateKeyEnd || '').trim();
+  const startTime = String(body.startTime || '').trim();
+  const endTime = String(body.endTime || '').trim();
+  const reason = String(body.reason || '').trim();
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) return json({ ok: false, reason: 'Invalid start date.' }, 400);
+  if (dateKeyEnd && !/^\d{4}-\d{2}-\d{2}$/.test(dateKeyEnd)) return json({ ok: false, reason: 'Invalid end date.' }, 400);
+  if (!/^\d{2}:\d{2}$/.test(startTime) || !/^\d{2}:\d{2}$/.test(endTime)) return json({ ok: false, reason: 'Invalid time.' }, 400);
+  if (parseTimeToMinutes(endTime) <= parseTimeToMinutes(startTime)) return json({ ok: false, reason: 'End time must be after start time.' }, 400);
+
+  const endDate = dateKeyEnd && dateKeyEnd >= dateKey ? dateKeyEnd : dateKey;
+  const now = nowIso(env.TIMEZONE);
+
+  // Insert one row per day in the range.
+  let count = 0;
+  const [y0, m0, d0] = dateKey.split('-').map(Number);
+  const [y1, m1, d1] = endDate.split('-').map(Number);
+  const startD = new Date(y0, m0 - 1, d0);
+  const endD = new Date(y1, m1 - 1, d1);
+  for (let cur = new Date(startD); cur <= endD; cur.setDate(cur.getDate() + 1)) {
+    const dk = cur.getFullYear() + '-' + String(cur.getMonth() + 1).padStart(2, '0') + '-' + String(cur.getDate()).padStart(2, '0');
+    await env.DB.prepare(
+      'INSERT INTO linda_extra (date_key, start_time, end_time, reason, created_at) VALUES (?, ?, ?, ?, ?)'
+    ).bind(dk, startTime, endTime, reason, now).run();
+    count++;
+  }
+
+  await bumpVersion(env.DB);
+  return json({ ok: true, added: count });
+}
+
+// Delete an extra by id. ?id=123
+
+export async function apiLindaDeleteExtra(req: Request, env: Env): Promise<Response> {
+  if (!await isLindaAuthed(req, env)) return json({ ok: false, reason: 'Access denied.' }, 403);
+  const url = new URL(req.url);
+  const id = parseInt(url.searchParams.get('id') || '0', 10);
+  if (!id) return json({ ok: false, reason: 'Missing id.' }, 400);
+  await env.DB.prepare('DELETE FROM linda_extra WHERE id = ?').bind(id).run();
+  await bumpVersion(env.DB);
+  return json({ ok: true });
 }
 
 // ─── POST /linda/login ─────────────────────────────────────
