@@ -649,6 +649,37 @@ function lindaMainPage(env: Env): string {
     .extra-row{background:#0f172a;}
   }
 
+  /* Week time-grid */
+  .weekBar{background:#fff;padding:10px 12px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--line);position:sticky;top:85px;z-index:3;}
+  .weekBar .nav{min-width:40px;height:40px;border:1px solid var(--line);background:#fff;border-radius:10px;font-size:18px;font-weight:800;cursor:pointer;color:var(--text);}
+  .weekBar .weekLabel{flex:1 1 auto;text-align:center;font-size:14px;font-weight:800;}
+  .weekBar .today-btn{height:40px;padding:0 12px;border:1px solid var(--accent);background:#ecfdf5;color:#065f46;border-radius:10px;font-size:12px;font-weight:800;cursor:pointer;}
+  .wg-wrap{overflow-x:auto;overflow-y:auto;max-height:calc(100vh - 160px);padding-bottom:80px;}
+  .wg-grid{display:grid;grid-template-columns:44px repeat(7, minmax(100px, 1fr));position:relative;background:#fff;}
+  .wg-head{position:sticky;top:0;background:#fff;z-index:2;border-bottom:1px solid var(--line);padding:6px 4px;text-align:center;font-size:12px;font-weight:800;color:var(--text);}
+  .wg-head .dnum{font-size:16px;}
+  .wg-head .dname{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;}
+  .wg-head.today-col{background:#ecfdf5;color:#065f46;}
+  .wg-hour-lbl{font-size:10px;color:var(--muted);text-align:right;padding:0 4px;border-right:1px solid var(--line);height:32px;line-height:32px;}
+  .wg-cell{position:relative;border-right:1px solid #f3f4f6;border-bottom:1px solid #f3f4f6;height:32px;cursor:pointer;}
+  .wg-cell.avail{background:#f0fdf4;}
+  .wg-cell:active{background:#e5e7eb;}
+  .wg-block{position:absolute;left:2px;right:2px;background:var(--accent);color:#fff;border-radius:6px;padding:3px 5px;font-size:11px;font-weight:700;cursor:pointer;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.15);z-index:1;}
+  .wg-block:active{opacity:.85;}
+  .wg-block.cancelled{background:#fef2f2;color:#991b1b;text-decoration:line-through;}
+  .wg-block.attended{background:#3730a3;}
+  .wg-block.no_show{background:#9a3412;}
+  .wg-block .bt{font-size:10px;opacity:.85;}
+  @media (prefers-color-scheme: dark){
+    .weekBar{background:#1e293b;border-color:#334155;}
+    .weekBar .nav{background:#0f172a;color:#e2e8f0;border-color:#334155;}
+    .wg-grid{background:#1e293b;}
+    .wg-head{background:#1e293b;border-color:#334155;}
+    .wg-cell{border-color:#334155;}
+    .wg-cell.avail{background:#064e3b;}
+    .wg-hour-lbl{border-color:#334155;}
+  }
+
   /* FAB */
   .fab{position:fixed;right:16px;bottom:16px;background:var(--accent);color:#fff;border:none;border-radius:999px;padding:14px 20px;font-size:15px;font-weight:800;box-shadow:0 6px 20px rgba(16,185,129,0.4);cursor:pointer;z-index:20;min-height:52px;}
   .fab:active{background:#059669;}
@@ -776,7 +807,8 @@ function lindaMainPage(env: Env): string {
   <button class="logout" onclick="logout()">Log out</button>
 </div>
 <div class="tabBar">
-  <button class="tabBtn active" id="tabDayBtn" onclick="setTab('day')">📅 My Day</button>
+  <button class="tabBtn active" id="tabDayBtn" onclick="setTab('day')">📅 Day</button>
+  <button class="tabBtn" id="tabWeekBtn" onclick="setTab('week')">📆 Week</button>
   <button class="tabBtn" id="tabAvailBtn" onclick="setTab('avail')">🗓 Availability</button>
 </div>
 
@@ -799,6 +831,16 @@ function lindaMainPage(env: Env): string {
   <div class="summary" id="summary"></div>
   <div class="list" id="list"><div class="empty">Loading…</div></div>
   </div>
+</div>
+
+<div id="pane-week" style="display:none;">
+  <div class="weekBar">
+    <button class="nav" onclick="navWeek(-1)" aria-label="Previous week">&#x25C0;</button>
+    <div class="weekLabel" id="weekLabel">—</div>
+    <button class="nav" onclick="navWeek(1)" aria-label="Next week">&#x25B6;</button>
+    <button class="today-btn" onclick="goThisWeek()">This</button>
+  </div>
+  <div id="weekGrid" class="wg-wrap"><div class="empty" style="margin:20px 12px;">Loading…</div></div>
 </div>
 
 <div id="pane-avail" style="display:none;">
@@ -1125,12 +1167,14 @@ function lindaMainPage(env: Env): string {
 
   // ── Tab switching ──
   window.setTab = function(which){
-    var isDay = which === 'day';
-    $('pane-day').style.display = isDay ? '' : 'none';
-    $('pane-avail').style.display = isDay ? 'none' : '';
-    $('tabDayBtn').classList.toggle('active', isDay);
-    $('tabAvailBtn').classList.toggle('active', !isDay);
-    if (!isDay) { loadExtras(); }
+    $('pane-day').style.display = which === 'day' ? '' : 'none';
+    $('pane-week').style.display = which === 'week' ? '' : 'none';
+    $('pane-avail').style.display = which === 'avail' ? '' : 'none';
+    $('tabDayBtn').classList.toggle('active', which === 'day');
+    $('tabWeekBtn').classList.toggle('active', which === 'week');
+    $('tabAvailBtn').classList.toggle('active', which === 'avail');
+    if (which === 'avail') loadExtras();
+    if (which === 'week') loadWeek();
   };
 
   // ── Availability tab: load, add, delete ──
@@ -1621,6 +1665,157 @@ function lindaMainPage(env: Env): string {
       connectWS();
     }
   });
+
+  // ── Week tab ──
+  var week = { start: '', data: null };
+  var DOW_NAMES = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  var DOW_KEYS = ['MON','TUE','WED','THU','FRI','SAT','SUN'];
+  var WG_HOUR_START = 7;   // first hour shown
+  var WG_HOUR_END = 21;    // last hour shown (exclusive)
+  var WG_PX_PER_HALF = 32; // px per 30 min row (matches CSS height:32px)
+
+  function mondayOf(dk){
+    var d = parseKey(dk);
+    // JS: Sun=0 .. Sat=6. Shift to Mon=0 .. Sun=6.
+    var shift = (d.getDay() + 6) % 7;
+    d.setDate(d.getDate() - shift);
+    return toKey(d);
+  }
+  function shiftDays(dk, n){
+    var d = parseKey(dk);
+    d.setDate(d.getDate() + n);
+    return toKey(d);
+  }
+
+  window.navWeek = function(delta){
+    week.start = shiftDays(week.start || mondayOf(today()), delta * 7);
+    loadWeek();
+  };
+  window.goThisWeek = function(){ week.start = mondayOf(today()); loadWeek(); };
+
+  async function loadWeek(){
+    if (!week.start) week.start = mondayOf(today());
+    var grid = $('weekGrid');
+    grid.innerHTML = '<div class="empty" style="margin:20px 12px;">Loading…</div>';
+    try {
+      var res = await fetch('/api/linda-week?start=' + encodeURIComponent(week.start));
+      if (res.status === 403) { window.location.reload(); return; }
+      var data = await res.json();
+      if (!data.ok){ grid.innerHTML = '<div class="err">' + esc(data.reason || 'Failed') + '</div>'; return; }
+      week.data = data;
+      renderWeek();
+    } catch(e){
+      grid.innerHTML = '<div class="err">Network error.</div>';
+    }
+  }
+
+  function weekLabelText(start){
+    var d1 = parseKey(start);
+    var d2 = parseKey(shiftDays(start, 6));
+    var fmt = function(d){ return d.toLocaleDateString(undefined, { day:'numeric', month:'short' }); };
+    return fmt(d1) + ' — ' + fmt(d2);
+  }
+
+  function timeToMin(hhmm){
+    var p = hhmm.split(':');
+    return parseInt(p[0], 10) * 60 + parseInt(p[1], 10);
+  }
+
+  function renderWeek(){
+    if (!week.data) return;
+    $('weekLabel').textContent = weekLabelText(week.start);
+    var todayK = today();
+    var appts = week.data.appointments || [];
+    var extras = week.data.extras || [];
+    var baseHours = week.data.baseHours || {};
+
+    // Build per-day working windows (base hours for that weekday + any extras).
+    var byDay = {};
+    for (var i = 0; i < 7; i++){
+      var dk = shiftDays(week.start, i);
+      var dowIdx = (parseKey(dk).getDay() + 6) % 7;
+      var windows = [].concat(baseHours[DOW_KEYS[dowIdx]] || []);
+      for (var j = 0; j < extras.length; j++){
+        if (extras[j].date_key === dk) windows.push({ start: extras[j].start_time, end: extras[j].end_time });
+      }
+      byDay[dk] = { windows: windows, appts: [] };
+    }
+    for (var i = 0; i < appts.length; i++){
+      var a = appts[i];
+      if (byDay[a.date_key]) byDay[a.date_key].appts.push(a);
+    }
+
+    var html = '<div class="wg-grid">';
+    // Header row
+    html += '<div class="wg-head"></div>';
+    for (var i = 0; i < 7; i++){
+      var dk = shiftDays(week.start, i);
+      var isToday = dk === todayK;
+      var d = parseKey(dk);
+      html += '<div class="wg-head' + (isToday ? ' today-col' : '') + '">';
+      html +=   '<div class="dname">' + DOW_NAMES[i] + '</div>';
+      html +=   '<div class="dnum">' + d.getDate() + '</div>';
+      html += '</div>';
+    }
+    // Body rows: 30-min increments from WG_HOUR_START to WG_HOUR_END.
+    for (var h = WG_HOUR_START; h < WG_HOUR_END; h++){
+      for (var hm = 0; hm < 2; hm++){
+        // Left column hour label (only on the :00 row)
+        html += '<div class="wg-hour-lbl">' + (hm === 0 ? pad(h) + ':00' : '') + '</div>';
+        for (var i = 0; i < 7; i++){
+          var dk = shiftDays(week.start, i);
+          var min = h * 60 + hm * 30;
+          // Mark cell as available if within a working window.
+          var avail = false;
+          var ws = byDay[dk].windows;
+          for (var k = 0; k < ws.length; k++){
+            if (min >= timeToMin(ws[k].start) && min < timeToMin(ws[k].end)) { avail = true; break; }
+          }
+          var cls = 'wg-cell' + (avail ? ' avail' : '');
+          // Only the :00 cell carries the tap; the :30 cell would double-book.
+          var slotTime = pad(h) + ':' + pad(hm * 30);
+          html += '<div class="' + cls + '" onclick="bookAtCell(\\'' + dk + '\\',\\'' + slotTime + '\\')">';
+          // Render blocks starting exactly at this half-hour.
+          var col = byDay[dk].appts;
+          for (var b = 0; b < col.length; b++){
+            var a = col[b];
+            if (timeToMin(a.start_time) !== min) continue;
+            var durMin = Math.max(timeToMin(a.end_time) - timeToMin(a.start_time), 15);
+            var heightPx = (durMin / 30) * WG_PX_PER_HALF - 2;
+            var bcls = 'wg-block';
+            if (String(a.status).indexOf('CANCELLED') >= 0) bcls += ' cancelled';
+            else if (a.status === 'ATTENDED') bcls += ' attended';
+            else if (a.status === 'NO_SHOW') bcls += ' no_show';
+            html += '<div class="' + bcls + '" style="top:1px;height:' + heightPx + 'px;" onclick="event.stopPropagation();openWeekAppt(\\'' + esc(a.id) + '\\',\\'' + dk + '\\')">';
+            html +=   esc(a.start_time) + ' ' + esc(a.full_name || '').split(' ')[0];
+            html +=   '<div class="bt">' + esc((a.full_name || '').split(' ').slice(1).join(' ')) + '</div>';
+            html += '</div>';
+          }
+          html += '</div>';
+        }
+      }
+    }
+    html += '</div>';
+    $('weekGrid').innerHTML = html;
+  }
+
+  window.bookAtCell = function(dk, startTime){
+    openBookSheet();
+    setBfDate(dk);
+    $('sheetTitle').textContent = 'Book at ' + startTime;
+    loadSheetSlots().then(function(){
+      setTimeout(function(){
+        var match = document.querySelector('#bfSlots .slot-btn[data-slot="' + startTime + '"]:not(.dis)');
+        if (match) match.click();
+      }, 80);
+    });
+  };
+  window.openWeekAppt = function(_apptId, dk){
+    // Simplest: jump to that day in the Day tab so the full appointment
+    // card with its Reschedule / Schedule-Next buttons is visible.
+    setTab('day');
+    setDate(dk);
+  };
 
   // Initial — land on today if she has appointments today, otherwise on the
   // next upcoming day that has a booking, so she doesn't have to flip through
