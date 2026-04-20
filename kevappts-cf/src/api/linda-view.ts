@@ -736,17 +736,18 @@ export async function lindaRoute(req: Request, env: Env): Promise<Response> {
 }
 
 // ─── GET /linda/logout ─────────────────────────────────────
-// Clears the linda_sig cookie server-side (the cookie is HttpOnly so the
-// client JS can't erase it on its own) and bounces back to the login page.
+// Clears BOTH linda_sig and admin_sig cookies — the /linda auth check
+// accepts either, so dropping just one would leave the session alive
+// whenever the user happens to also have admin_sig (from visiting /admin
+// on the same device).
 
 export function handleLindaLogout(): Response {
-  return new Response(null, {
-    status: 302,
-    headers: {
-      'Location': '/linda',
-      'Set-Cookie': 'linda_sig=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0',
-    },
-  });
+  const headers = new Headers();
+  headers.set('Location', '/linda');
+  const attrs = 'Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0';
+  headers.append('Set-Cookie', 'linda_sig=; ' + attrs);
+  headers.append('Set-Cookie', 'admin_sig=; ' + attrs);
+  return new Response(null, { status: 302, headers });
 }
 
 function html(body: string, status = 200): Response {
