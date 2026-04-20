@@ -74,6 +74,23 @@ export async function apiLindaNextDay(req: Request, env: Env): Promise<Response>
   return json({ ok: true, dateKey, todayKey });
 }
 
+// ─── /api/linda-search ─────────────────────────────────────
+// Matches name/phone/email across all Linda appointments. Limit 20.
+
+export async function apiLindaSearch(req: Request, env: Env): Promise<Response> {
+  if (!await isLindaAuthed(req, env)) return json({ ok: false, reason: 'Access denied.' }, 403);
+  const url = new URL(req.url);
+  const q = (url.searchParams.get('q') || '').trim();
+  if (q.length < 2) return json({ ok: true, results: [] });
+  const pat = '%' + q + '%';
+  const rows = await env.DB.prepare(
+    "SELECT id, date_key, start_time, end_time, full_name, email, phone, status " +
+    "FROM appointments WHERE clinic = 'linda' AND (full_name LIKE ? OR phone LIKE ? OR email LIKE ?) " +
+    "ORDER BY date_key DESC, start_time DESC LIMIT 20"
+  ).bind(pat, pat, pat).all<any>();
+  return json({ ok: true, results: rows.results });
+}
+
 // ─── /api/linda-slots ──────────────────────────────────────
 // Returns all slots for a date with availability + whether the date is
 // "working" (base hours or extras). Used by the Book and Reschedule modals.
@@ -486,6 +503,16 @@ function lindaMainPage(env: Env): string {
   .emptyEmoji{font-size:40px;margin-bottom:8px;}
   .err{padding:14px;margin:10px 12px;background:#fef2f2;color:#991b1b;border-radius:10px;font-size:14px;}
 
+  /* Search */
+  .searchBar{padding:10px 12px;background:#fff;border-bottom:1px solid var(--line);display:flex;gap:8px;align-items:center;}
+  .searchBar input{flex:1 1 auto;padding:12px;border:1px solid var(--line);border-radius:10px;font-size:15px;min-height:44px;background:#fff;color:var(--text);}
+  .searchBar .clear{background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;padding:4px 8px;min-width:32px;}
+  .searchResults{padding:0 12px 80px;}
+  .srow{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:8px;cursor:pointer;}
+  .srow:active{background:#f3f4f6;}
+  .srow-main{font-size:15px;font-weight:800;}
+  .srow-dim{font-size:13px;color:var(--muted);margin-top:2px;}
+
   /* Tabs */
   .tabBar{display:flex;gap:4px;padding:6px;background:#fff;border-bottom:1px solid var(--line);position:sticky;top:41px;z-index:4;}
   .tabBtn{flex:1 1 0;padding:12px 8px;background:#f3f4f6;border:none;border-radius:10px;font-size:14px;font-weight:800;cursor:pointer;color:var(--muted);min-height:44px;}
@@ -620,6 +647,12 @@ function lindaMainPage(env: Env): string {
 </div>
 
 <div id="pane-day">
+  <div class="searchBar">
+    <input type="search" id="searchInput" placeholder="Search name, phone or email…" autocomplete="off">
+    <button class="clear" id="searchClear" onclick="clearSearch()" style="display:none;" aria-label="Clear">&times;</button>
+  </div>
+  <div id="searchResults" class="searchResults" style="display:none;"></div>
+  <div id="dayContent">
   <div class="dateBar">
     <button class="nav" onclick="navDay(-1)" aria-label="Previous day">&#x25C0;</button>
     <button type="button" class="date-btn" id="dateInputBtn" onclick="pickDate('dateInput', function(dk){ setDate(dk); })" style="flex:1 1 auto;"><span class="date-icon">📅</span><span class="date-val" id="dateInputLabel">Today</span></button>
@@ -630,6 +663,7 @@ function lindaMainPage(env: Env): string {
   <div class="dayLabel" id="dayLabel"></div>
   <div class="summary" id="summary"></div>
   <div class="list" id="list"><div class="empty">Loading…</div></div>
+  </div>
 </div>
 
 <div id="pane-avail" style="display:none;">
@@ -825,6 +859,53 @@ function lindaMainPage(env: Env): string {
     }
   }
 
+  // ── Search across all Linda appointments ──
+  var searchTimer = null;
+  function runSearch(q){
+    var rEl = $('searchResults'), dEl = $('dayContent');
+    if (!q || q.length < 2){
+      rEl.style.display = 'none';
+      rEl.innerHTML = '';
+      dEl.style.display = '';
+      $('searchClear').style.display = 'none';
+      return;
+    }
+    dEl.style.display = 'none';
+    rEl.style.display = '';
+    rEl.innerHTML = '<div class="empty" style="margin:16px 0;border:none;">Searching…</div>';
+    $('searchClear').style.display = '';
+    fetch('/api/linda-search?q=' + encodeURIComponent(q)).then(function(r){
+      if (r.status === 403) { window.location.reload(); return null; }
+      return r.json();
+    }).then(function(data){
+      if (!data || !data.ok) return;
+      if (!data.results.length){
+        rEl.innerHTML = '<div class="empty" style="margin:16px 0;border:none;">No matches.</div>';
+        return;
+      }
+      var html = '';
+      for (var i = 0; i < data.results.length; i++){
+        var r = data.results[i];
+        html += '<div class="srow" onclick="jumpToDate(\\'' + esc(r.date_key) + '\\')">';
+        html +=   '<div class="srow-main">' + esc(r.full_name || 'No name') + ' <span style="color:var(--muted);font-weight:600;">· ' + esc(r.start_time) + '</span></div>';
+        html +=   '<div class="srow-dim">' + esc(formatNiceShort(r.date_key)) + (r.phone ? ' · ' + esc(r.phone) : '') + (r.status ? ' · ' + esc(statusLabel(r.status)) : '') + '</div>';
+        html += '</div>';
+      }
+      rEl.innerHTML = html;
+    }).catch(function(){
+      rEl.innerHTML = '<div class="err" style="margin:16px 0;">Search failed.</div>';
+    });
+  }
+  window.clearSearch = function(){
+    $('searchInput').value = '';
+    runSearch('');
+  };
+  window.jumpToDate = function(dk){
+    $('searchInput').value = '';
+    runSearch('');
+    setDate(dk);
+  };
+
   function setDate(k){
     state.dateKey = k;
     $('dateInput').value = k;
@@ -843,6 +924,12 @@ function lindaMainPage(env: Env): string {
   window.goToday = goToday;
 
   // dateInput is now a hidden field driven by the calendar picker; no change listener needed.
+
+  $('searchInput').addEventListener('input', function(e){
+    var q = e.target.value.trim();
+    if (searchTimer) clearTimeout(searchTimer);
+    searchTimer = setTimeout(function(){ runSearch(q); }, 220);
+  });
 
   window.logout = function(){
     document.cookie = 'linda_sig=; Path=/; Max-Age=0';
