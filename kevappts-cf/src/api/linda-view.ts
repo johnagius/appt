@@ -321,6 +321,29 @@ export async function apiLindaCopyDay(req: Request, env: Env): Promise<Response>
   return json({ ok: true, inserted, skipped });
 }
 
+// Edit an existing extra row. Body: { id, startTime, endTime, reason? }
+
+export async function apiLindaUpdateExtra(req: Request, env: Env): Promise<Response> {
+  if (!await isLindaAuthed(req, env)) return json({ ok: false, reason: 'Access denied.' }, 403);
+  const body: any = await req.json();
+  const id = parseInt(String(body.id || '0'), 10);
+  const startTime = String(body.startTime || '').trim();
+  const endTime = String(body.endTime || '').trim();
+  const reason = String(body.reason || '').trim();
+  if (!id) return json({ ok: false, reason: 'Missing id.' }, 400);
+  if (!/^\d{2}:\d{2}$/.test(startTime) || !/^\d{2}:\d{2}$/.test(endTime)) return json({ ok: false, reason: 'Invalid time.' }, 400);
+  if (parseTimeToMinutes(endTime) <= parseTimeToMinutes(startTime)) return json({ ok: false, reason: 'End must be after start.' }, 400);
+
+  const existing = await env.DB.prepare('SELECT date_key FROM linda_extra WHERE id = ?').bind(id).first<{ date_key: string }>();
+  if (!existing) return json({ ok: false, reason: 'Extra not found.' }, 404);
+
+  await env.DB.prepare(
+    'UPDATE linda_extra SET start_time = ?, end_time = ?, reason = ? WHERE id = ?'
+  ).bind(startTime, endTime, reason, id).run();
+  await bumpVersion(env.DB);
+  return json({ ok: true, dateKey: existing.date_key });
+}
+
 // Delete an extra by id. ?id=123
 
 export async function apiLindaDeleteExtra(req: Request, env: Env): Promise<Response> {
@@ -874,6 +897,13 @@ function lindaMainPage(env: Env): string {
   .extra-dim{font-size:12px;color:var(--muted);margin-top:2px;}
   .extra-del{background:#fef2f2;color:#991b1b;border:none;padding:10px 14px;border-radius:8px;font-weight:800;font-size:13px;cursor:pointer;min-height:40px;}
   .extra-del:active{background:#fee2e2;}
+  .extra-edit{background:#fffbeb;color:#92400e;border:none;padding:10px 14px;border-radius:8px;font-weight:800;font-size:13px;cursor:pointer;min-height:40px;margin-right:6px;}
+  .extra-edit:active{background:#fef3c7;}
+  .extra-edit-panel{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:8px;}
+  .extra-edit-panel input[type=time]{padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:14px;min-height:36px;background:#fff;color:var(--text);}
+  .extra-edit-panel button{padding:8px 12px;border-radius:8px;font-weight:800;font-size:13px;border:none;cursor:pointer;}
+  .extra-edit-panel .save{background:var(--accent);color:#fff;}
+  .extra-edit-panel .cancel{background:#f3f4f6;color:var(--text);}
   .avail-msg{font-size:13px;margin-top:8px;}
   .avail-msg.ok{color:#059669;}
   .avail-msg.bad{color:#dc2626;}
@@ -1530,12 +1560,22 @@ function lindaMainPage(env: Env): string {
       var html = '';
       for (var i = 0; i < data.extras.length; i++){
         var x = data.extras[i];
-        html += '<div class="extra-row">';
-        html +=   '<div>';
-        html +=     '<div class="extra-when">' + esc(formatNiceShort(x.date_key)) + ' · ' + esc(x.start_time) + '–' + esc(x.end_time) + '</div>';
+        html += '<div class="extra-row" id="extra-row-' + x.id + '">';
+        html +=   '<div style="flex:1 1 auto;min-width:0;">';
+        html +=     '<div class="extra-when">' + esc(formatNiceShort(x.date_key)) + ' · <span id="extra-time-' + x.id + '">' + esc(x.start_time) + '–' + esc(x.end_time) + '</span></div>';
         if (x.reason) html += '<div class="extra-dim">' + esc(x.reason) + '</div>';
+        html +=     '<div class="extra-edit-panel" id="extra-edit-' + x.id + '" style="display:none;">';
+        html +=       '<input type="time" step="1800" id="extra-s-' + x.id + '" value="' + esc(x.start_time) + '">';
+        html +=       '<span>→</span>';
+        html +=       '<input type="time" step="1800" id="extra-e-' + x.id + '" value="' + esc(x.end_time) + '">';
+        html +=       '<button class="save" onclick="saveExtraEdit(' + x.id + ')">Save</button>';
+        html +=       '<button class="cancel" onclick="toggleExtraEdit(' + x.id + ',false)">Cancel</button>';
+        html +=     '</div>';
         html +=   '</div>';
-        html +=   '<button class="extra-del" onclick="deleteExtra(' + x.id + ')">Remove</button>';
+        html +=   '<div>';
+        html +=     '<button class="extra-edit" onclick="toggleExtraEdit(' + x.id + ',true)">Edit</button>';
+        html +=     '<button class="extra-del" onclick="deleteExtra(' + x.id + ')">Remove</button>';
+        html +=   '</div>';
         html += '</div>';
       }
       el.innerHTML = html;
@@ -1580,6 +1620,26 @@ function lindaMainPage(env: Env): string {
     } catch (e) {
       setAvMsg('Network error', 'bad');
     }
+  };
+
+  window.toggleExtraEdit = function(id, on){
+    var p = document.getElementById('extra-edit-' + id);
+    if (p) p.style.display = on ? '' : 'none';
+  };
+  window.saveExtraEdit = async function(id){
+    var s = (document.getElementById('extra-s-' + id) || {}).value || '';
+    var e = (document.getElementById('extra-e-' + id) || {}).value || '';
+    if (!s || !e) { alert('Pick start and end times.'); return; }
+    try {
+      var res = await fetch('/api/linda-extras', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: id, startTime: s, endTime: e }),
+      });
+      if (res.status === 403) { window.location.reload(); return; }
+      var data = await res.json();
+      if (data.ok) { loadExtras(); }
+      else alert(data.reason || 'Failed');
+    } catch(err){ alert('Network error'); }
   };
 
   window.deleteExtra = async function(id){
