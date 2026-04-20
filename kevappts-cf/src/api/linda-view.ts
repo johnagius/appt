@@ -492,6 +492,43 @@ function lindaMainPage(env: Env): string {
     .extra-row{background:#0f172a;}
   }
 
+  /* FAB */
+  .fab{position:fixed;right:16px;bottom:16px;background:var(--accent);color:#fff;border:none;border-radius:999px;padding:14px 20px;font-size:15px;font-weight:800;box-shadow:0 6px 20px rgba(16,185,129,0.4);cursor:pointer;z-index:20;min-height:52px;}
+  .fab:active{background:#059669;}
+
+  /* Modal / sheet */
+  .sheet-overlay{position:fixed;inset:0;background:rgba(17,24,39,0.6);display:none;z-index:60;}
+  .sheet-overlay.show{display:block;}
+  .sheet{position:fixed;left:0;right:0;bottom:0;background:#fff;border-radius:18px 18px 0 0;max-height:92vh;overflow-y:auto;padding:16px 14px 24px;z-index:61;transform:translateY(100%);transition:transform .25s ease;box-shadow:0 -8px 30px rgba(0,0,0,0.2);}
+  .sheet.show{transform:translateY(0);}
+  .sheet-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
+  .sheet-title{margin:0;font-size:18px;font-weight:900;}
+  .sheet-close{background:none;border:none;font-size:26px;line-height:1;color:var(--muted);cursor:pointer;padding:4px 8px;}
+  .sheet-section{margin-bottom:14px;}
+  .sheet-label{font-size:12px;color:var(--muted);font-weight:800;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;}
+  .sheet-input{width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;font-size:16px;font-family:inherit;min-height:44px;background:#fff;color:var(--text);}
+  .sheet-row{display:flex;gap:8px;}
+  .sheet-row .sheet-input{flex:1 1 0;}
+  .slot-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:6px;}
+  .slot-btn{padding:12px 6px;border:1px solid var(--line);background:#fff;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;color:var(--text);min-height:44px;}
+  .slot-btn:active{background:#f3f4f6;}
+  .slot-btn.chosen{background:var(--accent);color:#fff;border-color:var(--accent);}
+  .slot-btn.dis{color:#9ca3af;background:#f9fafb;cursor:not-allowed;text-decoration:line-through;}
+  .sheet-submit{width:100%;padding:14px;background:var(--accent);color:#fff;border:none;border-radius:999px;font-size:16px;font-weight:800;cursor:pointer;min-height:50px;margin-top:6px;}
+  .sheet-submit:disabled{background:#9ca3af;}
+  .sheet-msg{padding:10px;border-radius:8px;font-size:13px;margin-top:8px;}
+  .sheet-msg.ok{background:#ecfdf5;color:#065f46;}
+  .sheet-msg.bad{background:#fef2f2;color:#991b1b;}
+  .open-prompt{background:#fef3c7;border:1px solid #fde68a;padding:12px;border-radius:10px;margin-top:8px;font-size:13px;color:#78350f;}
+  .open-prompt button{margin-top:8px;background:#f59e0b;color:#fff;border:none;padding:10px 14px;border-radius:8px;font-weight:800;cursor:pointer;width:100%;}
+
+  @media (prefers-color-scheme: dark){
+    .sheet{background:#1e293b;color:#e2e8f0;}
+    .sheet-input,.slot-btn{background:#0f172a;color:#e2e8f0;border-color:#334155;}
+    .slot-btn.dis{background:#0f172a;color:#475569;}
+    .open-prompt{background:#422006;border-color:#92400e;color:#fde68a;}
+  }
+
   /* Idle overlay pauses network activity */
   .idle-overlay{position:fixed;inset:0;background:rgba(17,24,39,0.92);color:#fff;display:none;align-items:center;justify-content:center;flex-direction:column;z-index:50;padding:20px;text-align:center;cursor:pointer;}
   .idle-overlay.show{display:flex;}
@@ -553,6 +590,48 @@ function lindaMainPage(env: Env): string {
       <div id="extraList"><div class="empty" style="margin:0;border:none;padding:20px 0;">Loading…</div></div>
     </div>
   </div>
+</div>
+
+<button class="fab" id="fabBook" onclick="openBookSheet()">+ Book</button>
+
+<div class="sheet-overlay" id="sheetOverlay" onclick="closeSheet()"></div>
+<div class="sheet" id="sheet" role="dialog" aria-modal="true">
+  <div class="sheet-head">
+    <h3 class="sheet-title" id="sheetTitle">Book appointment</h3>
+    <button class="sheet-close" onclick="closeSheet()" aria-label="Close">×</button>
+  </div>
+
+  <div class="sheet-section" id="sheetPatientSection">
+    <div class="sheet-label">Patient</div>
+    <input class="sheet-input" id="bfName" placeholder="Full name" style="margin-bottom:8px;">
+    <div class="sheet-row">
+      <input class="sheet-input" id="bfPhone" type="tel" placeholder="Phone" inputmode="tel">
+      <input class="sheet-input" id="bfEmail" type="email" placeholder="Email" inputmode="email">
+    </div>
+    <textarea class="sheet-input" id="bfComments" placeholder="Comments (optional)" style="margin-top:8px;min-height:60px;"></textarea>
+  </div>
+
+  <div class="sheet-section">
+    <div class="sheet-label">Date</div>
+    <input class="sheet-input" type="date" id="bfDate">
+  </div>
+
+  <div class="sheet-section">
+    <div class="sheet-label">Time</div>
+    <div id="bfSlots"><div class="sheet-msg">Pick a date first.</div></div>
+    <div id="bfOpenPrompt" class="open-prompt" style="display:none;">
+      <b>Not a working day yet.</b><br>
+      Open these hours quickly so you can book:
+      <div class="sheet-row" style="margin-top:8px;">
+        <input class="sheet-input" type="time" id="bfOpenStart" step="1800" value="09:00">
+        <input class="sheet-input" type="time" id="bfOpenEnd" step="1800" value="13:00">
+      </div>
+      <button onclick="quickOpenDate()">Open this day</button>
+    </div>
+  </div>
+
+  <button class="sheet-submit" id="bfSubmit" onclick="submitSheet()" disabled>Book</button>
+  <div id="bfMsg"></div>
 </div>
 
 <div class="idle-overlay" id="idleOverlay">
@@ -763,6 +842,152 @@ function lindaMainPage(env: Env): string {
       if (res.status === 403) { window.location.reload(); return; }
       loadExtras();
     } catch(e){}
+  };
+
+  // ── Booking sheet (used for new booking; reschedule extension in next commit) ──
+  var sheet = { mode: 'new', slot: '', apptId: '' };
+
+  function openSheet(){ $('sheetOverlay').classList.add('show'); $('sheet').classList.add('show'); }
+  window.closeSheet = function(){ $('sheetOverlay').classList.remove('show'); $('sheet').classList.remove('show'); };
+
+  function resetSheet(){
+    $('bfName').value = ''; $('bfPhone').value = ''; $('bfEmail').value = ''; $('bfComments').value = '';
+    $('bfDate').value = state.dateKey || today();
+    $('bfSlots').innerHTML = '<div class="sheet-msg">Pick a date first.</div>';
+    $('bfOpenPrompt').style.display = 'none';
+    $('bfMsg').innerHTML = '';
+    sheet.slot = '';
+    updateSheetSubmit();
+  }
+
+  window.openBookSheet = function(prefill){
+    sheet.mode = 'new'; sheet.apptId = '';
+    $('sheetTitle').textContent = 'Book appointment';
+    $('sheetPatientSection').style.display = '';
+    $('bfSubmit').textContent = 'Book';
+    resetSheet();
+    if (prefill){
+      if (prefill.fullName) $('bfName').value = prefill.fullName;
+      if (prefill.phone) $('bfPhone').value = prefill.phone;
+      if (prefill.email) $('bfEmail').value = prefill.email;
+      if (prefill.comments) $('bfComments').value = prefill.comments;
+    }
+    openSheet();
+    loadSheetSlots();
+  };
+
+  function renderSheetSlots(data){
+    var el = $('bfSlots');
+    $('bfOpenPrompt').style.display = 'none';
+    if (!data.ok){ el.innerHTML = '<div class="sheet-msg bad">' + esc(data.reason || 'Failed') + '</div>'; return; }
+    if (!data.isWorkingDay){
+      el.innerHTML = '<div class="sheet-msg bad">Not a working day yet for this date.</div>';
+      $('bfOpenPrompt').style.display = '';
+      return;
+    }
+    if (!data.slots || !data.slots.length){
+      el.innerHTML = '<div class="sheet-msg">No slots on this date.</div>';
+      return;
+    }
+    var html = '<div class="slot-grid">';
+    for (var i = 0; i < data.slots.length; i++){
+      var s = data.slots[i];
+      var cls = 'slot-btn' + (s.available ? '' : ' dis');
+      var click = s.available ? ' onclick="pickSlot(\\'' + s.start + '\\')"' : '';
+      html += '<button class="' + cls + '" data-slot="' + esc(s.start) + '"' + click + (s.available ? '' : ' disabled') + '>' + esc(s.start) + '</button>';
+    }
+    html += '</div>';
+    el.innerHTML = html;
+  }
+
+  window.pickSlot = function(startTime){
+    sheet.slot = startTime;
+    var btns = document.querySelectorAll('#bfSlots .slot-btn');
+    for (var i = 0; i < btns.length; i++){
+      btns[i].classList.toggle('chosen', btns[i].getAttribute('data-slot') === startTime);
+    }
+    updateSheetSubmit();
+  };
+
+  async function loadSheetSlots(){
+    var dk = $('bfDate').value;
+    if (!dk) { $('bfSlots').innerHTML = '<div class="sheet-msg">Pick a date first.</div>'; return; }
+    $('bfSlots').innerHTML = '<div class="sheet-msg">Loading…</div>';
+    try {
+      var res = await fetch('/api/linda-slots?date=' + encodeURIComponent(dk));
+      if (res.status === 403) { window.location.reload(); return; }
+      var data = await res.json();
+      sheet.slot = '';
+      renderSheetSlots(data);
+      updateSheetSubmit();
+    } catch(e){
+      $('bfSlots').innerHTML = '<div class="sheet-msg bad">Network error.</div>';
+    }
+  }
+  $('bfDate').addEventListener('change', loadSheetSlots);
+
+  window.quickOpenDate = async function(){
+    var dk = $('bfDate').value;
+    var s = $('bfOpenStart').value, e = $('bfOpenEnd').value;
+    if (!dk || !s || !e) return;
+    try {
+      var res = await fetch('/api/linda-extras', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dateKey: dk, startTime: s, endTime: e }),
+      });
+      var data = await res.json();
+      if (data.ok) { loadSheetSlots(); }
+      else { alert(data.reason || 'Failed to open day.'); }
+    } catch(e){}
+  };
+
+  function updateSheetSubmit(){
+    var dk = $('bfDate').value;
+    var hasSlot = !!sheet.slot;
+    var hasPatient = sheet.mode === 'reschedule' || ($('bfName').value.trim() && ($('bfPhone').value.trim() || $('bfEmail').value.trim()));
+    $('bfSubmit').disabled = !(dk && hasSlot && hasPatient);
+  }
+  ['bfName','bfPhone','bfEmail','bfDate'].forEach(function(id){ $(id).addEventListener('input', updateSheetSubmit); });
+
+  function setBfMsg(text, kind){
+    $('bfMsg').innerHTML = text ? ('<div class="sheet-msg ' + (kind || '') + '">' + esc(text) + '</div>') : '';
+  }
+
+  window.submitSheet = async function(){
+    $('bfSubmit').disabled = true;
+    $('bfSubmit').textContent = sheet.mode === 'reschedule' ? 'Rescheduling…' : 'Booking…';
+    setBfMsg('', '');
+    var dk = $('bfDate').value;
+    try {
+      var endpoint = sheet.mode === 'reschedule' ? '/api/linda-reschedule' : '/api/linda-new-booking';
+      var body = sheet.mode === 'reschedule'
+        ? { appointmentId: sheet.apptId, dateKey: dk, startTime: sheet.slot }
+        : {
+            dateKey: dk,
+            startTime: sheet.slot,
+            fullName: $('bfName').value.trim(),
+            email: $('bfEmail').value.trim(),
+            phone: $('bfPhone').value.trim(),
+            comments: $('bfComments').value.trim(),
+          };
+      var res = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      var data = await res.json();
+      if (data.ok){
+        setBfMsg(sheet.mode === 'reschedule' ? 'Rescheduled.' : 'Booked!', 'ok');
+        setTimeout(function(){
+          window.closeSheet();
+          setDate(dk);
+        }, 700);
+      } else {
+        setBfMsg(data.reason || 'Failed', 'bad');
+        $('bfSubmit').disabled = false;
+        $('bfSubmit').textContent = sheet.mode === 'reschedule' ? 'Reschedule' : 'Book';
+      }
+    } catch(e){
+      setBfMsg('Network error', 'bad');
+      $('bfSubmit').disabled = false;
+      $('bfSubmit').textContent = sheet.mode === 'reschedule' ? 'Reschedule' : 'Book';
+    }
   };
 
   // ── Idle overlay: hides content + stops network after 2 min inactivity ──
