@@ -38,7 +38,7 @@ import { doctorPage } from './pages/doctor-page';
 import { reschedulePage } from './pages/reschedule-page';
 import { followupPage } from './pages/followup-page';
 import { physioPage } from './pages/physio-page';
-import { apiLindaGetDay, apiLindaNextDay, apiLindaSlots, apiLindaListExtras, apiLindaAddExtra, apiLindaDeleteExtra, apiLindaUpdateExtra, apiLindaReschedule, apiLindaNewBooking, apiLindaSearch, apiLindaPatientHistory, apiLindaClientsAutocomplete, apiLindaWeek, apiLindaCopyDay, apiLindaCancel, apiLindaCancelDay, apiLindaMarkStatus, handleLindaLogin, handleLindaLogout, lindaRoute } from './api/linda-view';
+import { apiLindaGetDay, apiLindaNextDay, apiLindaSlots, apiLindaListExtras, apiLindaAddExtra, apiLindaDeleteExtra, apiLindaUpdateExtra, apiLindaReschedule, apiLindaNewBooking, apiLindaSearch, apiLindaPatientHistory, apiLindaClientsAutocomplete, apiLindaWeek, apiLindaCopyDay, apiLindaCancel, apiLindaCancelDay, apiLindaMarkStatus, apiLindaBaseSchedule, handleLindaLogin, handleLindaLogout, lindaRoute } from './api/linda-view';
 
 export { RealtimeHub };
 
@@ -129,6 +129,7 @@ export default {
       if (path === '/api/linda-cancel' && method === 'POST') return apiLindaCancel(request, env);
       if (path === '/api/linda-cancel-day' && method === 'POST') return apiLindaCancelDay(request, env);
       if (path === '/api/linda-mark-status' && method === 'POST') return apiLindaMarkStatus(request, env);
+      if (path === '/api/linda-base-schedule' && method === 'GET') return apiLindaBaseSchedule(request, env);
 
       // ─── Linda private page + login ──────────────
       if (path === '/linda' && method === 'GET') return lindaRoute(request, env);

@@ -215,6 +215,24 @@ export async function apiLindaSlots(req: Request, env: Env): Promise<Response> {
   return json({ ok: true, dateKey, slots, isWorkingDay, extras });
 }
 
+// ─── /api/linda-base-schedule ──────────────────────────────
+// Returns Linda's weekly template hours + window dates + slot duration
+// so the Availability tab can show her planned schedule as well as the
+// ad-hoc extras she's opened.
+
+export async function apiLindaBaseSchedule(req: Request, env: Env): Promise<Response> {
+  if (!await isLindaAuthed(req, env)) return json({ ok: false, reason: 'Access denied.' }, 403);
+  const cfg = await loadLindaConfig(env.DB);
+  return json({
+    ok: true,
+    enabled: cfg.enabled,
+    windowStart: cfg.windowStart,
+    windowEnd: cfg.windowEnd,
+    slotMin: cfg.slotMin,
+    hours: cfg.hours,
+  });
+}
+
 // ─── /api/linda-extras ─────────────────────────────────────
 // List upcoming ad-hoc availability Linda has added.
 
@@ -953,6 +971,12 @@ function lindaMainPage(env: Env): string {
   .avail-msg.ok{color:#059669;}
   .avail-msg.bad{color:#dc2626;}
 
+  .base-row{display:flex;align-items:center;padding:8px 10px;background:#f9fafb;border-radius:8px;margin-bottom:6px;font-size:14px;gap:10px;}
+  .base-row .d{flex:0 0 48px;font-weight:800;color:var(--text);text-transform:uppercase;font-size:12px;letter-spacing:.4px;}
+  .base-row .h{flex:1 1 auto;color:var(--text);}
+  .base-row.closed .h{color:var(--muted);font-style:italic;}
+  @media (prefers-color-scheme: dark){ .base-row{background:#0f172a;} }
+
   @media (prefers-color-scheme: dark){
     .tabBar{background:#1e293b;border-color:#334155;}
     .tabBtn{background:#0f172a;color:#94a3b8;}
@@ -1184,6 +1208,13 @@ function lindaMainPage(env: Env): string {
 
 <div id="pane-avail" style="display:none;">
   <div class="avail-wrap">
+    <div class="avail-card">
+      <h3>Your weekly schedule</h3>
+      <p class="hint" id="baseWindow">Loading…</p>
+      <div id="baseSchedule"></div>
+      <p class="hint" style="margin-top:10px;font-size:12px;">Your weekly hours and booking window are set by the admin panel.</p>
+    </div>
+
     <div class="avail-card">
       <h3>Open extra availability</h3>
       <p class="hint">Add a date (or date range) and the hours you'll be there. Patients can then book these slots. Your weekly schedule stays as-is.</p>
@@ -1579,7 +1610,7 @@ function lindaMainPage(env: Env): string {
     $('tabDayBtn').classList.toggle('active', which === 'day');
     $('tabWeekBtn').classList.toggle('active', which === 'week');
     $('tabAvailBtn').classList.toggle('active', which === 'avail');
-    if (which === 'avail') loadExtras();
+    if (which === 'avail') { loadBaseSchedule(); loadExtras(); }
     if (which === 'week') loadWeek();
   };
 
@@ -1589,6 +1620,43 @@ function lindaMainPage(env: Env): string {
       var d = parseKey(k);
       return d.toLocaleDateString(undefined, { weekday:'short', day:'numeric', month:'short' });
     } catch(e){ return k; }
+  }
+
+  var DOW_LABELS = [
+    { key: 'MON', label: 'Mon' },
+    { key: 'TUE', label: 'Tue' },
+    { key: 'WED', label: 'Wed' },
+    { key: 'THU', label: 'Thu' },
+    { key: 'FRI', label: 'Fri' },
+    { key: 'SAT', label: 'Sat' },
+    { key: 'SUN', label: 'Sun' },
+  ];
+
+  async function loadBaseSchedule(){
+    var el = $('baseSchedule');
+    var winEl = $('baseWindow');
+    try {
+      var res = await fetch('/api/linda-base-schedule');
+      if (res.status === 403) { window.location.reload(); return; }
+      var data = await res.json();
+      if (!data.ok){ el.innerHTML = '<div class="err" style="margin:0;">' + esc(data.reason || 'Failed') + '</div>'; return; }
+      winEl.textContent = 'Booking window: ' + fmtDay(data.windowStart) + ' — ' + fmtDay(data.windowEnd) +
+        ' · ' + data.slotMin + '-min slots' + (data.enabled ? '' : ' · bookings paused');
+      var html = '';
+      for (var i = 0; i < DOW_LABELS.length; i++){
+        var d = DOW_LABELS[i];
+        var windows = (data.hours || {})[d.key] || [];
+        if (!windows.length){
+          html += '<div class="base-row closed"><div class="d">' + d.label + '</div><div class="h">Closed</div></div>';
+        } else {
+          var txt = windows.map(function(w){ return esc(w.start) + '–' + esc(w.end); }).join(' · ');
+          html += '<div class="base-row"><div class="d">' + d.label + '</div><div class="h">' + txt + '</div></div>';
+        }
+      }
+      el.innerHTML = html;
+    } catch(e){
+      el.innerHTML = '<div class="err" style="margin:0;">Network error.</div>';
+    }
   }
 
   async function loadExtras(){
