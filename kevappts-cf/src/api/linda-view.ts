@@ -555,6 +555,39 @@ function lindaMainPage(env: Env): string {
     .open-prompt{background:#422006;border-color:#92400e;color:#fde68a;}
   }
 
+  /* Inline calendar (replaces ugly dd/mm/yyyy native input) */
+  .date-btn{width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--text);font-size:15px;font-family:inherit;text-align:left;min-height:44px;display:flex;align-items:center;gap:8px;cursor:pointer;}
+  .date-btn:active{background:#f3f4f6;}
+  .date-btn .date-icon{font-size:17px;}
+  .date-btn .date-val{flex:1 1 auto;font-weight:600;}
+  .date-btn.empty .date-val{color:var(--muted);font-weight:400;}
+  .cal-sheet{position:fixed;left:0;right:0;bottom:0;background:#fff;border-radius:18px 18px 0 0;padding:14px 12px 20px;z-index:71;transform:translateY(100%);transition:transform .25s ease;box-shadow:0 -8px 30px rgba(0,0,0,0.2);max-height:92vh;overflow-y:auto;}
+  .cal-sheet.show{transform:translateY(0);}
+  .cal-overlay{position:fixed;inset:0;background:rgba(17,24,39,0.6);display:none;z-index:70;}
+  .cal-overlay.show{display:block;}
+  .cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;padding:0 4px;}
+  .cal-title{margin:0;font-size:17px;font-weight:900;}
+  .cal-nav{background:#f3f4f6;border:none;border-radius:8px;width:40px;height:40px;font-size:20px;font-weight:800;cursor:pointer;color:var(--text);}
+  .cal-nav:active{background:#e5e7eb;}
+  .cal-dows{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:4px;}
+  .cal-dow{text-align:center;font-size:11px;color:var(--muted);font-weight:800;padding:6px 0;text-transform:uppercase;letter-spacing:.4px;}
+  .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;}
+  .cal-cell{aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;border-radius:10px;cursor:pointer;color:var(--text);background:transparent;border:none;min-height:40px;}
+  .cal-cell:active{background:#f3f4f6;}
+  .cal-cell.other-month{color:var(--muted);opacity:.4;}
+  .cal-cell.today{outline:2px solid var(--accent);}
+  .cal-cell.sel{background:var(--accent);color:#fff;}
+  .cal-cell.disabled{color:#d1d5db;cursor:not-allowed;background:transparent;}
+  .cal-cell.weekend{color:#6b7280;}
+
+  @media (prefers-color-scheme: dark){
+    .date-btn{background:#0f172a;color:#e2e8f0;border-color:#334155;}
+    .cal-sheet{background:#1e293b;color:#e2e8f0;}
+    .cal-nav{background:#0f172a;color:#e2e8f0;}
+    .cal-cell{color:#e2e8f0;}
+    .cal-cell.other-month{color:#475569;}
+  }
+
   /* Idle overlay pauses network activity */
   .idle-overlay{position:fixed;inset:0;background:rgba(17,24,39,0.92);color:#fff;display:none;align-items:center;justify-content:center;flex-direction:column;z-index:50;padding:20px;text-align:center;cursor:pointer;}
   .idle-overlay.show{display:flex;}
@@ -603,8 +636,8 @@ function lindaMainPage(env: Env): string {
     <div class="avail-card">
       <h3>Open extra availability</h3>
       <p class="hint">Add a date (or date range) and the hours you'll be there. Patients can then book these slots. Your weekly schedule stays as-is.</p>
-      <div class="avail-row"><label>From date</label><input type="date" id="avDateFrom"></div>
-      <div class="avail-row"><label>To date</label><input type="date" id="avDateTo"></div>
+      <div class="avail-row"><label>From date</label><button type="button" class="date-btn empty" id="avDateFromBtn" onclick="pickDate('avDateFrom')"><span class="date-icon">📅</span><span class="date-val" id="avDateFromLabel">Pick a date</span></button><input type="hidden" id="avDateFrom"></div>
+      <div class="avail-row"><label>To date</label><button type="button" class="date-btn empty" id="avDateToBtn" onclick="pickDate('avDateTo')"><span class="date-icon">📅</span><span class="date-val" id="avDateToLabel">Same day</span></button><input type="hidden" id="avDateTo"></div>
       <div style="font-size:12px;color:var(--muted);font-weight:800;text-transform:uppercase;letter-spacing:.4px;margin:8px 0 4px;">Morning</div>
       <div class="avail-row"><label>Start</label><input type="time" id="avStart" step="1800" value="09:30"></div>
       <div class="avail-row"><label>End</label><input type="time" id="avEnd" step="1800" value="13:00"></div>
@@ -668,6 +701,20 @@ function lindaMainPage(env: Env): string {
 
   <button class="sheet-submit" id="bfSubmit" onclick="submitSheet()" disabled>Book</button>
   <div id="bfMsg"></div>
+</div>
+
+<div class="cal-overlay" id="calOverlay" onclick="closeCal()"></div>
+<div class="cal-sheet" id="calSheet" role="dialog" aria-modal="true">
+  <div class="cal-head">
+    <button class="cal-nav" onclick="calStep(-1)" aria-label="Previous month">‹</button>
+    <h3 class="cal-title" id="calTitle">Month YYYY</h3>
+    <button class="cal-nav" onclick="calStep(1)" aria-label="Next month">›</button>
+  </div>
+  <div class="cal-dows">
+    <div class="cal-dow">Mon</div><div class="cal-dow">Tue</div><div class="cal-dow">Wed</div>
+    <div class="cal-dow">Thu</div><div class="cal-dow">Fri</div><div class="cal-dow">Sat</div><div class="cal-dow">Sun</div>
+  </div>
+  <div class="cal-grid" id="calGrid"></div>
 </div>
 
 <div class="idle-overlay" id="idleOverlay">
@@ -890,6 +937,88 @@ function lindaMainPage(env: Env): string {
       if (res.status === 403) { window.location.reload(); return; }
       loadExtras();
     } catch(e){}
+  };
+
+  // ── Inline calendar picker (replaces dd/mm/yyyy native inputs) ──
+  var cal = { month: null, year: null, onPick: null, targetHidden: null, targetLabel: null, targetBtn: null };
+  var MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+  function fmtDay(k){
+    try {
+      var d = parseKey(k);
+      return d.toLocaleDateString(undefined, { weekday:'short', day:'numeric', month:'short', year:'numeric' });
+    } catch(e){ return k; }
+  }
+
+  function renderCalGrid(){
+    $('calTitle').textContent = MONTH_NAMES[cal.month] + ' ' + cal.year;
+    var first = new Date(cal.year, cal.month, 1);
+    // Convert JS Sunday-first (0=Sun) to Mon-first index.
+    var startOffset = (first.getDay() + 6) % 7;
+    var daysInMonth = new Date(cal.year, cal.month + 1, 0).getDate();
+    var daysInPrev = new Date(cal.year, cal.month, 0).getDate();
+    var todayK = today();
+    var selK = cal.targetHidden ? $(cal.targetHidden).value : '';
+    var html = '';
+    // Previous-month trailing days
+    for (var i = 0; i < startOffset; i++){
+      var d = daysInPrev - startOffset + i + 1;
+      html += '<button class="cal-cell other-month" disabled>' + d + '</button>';
+    }
+    // This month
+    for (var d = 1; d <= daysInMonth; d++){
+      var dk = cal.year + '-' + pad(cal.month + 1) + '-' + pad(d);
+      var classes = 'cal-cell';
+      var dayOfWeek = new Date(cal.year, cal.month, d).getDay();
+      if (dayOfWeek === 0 || dayOfWeek === 6) classes += ' weekend';
+      if (dk === todayK) classes += ' today';
+      if (dk === selK) classes += ' sel';
+      html += '<button class="' + classes + '" onclick="calPick(\\'' + dk + '\\')">' + d + '</button>';
+    }
+    // Fill trailing cells to complete the 6-row grid (optional tidy).
+    var total = startOffset + daysInMonth;
+    var rem = (7 - (total % 7)) % 7;
+    for (var i = 0; i < rem; i++){
+      html += '<button class="cal-cell other-month" disabled>' + (i + 1) + '</button>';
+    }
+    $('calGrid').innerHTML = html;
+  }
+
+  window.calStep = function(delta){
+    cal.month += delta;
+    if (cal.month < 0) { cal.month = 11; cal.year--; }
+    else if (cal.month > 11) { cal.month = 0; cal.year++; }
+    renderCalGrid();
+  };
+
+  window.closeCal = function(){
+    $('calOverlay').classList.remove('show');
+    $('calSheet').classList.remove('show');
+  };
+
+  window.calPick = function(dk){
+    if (cal.targetHidden) $(cal.targetHidden).value = dk;
+    if (cal.targetLabel) $(cal.targetLabel).textContent = fmtDay(dk);
+    if (cal.targetBtn) $(cal.targetBtn).classList.remove('empty');
+    var fn = cal.onPick;
+    closeCal();
+    if (typeof fn === 'function') fn(dk);
+  };
+
+  // pickDate(hiddenInputId) — opens the calendar targeting <input type="hidden" id="...">
+  // and updates its matching label (id+"Label") and button (id+"Btn") classes.
+  window.pickDate = function(hiddenId, onPick){
+    var existing = $(hiddenId).value;
+    var d = existing ? parseKey(existing) : new Date();
+    cal.month = d.getMonth();
+    cal.year = d.getFullYear();
+    cal.targetHidden = hiddenId;
+    cal.targetLabel = hiddenId + 'Label';
+    cal.targetBtn = hiddenId + 'Btn';
+    cal.onPick = onPick || null;
+    renderCalGrid();
+    $('calOverlay').classList.add('show');
+    $('calSheet').classList.add('show');
   };
 
   // ── Booking sheet (used for new booking; reschedule extension in next commit) ──
