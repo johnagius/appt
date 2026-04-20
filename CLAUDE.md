@@ -19,9 +19,10 @@ Every update ends with the user seeing both of these, formatted as shown:
 
 ### GitHub download (latest `main` as zip)
 
-```
-https://github.com/johnagius/appt/archive/refs/heads/main.zip
-```
+Present this as a **clickable markdown link** (NOT inside a code block, so the
+user can click it directly to trigger the browser download):
+
+[Download latest `main` as zip](https://github.com/johnagius/appt/archive/refs/heads/main.zip)
 
 ### One-shot Windows deploy command
 
