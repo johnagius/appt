@@ -460,6 +460,38 @@ function lindaMainPage(env: Env): string {
   .emptyEmoji{font-size:40px;margin-bottom:8px;}
   .err{padding:14px;margin:10px 12px;background:#fef2f2;color:#991b1b;border-radius:10px;font-size:14px;}
 
+  /* Tabs */
+  .tabBar{display:flex;gap:4px;padding:6px;background:#fff;border-bottom:1px solid var(--line);position:sticky;top:41px;z-index:4;}
+  .tabBtn{flex:1 1 0;padding:12px 8px;background:#f3f4f6;border:none;border-radius:10px;font-size:14px;font-weight:800;cursor:pointer;color:var(--muted);min-height:44px;}
+  .tabBtn.active{background:var(--accent);color:#fff;}
+
+  /* Availability tab */
+  .avail-wrap{padding:12px;padding-bottom:80px;}
+  .avail-card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px;}
+  .avail-card h3{margin:0 0 8px 0;font-size:15px;font-weight:900;}
+  .avail-card .hint{margin:0 0 12px 0;font-size:13px;color:var(--muted);line-height:1.5;}
+  .avail-row{display:flex;gap:8px;align-items:center;margin-bottom:8px;}
+  .avail-row label{flex:0 0 80px;font-size:13px;color:var(--muted);font-weight:700;}
+  .avail-row input{flex:1 1 auto;padding:12px;border:1px solid var(--line);border-radius:10px;font-size:15px;min-height:44px;background:#fff;color:var(--text);}
+  .avail-save{width:100%;padding:14px;background:var(--accent);color:#fff;border:none;border-radius:999px;font-size:15px;font-weight:800;cursor:pointer;min-height:48px;margin-top:6px;}
+  .avail-save:active{background:#059669;}
+  .extra-row{display:flex;align-items:center;justify-content:space-between;padding:12px;background:#f9fafb;border-radius:10px;margin-bottom:8px;gap:10px;}
+  .extra-when{font-size:14px;font-weight:700;}
+  .extra-dim{font-size:12px;color:var(--muted);margin-top:2px;}
+  .extra-del{background:#fef2f2;color:#991b1b;border:none;padding:10px 14px;border-radius:8px;font-weight:800;font-size:13px;cursor:pointer;min-height:40px;}
+  .extra-del:active{background:#fee2e2;}
+  .avail-msg{font-size:13px;margin-top:8px;}
+  .avail-msg.ok{color:#059669;}
+  .avail-msg.bad{color:#dc2626;}
+
+  @media (prefers-color-scheme: dark){
+    .tabBar{background:#1e293b;border-color:#334155;}
+    .tabBtn{background:#0f172a;color:#94a3b8;}
+    .avail-card{background:#1e293b;border-color:#334155;}
+    .avail-row input{background:#0f172a;color:#e2e8f0;border-color:#334155;}
+    .extra-row{background:#0f172a;}
+  }
+
   /* Idle overlay pauses network activity */
   .idle-overlay{position:fixed;inset:0;background:rgba(17,24,39,0.92);color:#fff;display:none;align-items:center;justify-content:center;flex-direction:column;z-index:50;padding:20px;text-align:center;cursor:pointer;}
   .idle-overlay.show{display:flex;}
@@ -486,15 +518,42 @@ function lindaMainPage(env: Env): string {
   <h1>${name}'s Diary <span class="liveDot" id="liveDot" title="Live status"></span></h1>
   <button class="logout" onclick="logout()">Log out</button>
 </div>
-<div class="dateBar">
-  <button class="nav" onclick="navDay(-1)" aria-label="Previous day">&#x25C0;</button>
-  <input type="date" id="dateInput">
-  <button class="nav" onclick="navDay(1)" aria-label="Next day">&#x25B6;</button>
-  <button class="today-btn" onclick="goToday()">Today</button>
+<div class="tabBar">
+  <button class="tabBtn active" id="tabDayBtn" onclick="setTab('day')">📅 My Day</button>
+  <button class="tabBtn" id="tabAvailBtn" onclick="setTab('avail')">🗓 Availability</button>
 </div>
-<div class="dayLabel" id="dayLabel"></div>
-<div class="summary" id="summary"></div>
-<div class="list" id="list"><div class="empty">Loading…</div></div>
+
+<div id="pane-day">
+  <div class="dateBar">
+    <button class="nav" onclick="navDay(-1)" aria-label="Previous day">&#x25C0;</button>
+    <input type="date" id="dateInput">
+    <button class="nav" onclick="navDay(1)" aria-label="Next day">&#x25B6;</button>
+    <button class="today-btn" onclick="goToday()">Today</button>
+  </div>
+  <div class="dayLabel" id="dayLabel"></div>
+  <div class="summary" id="summary"></div>
+  <div class="list" id="list"><div class="empty">Loading…</div></div>
+</div>
+
+<div id="pane-avail" style="display:none;">
+  <div class="avail-wrap">
+    <div class="avail-card">
+      <h3>Open extra availability</h3>
+      <p class="hint">Add a date (or date range) and the hours you'll be there. Patients can then book these slots. Your weekly schedule stays as-is.</p>
+      <div class="avail-row"><label>From date</label><input type="date" id="avDateFrom"></div>
+      <div class="avail-row"><label>To date</label><input type="date" id="avDateTo"></div>
+      <div class="avail-row"><label>Start</label><input type="time" id="avStart" step="1800" value="09:00"></div>
+      <div class="avail-row"><label>End</label><input type="time" id="avEnd" step="1800" value="13:00"></div>
+      <button class="avail-save" onclick="saveAvail()">Open these hours</button>
+      <div class="avail-msg" id="avMsg"></div>
+    </div>
+
+    <div class="avail-card">
+      <h3>Upcoming extra hours</h3>
+      <div id="extraList"><div class="empty" style="margin:0;border:none;padding:20px 0;">Loading…</div></div>
+    </div>
+  </div>
+</div>
 
 <div class="idle-overlay" id="idleOverlay">
   <div class="idle-emoji">🧘</div>
@@ -616,6 +675,20 @@ function lindaMainPage(env: Env): string {
     document.cookie = 'linda_sig=; Path=/; Max-Age=0';
     window.location.href = '/linda';
   };
+
+  // ── Tab switching ──
+  window.setTab = function(which){
+    var isDay = which === 'day';
+    $('pane-day').style.display = isDay ? '' : 'none';
+    $('pane-avail').style.display = isDay ? 'none' : '';
+    $('tabDayBtn').classList.toggle('active', isDay);
+    $('tabAvailBtn').classList.toggle('active', !isDay);
+    if (!isDay) { loadExtras(); }
+  };
+
+  // Placeholder — wired in next commit.
+  function loadExtras(){ $('extraList').innerHTML = '<div class="empty" style="margin:0;border:none;padding:20px 0;">Coming in next commit…</div>'; }
+  window.saveAvail = function(){ alert('Wired in next commit'); };
 
   // ── Idle overlay: hides content + stops network after 2 min inactivity ──
   function resetIdle(){
