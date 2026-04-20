@@ -899,6 +899,16 @@ export function adminPage(sig: string): string {
           <button class="btn btn-sm" style="background:#8b5cf6;color:#fff;" onclick="sendReviewEmails('spinola')">Send Review Request</button>
         </div>
       </div>
+      <div class="card rev-card">
+        <div class="rev-card-header">
+          <h3 class="rev-card-title" style="color:#10b981;">Linda — Physiotherapy</h3>
+          <label class="rev-check-label"><input type="checkbox" id="revSelectAllLinda" onchange="toggleRevAll('linda',this.checked)"> Select all</label>
+        </div>
+        <div class="rev-list" id="revLindaList"><div class="empty">Loading...</div></div>
+        <div class="rev-card-footer">
+          <button class="btn btn-sm" style="background:#10b981;color:#fff;" onclick="sendReviewEmails('linda')">Send Review Request</button>
+        </div>
+      </div>
     </div>
     <div class="msg rev-msg" id="reviewsMsg"></div>
   </div>
@@ -3909,6 +3919,7 @@ function renderSpCountryBreakdown(countries) {
 
 var _reviewPotters = [];
 var _reviewSpinola = [];
+var _reviewLinda = [];
 var _reviewDateKey = '';
 
 // ── Reminders Tab ──
@@ -4003,9 +4014,11 @@ function loadReviewPatients() {
       showMsg('reviewsMsg', '', '');
       _reviewPotters = res.potters || [];
       _reviewSpinola = res.spinola || [];
+      _reviewLinda = res.linda || [];
       _reviewDateKey = dateKey;
       renderReviewList('potters', _reviewPotters);
       renderReviewList('spinola', _reviewSpinola);
+      renderReviewList('linda', _reviewLinda);
     })
     .catch(function(err) {
       showMsg('reviewsMsg', 'bad', 'Error: ' + (err && err.message ? err.message : String(err)));
@@ -4013,7 +4026,7 @@ function loadReviewPatients() {
 }
 
 function renderReviewList(loc, patients) {
-  var elId = loc === 'potters' ? 'revPottersList' : 'revSpinolaList';
+  var elId = loc === 'potters' ? 'revPottersList' : loc === 'linda' ? 'revLindaList' : 'revSpinolaList';
   var el = document.getElementById(elId);
   if (!patients.length) { el.innerHTML = '<div class="empty">No patients with email today.</div>'; return; }
 
@@ -4061,7 +4074,7 @@ function sendReviewEmails(loc) {
   var teamNames = getSelectedTeamNames();
   if (!teamNames.length) { showMsg('reviewsMsg', 'bad', 'Please select at least one team member.'); return; }
 
-  var clinicLoc = loc === 'potters' ? 'potters' : 'spinola';
+  var clinicLoc = loc === 'linda' ? 'linda' : loc === 'spinola' ? 'spinola' : 'potters';
   showMsg('reviewsMsg', '', 'Sending ' + ids.length + ' email(s)...');
 
   apiCall('reviews/send', { body: { appointmentIds: ids, location: clinicLoc, teamNames: teamNames, dateKey: _reviewDateKey } })

@@ -651,6 +651,7 @@ export async function apiAdminGetReviewPatients(req: Request, env: Env): Promise
 
   const potters: any[] = [];
   const spinola: any[] = [];
+  const linda: any[] = [];
 
   for (const a of allAppts) {
     if (!a.email || a.status.includes('CANCELLED')) continue;
@@ -667,12 +668,14 @@ export async function apiAdminGetReviewPatients(req: Request, env: Env): Promise
     };
     if (a.clinic === 'spinola') {
       spinola.push(item);
+    } else if (a.clinic === 'linda') {
+      linda.push(item);
     } else if (a.status !== 'RELOCATED_SPINOLA') {
       potters.push(item);
     }
   }
 
-  return json({ ok: true, potters, spinola, dateKey });
+  return json({ ok: true, potters, spinola, linda, dateKey });
 }
 
 // ─── Send Review Requests ──────────────────────────────────
