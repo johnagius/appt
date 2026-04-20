@@ -59,11 +59,27 @@ export function isInLindaWindow(dateKey: string, cfg: LindaConfig): boolean {
   return dateKey >= cfg.windowStart && dateKey <= cfg.windowEnd;
 }
 
-export function buildLindaSlots(dateKey: string, cfg: LindaConfig): Slot[] {
+export function buildLindaSlots(dateKey: string, cfg: LindaConfig, extras?: { start: string; end: string }[] | null): Slot[] {
   const d = parseDateKey(dateKey);
   const dow = dayOfWeekKey(d);
-  if (!cfg.hours[dow] || cfg.hours[dow].length === 0) return [];
-  return buildSlotsForDate(d, cfg.slotMin, null, cfg.hours);
+  const base = cfg.hours[dow] || [];
+  const hasBase = base.length > 0;
+  const hasExtra = extras && extras.length > 0;
+  if (!hasBase && !hasExtra) return [];
+  // buildSlotsForDate takes an hoursOverride (used for base) plus extraWindows
+  // that it merges in. If Linda has no base hours that day but has extras,
+  // pass an empty hours map but the extras will add slots on their own.
+  const hoursOverride = hasBase
+    ? cfg.hours
+    : ({ MON: [], TUE: [], WED: [], THU: [], FRI: [], SAT: [], SUN: [], [dow]: [] } as any);
+  return buildSlotsForDate(d, cfg.slotMin, extras || null, hoursOverride);
+}
+
+export async function getLindaExtrasForDate(db: D1Database, dateKey: string): Promise<{ id: number; start: string; end: string }[]> {
+  const rows = await db.prepare(
+    'SELECT id, start_time AS s, end_time AS e FROM linda_extra WHERE date_key = ? ORDER BY start_time'
+  ).bind(dateKey).all<{ id: number; s: string; e: string }>();
+  return rows.results.map(r => ({ id: r.id, start: r.s, end: r.e }));
 }
 
 export function buildLindaDateOptions(tz: string, cfg: LindaConfig): DateOption[] {

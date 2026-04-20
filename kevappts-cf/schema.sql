@@ -112,6 +112,17 @@ CREATE TABLE IF NOT EXISTS referrals (
 CREATE INDEX IF NOT EXISTS idx_referral_code ON referrals(referral_code);
 CREATE INDEX IF NOT EXISTS idx_referral_referrer ON referrals(referrer_email);
 
+-- Linda extra availability slots (ad-hoc dates/time ranges Linda adds beyond her weekly schedule)
+CREATE TABLE IF NOT EXISTS linda_extra (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  date_key TEXT NOT NULL,
+  start_time TEXT NOT NULL,
+  end_time TEXT NOT NULL,
+  reason TEXT DEFAULT '',
+  created_at TEXT DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS idx_linda_extra_date ON linda_extra(date_key);
+
 -- Seed data version
 INSERT OR IGNORE INTO data_version (id, version) VALUES (1, 0);
 

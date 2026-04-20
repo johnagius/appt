@@ -19,7 +19,7 @@ import { generateId } from '../services/crypto';
 import { sendDoctorBookingEmail, sendLindaConfirmationEmail } from '../services/email';
 import { createCalendarEvent } from '../services/calendar';
 import {
-  buildLindaDateOptions, buildLindaSlots, isInLindaWindow, loadLindaConfig,
+  buildLindaDateOptions, buildLindaSlots, getLindaExtrasForDate, isInLindaWindow, loadLindaConfig,
   type LindaConfig,
 } from '../services/linda';
 
@@ -86,7 +86,8 @@ async function buildLindaAvailability(dateKey: string, env: Env, cfg: LindaConfi
     return { ok: false, reason: 'Date is in the past', dateKey, slots: [] };
   }
 
-  const baseSlots = buildLindaSlots(dateKey, cfg);
+  const extras = await getLindaExtrasForDate(env.DB, dateKey);
+  const baseSlots = buildLindaSlots(dateKey, cfg, extras);
   if (!baseSlots.length) return { ok: false, reason: 'Closed', dateKey, slots: [] };
 
   const taken = await getTakenSlots(env.DB, dateKey, 'linda');
@@ -129,8 +130,9 @@ export async function apiPhysioBook(req: Request, env: Env): Promise<Response> {
   const todayKey = todayKeyLocal(tz);
   if (dateKey < todayKey) return json({ ok: false, reason: 'You cannot book a past date.' }, 400);
 
-  // Validate slot against Linda's hours
-  const slots = buildLindaSlots(dateKey, cfg);
+  // Validate slot against Linda's hours (including ad-hoc extras)
+  const extras = await getLindaExtrasForDate(env.DB, dateKey);
+  const slots = buildLindaSlots(dateKey, cfg, extras);
   const slotFound = slots.find(s => s.start === startTime);
   if (!slotFound) return json({ ok: false, reason: 'Invalid slot' }, 400);
 
