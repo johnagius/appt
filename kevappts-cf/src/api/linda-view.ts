@@ -248,6 +248,94 @@ export async function apiLindaReschedule(req: Request, env: Env): Promise<Respon
   return json({ ok: true, appointmentId, dateKey, startTime, endTime: slotFound.end });
 }
 
+// ─── POST /api/linda-new-booking ───────────────────────────
+// Linda creates a booking on behalf of a patient (walk-in, phone booking,
+// or "clone" of an existing appointment's patient into a future slot).
+// Body: { dateKey, startTime, fullName, email, phone, comments? }
+
+export async function apiLindaNewBooking(req: Request, env: Env): Promise<Response> {
+  if (!await isLindaAuthed(req, env)) return json({ ok: false, reason: 'Access denied.' }, 403);
+  const body: any = await req.json();
+  const dateKey = String(body.dateKey || '').trim();
+  const startTime = String(body.startTime || '').trim();
+  const fullName = String(body.fullName || '').trim();
+  const email = String(body.email || '').trim().toLowerCase();
+  const phone = String(body.phone || '').trim();
+  const comments = String(body.comments || '').trim();
+
+  if (!dateKey || !startTime || !fullName || (!email && !phone)) {
+    return json({ ok: false, reason: 'Name and at least one of email or phone are required.' }, 400);
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) return json({ ok: false, reason: 'Invalid date.' }, 400);
+
+  const cfg = await loadLindaConfig(env.DB);
+  const extras = await getLindaExtrasForDate(env.DB, dateKey);
+  const slots = buildLindaSlots(dateKey, cfg, extras);
+  const slotFound = slots.find(s => s.start === startTime);
+  if (!slotFound) return json({ ok: false, reason: 'Not a valid slot for this date. Open availability first.' }, 400);
+
+  if (await isSlotTaken(env.DB, dateKey, startTime, 'linda')) {
+    return json({ ok: false, reason: 'That slot is already taken.' }, 400);
+  }
+
+  const now = nowIso(env.TIMEZONE);
+  if (email) await getOrCreateClient(env.DB, fullName, email, phone, now);
+
+  const appt: Appointment = {
+    id: 'A-' + generateId(),
+    date_key: dateKey,
+    start_time: startTime,
+    end_time: slotFound.end,
+    service_id: 'physio',
+    service_name: 'Physiotherapy Consultation',
+    full_name: fullName,
+    email: email || '',
+    phone: phone || '',
+    comments,
+    status: 'BOOKED',
+    location: env.LINDA_LOCATION || "Potter's Clinic",
+    clinic: 'linda',
+    created_at: now,
+    updated_at: now,
+    token: generateId(),
+    calendar_event_id: '',
+    cancelled_at: '',
+    cancel_reason: '',
+    reminder_sent: '',
+    confirmed: '',
+    booking_source: 'linda-internal',
+  };
+
+  await insertAppointment(env.DB, appt);
+  await bumpVersion(env.DB);
+
+  try {
+    const doId = env.REALTIME.idFromName('global');
+    const stub = env.REALTIME.get(doId);
+    await stub.fetch('http://internal/broadcast', {
+      method: 'POST',
+      body: JSON.stringify({ type: 'slots_updated', dateKey, clinic: 'linda' }),
+    });
+  } catch {}
+
+  const ctx = (globalThis as any).__ctx;
+  if (ctx?.waitUntil) {
+    ctx.waitUntil((async () => {
+      try {
+        const eventId = await createCalendarEvent(env, appt);
+        if (eventId) await env.DB.prepare('UPDATE appointments SET calendar_event_id = ? WHERE id = ?').bind(eventId, appt.id).run();
+      } catch (e) { console.error('Linda new-booking cal error:', e); }
+      try { if (email) await sendLindaConfirmationEmail(env, appt); } catch (e) { console.error('Linda new-booking confirm email error:', e); }
+      try {
+        const day = await env.DB.prepare("SELECT * FROM appointments WHERE date_key = ? AND status IN ('BOOKED','RELOCATED_SPINOLA') ORDER BY start_time").bind(dateKey).all<Appointment>();
+        await sendDoctorBookingEmail(env, appt, day.results);
+      } catch (e) { console.error('Linda new-booking doctor email error:', e); }
+    })());
+  }
+
+  return json({ ok: true, appointmentId: appt.id, dateKey, startTime, endTime: slotFound.end });
+}
+
 // ─── POST /linda/login ─────────────────────────────────────
 
 export async function handleLindaLogin(req: Request, env: Env): Promise<Response> {
