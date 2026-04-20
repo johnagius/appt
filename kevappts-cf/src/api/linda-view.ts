@@ -285,6 +285,42 @@ export async function apiLindaAddExtra(req: Request, env: Env): Promise<Response
   return json({ ok: true, added: count });
 }
 
+// Copy a day's extras forward to one or more future dates.
+// Body: { fromDateKey, toDateKeys: [...] }
+// Skips duplicates (same date_key + start_time + end_time already exists).
+
+export async function apiLindaCopyDay(req: Request, env: Env): Promise<Response> {
+  if (!await isLindaAuthed(req, env)) return json({ ok: false, reason: 'Access denied.' }, 403);
+  const body: any = await req.json();
+  const fromDateKey = String(body.fromDateKey || '').trim();
+  const toDateKeys = Array.isArray(body.toDateKeys) ? body.toDateKeys.map((d: any) => String(d).trim()).filter((d: string) => /^\d{4}-\d{2}-\d{2}$/.test(d)) : [];
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(fromDateKey)) return json({ ok: false, reason: 'Invalid source date.' }, 400);
+  if (!toDateKeys.length) return json({ ok: false, reason: 'Pick at least one target date.' }, 400);
+
+  const sourceRows = await env.DB.prepare(
+    'SELECT start_time, end_time, reason FROM linda_extra WHERE date_key = ? ORDER BY start_time'
+  ).bind(fromDateKey).all<{ start_time: string; end_time: string; reason: string }>();
+  if (!sourceRows.results.length) return json({ ok: false, reason: 'Source day has no extra hours to copy.' }, 400);
+
+  const now = nowIso(env.TIMEZONE);
+  let inserted = 0, skipped = 0;
+  for (const dk of toDateKeys) {
+    for (const r of sourceRows.results) {
+      const existing = await env.DB.prepare(
+        'SELECT 1 FROM linda_extra WHERE date_key = ? AND start_time = ? AND end_time = ?'
+      ).bind(dk, r.start_time, r.end_time).first();
+      if (existing) { skipped++; continue; }
+      await env.DB.prepare(
+        'INSERT INTO linda_extra (date_key, start_time, end_time, reason, created_at) VALUES (?, ?, ?, ?, ?)'
+      ).bind(dk, r.start_time, r.end_time, r.reason || '', now).run();
+      inserted++;
+    }
+  }
+  await bumpVersion(env.DB);
+  return json({ ok: true, inserted, skipped });
+}
+
 // Delete an extra by id. ?id=123
 
 export async function apiLindaDeleteExtra(req: Request, env: Env): Promise<Response> {
@@ -861,6 +897,25 @@ function lindaMainPage(env: Env): string {
     </div>
 
     <div class="avail-card">
+      <h3>Copy a day's hours</h3>
+      <p class="hint">Pick a day that already has hours opened, then pick one or more future dates to clone those hours to.</p>
+      <div class="avail-row">
+        <label>From</label>
+        <button type="button" class="date-btn empty" id="cdFromBtn" onclick="pickDate('cdFrom')"><span class="date-icon">📅</span><span class="date-val" id="cdFromLabel">Pick source day</span></button>
+        <input type="hidden" id="cdFrom">
+      </div>
+      <div style="font-size:12px;color:var(--muted);font-weight:800;text-transform:uppercase;letter-spacing:.4px;margin:10px 0 6px;">Copy to</div>
+      <div id="cdTargetChips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;"></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        <button class="btn" type="button" onclick="addCopyTargetPreset('next-week')" style="padding:10px 12px;border:1px solid var(--line);border-radius:999px;background:#f3f4f6;font-weight:700;font-size:13px;cursor:pointer;">+ Same day next week</button>
+        <button class="btn" type="button" onclick="addCopyTargetPreset('next-4-weeks')" style="padding:10px 12px;border:1px solid var(--line);border-radius:999px;background:#f3f4f6;font-weight:700;font-size:13px;cursor:pointer;">+ Same day × 4 weeks</button>
+        <button class="btn" type="button" onclick="addCopyTargetCustom()" style="padding:10px 12px;border:1px solid var(--line);border-radius:999px;background:#f3f4f6;font-weight:700;font-size:13px;cursor:pointer;">+ Pick a date</button>
+      </div>
+      <button class="avail-save" style="margin-top:12px;" onclick="submitCopyDay()">Copy hours</button>
+      <div class="avail-msg" id="cdMsg"></div>
+    </div>
+
+    <div class="avail-card">
       <h3>Upcoming extra hours</h3>
       <div id="extraList"><div class="empty" style="margin:0;border:none;padding:20px 0;">Loading…</div></div>
     </div>
@@ -1301,6 +1356,82 @@ function lindaMainPage(env: Env): string {
       $('phLast').textContent = 'Network error.';
     }
   };
+
+  // ── Copy day hours to future dates ──
+  var cdTargets = [];
+  function renderCopyChips(){
+    var el = $('cdTargetChips');
+    if (!cdTargets.length) { el.innerHTML = '<span style="font-size:12px;color:var(--muted);">No targets yet.</span>'; return; }
+    var html = '';
+    for (var i = 0; i < cdTargets.length; i++){
+      html += '<span style="display:inline-flex;align-items:center;gap:6px;background:#ecfdf5;color:#065f46;padding:6px 10px;border-radius:999px;font-size:13px;font-weight:700;">';
+      html +=   esc(formatNiceShort(cdTargets[i]));
+      html +=   ' <button type="button" onclick="removeCopyTarget(' + i + ')" style="background:none;border:none;color:#065f46;font-size:16px;cursor:pointer;line-height:1;padding:0;">&times;</button>';
+      html += '</span>';
+    }
+    el.innerHTML = html;
+  }
+  window.removeCopyTarget = function(idx){ cdTargets.splice(idx, 1); renderCopyChips(); };
+  window.addCopyTargetPreset = function(which){
+    var from = $('cdFrom').value;
+    if (!from) { alert('Pick a source date first.'); return; }
+    if (which === 'next-week'){
+      cdTargets.push(shiftDays(from, 7));
+    } else if (which === 'next-4-weeks'){
+      for (var i = 1; i <= 4; i++) cdTargets.push(shiftDays(from, 7 * i));
+    }
+    // dedupe
+    cdTargets = Array.from(new Set(cdTargets));
+    renderCopyChips();
+  };
+  window.addCopyTargetCustom = function(){
+    pickDate('cdCustomTmp', function(dk){
+      cdTargets.push(dk);
+      cdTargets = Array.from(new Set(cdTargets));
+      renderCopyChips();
+    });
+  };
+
+  window.submitCopyDay = async function(){
+    var from = $('cdFrom').value;
+    if (!from) { $('cdMsg').textContent = 'Pick a source date first.'; $('cdMsg').className = 'avail-msg bad'; return; }
+    if (!cdTargets.length) { $('cdMsg').textContent = 'Add at least one target date.'; $('cdMsg').className = 'avail-msg bad'; return; }
+    $('cdMsg').textContent = 'Copying…'; $('cdMsg').className = 'avail-msg';
+    try {
+      var res = await fetch('/api/linda-copy-day', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fromDateKey: from, toDateKeys: cdTargets }),
+      });
+      if (res.status === 403) { window.location.reload(); return; }
+      var data = await res.json();
+      if (data.ok){
+        $('cdMsg').textContent = 'Copied ' + data.inserted + ' row(s)' + (data.skipped ? ' (' + data.skipped + ' duplicate' + (data.skipped === 1 ? '' : 's') + ' skipped)' : '') + '.';
+        $('cdMsg').className = 'avail-msg ok';
+        cdTargets = [];
+        renderCopyChips();
+        loadExtras();
+      } else {
+        $('cdMsg').textContent = data.reason || 'Failed';
+        $('cdMsg').className = 'avail-msg bad';
+      }
+    } catch(e){
+      $('cdMsg').textContent = 'Network error';
+      $('cdMsg').className = 'avail-msg bad';
+    }
+  };
+
+  // Create a hidden input for the ad-hoc target picker used by Copy Day.
+  var cdCustomTmp = document.createElement('input');
+  cdCustomTmp.type = 'hidden';
+  cdCustomTmp.id = 'cdCustomTmp';
+  document.body.appendChild(cdCustomTmp);
+  // Matching label + button elements so pickDate() has something to update.
+  ['cdCustomTmpLabel','cdCustomTmpBtn'].forEach(function(id){
+    var el = document.createElement('span'); el.id = id; el.style.display = 'none'; document.body.appendChild(el);
+  });
+
+  // Paint the empty-state on first load.
+  renderCopyChips();
 
   // ── Inline calendar picker (replaces dd/mm/yyyy native inputs) ──
   var cal = { month: null, year: null, onPick: null, targetHidden: null, targetLabel: null, targetBtn: null };
