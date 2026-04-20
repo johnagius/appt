@@ -127,6 +127,8 @@ export async function apiLindaAddExtra(req: Request, env: Env): Promise<Response
   const dateKeyEnd = String(body.dateKeyEnd || '').trim();
   const startTime = String(body.startTime || '').trim();
   const endTime = String(body.endTime || '').trim();
+  const eveningStart = String(body.eveningStart || '').trim();
+  const eveningEnd = String(body.eveningEnd || '').trim();
   const reason = String(body.reason || '').trim();
 
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) return json({ ok: false, reason: 'Invalid start date.' }, 400);
@@ -134,10 +136,26 @@ export async function apiLindaAddExtra(req: Request, env: Env): Promise<Response
   if (!/^\d{2}:\d{2}$/.test(startTime) || !/^\d{2}:\d{2}$/.test(endTime)) return json({ ok: false, reason: 'Invalid time.' }, 400);
   if (parseTimeToMinutes(endTime) <= parseTimeToMinutes(startTime)) return json({ ok: false, reason: 'End time must be after start time.' }, 400);
 
+  // Build the list of time ranges to insert per day (morning always, evening optional).
+  const ranges: { start: string; end: string }[] = [{ start: startTime, end: endTime }];
+  const hasEvening = eveningStart && eveningEnd;
+  if (hasEvening) {
+    if (!/^\d{2}:\d{2}$/.test(eveningStart) || !/^\d{2}:\d{2}$/.test(eveningEnd)) {
+      return json({ ok: false, reason: 'Invalid evening time.' }, 400);
+    }
+    if (parseTimeToMinutes(eveningEnd) <= parseTimeToMinutes(eveningStart)) {
+      return json({ ok: false, reason: 'Evening end must be after evening start.' }, 400);
+    }
+    if (parseTimeToMinutes(eveningStart) < parseTimeToMinutes(endTime)) {
+      return json({ ok: false, reason: "Evening start must be after the morning end." }, 400);
+    }
+    ranges.push({ start: eveningStart, end: eveningEnd });
+  }
+
   const endDate = dateKeyEnd && dateKeyEnd >= dateKey ? dateKeyEnd : dateKey;
   const now = nowIso(env.TIMEZONE);
 
-  // Insert one row per day in the range.
+  // Insert one row per range per day.
   let count = 0;
   const [y0, m0, d0] = dateKey.split('-').map(Number);
   const [y1, m1, d1] = endDate.split('-').map(Number);
@@ -145,10 +163,12 @@ export async function apiLindaAddExtra(req: Request, env: Env): Promise<Response
   const endD = new Date(y1, m1 - 1, d1);
   for (let cur = new Date(startD); cur <= endD; cur.setDate(cur.getDate() + 1)) {
     const dk = cur.getFullYear() + '-' + String(cur.getMonth() + 1).padStart(2, '0') + '-' + String(cur.getDate()).padStart(2, '0');
-    await env.DB.prepare(
-      'INSERT INTO linda_extra (date_key, start_time, end_time, reason, created_at) VALUES (?, ?, ?, ?, ?)'
-    ).bind(dk, startTime, endTime, reason, now).run();
-    count++;
+    for (const r of ranges) {
+      await env.DB.prepare(
+        'INSERT INTO linda_extra (date_key, start_time, end_time, reason, created_at) VALUES (?, ?, ?, ?, ?)'
+      ).bind(dk, r.start, r.end, reason, now).run();
+      count++;
+    }
   }
 
   await bumpVersion(env.DB);
