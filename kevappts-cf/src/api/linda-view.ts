@@ -265,15 +265,26 @@ export async function apiLindaAddExtra(req: Request, env: Env): Promise<Response
   const endDate = dateKeyEnd && dateKeyEnd >= dateKey ? dateKeyEnd : dateKey;
   const now = nowIso(env.TIMEZONE);
 
-  // Insert one row per range per day.
-  let count = 0;
+  // Insert one row per range per day, skipping any that would collide
+  // with an existing extra for the same day (overlap or exact duplicate).
+  let count = 0, skipped = 0;
   const [y0, m0, d0] = dateKey.split('-').map(Number);
   const [y1, m1, d1] = endDate.split('-').map(Number);
   const startD = new Date(y0, m0 - 1, d0);
   const endD = new Date(y1, m1 - 1, d1);
   for (let cur = new Date(startD); cur <= endD; cur.setDate(cur.getDate() + 1)) {
     const dk = cur.getFullYear() + '-' + String(cur.getMonth() + 1).padStart(2, '0') + '-' + String(cur.getDate()).padStart(2, '0');
+    const existingRows = await env.DB.prepare(
+      'SELECT start_time, end_time FROM linda_extra WHERE date_key = ?'
+    ).bind(dk).all<{ start_time: string; end_time: string }>();
     for (const r of ranges) {
+      const newStart = parseTimeToMinutes(r.start);
+      const newEnd = parseTimeToMinutes(r.end);
+      const overlap = existingRows.results.some(row => {
+        const es = parseTimeToMinutes(row.start_time), ee = parseTimeToMinutes(row.end_time);
+        return newStart < ee && newEnd > es;
+      });
+      if (overlap) { skipped++; continue; }
       await env.DB.prepare(
         'INSERT INTO linda_extra (date_key, start_time, end_time, reason, created_at) VALUES (?, ?, ?, ?, ?)'
       ).bind(dk, r.start, r.end, reason, now).run();
@@ -282,7 +293,10 @@ export async function apiLindaAddExtra(req: Request, env: Env): Promise<Response
   }
 
   await bumpVersion(env.DB);
-  return json({ ok: true, added: count });
+  if (count === 0 && skipped > 0) {
+    return json({ ok: false, reason: "Those hours overlap with existing availability on " + (skipped === 1 ? 'that day' : 'those days') + '. Edit or remove existing rows first.' }, 409);
+  }
+  return json({ ok: true, added: count, skipped });
 }
 
 // Copy a day's extras forward to one or more future dates.
