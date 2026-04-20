@@ -2029,10 +2029,21 @@ function lindaMainPage(env: Env): string {
     openBookSheet();
     setBfDate(dk);
     $('sheetTitle').textContent = 'Book at ' + startTime;
+    // Don't require an EXACT slot match — Linda's slot length might not
+    // align with the 30-min grid (e.g. 60-min slots). Pick the first
+    // available slot at or after the clicked cell-time.
     loadSheetSlots().then(function(){
       setTimeout(function(){
-        var match = document.querySelector('#bfSlots .slot-btn[data-slot="' + startTime + '"]:not(.dis)');
-        if (match) match.click();
+        var cellMin = parseInt(startTime.slice(0,2), 10) * 60 + parseInt(startTime.slice(3,5), 10);
+        var btns = document.querySelectorAll('#bfSlots .slot-btn:not(.dis)');
+        var chosen = null, chosenMin = null;
+        for (var i = 0; i < btns.length; i++){
+          var st = btns[i].getAttribute('data-slot') || '';
+          if (!/^\\d{2}:\\d{2}$/.test(st)) continue;
+          var m = parseInt(st.slice(0,2), 10) * 60 + parseInt(st.slice(3,5), 10);
+          if (m >= cellMin && (chosenMin === null || m < chosenMin)) { chosen = btns[i]; chosenMin = m; }
+        }
+        if (chosen) chosen.click();
       }, 80);
     });
   };
