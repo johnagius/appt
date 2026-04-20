@@ -17,7 +17,7 @@ import { buildLindaSlots, getLindaExtrasForDate, loadLindaConfig } from '../serv
 import { getTakenSlots, bumpVersion, getAppointmentById, isSlotTaken, updateAppointmentStatus, insertAppointment, getOrCreateClient } from '../db/queries';
 import { generateId } from '../services/crypto';
 import { createCalendarEvent, deleteCalendarEvent } from '../services/calendar';
-import { sendAppointmentPushedEmail, sendLindaConfirmationEmail, sendDoctorBookingEmail } from '../services/email';
+import { sendAppointmentPushedEmail, sendLindaConfirmationEmail, sendDoctorBookingEmail, sendClientCancelledEmail, sendCustomNotificationEmail } from '../services/email';
 
 function json(data: any, status = 200): Response {
   return new Response(JSON.stringify(data), {
@@ -502,6 +502,124 @@ export async function apiLindaNewBooking(req: Request, env: Env): Promise<Respon
   return json({ ok: true, appointmentId: appt.id, dateKey, startTime, endTime: slotFound.end });
 }
 
+// ─── POST /api/linda-cancel ────────────────────────────────
+// Cancels one Linda appointment. Body: { appointmentId, reason?, rebook? }
+// If rebook=true, the patient email invites them to book a new time;
+// otherwise a standard cancellation.
+
+export async function apiLindaCancel(req: Request, env: Env): Promise<Response> {
+  if (!await isLindaAuthed(req, env)) return json({ ok: false, reason: 'Access denied.' }, 403);
+  const body: any = await req.json();
+  const appointmentId = String(body.appointmentId || '').trim();
+  const reason = String(body.reason || '').trim() || 'Cancelled by Linda';
+  const rebook = body.rebook === true;
+  if (!appointmentId) return json({ ok: false, reason: 'Missing id.' }, 400);
+
+  const appt = await getAppointmentById(env.DB, appointmentId);
+  if (!appt) return json({ ok: false, reason: 'Not found.' }, 404);
+  if (appt.clinic !== 'linda') return json({ ok: false, reason: 'Not a Linda appointment.' }, 400);
+  if (String(appt.status).includes('CANCELLED')) return json({ ok: true, alreadyCancelled: true });
+
+  const now = nowIso(env.TIMEZONE);
+  await updateAppointmentStatus(env.DB, appt.id, {
+    status: 'CANCELLED_DOCTOR',
+    cancelled_at: now,
+    cancel_reason: reason,
+    calendar_event_id: '',
+  }, now);
+  await bumpVersion(env.DB);
+
+  try {
+    const doId = env.REALTIME.idFromName('global');
+    const stub = env.REALTIME.get(doId);
+    await stub.fetch('http://internal/broadcast', {
+      method: 'POST',
+      body: JSON.stringify({ type: 'slots_updated', dateKey: appt.date_key, clinic: 'linda' }),
+    });
+  } catch {}
+
+  const ctx = (globalThis as any).__ctx;
+  if (ctx?.waitUntil) {
+    ctx.waitUntil((async () => {
+      if (appt.calendar_event_id) {
+        try { await deleteCalendarEvent(env, appt.calendar_event_id, 'linda'); } catch {}
+      }
+      try {
+        if (rebook) {
+          await sendCustomNotificationEmail(env, appt,
+            'Linda needs to reschedule this appointment. Please book a new time via ' +
+            'https://kevappts.labrint.workers.dev/physio — sorry for any inconvenience.');
+        } else {
+          await sendClientCancelledEmail(env, appt, reason);
+        }
+      } catch (e) { console.error('Linda cancel email error:', e); }
+    })());
+  }
+  return json({ ok: true });
+}
+
+// ─── POST /api/linda-cancel-day ────────────────────────────
+// Cancels every non-cancelled Linda appointment on a given date.
+// Body: { dateKey, reason?, rebook? }
+
+export async function apiLindaCancelDay(req: Request, env: Env): Promise<Response> {
+  if (!await isLindaAuthed(req, env)) return json({ ok: false, reason: 'Access denied.' }, 403);
+  const body: any = await req.json();
+  const dateKey = String(body.dateKey || '').trim();
+  const reason = String(body.reason || '').trim() || 'Linda is not available that day';
+  const rebook = body.rebook === true;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) return json({ ok: false, reason: 'Invalid date.' }, 400);
+
+  const rows = await env.DB.prepare(
+    "SELECT * FROM appointments WHERE clinic='linda' AND date_key=? AND status NOT LIKE '%CANCELLED%'"
+  ).bind(dateKey).all<Appointment>();
+
+  const now = nowIso(env.TIMEZONE);
+  let count = 0;
+  const toNotify: { appt: Appointment; calEventId: string }[] = [];
+  for (const appt of rows.results) {
+    await updateAppointmentStatus(env.DB, appt.id, {
+      status: 'CANCELLED_DOCTOR',
+      cancelled_at: now,
+      cancel_reason: reason,
+      calendar_event_id: '',
+    }, now);
+    toNotify.push({ appt, calEventId: appt.calendar_event_id });
+    count++;
+  }
+  await bumpVersion(env.DB);
+
+  try {
+    const doId = env.REALTIME.idFromName('global');
+    const stub = env.REALTIME.get(doId);
+    await stub.fetch('http://internal/broadcast', {
+      method: 'POST',
+      body: JSON.stringify({ type: 'slots_updated', dateKey, clinic: 'linda' }),
+    });
+  } catch {}
+
+  const ctx = (globalThis as any).__ctx;
+  if (ctx?.waitUntil) {
+    ctx.waitUntil((async () => {
+      for (const t of toNotify) {
+        if (t.calEventId) {
+          try { await deleteCalendarEvent(env, t.calEventId, 'linda'); } catch {}
+        }
+        try {
+          if (rebook) {
+            await sendCustomNotificationEmail(env, t.appt,
+              'Linda needs to reschedule this appointment. Please book a new time via ' +
+              'https://kevappts.labrint.workers.dev/physio — sorry for any inconvenience.');
+          } else {
+            await sendClientCancelledEmail(env, t.appt, reason);
+          }
+        } catch (e) { console.error('Linda bulk-cancel email error:', e); }
+      }
+    })());
+  }
+  return json({ ok: true, cancelled: count });
+}
+
 // ─── POST /linda/login ─────────────────────────────────────
 
 export async function handleLindaLogin(req: Request, env: Env): Promise<Response> {
@@ -673,6 +791,19 @@ function lindaMainPage(env: Env): string {
   .action-btn:active{background:#f3f4f6;}
   .action-btn.reschedule{border-color:#f59e0b;color:#92400e;background:#fffbeb;}
   .action-btn.clone,.action-btn.next-session{border-color:#2563eb;color:#1e40af;background:#eff6ff;}
+  .action-btn.cancel{border-color:#ef4444;color:#991b1b;background:#fef2f2;}
+
+  /* Day-wide actions row */
+  .day-actions{display:flex;gap:8px;padding:0 12px 6px;flex-wrap:wrap;}
+  .day-action-btn{flex:1 1 0;min-width:140px;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:#fff;color:var(--text);font-weight:800;font-size:13px;cursor:pointer;transition:background .18s ease,transform .18s var(--ease);}
+  .day-action-btn:active{transform:scale(.97);}
+  .day-action-btn.warn{border-color:#f59e0b;color:#92400e;background:#fffbeb;}
+  .day-action-btn.danger{border-color:#ef4444;color:#991b1b;background:#fef2f2;}
+  @media (prefers-color-scheme: dark){
+    .day-action-btn{background:#0f172a;color:#e2e8f0;border-color:#334155;}
+    .day-action-btn.warn{background:#422006;color:#fde68a;border-color:#92400e;}
+    .day-action-btn.danger{background:#450a0a;color:#fecaca;border-color:#991b1b;}
+  }
 
   .empty{padding:30px 20px;text-align:center;color:var(--muted);font-size:15px;background:#fff;border-radius:14px;margin:0 12px;border:1px dashed var(--line);}
   .emptyEmoji{font-size:40px;margin-bottom:8px;}
@@ -924,6 +1055,10 @@ function lindaMainPage(env: Env): string {
   <div class="dayLabel" id="dayLabel"></div>
   <div id="nextUp"></div>
   <div class="summary" id="summary"></div>
+  <div class="day-actions" id="dayActions" style="display:none;">
+    <button class="day-action-btn warn" onclick="rescheduleAllDay()">🔄 Reschedule all</button>
+    <button class="day-action-btn danger" onclick="cancelAllDay()">✖ Cancel all</button>
+  </div>
   <div class="list" id="list"><div class="empty">Loading…</div></div>
   </div>
 </div>
@@ -1166,6 +1301,12 @@ function lindaMainPage(env: Env): string {
     state.appointments = list;
     var el = $('list');
     $('summary').textContent = list.length + ' appointment' + (list.length === 1 ? '' : 's');
+    // Day-wide buttons only make sense when there's at least one active booking.
+    var activeCount = 0;
+    for (var j = 0; j < list.length; j++){
+      if (!list[j].status || String(list[j].status).indexOf('CANCELLED') < 0) activeCount++;
+    }
+    $('dayActions').style.display = activeCount > 0 ? '' : 'none';
     renderNextUp();
     if (!list.length){
       el.innerHTML = '<div class="empty"><div class="emptyEmoji">🌿</div>No appointments on this day.</div>';
@@ -1199,6 +1340,10 @@ function lindaMainPage(env: Env): string {
         html += '<div class="action-row">';
         html +=   '<button class="action-btn reschedule" onclick="openReschedule(\\'' + esc(a.id) + '\\')">Reschedule</button>';
         html +=   '<button class="action-btn next-session" data-patient="' + nextPayload + '" onclick="openScheduleNextFromEl(this)">Schedule Next Session</button>';
+        html += '</div>';
+        var cancelInfo = esc(JSON.stringify({ id: a.id, name: a.full_name || 'this patient', dateKey: a.date_key, startTime: a.start_time }));
+        html += '<div class="action-row" style="margin-top:6px;">';
+        html +=   '<button class="action-btn cancel" data-appt="' + cancelInfo + '" onclick="cancelOneFromEl(this)">Cancel</button>';
         html += '</div>';
       }
       html += '</div>';
@@ -1781,6 +1926,51 @@ function lindaMainPage(env: Env): string {
   // Schedule Next Session — prefills the Book sheet with this patient's
   // details and defaults to tomorrow, so Linda can quickly book their
   // follow-up appointment.
+  // ── Cancel handlers (per appointment + whole day) ──
+  function readJsonAttr(el, attr){
+    try { return JSON.parse(el.getAttribute(attr) || '{}'); } catch(e){ return {}; }
+  }
+  window.cancelOneFromEl = async function(el){
+    var info = readJsonAttr(el, 'data-appt');
+    var rebook = confirm('Cancel ' + (info.name || 'this appointment') + ' at ' + info.startTime + '?\\n\\n[OK] Cancel — email them the cancellation.\\n[Cancel] Back out.');
+    if (!rebook) return;
+    var invite = confirm('Also invite them to book a new time?\\n\\n[OK] Yes, send "please rebook" email.\\n[Cancel] No, standard cancellation email.');
+    try {
+      var res = await fetch('/api/linda-cancel', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ appointmentId: info.id, rebook: invite, reason: 'Cancelled by Linda' }),
+      });
+      if (res.status === 403) { window.location.reload(); return; }
+      var data = await res.json();
+      if (data.ok) { load(); if ($('pane-week').style.display !== 'none') loadWeek(); }
+      else alert(data.reason || 'Failed');
+    } catch(e){ alert('Network error'); }
+  };
+  window.cancelAllDay = function(){ bulkCancelDay(false); };
+  window.rescheduleAllDay = function(){ bulkCancelDay(true); };
+  async function bulkCancelDay(rebook){
+    var verb = rebook ? 'Reschedule all' : 'Cancel all';
+    var msg = rebook
+      ? 'Send every patient on this day a "please rebook" email and clear your calendar for the day?'
+      : 'Cancel every booking on this day and email each patient?';
+    if (!confirm(verb + ' — ' + msg)) return;
+    try {
+      var res = await fetch('/api/linda-cancel-day', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dateKey: state.dateKey, rebook: rebook, reason: rebook ? 'Linda needs to reschedule' : 'Cancelled by Linda' }),
+      });
+      if (res.status === 403) { window.location.reload(); return; }
+      var data = await res.json();
+      if (data.ok){
+        alert(verb + ' — ' + data.cancelled + ' appointment' + (data.cancelled === 1 ? '' : 's') + ' processed.');
+        load();
+        if ($('pane-week').style.display !== 'none') loadWeek();
+      } else {
+        alert(data.reason || 'Failed');
+      }
+    } catch(e){ alert('Network error'); }
+  }
+
   // Safe wrappers: read data-patient JSON from the clicked element and parse.
   // The raw JSON is HTML-escaped at render time (no inline JS eval), so a
   // stray quote can't break out and inject script.

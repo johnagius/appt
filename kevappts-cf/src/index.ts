@@ -38,7 +38,7 @@ import { doctorPage } from './pages/doctor-page';
 import { reschedulePage } from './pages/reschedule-page';
 import { followupPage } from './pages/followup-page';
 import { physioPage } from './pages/physio-page';
-import { apiLindaGetDay, apiLindaNextDay, apiLindaSlots, apiLindaListExtras, apiLindaAddExtra, apiLindaDeleteExtra, apiLindaReschedule, apiLindaNewBooking, apiLindaSearch, apiLindaPatientHistory, apiLindaClientsAutocomplete, apiLindaWeek, apiLindaCopyDay, handleLindaLogin, lindaRoute } from './api/linda-view';
+import { apiLindaGetDay, apiLindaNextDay, apiLindaSlots, apiLindaListExtras, apiLindaAddExtra, apiLindaDeleteExtra, apiLindaReschedule, apiLindaNewBooking, apiLindaSearch, apiLindaPatientHistory, apiLindaClientsAutocomplete, apiLindaWeek, apiLindaCopyDay, apiLindaCancel, apiLindaCancelDay, handleLindaLogin, lindaRoute } from './api/linda-view';
 
 export { RealtimeHub };
 
@@ -125,6 +125,8 @@ export default {
       if (path === '/api/linda-clients-autocomplete' && method === 'GET') return apiLindaClientsAutocomplete(request, env);
       if (path === '/api/linda-week' && method === 'GET') return apiLindaWeek(request, env);
       if (path === '/api/linda-copy-day' && method === 'POST') return apiLindaCopyDay(request, env);
+      if (path === '/api/linda-cancel' && method === 'POST') return apiLindaCancel(request, env);
+      if (path === '/api/linda-cancel-day' && method === 'POST') return apiLindaCancelDay(request, env);
 
       // ─── Linda private page + login ──────────────
       if (path === '/linda' && method === 'GET') return lindaRoute(request, env);
