@@ -605,8 +605,12 @@ function lindaMainPage(env: Env): string {
       <p class="hint">Add a date (or date range) and the hours you'll be there. Patients can then book these slots. Your weekly schedule stays as-is.</p>
       <div class="avail-row"><label>From date</label><input type="date" id="avDateFrom"></div>
       <div class="avail-row"><label>To date</label><input type="date" id="avDateTo"></div>
-      <div class="avail-row"><label>Start</label><input type="time" id="avStart" step="1800" value="09:00"></div>
+      <div style="font-size:12px;color:var(--muted);font-weight:800;text-transform:uppercase;letter-spacing:.4px;margin:8px 0 4px;">Morning</div>
+      <div class="avail-row"><label>Start</label><input type="time" id="avStart" step="1800" value="09:30"></div>
       <div class="avail-row"><label>End</label><input type="time" id="avEnd" step="1800" value="13:00"></div>
+      <div style="font-size:12px;color:var(--muted);font-weight:800;text-transform:uppercase;letter-spacing:.4px;margin:12px 0 4px;">Evening (optional)</div>
+      <div class="avail-row"><label>Start</label><input type="time" id="avEveningStart" step="1800" placeholder="e.g. 16:00"></div>
+      <div class="avail-row"><label>End</label><input type="time" id="avEveningEnd" step="1800" placeholder="e.g. 18:30"></div>
       <button class="avail-save" onclick="saveAvail()">Open these hours</button>
       <div class="avail-msg" id="avMsg"></div>
     </div>
@@ -648,11 +652,17 @@ function lindaMainPage(env: Env): string {
     <div id="bfOpenPrompt" class="open-prompt" style="display:none;">
       <b>Not a working day yet.</b><br>
       Open these hours quickly so you can book:
-      <div class="sheet-row" style="margin-top:8px;">
-        <input class="sheet-input" type="time" id="bfOpenStart" step="1800" value="09:00">
+      <div style="font-size:11px;font-weight:800;text-transform:uppercase;margin-top:8px;opacity:.8;">Morning</div>
+      <div class="sheet-row" style="margin-top:4px;">
+        <input class="sheet-input" type="time" id="bfOpenStart" step="1800" value="09:30">
         <input class="sheet-input" type="time" id="bfOpenEnd" step="1800" value="13:00">
       </div>
-      <button onclick="quickOpenDate()">Open this day</button>
+      <div style="font-size:11px;font-weight:800;text-transform:uppercase;margin-top:8px;opacity:.8;">Evening (optional)</div>
+      <div class="sheet-row" style="margin-top:4px;">
+        <input class="sheet-input" type="time" id="bfOpenEveningStart" step="1800" placeholder="16:00">
+        <input class="sheet-input" type="time" id="bfOpenEveningEnd" step="1800" placeholder="18:30">
+      </div>
+      <button onclick="quickOpenDate()" style="margin-top:10px;">Open this day</button>
     </div>
   </div>
 
@@ -846,19 +856,24 @@ function lindaMainPage(env: Env): string {
     var dateTo = $('avDateTo').value;
     var start = $('avStart').value;
     var end = $('avEnd').value;
+    var evStart = $('avEveningStart').value;
+    var evEnd = $('avEveningEnd').value;
     if (!dateFrom) { setAvMsg('Pick a start date.', 'bad'); return; }
-    if (!start || !end) { setAvMsg('Pick a start and end time.', 'bad'); return; }
+    if (!start || !end) { setAvMsg('Pick a morning start and end time.', 'bad'); return; }
+    if ((evStart && !evEnd) || (!evStart && evEnd)) { setAvMsg('Evening needs both a start and end time.', 'bad'); return; }
     setAvMsg('Saving…', '');
+    var body = { dateKey: dateFrom, dateKeyEnd: dateTo || undefined, startTime: start, endTime: end };
+    if (evStart && evEnd) { body.eveningStart = evStart; body.eveningEnd = evEnd; }
     try {
       var res = await fetch('/api/linda-extras', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dateKey: dateFrom, dateKeyEnd: dateTo || undefined, startTime: start, endTime: end }),
+        body: JSON.stringify(body),
       });
       if (res.status === 403) { window.location.reload(); return; }
       var data = await res.json();
       if (data.ok) {
-        setAvMsg('Opened ' + data.added + ' day' + (data.added === 1 ? '' : 's') + '.', 'ok');
+        setAvMsg('Opened ' + data.added + ' row' + (data.added === 1 ? '' : 's') + '.', 'ok');
         loadExtras();
       } else {
         setAvMsg(data.reason || 'Failed', 'bad');
@@ -962,11 +977,15 @@ function lindaMainPage(env: Env): string {
   window.quickOpenDate = async function(){
     var dk = $('bfDate').value;
     var s = $('bfOpenStart').value, e = $('bfOpenEnd').value;
+    var evS = $('bfOpenEveningStart').value, evE = $('bfOpenEveningEnd').value;
     if (!dk || !s || !e) return;
+    if ((evS && !evE) || (!evS && evE)) { alert('Evening needs both a start and end.'); return; }
+    var body = { dateKey: dk, startTime: s, endTime: e };
+    if (evS && evE) { body.eveningStart = evS; body.eveningEnd = evE; }
     try {
       var res = await fetch('/api/linda-extras', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dateKey: dk, startTime: s, endTime: e }),
+        body: JSON.stringify(body),
       });
       var data = await res.json();
       if (data.ok) { loadSheetSlots(); }
