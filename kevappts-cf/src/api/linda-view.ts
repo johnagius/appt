@@ -12,6 +12,7 @@
  */
 import type { Env, Appointment } from '../types';
 import { computeLindaSig, verifyLindaSig, verifyAdminSig } from '../services/crypto';
+import { todayKeyLocal } from '../services/utils';
 
 function json(data: any, status = 200): Response {
   return new Response(JSON.stringify(data), {
@@ -49,6 +50,23 @@ export async function apiLindaGetDay(req: Request, env: Env): Promise<Response> 
   ).bind(dateKey).all<Appointment>();
 
   return json({ ok: true, dateKey, appointments: rows.results });
+}
+
+// ─── /api/linda-next-day ───────────────────────────────────
+// Returns the first date >= today that has a non-cancelled Linda appointment.
+// If today has any, returns today. If none anywhere in the future, returns today.
+
+export async function apiLindaNextDay(req: Request, env: Env): Promise<Response> {
+  if (!await isLindaAuthed(req, env)) return json({ ok: false, reason: 'Access denied.' }, 403);
+
+  const todayKey = todayKeyLocal(env.TIMEZONE);
+  const row = await env.DB.prepare(
+    "SELECT MIN(date_key) AS dk FROM appointments " +
+    "WHERE clinic = 'linda' AND date_key >= ? AND status NOT LIKE '%CANCELLED%'"
+  ).bind(todayKey).first<{ dk: string | null }>();
+
+  const dateKey = row?.dk || todayKey;
+  return json({ ok: true, dateKey, todayKey });
 }
 
 // ─── POST /linda/login ─────────────────────────────────────
@@ -160,13 +178,14 @@ function lindaMainPage(env: Env): string {
   .status-NO_SHOW{background:#fff7ed;color:#9a3412;}
   .status-CANCELLED{background:#fef2f2;color:#991b1b;text-decoration:line-through;}
   .appt-name{font-size:16px;font-weight:700;margin:0 0 6px 0;}
-  .contact-row{display:flex;gap:8px;margin-top:10px;}
-  .contact-btn{flex:1 1 0;display:flex;align-items:center;justify-content:center;gap:6px;padding:12px 8px;border-radius:10px;text-decoration:none;font-weight:700;font-size:14px;min-height:44px;}
+  .contact-row{display:flex;flex-direction:column;gap:8px;margin-top:10px;}
+  .contact-btn{display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:10px;text-decoration:none;font-weight:700;font-size:15px;min-height:48px;word-break:break-all;line-height:1.3;}
+  .contact-btn .icon{flex:0 0 auto;font-size:18px;}
+  .contact-btn .val{flex:1 1 auto;text-align:left;}
   .call{background:#10b981;color:#fff;}
   .call:active{background:#059669;}
   .email{background:#2563eb;color:#fff;}
   .email:active{background:#1d4ed8;}
-  .contact-btn svg{width:16px;height:16px;}
   .comments{margin-top:10px;padding:10px;background:#f9fafb;border-radius:10px;font-size:13px;color:var(--text);white-space:pre-wrap;border-left:3px solid var(--accent);}
   .comments-label{font-size:11px;color:var(--muted);font-weight:800;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px;}
 
@@ -284,8 +303,8 @@ function lindaMainPage(env: Env): string {
       html +=   '<div class="appt-name">' + esc(a.full_name || 'No name') + '</div>';
       if (a.service_name) html += '<div style="font-size:13px;color:var(--muted);">' + esc(a.service_name) + '</div>';
       html +=   '<div class="contact-row">';
-      if (tel) html += '<a class="contact-btn call" href="tel:' + esc(tel) + '">📞 Call</a>';
-      if (email) html += '<a class="contact-btn email" href="mailto:' + esc(email) + '">✉️ Email</a>';
+      if (tel) html += '<a class="contact-btn call" href="tel:' + esc(tel) + '"><span class="icon">📞</span><span class="val">' + esc(a.phone) + '</span></a>';
+      if (email) html += '<a class="contact-btn email" href="mailto:' + esc(email) + '"><span class="icon">✉️</span><span class="val">' + esc(email) + '</span></a>';
       html +=   '</div>';
       if (a.comments && a.comments.trim()){
         html += '<div class="comments"><div class="comments-label">Note from patient</div>' + esc(a.comments) + '</div>';
@@ -396,8 +415,19 @@ function lindaMainPage(env: Env): string {
     }
   });
 
-  // Initial
-  setDate(today());
+  // Initial — land on today if she has appointments today, otherwise on the
+  // next upcoming day that has a booking, so she doesn't have to flip through
+  // empty days.
+  async function initialLand(){
+    try {
+      var r = await fetch('/api/linda-next-day');
+      if (r.status === 403) { window.location.reload(); return; }
+      var d = await r.json();
+      if (d.ok && d.dateKey) { setDate(d.dateKey); return; }
+    } catch(e){}
+    setDate(today());
+  }
+  initialLand();
   connectWS();
   resetIdle();
 })();
