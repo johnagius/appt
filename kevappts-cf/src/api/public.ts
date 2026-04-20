@@ -265,7 +265,14 @@ async function doBook(req: Request, env: Env, clinic: 'potters' | 'spinola'): Pr
     booking_source: bookingSource,
   };
 
-  await insertAppointment(env.DB, appt);
+  try {
+    await insertAppointment(env.DB, appt);
+  } catch (e: any) {
+    if (String(e?.message || '').toLowerCase().includes('unique')) {
+      return json({ ok: false, reason: 'That slot was just taken. Please pick another.' }, 409);
+    }
+    throw e;
+  }
   await bumpVersion(env.DB);
 
   // Broadcast SYNCHRONOUSLY before returning response — ensures admin pages update

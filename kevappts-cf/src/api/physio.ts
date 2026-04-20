@@ -180,7 +180,14 @@ export async function apiPhysioBook(req: Request, env: Env): Promise<Response> {
     booking_source: 'physio',
   };
 
-  await insertAppointment(env.DB, appt);
+  try {
+    await insertAppointment(env.DB, appt);
+  } catch (e: any) {
+    if (String(e?.message || '').toLowerCase().includes('unique')) {
+      return json({ ok: false, reason: 'That slot was just taken. Please pick another.' }, 409);
+    }
+    throw e;
+  }
   await bumpVersion(env.DB);
 
   // Broadcast so Linda's /linda page and admin panels refresh immediately.

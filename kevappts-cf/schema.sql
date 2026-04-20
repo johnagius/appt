@@ -30,6 +30,11 @@ CREATE INDEX IF NOT EXISTS idx_appt_token ON appointments(token);
 CREATE INDEX IF NOT EXISTS idx_appt_date_status ON appointments(date_key, status);
 CREATE INDEX IF NOT EXISTS idx_appt_clinic_date ON appointments(clinic, date_key);
 CREATE INDEX IF NOT EXISTS idx_appt_email ON appointments(email);
+-- Partial unique index: only one BOOKED row per (clinic, date_key, start_time).
+-- Cancelled / attended / no-show rows are unconstrained so history is preserved.
+-- Backstops the application-level isSlotTaken check against simultaneous books.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_appt_unique_booked_slot
+  ON appointments(clinic, date_key, start_time) WHERE status = 'BOOKED';
 
 CREATE TABLE IF NOT EXISTS clients (
   id TEXT PRIMARY KEY,

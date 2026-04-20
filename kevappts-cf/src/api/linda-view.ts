@@ -410,9 +410,16 @@ export async function apiLindaReschedule(req: Request, env: Env): Promise<Respon
   const oldCalEventId = appt.calendar_event_id;
   const oldDate = appt.date_key;
 
-  await env.DB.prepare(
-    'UPDATE appointments SET date_key = ?, start_time = ?, end_time = ?, updated_at = ?, calendar_event_id = ? WHERE id = ?'
-  ).bind(dateKey, startTime, slotFound.end, now, '', appointmentId).run();
+  try {
+    await env.DB.prepare(
+      'UPDATE appointments SET date_key = ?, start_time = ?, end_time = ?, updated_at = ?, calendar_event_id = ? WHERE id = ?'
+    ).bind(dateKey, startTime, slotFound.end, now, '', appointmentId).run();
+  } catch (e: any) {
+    if (String(e?.message || '').toLowerCase().includes('unique')) {
+      return json({ ok: false, reason: 'That slot was just taken. Please pick another.' }, 409);
+    }
+    throw e;
+  }
   await bumpVersion(env.DB);
 
   // Broadcast so the /linda page and public physio page refresh.
@@ -509,7 +516,16 @@ export async function apiLindaNewBooking(req: Request, env: Env): Promise<Respon
     booking_source: 'linda-internal',
   };
 
-  await insertAppointment(env.DB, appt);
+  try {
+    await insertAppointment(env.DB, appt);
+  } catch (e: any) {
+    // The (clinic, date_key, start_time) WHERE status='BOOKED' partial unique
+    // index catches simultaneous-book races after our isSlotTaken check passed.
+    if (String(e?.message || '').toLowerCase().includes('unique')) {
+      return json({ ok: false, reason: 'That slot was just taken. Please pick another.' }, 409);
+    }
+    throw e;
+  }
   await bumpVersion(env.DB);
 
   try {
