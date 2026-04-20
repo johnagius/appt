@@ -456,6 +456,12 @@ function lindaMainPage(env: Env): string {
   .comments{margin-top:10px;padding:10px;background:#f9fafb;border-radius:10px;font-size:13px;color:var(--text);white-space:pre-wrap;border-left:3px solid var(--accent);}
   .comments-label{font-size:11px;color:var(--muted);font-weight:800;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px;}
 
+  .action-row{display:flex;gap:8px;margin-top:10px;}
+  .action-btn{flex:1 1 0;padding:10px;border:1px solid var(--line);background:#fff;color:var(--text);border-radius:10px;font-size:13px;font-weight:800;cursor:pointer;min-height:40px;}
+  .action-btn:active{background:#f3f4f6;}
+  .action-btn.reschedule{border-color:#f59e0b;color:#92400e;background:#fffbeb;}
+  .action-btn.clone{border-color:#2563eb;color:#1e40af;background:#eff6ff;}
+
   .empty{padding:30px 20px;text-align:center;color:var(--muted);font-size:15px;background:#fff;border-radius:14px;margin:0 12px;border:1px dashed var(--line);}
   .emptyEmoji{font-size:40px;margin-bottom:8px;}
   .err{padding:14px;margin:10px 12px;background:#fef2f2;color:#991b1b;border-radius:10px;font-size:14px;}
@@ -714,6 +720,13 @@ function lindaMainPage(env: Env): string {
       if (a.comments && a.comments.trim()){
         html += '<div class="comments"><div class="comments-label">Note from patient</div>' + esc(a.comments) + '</div>';
       }
+      if (!a.status || a.status.indexOf('CANCELLED') < 0){
+        var payload = JSON.stringify({ id: a.id, fullName: a.full_name, email: a.email, phone: a.phone, comments: a.comments || '' }).replace(/'/g, '&#39;');
+        html += '<div class="action-row">';
+        html +=   '<button class="action-btn reschedule" onclick="openReschedule(\\'' + esc(a.id) + '\\')">Reschedule</button>';
+        html +=   "<button class=\\"action-btn clone\\" onclick='openClone(" + payload + ")'>Clone</button>";
+        html += '</div>';
+      }
       html += '</div>';
     }
     el.innerHTML = html;
@@ -952,6 +965,27 @@ function lindaMainPage(env: Env): string {
   function setBfMsg(text, kind){
     $('bfMsg').innerHTML = text ? ('<div class="sheet-msg ' + (kind || '') + '">' + esc(text) + '</div>') : '';
   }
+
+  window.openReschedule = function(appointmentId){
+    sheet.mode = 'reschedule';
+    sheet.apptId = appointmentId;
+    $('sheetTitle').textContent = 'Reschedule appointment';
+    $('sheetPatientSection').style.display = 'none';
+    $('bfSubmit').textContent = 'Reschedule';
+    resetSheet();
+    openSheet();
+    loadSheetSlots();
+  };
+
+  window.openClone = function(patient){
+    // Opens the new-booking sheet prefilled with this patient's details, on
+    // tomorrow by default so she's less likely to pick a same-day conflict.
+    var d = parseKey(state.dateKey);
+    d.setDate(d.getDate() + 1);
+    openBookSheet({ fullName: patient.fullName, email: patient.email, phone: patient.phone, comments: '' });
+    $('bfDate').value = toKey(d);
+    loadSheetSlots();
+  };
 
   window.submitSheet = async function(){
     $('bfSubmit').disabled = true;
