@@ -1010,7 +1010,7 @@ function lindaMainPage(env: Env): string {
 
 <script>
 (function(){
-  var IDLE_MS = 120000; // 2 min
+  var IDLE_MS = 90000; // 1.5 min of no interaction before the splash appears.
   var state = { dateKey: '', idle: false, appointments: [] };
   var idleTimer = null;
 
@@ -1732,7 +1732,16 @@ function lindaMainPage(env: Env): string {
     }
   };
 
-  // ── Idle overlay: hides content + stops network after 2 min inactivity ──
+  // ── Idle overlay ──
+  // Behaviour: shows after IDLE_MS of real interaction-free time, AND
+  // immediately whenever the tab is hidden (so coming back from another
+  // app always lands on the splash). Tap anywhere to resume.
+  function goIdle(){
+    if (state.idle) return;
+    state.idle = true;
+    $('idleOverlay').classList.add('show');
+    if (_ws) { try { _ws.close(); } catch(e) {} _ws = null; }
+  }
   function resetIdle(){
     if (state.idle){
       state.idle = false;
@@ -1741,16 +1750,21 @@ function lindaMainPage(env: Env): string {
       connectWS();
     }
     if (idleTimer) clearTimeout(idleTimer);
-    idleTimer = setTimeout(function(){
-      state.idle = true;
-      $('idleOverlay').classList.add('show');
-      if (_ws) { try { _ws.close(); } catch(e) {} _ws = null; }
-    }, IDLE_MS);
+    idleTimer = setTimeout(goIdle, IDLE_MS);
   }
-  ['touchstart','mousedown','keydown','scroll','visibilitychange'].forEach(function(ev){
+  // Interaction events only — visibilitychange is handled separately below.
+  ['touchstart','mousedown','keydown','scroll'].forEach(function(ev){
     document.addEventListener(ev, resetIdle, { passive: true });
   });
   $('idleOverlay').addEventListener('click', resetIdle);
+
+  // When the tab becomes hidden (home-button press, app switch, screen lock),
+  // immediately show the splash so the next time Linda opens the app she sees
+  // it and can tap to wake. When she comes back, we leave the splash visible
+  // until she actually taps — matches the rest of the app's pages.
+  document.addEventListener('visibilitychange', function(){
+    if (document.hidden) goIdle();
+  });
 
   // ── WebSocket for live booking notifications ──
   var _ws = null, _wsDelay = 1000, _wsTimer = null;
@@ -1790,6 +1804,10 @@ function lindaMainPage(env: Env): string {
     t.classList.add('show');
     setTimeout(function(){ t.classList.remove('show'); }, 2500);
   }
+  // Note: the primary visibilitychange handler (idle-overlay side) runs first
+  // and sets state.idle = true when the tab hides. This second handler only
+  // reconnects the WebSocket when we come back AND we're not in the idle
+  // state — so the splash stays put until the user taps resume.
   document.addEventListener('visibilitychange', function(){
     if (!document.hidden && !state.idle && (!_ws || _ws.readyState !== 1)){
       _wsDelay = 1000;
