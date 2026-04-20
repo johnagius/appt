@@ -622,7 +622,8 @@ function lindaMainPage(env: Env): string {
 <div id="pane-day">
   <div class="dateBar">
     <button class="nav" onclick="navDay(-1)" aria-label="Previous day">&#x25C0;</button>
-    <input type="date" id="dateInput">
+    <button type="button" class="date-btn" id="dateInputBtn" onclick="pickDate('dateInput', function(dk){ setDate(dk); })" style="flex:1 1 auto;"><span class="date-icon">📅</span><span class="date-val" id="dateInputLabel">Today</span></button>
+    <input type="hidden" id="dateInput">
     <button class="nav" onclick="navDay(1)" aria-label="Next day">&#x25B6;</button>
     <button class="today-btn" onclick="goToday()">Today</button>
   </div>
@@ -676,7 +677,8 @@ function lindaMainPage(env: Env): string {
 
   <div class="sheet-section">
     <div class="sheet-label">Date</div>
-    <input class="sheet-input" type="date" id="bfDate">
+    <button type="button" class="date-btn empty" id="bfDateBtn" onclick="pickDate('bfDate', function(){ loadSheetSlots(); updateSheetSubmit(); })"><span class="date-icon">📅</span><span class="date-val" id="bfDateLabel">Pick a date</span></button>
+    <input type="hidden" id="bfDate">
   </div>
 
   <div class="sheet-section">
@@ -826,6 +828,8 @@ function lindaMainPage(env: Env): string {
   function setDate(k){
     state.dateKey = k;
     $('dateInput').value = k;
+    var btnLabel = $('dateInputLabel');
+    if (btnLabel) btnLabel.textContent = fmtDay(k);
     $('dayLabel').textContent = formatNice(k);
     load();
   }
@@ -838,7 +842,7 @@ function lindaMainPage(env: Env): string {
   window.navDay = navDay;
   window.goToday = goToday;
 
-  $('dateInput').addEventListener('change', function(e){ setDate(e.target.value); });
+  // dateInput is now a hidden field driven by the calendar picker; no change listener needed.
 
   window.logout = function(){
     document.cookie = 'linda_sig=; Path=/; Max-Age=0';
@@ -1027,9 +1031,15 @@ function lindaMainPage(env: Env): string {
   function openSheet(){ $('sheetOverlay').classList.add('show'); $('sheet').classList.add('show'); }
   window.closeSheet = function(){ $('sheetOverlay').classList.remove('show'); $('sheet').classList.remove('show'); };
 
+  function setBfDate(k){
+    $('bfDate').value = k;
+    $('bfDateLabel').textContent = fmtDay(k);
+    $('bfDateBtn').classList.remove('empty');
+  }
+
   function resetSheet(){
     $('bfName').value = ''; $('bfPhone').value = ''; $('bfEmail').value = ''; $('bfComments').value = '';
-    $('bfDate').value = state.dateKey || today();
+    setBfDate(state.dateKey || today());
     $('bfSlots').innerHTML = '<div class="sheet-msg">Pick a date first.</div>';
     $('bfOpenPrompt').style.display = 'none';
     $('bfMsg').innerHTML = '';
@@ -1101,7 +1111,8 @@ function lindaMainPage(env: Env): string {
       $('bfSlots').innerHTML = '<div class="sheet-msg bad">Network error.</div>';
     }
   }
-  $('bfDate').addEventListener('change', loadSheetSlots);
+  // bfDate is now a hidden field set via pickDate + setBfDate; the picker's
+  // onPick callback handles loading slots.
 
   window.quickOpenDate = async function(){
     var dk = $('bfDate').value;
@@ -1128,7 +1139,7 @@ function lindaMainPage(env: Env): string {
     var hasPatient = sheet.mode === 'reschedule' || ($('bfName').value.trim() && ($('bfPhone').value.trim() || $('bfEmail').value.trim()));
     $('bfSubmit').disabled = !(dk && hasSlot && hasPatient);
   }
-  ['bfName','bfPhone','bfEmail','bfDate'].forEach(function(id){ $(id).addEventListener('input', updateSheetSubmit); });
+  ['bfName','bfPhone','bfEmail'].forEach(function(id){ $(id).addEventListener('input', updateSheetSubmit); });
 
   function setBfMsg(text, kind){
     $('bfMsg').innerHTML = text ? ('<div class="sheet-msg ' + (kind || '') + '">' + esc(text) + '</div>') : '';
@@ -1152,7 +1163,7 @@ function lindaMainPage(env: Env): string {
     var d = parseKey(state.dateKey);
     d.setDate(d.getDate() + 1);
     openBookSheet({ fullName: patient.fullName, email: patient.email, phone: patient.phone, comments: '' });
-    $('bfDate').value = toKey(d);
+    setBfDate(toKey(d));
     $('sheetTitle').textContent = 'Schedule next session';
     loadSheetSlots();
   };
