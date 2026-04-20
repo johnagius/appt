@@ -71,7 +71,7 @@ export async function apiLindaNextDay(req: Request, env: Env): Promise<Response>
   ).bind(todayKey).first<{ dk: string | null }>();
 
   const dateKey = row?.dk || todayKey;
-  return json({ ok: true, dateKey, todayKey });
+  return json({ ok: true, dateKey, todayKey, timezone: env.TIMEZONE });
 }
 
 // ─── /api/linda-search ─────────────────────────────────────
@@ -1070,16 +1070,35 @@ function lindaMainPage(env: Env): string {
 <script>
 (function(){
   var IDLE_MS = 90000; // 1.5 min of no interaction before the splash appears.
-  var state = { dateKey: '', idle: false, appointments: [] };
+  var state = { dateKey: '', idle: false, appointments: [], tz: 'Europe/Malta' };
   var idleTimer = null;
 
   function $(id){ return document.getElementById(id); }
 
   function pad(n){ return String(n).padStart(2,'0'); }
-  function today(){
-    var d = new Date();
-    return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate());
+
+  // "Today" and "now in minutes since midnight" in Malta (server) time, not
+  // whatever timezone Linda's phone is in. Intl.DateTimeFormat is well
+  // supported on mobile browsers.
+  function todayMalta(){
+    try {
+      return new Date().toLocaleDateString('en-CA', { timeZone: state.tz }); // YYYY-MM-DD
+    } catch(e){
+      var d = new Date();
+      return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate());
+    }
   }
+  function nowMinutesMalta(){
+    try {
+      var s = new Date().toLocaleTimeString('en-GB', { timeZone: state.tz, hour12: false, hour: '2-digit', minute: '2-digit' });
+      var p = s.split(':');
+      return parseInt(p[0], 10) * 60 + parseInt(p[1], 10);
+    } catch(e){
+      var d = new Date();
+      return d.getHours() * 60 + d.getMinutes();
+    }
+  }
+  function today(){ return todayMalta(); }
   function parseKey(k){
     var p = k.split('-');
     return new Date(parseInt(p[0]), parseInt(p[1]) - 1, parseInt(p[2]));
@@ -1109,8 +1128,7 @@ function lindaMainPage(env: Env): string {
       el.innerHTML = '';
       return;
     }
-    var now = new Date();
-    var nowMin = now.getHours() * 60 + now.getMinutes();
+    var nowMin = nowMinutesMalta();
     var next = null;
     for (var i = 0; i < (state.appointments || []).length; i++){
       var a = state.appointments[i];
@@ -2075,6 +2093,7 @@ function lindaMainPage(env: Env): string {
       var r = await fetch('/api/linda-next-day');
       if (r.status === 403) { window.location.reload(); return; }
       var d = await r.json();
+      if (d && d.timezone) state.tz = d.timezone;
       if (d.ok && d.dateKey) { setDate(d.dateKey); return; }
     } catch(e){}
     setDate(today());
