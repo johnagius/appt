@@ -1805,7 +1805,8 @@ function lindaMainPage(env: Env): string {
         setBfMsg(sheet.mode === 'reschedule' ? 'Rescheduled.' : 'Booked!', 'ok');
         setTimeout(function(){
           window.closeSheet();
-          setDate(dk);
+          setDate(dk);  // reloads the day list + triggers renderNextUp once appointments arrive
+          if ($('pane-week').style.display !== 'none') loadWeek(); // keep week grid fresh when she's on it
         }, 700);
       } else {
         setBfMsg(data.reason || 'Failed', 'bad');
@@ -1870,11 +1871,13 @@ function lindaMainPage(env: Env): string {
         if (ev.data === 'pong' || ev.data === 'ping') return;
         var msg = JSON.parse(ev.data);
         if (msg.type === 'slots_updated' || msg.type === 'appointment_changed'){
-          // Only refresh if the update is for the day we're viewing (or unknown)
+          // Refresh the Day list when the change is for the date we're viewing
+          // (or unknown), and refresh the Week grid whenever it's the visible pane.
           if (!msg.dateKey || msg.dateKey === state.dateKey){
             showToast();
             load();
           }
+          if ($('pane-week').style.display !== 'none') loadWeek();
         }
       } catch(e){}
     };
