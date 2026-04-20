@@ -38,7 +38,7 @@ import { doctorPage } from './pages/doctor-page';
 import { reschedulePage } from './pages/reschedule-page';
 import { followupPage } from './pages/followup-page';
 import { physioPage } from './pages/physio-page';
-import { apiLindaGetDay, apiLindaNextDay, apiLindaSlots, apiLindaListExtras, apiLindaAddExtra, apiLindaDeleteExtra, apiLindaUpdateExtra, apiLindaReschedule, apiLindaNewBooking, apiLindaSearch, apiLindaPatientHistory, apiLindaClientsAutocomplete, apiLindaWeek, apiLindaCopyDay, apiLindaCancel, apiLindaCancelDay, apiLindaMarkStatus, handleLindaLogin, lindaRoute } from './api/linda-view';
+import { apiLindaGetDay, apiLindaNextDay, apiLindaSlots, apiLindaListExtras, apiLindaAddExtra, apiLindaDeleteExtra, apiLindaUpdateExtra, apiLindaReschedule, apiLindaNewBooking, apiLindaSearch, apiLindaPatientHistory, apiLindaClientsAutocomplete, apiLindaWeek, apiLindaCopyDay, apiLindaCancel, apiLindaCancelDay, apiLindaMarkStatus, handleLindaLogin, handleLindaLogout, lindaRoute } from './api/linda-view';
 
 export { RealtimeHub };
 
@@ -133,6 +133,7 @@ export default {
       // ─── Linda private page + login ──────────────
       if (path === '/linda' && method === 'GET') return lindaRoute(request, env);
       if (path === '/linda/login' && method === 'POST') return handleLindaLogin(request, env);
+      if (path === '/linda/logout' && method === 'GET') return handleLindaLogout();
 
       // ─── Cancel / Action API ───────────────────────
       if (path === '/api/cancel-info' && method === 'GET') return apiGetCancelInfo(request, env);

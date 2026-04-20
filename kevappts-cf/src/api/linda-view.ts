@@ -735,6 +735,20 @@ export async function lindaRoute(req: Request, env: Env): Promise<Response> {
   return html(lindaMainPage(env));
 }
 
+// ─── GET /linda/logout ─────────────────────────────────────
+// Clears the linda_sig cookie server-side (the cookie is HttpOnly so the
+// client JS can't erase it on its own) and bounces back to the login page.
+
+export function handleLindaLogout(): Response {
+  return new Response(null, {
+    status: 302,
+    headers: {
+      'Location': '/linda',
+      'Set-Cookie': 'linda_sig=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0',
+    },
+  });
+}
+
 function html(body: string, status = 200): Response {
   return new Response(body, {
     status,
@@ -1545,8 +1559,9 @@ function lindaMainPage(env: Env): string {
   });
 
   window.logout = function(){
-    document.cookie = 'linda_sig=; Path=/; Max-Age=0';
-    window.location.href = '/linda';
+    // The cookie is HttpOnly, so we can't erase it from JS. Hit the server
+    // logout route which clears it via Set-Cookie and redirects back here.
+    window.location.href = '/linda/logout';
   };
 
   // ── Tab switching ──
