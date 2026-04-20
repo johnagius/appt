@@ -1166,8 +1166,8 @@ function lindaMainPage(env: Env): string {
       html +=     '<div class="appt-time">' + time + '</div>';
       html +=     '<div class="appt-status ' + statusCls + '">' + statusTxt + '</div>';
       html +=   '</div>';
-      var patientQuery = JSON.stringify({ email: a.email || '', phone: a.phone || '', name: a.full_name || '' }).replace(/'/g, '&#39;');
-      html +=   "<div class=\\"appt-name\\" onclick='openPatientHistory(" + patientQuery + ")'>" + esc(a.full_name || 'No name') + '</div>';
+      var patientPayload = esc(JSON.stringify({ email: a.email || '', phone: a.phone || '', name: a.full_name || '' }));
+      html +=   '<div class="appt-name" data-patient="' + patientPayload + '" onclick="openPatientHistoryFromEl(this)">' + esc(a.full_name || 'No name') + '</div>';
       if (a.service_name) html += '<div style="font-size:13px;color:var(--muted);">' + esc(a.service_name) + '</div>';
       html +=   '<div class="contact-row">';
       if (tel) html += '<a class="contact-btn call" href="tel:' + esc(tel) + '"><span class="icon">📞</span><span class="val">' + esc(a.phone) + '</span></a>';
@@ -1177,10 +1177,10 @@ function lindaMainPage(env: Env): string {
         html += '<div class="comments"><div class="comments-label">Note from patient</div>' + esc(a.comments) + '</div>';
       }
       if (!a.status || a.status.indexOf('CANCELLED') < 0){
-        var payload = JSON.stringify({ id: a.id, fullName: a.full_name, email: a.email, phone: a.phone, comments: a.comments || '' }).replace(/'/g, '&#39;');
+        var nextPayload = esc(JSON.stringify({ id: a.id, fullName: a.full_name, email: a.email, phone: a.phone, comments: a.comments || '' }));
         html += '<div class="action-row">';
         html +=   '<button class="action-btn reschedule" onclick="openReschedule(\\'' + esc(a.id) + '\\')">Reschedule</button>';
-        html +=   "<button class=\\"action-btn next-session\\" onclick='openScheduleNext(" + payload + ")'>Schedule Next Session</button>";
+        html +=   '<button class="action-btn next-session" data-patient="' + nextPayload + '" onclick="openScheduleNextFromEl(this)">Schedule Next Session</button>';
         html += '</div>';
       }
       html += '</div>';
@@ -1724,8 +1724,8 @@ function lindaMainPage(env: Env): string {
         var html = '';
         for (var i = 0; i < data.results.length; i++){
           var r = data.results[i];
-          var p = JSON.stringify(r).replace(/'/g, '&#39;');
-          html += "<div class=\\"ac-item\\" onclick='pickAc(" + p + ")'>";
+          var p = esc(JSON.stringify(r));
+          html += '<div class="ac-item" data-patient="' + p + '" onclick="pickAcFromEl(this)">';
           html +=   '<div class="name">' + esc(r.fullName || 'Unknown') + '</div>';
           html +=   '<div class="dim">' + [r.phone, r.email].filter(Boolean).map(esc).join(' · ') + '</div>';
           html += '</div>';
@@ -1763,6 +1763,16 @@ function lindaMainPage(env: Env): string {
   // Schedule Next Session — prefills the Book sheet with this patient's
   // details and defaults to tomorrow, so Linda can quickly book their
   // follow-up appointment.
+  // Safe wrappers: read data-patient JSON from the clicked element and parse.
+  // The raw JSON is HTML-escaped at render time (no inline JS eval), so a
+  // stray quote can't break out and inject script.
+  function readPatientAttr(el){
+    try { return JSON.parse(el.getAttribute('data-patient') || '{}'); } catch(e){ return {}; }
+  }
+  window.openPatientHistoryFromEl = function(el){ openPatientHistory(readPatientAttr(el)); };
+  window.openScheduleNextFromEl = function(el){ openScheduleNext(readPatientAttr(el)); };
+  window.pickAcFromEl = function(el){ pickAc(readPatientAttr(el)); };
+
   window.openScheduleNext = function(patient){
     var d = parseKey(state.dateKey);
     d.setDate(d.getDate() + 1);
