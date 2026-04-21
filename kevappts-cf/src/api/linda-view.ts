@@ -291,6 +291,69 @@ export async function apiLindaDeleteOff(req: Request, env: Env): Promise<Respons
   return json({ ok: true });
 }
 
+// ─── /api/linda-windows ────────────────────────────────────
+// CRUD for Linda's booking periods. She can have multiple disjoint stints
+// (she lives abroad and visits for weeks at a time).
+
+export async function apiLindaListWindows(req: Request, env: Env): Promise<Response> {
+  if (!await isLindaAuthed(req, env)) return json({ ok: false, reason: 'Access denied.' }, 403);
+  // Just return whatever loadLindaConfig surfaces — keeps legacy-migration in one place.
+  const cfg = await loadLindaConfig(env.DB);
+  return json({ ok: true, windows: cfg.windows });
+}
+
+// POST /api/linda-windows { startDate, endDate, note? }
+export async function apiLindaAddWindow(req: Request, env: Env): Promise<Response> {
+  if (!await isLindaAuthed(req, env)) return json({ ok: false, reason: 'Access denied.' }, 403);
+  const body: any = await req.json();
+  const startDate = String(body.startDate || '').trim();
+  const endDate = String(body.endDate || '').trim();
+  const note = String(body.note || '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate)) return json({ ok: false, reason: 'Invalid start date.' }, 400);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(endDate)) return json({ ok: false, reason: 'Invalid end date.' }, 400);
+  if (endDate < startDate) return json({ ok: false, reason: 'End must be on or after start.' }, 400);
+
+  const res = await env.DB.prepare(
+    "INSERT INTO linda_windows (start_date, end_date, note, created_at) VALUES (?, ?, ?, datetime('now'))"
+  ).bind(startDate, endDate, note).run();
+  await bumpVersion(env.DB);
+  return json({ ok: true, id: res.meta?.last_row_id });
+}
+
+// PUT /api/linda-windows { id, startDate, endDate, note? }
+export async function apiLindaUpdateWindow(req: Request, env: Env): Promise<Response> {
+  if (!await isLindaAuthed(req, env)) return json({ ok: false, reason: 'Access denied.' }, 403);
+  const body: any = await req.json();
+  const id = parseInt(String(body.id || '0'), 10);
+  const startDate = String(body.startDate || '').trim();
+  const endDate = String(body.endDate || '').trim();
+  const note = String(body.note || '').trim();
+  if (!id) return json({ ok: false, reason: 'Missing id.' }, 400);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate)) return json({ ok: false, reason: 'Invalid start date.' }, 400);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(endDate)) return json({ ok: false, reason: 'Invalid end date.' }, 400);
+  if (endDate < startDate) return json({ ok: false, reason: 'End must be on or after start.' }, 400);
+
+  const existing = await env.DB.prepare('SELECT id FROM linda_windows WHERE id = ?').bind(id).first();
+  if (!existing) return json({ ok: false, reason: 'Window not found.' }, 404);
+
+  await env.DB.prepare(
+    'UPDATE linda_windows SET start_date=?, end_date=?, note=? WHERE id=?'
+  ).bind(startDate, endDate, note, id).run();
+  await bumpVersion(env.DB);
+  return json({ ok: true });
+}
+
+// DELETE /api/linda-windows?id=N
+export async function apiLindaDeleteWindow(req: Request, env: Env): Promise<Response> {
+  if (!await isLindaAuthed(req, env)) return json({ ok: false, reason: 'Access denied.' }, 403);
+  const url = new URL(req.url);
+  const id = parseInt(url.searchParams.get('id') || '0', 10);
+  if (!id) return json({ ok: false, reason: 'Missing id.' }, 400);
+  await env.DB.prepare('DELETE FROM linda_windows WHERE id = ?').bind(id).run();
+  await bumpVersion(env.DB);
+  return json({ ok: true });
+}
+
 // ─── /api/linda-base-schedule ──────────────────────────────
 // Returns Linda's weekly template hours + window dates + slot duration
 // so the Availability tab can show her planned schedule as well as the
