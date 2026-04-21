@@ -28,8 +28,8 @@ import {
 } from './api/admin';
 import { verifyAdminSig, computeAdminSig } from './services/crypto';
 import { todayKeyLocal, nowIso, parseTimeToMinutes, toDateKey, todayLocal, addDays, nowMinutesLocal } from './services/utils';
-import { getActiveAppointmentsByDate, getAppointmentByToken, getFollowUpEligibleAppointmentsByDate, insertFollowUp } from './db/queries';
-import { sendDailyDoctorSchedule, sendReminderEmail, sendFollowUpEmail } from './services/email';
+import { getActiveAppointmentsByDate, getAppointmentByToken, getFollowUpEligibleAppointmentsByDate, insertFollowUp, isReviewSent, markReviewSent } from './db/queries';
+import { sendDailyDoctorSchedule, sendReminderEmail, sendFollowUpEmail, sendReviewRequestEmail } from './services/email';
 import { indexPage } from './pages/index-page';
 import { cancelPage } from './pages/cancel-page';
 import { docActionPage } from './pages/docaction-page';
@@ -434,6 +434,42 @@ export default {
         }
       } catch (e) { console.error('Follow-up cron error:', e); }
     }
+
+    // Automatic review emails — fire ~1 hour after end_time for any appointment
+    // (any clinic) whose status is BOOKED / ATTENDED / RELOCATED_SPINOLA and
+    // which we haven't already asked. Cron fires every 10 min, so max delay
+    // after the 1-hour mark is ~10 min; the look-back window of 3 hours
+    // absorbs any skipped ticks without re-sending already-sent rows.
+    try {
+      const appts = await env.DB.prepare(
+        "SELECT * FROM appointments " +
+        "WHERE date_key = ? AND email != '' AND end_time != '' " +
+        "AND status IN ('BOOKED', 'ATTENDED', 'RELOCATED_SPINOLA') " +
+        "ORDER BY start_time"
+      ).bind(todayKey).all<any>();
+
+      for (const appt of appts.results) {
+        const apptEndMin = parseTimeToMinutes(appt.end_time);
+        const minsSinceEnd = maltaMin - apptEndMin;
+        // Eligible window: 60-180 min after end_time. Before 60 = too soon;
+        // after 180 we might as well give up to avoid sending days later.
+        if (minsSinceEnd < 60 || minsSinceEnd > 180) continue;
+        if (await isReviewSent(env.DB, appt.id)) continue;
+
+        const location: 'potters' | 'spinola' | 'linda' =
+          appt.clinic === 'spinola' ? 'spinola'
+          : appt.clinic === 'linda' ? 'linda'
+          : 'potters';
+
+        try {
+          await sendReviewRequestEmail(env, appt, location);
+          await markReviewSent(env.DB, appt.id, nowIso(tz), 'auto');
+          console.log('Auto-review sent:', appt.id, location, appt.email);
+        } catch (e) {
+          console.error('Auto-review send error:', appt.id, e);
+        }
+      }
+    } catch (e) { console.error('Auto-review cron error:', e); }
   },
 };
 
