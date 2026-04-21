@@ -715,6 +715,107 @@ export async function apiLindaMarkStatus(req: Request, env: Env): Promise<Respon
   return json({ ok: true });
 }
 
+// ─── POST /api/linda-reschedule-day ────────────────────────
+// Move every non-cancelled booking from one date to another, keeping
+// each patient's start time. Returns moved count + any conflicts that
+// Linda needs to handle manually.
+// Body: { fromDateKey, toDateKey }
+
+export async function apiLindaRescheduleDay(req: Request, env: Env): Promise<Response> {
+  if (!await isLindaAuthed(req, env)) return json({ ok: false, reason: 'Access denied.' }, 403);
+  const body: any = await req.json();
+  const fromDateKey = String(body.fromDateKey || '').trim();
+  const toDateKey = String(body.toDateKey || '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(fromDateKey)) return json({ ok: false, reason: 'Invalid source date.' }, 400);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(toDateKey)) return json({ ok: false, reason: 'Invalid target date.' }, 400);
+  if (fromDateKey === toDateKey) return json({ ok: false, reason: 'Target must be a different date.' }, 400);
+
+  const cfg = await loadLindaConfig(env.DB);
+  if (await isLindaDayOff(env.DB, toDateKey)) {
+    return json({ ok: false, reason: 'Target date is marked as a day off.' }, 400);
+  }
+
+  const extras = await getLindaExtrasForDate(env.DB, toDateKey);
+  const targetSlots = buildLindaSlots(toDateKey, cfg, extras, false);
+  if (!targetSlots.length) {
+    return json({ ok: false, reason: 'Target date has no working hours. Open availability for it first.' }, 400);
+  }
+  const targetByStart: Record<string, { start: string; end: string }> = {};
+  for (const s of targetSlots) targetByStart[s.start] = s;
+
+  const takenOnTarget = await getTakenSlots(env.DB, toDateKey, 'linda');
+
+  const rows = await env.DB.prepare(
+    "SELECT * FROM appointments WHERE clinic='linda' AND date_key=? AND status NOT LIKE '%CANCELLED%' ORDER BY start_time"
+  ).bind(fromDateKey).all<Appointment>();
+
+  const now = nowIso(env.TIMEZONE);
+  const moved: Appointment[] = [];
+  const origsByNewId: Record<string, Appointment> = {};
+  const conflicts: { id: string; name: string; startTime: string; reason: string }[] = [];
+
+  for (const appt of rows.results) {
+    const target = targetByStart[appt.start_time];
+    if (!target) {
+      conflicts.push({ id: appt.id, name: appt.full_name, startTime: appt.start_time, reason: 'No matching slot on target date.' });
+      continue;
+    }
+    if (takenOnTarget.has(appt.start_time)) {
+      conflicts.push({ id: appt.id, name: appt.full_name, startTime: appt.start_time, reason: 'Target slot already taken.' });
+      continue;
+    }
+    try {
+      await env.DB.prepare(
+        'UPDATE appointments SET date_key=?, start_time=?, end_time=?, updated_at=?, calendar_event_id=? WHERE id=?'
+      ).bind(toDateKey, target.start, target.end, now, '', appt.id).run();
+      takenOnTarget.add(target.start);
+      const updated: Appointment = { ...appt, date_key: toDateKey, start_time: target.start, end_time: target.end, calendar_event_id: '' };
+      moved.push(updated);
+      origsByNewId[appt.id] = appt;
+    } catch (e: any) {
+      if (String(e?.message || '').toLowerCase().includes('unique')) {
+        conflicts.push({ id: appt.id, name: appt.full_name, startTime: appt.start_time, reason: 'Target slot just taken.' });
+      } else {
+        conflicts.push({ id: appt.id, name: appt.full_name, startTime: appt.start_time, reason: 'Database error.' });
+      }
+    }
+  }
+
+  await bumpVersion(env.DB);
+
+  try {
+    const doId = env.REALTIME.idFromName('global');
+    const stub = env.REALTIME.get(doId);
+    await stub.fetch('http://internal/broadcast', { method: 'POST', body: JSON.stringify({ type: 'slots_updated', dateKey: fromDateKey, clinic: 'linda' }) });
+    await stub.fetch('http://internal/broadcast', { method: 'POST', body: JSON.stringify({ type: 'slots_updated', dateKey: toDateKey, clinic: 'linda' }) });
+  } catch {}
+
+  const ctx = (globalThis as any).__ctx;
+  if (ctx?.waitUntil) {
+    ctx.waitUntil((async () => {
+      for (const updated of moved) {
+        const orig = origsByNewId[updated.id];
+        if (orig?.calendar_event_id) {
+          try { await deleteCalendarEvent(env, orig.calendar_event_id, 'linda'); } catch {}
+        }
+        try {
+          const newEventId = await createCalendarEvent(env, updated);
+          if (newEventId) {
+            await env.DB.prepare('UPDATE appointments SET calendar_event_id = ? WHERE id = ?').bind(newEventId, updated.id).run();
+          }
+        } catch (e) { console.error('Linda reschedule-day cal error:', e); }
+        try {
+          // sendAppointmentPushedEmail takes the ORIGINAL appointment + new date/time
+          // so "Previous: X → New: Y" renders correctly in the email.
+          await sendAppointmentPushedEmail(env, orig, updated.date_key, updated.start_time, updated.end_time);
+        } catch (e) { console.error('Linda reschedule-day email error:', e); }
+      }
+    })());
+  }
+
+  return json({ ok: true, moved: moved.length, conflicts });
+}
+
 // ─── POST /api/linda-cancel ────────────────────────────────
 // Cancels one Linda appointment. Body: { appointmentId, reason?, rebook? }
 // If rebook=true, the patient email invites them to book a new time;
@@ -2420,7 +2521,49 @@ function lindaMainPage(env: Env): string {
     } catch(e){ alert('Network error'); }
   };
   window.cancelAllDay = function(){ bulkCancelDay(false); };
-  window.rescheduleAllDay = function(){ bulkCancelDay(true); };
+  window.rescheduleAllDay = function(){
+    // Open the reusable calendar picker; on pick, ask for confirmation and
+    // call the new /api/linda-reschedule-day endpoint.
+    pickDate('rdTarget', function(targetDate){
+      if (!targetDate) return;
+      if (!confirm('Move every booking on ' + state.dateKey + ' to ' + targetDate + '?\\n\\nPatients will receive an email with the new date and time.')) return;
+      doRescheduleDay(targetDate);
+    });
+  };
+  // Hidden input + label/button stubs so pickDate has targets to update.
+  (function ensureRdTargets(){
+    ['rdTarget','rdTargetLabel','rdTargetBtn'].forEach(function(id){
+      if ($(id)) return;
+      var el = id === 'rdTarget' ? document.createElement('input') : document.createElement('span');
+      if (id === 'rdTarget') el.type = 'hidden';
+      el.id = id;
+      if (id !== 'rdTarget') el.style.display = 'none';
+      document.body.appendChild(el);
+    });
+  })();
+
+  async function doRescheduleDay(targetDate){
+    try {
+      var res = await fetch('/api/linda-reschedule-day', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fromDateKey: state.dateKey, toDateKey: targetDate }),
+      });
+      if (res.status === 403) { window.location.reload(); return; }
+      var data = await res.json();
+      if (!data.ok) { alert(data.reason || 'Failed'); return; }
+      var msg = 'Moved ' + data.moved + ' booking' + (data.moved === 1 ? '' : 's') + ' to ' + targetDate + '.';
+      if (data.conflicts && data.conflicts.length){
+        msg += '\\n\\nCould not move (you\\u2019ll need to handle these manually):';
+        for (var i = 0; i < data.conflicts.length; i++){
+          var c = data.conflicts[i];
+          msg += '\\n\\u2022 ' + c.name + ' @ ' + c.startTime + ' \\u2014 ' + c.reason;
+        }
+      }
+      alert(msg);
+      load();
+      if ($('pane-week').style.display !== 'none') loadWeek();
+    } catch(e){ alert('Network error'); }
+  }
   async function bulkCancelDay(rebook){
     var verb = rebook ? 'Reschedule all' : 'Cancel all';
     var msg = rebook

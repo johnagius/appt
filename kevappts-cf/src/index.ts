@@ -38,7 +38,7 @@ import { doctorPage } from './pages/doctor-page';
 import { reschedulePage } from './pages/reschedule-page';
 import { followupPage } from './pages/followup-page';
 import { physioPage } from './pages/physio-page';
-import { apiLindaGetDay, apiLindaNextDay, apiLindaSlots, apiLindaListExtras, apiLindaAddExtra, apiLindaDeleteExtra, apiLindaUpdateExtra, apiLindaListOff, apiLindaAddOff, apiLindaDeleteOff, apiLindaReschedule, apiLindaNewBooking, apiLindaSearch, apiLindaPatientHistory, apiLindaClientsAutocomplete, apiLindaWeek, apiLindaCopyDay, apiLindaCancel, apiLindaCancelDay, apiLindaMarkStatus, apiLindaBaseSchedule, apiLindaSaveBaseSchedule, handleLindaLogin, handleLindaLogout, lindaRoute } from './api/linda-view';
+import { apiLindaGetDay, apiLindaNextDay, apiLindaSlots, apiLindaListExtras, apiLindaAddExtra, apiLindaDeleteExtra, apiLindaUpdateExtra, apiLindaListOff, apiLindaAddOff, apiLindaDeleteOff, apiLindaReschedule, apiLindaRescheduleDay, apiLindaNewBooking, apiLindaSearch, apiLindaPatientHistory, apiLindaClientsAutocomplete, apiLindaWeek, apiLindaCopyDay, apiLindaCancel, apiLindaCancelDay, apiLindaMarkStatus, apiLindaBaseSchedule, apiLindaSaveBaseSchedule, handleLindaLogin, handleLindaLogout, lindaRoute } from './api/linda-view';
 
 export { RealtimeHub };
 
@@ -123,6 +123,7 @@ export default {
       if (path === '/api/linda-off' && method === 'POST') return apiLindaAddOff(request, env);
       if (path === '/api/linda-off' && method === 'DELETE') return apiLindaDeleteOff(request, env);
       if (path === '/api/linda-reschedule' && method === 'POST') return apiLindaReschedule(request, env);
+      if (path === '/api/linda-reschedule-day' && method === 'POST') return apiLindaRescheduleDay(request, env);
       if (path === '/api/linda-new-booking' && method === 'POST') return apiLindaNewBooking(request, env);
       if (path === '/api/linda-search' && method === 'GET') return apiLindaSearch(request, env);
       if (path === '/api/linda-patient-history' && method === 'GET') return apiLindaPatientHistory(request, env);
