@@ -128,6 +128,19 @@ CREATE TABLE IF NOT EXISTS linda_extra (
 );
 CREATE INDEX IF NOT EXISTS idx_linda_extra_date ON linda_extra(date_key);
 
+-- Linda booking windows — she lives abroad and comes for multiple stints.
+-- Each row is a continuous working period (start + end dates). A booking is
+-- "in window" if any row covers its date. Legacy LINDA_WINDOW_START/END in
+-- the config table are auto-migrated into one row on first load.
+CREATE TABLE IF NOT EXISTS linda_windows (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  start_date TEXT NOT NULL,
+  end_date TEXT NOT NULL,
+  note TEXT DEFAULT '',
+  created_at TEXT DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS idx_linda_windows_dates ON linda_windows(start_date, end_date);
+
 -- Linda day-off: dates she's cancelled her base availability for. Any booking
 -- already made on that date stays (she'll reschedule via the normal flow);
 -- no NEW bookings are offered. Overrides the base weekly schedule and any

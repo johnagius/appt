@@ -8,6 +8,7 @@ import {
 
 const standardConfig: LindaConfig = {
   enabled: true,
+  windows: [{ id: 1, start: '2026-04-24', end: '2026-05-07', note: '' }],
   windowStart: '2026-04-24',
   windowEnd: '2026-05-07',
   slotMin: 30,
@@ -22,6 +23,15 @@ const standardConfig: LindaConfig = {
   },
 };
 
+function withWindows(cfg: LindaConfig, windows: { id: number; start: string; end: string; note: string }[]): LindaConfig {
+  return {
+    ...cfg,
+    windows,
+    windowStart: windows[0]?.start || cfg.windowStart,
+    windowEnd: windows[windows.length - 1]?.end || cfg.windowEnd,
+  };
+}
+
 describe('isInLindaWindow', () => {
   it('accepts the first and last day of the window', () => {
     expect(isInLindaWindow('2026-04-24', standardConfig)).toBe(true);
@@ -34,9 +44,20 @@ describe('isInLindaWindow', () => {
   });
 
   it('uses lexicographic YYYY-MM-DD compare (safe for ISO dates)', () => {
-    const cfg = { ...standardConfig, windowStart: '2026-01-01', windowEnd: '2026-12-31' };
+    const cfg = withWindows(standardConfig, [{ id: 1, start: '2026-01-01', end: '2026-12-31', note: '' }]);
     expect(isInLindaWindow('2026-02-15', cfg)).toBe(true);
     expect(isInLindaWindow('2027-01-01', cfg)).toBe(false);
+  });
+
+  it('accepts a date inside ANY of multiple windows', () => {
+    const cfg = withWindows(standardConfig, [
+      { id: 1, start: '2026-04-28', end: '2026-05-07', note: 'first stint' },
+      { id: 2, start: '2026-06-15', end: '2026-06-22', note: 'summer stint' },
+    ]);
+    expect(isInLindaWindow('2026-04-30', cfg)).toBe(true);
+    expect(isInLindaWindow('2026-06-18', cfg)).toBe(true);
+    expect(isInLindaWindow('2026-05-20', cfg)).toBe(false); // between the two
+    expect(isInLindaWindow('2026-06-23', cfg)).toBe(false); // past second
   });
 });
 
@@ -88,7 +109,7 @@ describe('buildLindaSlots', () => {
 
 describe('buildLindaDateOptions', () => {
   it('returns Mon-Fri inside the window as enabled, weekends as closed', () => {
-    const future: LindaConfig = { ...standardConfig, windowStart: '2026-04-24', windowEnd: '2026-04-27' };
+    const future = withWindows(standardConfig, [{ id: 1, start: '2026-04-24', end: '2026-04-27', note: '' }]);
     const opts = buildLindaDateOptions('Europe/Malta', future);
     expect(opts.length).toBe(4); // Fri, Sat, Sun, Mon
     expect(opts[0]).toMatchObject({ dateKey: '2026-04-24', disabled: false }); // Fri
@@ -98,7 +119,19 @@ describe('buildLindaDateOptions', () => {
   });
 
   it('returns an empty list when end is before start', () => {
-    const bad: LindaConfig = { ...standardConfig, windowStart: '2026-05-07', windowEnd: '2026-04-24' };
+    const bad = withWindows(standardConfig, [{ id: 1, start: '2026-05-07', end: '2026-04-24', note: '' }]);
     expect(buildLindaDateOptions('Europe/Malta', bad)).toEqual([]);
+  });
+
+  it('concatenates dates across multiple windows without duplication', () => {
+    const multi = withWindows(standardConfig, [
+      { id: 1, start: '2026-04-28', end: '2026-04-29', note: 'A' },
+      { id: 2, start: '2026-04-29', end: '2026-04-30', note: 'overlaps A' },
+      { id: 3, start: '2026-06-15', end: '2026-06-16', note: 'later' },
+    ]);
+    const opts = buildLindaDateOptions('Europe/Malta', multi);
+    expect(opts.map(o => o.dateKey)).toEqual([
+      '2026-04-28', '2026-04-29', '2026-04-30', '2026-06-15', '2026-06-16',
+    ]);
   });
 });

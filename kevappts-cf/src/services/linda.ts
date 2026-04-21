@@ -25,9 +25,20 @@ const DEFAULT_HOURS: WorkingHours = {
   SUN: [],
 };
 
+export interface LindaWindow {
+  id: number;
+  start: string;
+  end: string;
+  note: string;
+}
+
 export interface LindaConfig {
   enabled: boolean;
-  windowStart: string;  // YYYY-MM-DD
+  /** All booking periods Linda has set. Ordered ascending by start date. */
+  windows: LindaWindow[];
+  /** First window's start — kept for backward compat with older readers. */
+  windowStart: string;
+  /** Last window's end — kept for backward compat with older readers. */
   windowEnd: string;
   slotMin: number;
   hours: WorkingHours;
@@ -46,17 +57,47 @@ export async function loadLindaConfig(db: D1Database): Promise<LindaConfig> {
 
   const slotMin = parseInt(map['LINDA_SLOT_MIN'] || String(DEFAULT_SLOT_MIN), 10) || DEFAULT_SLOT_MIN;
 
+  // Load windows; one-time migration from legacy LINDA_WINDOW_START/END.
+  let windowRows = await db.prepare(
+    'SELECT id, start_date AS s, end_date AS e, note FROM linda_windows ORDER BY start_date'
+  ).all<{ id: number; s: string; e: string; note: string }>();
+  if (!windowRows.results.length) {
+    const legacyStart = map['LINDA_WINDOW_START'];
+    const legacyEnd = map['LINDA_WINDOW_END'];
+    if (legacyStart && legacyEnd) {
+      await db.prepare(
+        "INSERT INTO linda_windows (start_date, end_date, note, created_at) VALUES (?, ?, 'migrated', datetime('now'))"
+      ).bind(legacyStart, legacyEnd).run();
+      windowRows = await db.prepare(
+        'SELECT id, start_date AS s, end_date AS e, note FROM linda_windows ORDER BY start_date'
+      ).all<{ id: number; s: string; e: string; note: string }>();
+    }
+  }
+
+  const windows: LindaWindow[] = windowRows.results.map(r => ({
+    id: r.id, start: r.s, end: r.e, note: r.note || '',
+  }));
+
+  // Fallback single default if nothing at all exists yet.
+  if (!windows.length) {
+    windows.push({ id: 0, start: DEFAULT_WINDOW_START, end: DEFAULT_WINDOW_END, note: '' });
+  }
+
   return {
     enabled: map['LINDA_ENABLED'] === '1' || map['LINDA_ENABLED'] === 'true',
-    windowStart: map['LINDA_WINDOW_START'] || DEFAULT_WINDOW_START,
-    windowEnd: map['LINDA_WINDOW_END'] || DEFAULT_WINDOW_END,
+    windows,
+    windowStart: windows[0].start,
+    windowEnd: windows[windows.length - 1].end,
     slotMin,
     hours,
   };
 }
 
 export function isInLindaWindow(dateKey: string, cfg: LindaConfig): boolean {
-  return dateKey >= cfg.windowStart && dateKey <= cfg.windowEnd;
+  for (const w of cfg.windows) {
+    if (dateKey >= w.start && dateKey <= w.end) return true;
+  }
+  return false;
 }
 
 export function buildLindaSlots(
@@ -97,26 +138,33 @@ export async function isLindaDayOff(db: D1Database, dateKey: string): Promise<bo
 
 export function buildLindaDateOptions(tz: string, cfg: LindaConfig): DateOption[] {
   const today = todayLocal(tz);
-  const start = parseDateKey(cfg.windowStart);
-  const end = parseDateKey(cfg.windowEnd);
   const out: DateOption[] = [];
+  const seen = new Set<string>();
 
-  if (end.getTime() < start.getTime()) return out;
-
-  let d = new Date(Math.max(today.getTime(), start.getTime()));
-  while (d.getTime() <= end.getTime()) {
-    const dk = toDateKey(d);
-    const dow = dayOfWeekKey(d);
-    const hasHours = cfg.hours[dow] && cfg.hours[dow].length > 0;
-
-    out.push({
-      dateKey: dk,
-      label: formatDateLabel(d, tz),
-      disabled: !hasHours,
-      reason: hasHours ? '' : 'Closed',
-      spinolaOnly: false,
-    });
-    d = addDays(d, 1);
+  // Iterate every booking window and emit each date (on or after today) once.
+  // Windows are already sorted by start date in loadLindaConfig, so the
+  // resulting list is monotonic; we still dedupe to be safe against overlaps.
+  for (const w of cfg.windows) {
+    const start = parseDateKey(w.start);
+    const end = parseDateKey(w.end);
+    if (end.getTime() < start.getTime()) continue;
+    let d = new Date(Math.max(today.getTime(), start.getTime()));
+    while (d.getTime() <= end.getTime()) {
+      const dk = toDateKey(d);
+      if (!seen.has(dk)) {
+        seen.add(dk);
+        const dow = dayOfWeekKey(d);
+        const hasHours = cfg.hours[dow] && cfg.hours[dow].length > 0;
+        out.push({
+          dateKey: dk,
+          label: formatDateLabel(d, tz),
+          disabled: !hasHours,
+          reason: hasHours ? '' : 'Closed',
+          spinolaOnly: false,
+        });
+      }
+      d = addDays(d, 1);
+    }
   }
 
   return out;
