@@ -1320,10 +1320,44 @@ function lindaMainPage(env: Env): string {
 <div id="pane-avail" style="display:none;">
   <div class="avail-wrap">
     <div class="avail-card">
-      <h3>Your weekly schedule</h3>
-      <p class="hint" id="baseWindow">Loading…</p>
+      <h3>Your booking window</h3>
+      <p class="hint">These are the first and last days patients can book you. Shorten or extend them any time — existing bookings aren't touched.</p>
+      <div class="avail-row">
+        <label>From</label>
+        <button type="button" class="date-btn empty" id="winStartBtn" onclick="pickDate('winStart', function(){ markWindowDirty(); })"><span class="date-icon">📅</span><span class="date-val" id="winStartLabel">Loading…</span></button>
+        <input type="hidden" id="winStart">
+      </div>
+      <div class="avail-row">
+        <label>To</label>
+        <button type="button" class="date-btn empty" id="winEndBtn" onclick="pickDate('winEnd', function(){ markWindowDirty(); })"><span class="date-icon">📅</span><span class="date-val" id="winEndLabel">Loading…</span></button>
+        <input type="hidden" id="winEnd">
+      </div>
+      <div class="avail-row"><label>Slots</label><select id="winSlotMin" onchange="markWindowDirty()"><option value="15">15 min</option><option value="20">20 min</option><option value="30" selected>30 min</option><option value="45">45 min</option><option value="60">60 min</option></select></div>
+      <button class="avail-save" id="winSaveBtn" style="display:none;" onclick="saveWindow()">Save window</button>
+      <div class="avail-msg" id="winMsg"></div>
+
+      <h3 style="margin-top:16px;">Weekly schedule</h3>
       <div id="baseSchedule"></div>
-      <p class="hint" style="margin-top:10px;font-size:12px;">Your weekly hours and booking window are set by the admin panel.</p>
+      <p class="hint" style="margin-top:10px;font-size:12px;">Weekly hours (Mon–Sun templates) are edited from the admin panel.</p>
+    </div>
+
+    <div class="avail-card">
+      <h3>Days off</h3>
+      <p class="hint">Mark a date (or date range) you're not working. Patients won't be offered those days. Any bookings already on the date are left untouched — use Reschedule on each card to shift them.</p>
+      <div class="avail-row">
+        <label>From</label>
+        <button type="button" class="date-btn empty" id="offFromBtn" onclick="pickDate('offFrom')"><span class="date-icon">📅</span><span class="date-val" id="offFromLabel">Pick a date</span></button>
+        <input type="hidden" id="offFrom">
+      </div>
+      <div class="avail-row">
+        <label>To</label>
+        <button type="button" class="date-btn empty" id="offToBtn" onclick="pickDate('offTo')"><span class="date-icon">📅</span><span class="date-val" id="offToLabel">Same day</span></button>
+        <input type="hidden" id="offTo">
+      </div>
+      <div class="avail-row"><label>Reason</label><input type="text" id="offReason" placeholder="Optional note, e.g. conference, sick"></div>
+      <button class="avail-save" onclick="saveOff()">Mark days off</button>
+      <div class="avail-msg" id="offMsg"></div>
+      <div id="offList" style="margin-top:10px;"><div class="empty" style="margin:0;border:none;padding:12px 0;">Loading…</div></div>
     </div>
 
     <div class="avail-card">
@@ -1721,7 +1755,7 @@ function lindaMainPage(env: Env): string {
     $('tabDayBtn').classList.toggle('active', which === 'day');
     $('tabWeekBtn').classList.toggle('active', which === 'week');
     $('tabAvailBtn').classList.toggle('active', which === 'avail');
-    if (which === 'avail') { loadBaseSchedule(); loadExtras(); }
+    if (which === 'avail') { loadBaseSchedule(); loadExtras(); loadOff(); }
     if (which === 'week') loadWeek();
   };
 
@@ -1743,16 +1777,50 @@ function lindaMainPage(env: Env): string {
     { key: 'SUN', label: 'Sun' },
   ];
 
+  function setHiddenDate(id, dk){
+    $(id).value = dk;
+    var lbl = $(id + 'Label');
+    var btn = $(id + 'Btn');
+    if (lbl) lbl.textContent = dk ? fmtDay(dk) : (id === 'winEnd' ? 'Loading…' : 'Pick a date');
+    if (btn) btn.classList.remove('empty');
+  }
+
+  window.markWindowDirty = function(){ $('winSaveBtn').style.display = ''; };
+
+  window.saveWindow = async function(){
+    var ws = $('winStart').value, we = $('winEnd').value, sm = parseInt($('winSlotMin').value, 10) || 30;
+    if (!ws || !we) { $('winMsg').textContent = 'Pick both dates.'; $('winMsg').className = 'avail-msg bad'; return; }
+    $('winMsg').textContent = 'Saving…'; $('winMsg').className = 'avail-msg';
+    try {
+      var res = await fetch('/api/linda-base-schedule', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ windowStart: ws, windowEnd: we, slotMin: sm }),
+      });
+      if (res.status === 403) { window.location.reload(); return; }
+      var data = await res.json();
+      if (data.ok){
+        $('winMsg').textContent = 'Saved.'; $('winMsg').className = 'avail-msg ok';
+        $('winSaveBtn').style.display = 'none';
+        loadBaseSchedule();
+      } else {
+        $('winMsg').textContent = data.reason || 'Failed'; $('winMsg').className = 'avail-msg bad';
+      }
+    } catch(e){
+      $('winMsg').textContent = 'Network error'; $('winMsg').className = 'avail-msg bad';
+    }
+  };
+
   async function loadBaseSchedule(){
     var el = $('baseSchedule');
-    var winEl = $('baseWindow');
     try {
       var res = await fetch('/api/linda-base-schedule');
       if (res.status === 403) { window.location.reload(); return; }
       var data = await res.json();
       if (!data.ok){ el.innerHTML = '<div class="err" style="margin:0;">' + esc(data.reason || 'Failed') + '</div>'; return; }
-      winEl.textContent = 'Booking window: ' + fmtDay(data.windowStart) + ' — ' + fmtDay(data.windowEnd) +
-        ' · ' + data.slotMin + '-min slots' + (data.enabled ? '' : ' · bookings paused');
+      setHiddenDate('winStart', data.windowStart);
+      setHiddenDate('winEnd', data.windowEnd);
+      $('winSlotMin').value = String(data.slotMin || 30);
+      $('winSaveBtn').style.display = 'none';
       var html = '';
       for (var i = 0; i < DOW_LABELS.length; i++){
         var d = DOW_LABELS[i];
@@ -1769,6 +1837,67 @@ function lindaMainPage(env: Env): string {
       el.innerHTML = '<div class="err" style="margin:0;">Network error.</div>';
     }
   }
+
+  // ── Days off ──
+  async function loadOff(){
+    var el = $('offList');
+    try {
+      var res = await fetch('/api/linda-off');
+      if (res.status === 403) { window.location.reload(); return; }
+      var data = await res.json();
+      if (!data.ok || !data.off || !data.off.length){
+        el.innerHTML = '<div class="empty" style="margin:0;border:none;padding:12px 0;">No days off marked.</div>';
+        return;
+      }
+      var html = '';
+      for (var i = 0; i < data.off.length; i++){
+        var o = data.off[i];
+        html += '<div class="extra-row">';
+        html +=   '<div><div class="extra-when">' + esc(formatNiceShort(o.date_key)) + '</div>';
+        if (o.reason) html += '<div class="extra-dim">' + esc(o.reason) + '</div>';
+        html +=   '</div>';
+        html +=   '<button class="extra-del" onclick="deleteOff(' + o.id + ')">Restore</button>';
+        html += '</div>';
+      }
+      el.innerHTML = html;
+    } catch(e){
+      el.innerHTML = '<div class="err" style="margin:0;">Network error.</div>';
+    }
+  }
+
+  window.saveOff = async function(){
+    var from = $('offFrom').value, to = $('offTo').value, reason = $('offReason').value;
+    if (!from) { $('offMsg').textContent = 'Pick a start date.'; $('offMsg').className = 'avail-msg bad'; return; }
+    $('offMsg').textContent = 'Saving…'; $('offMsg').className = 'avail-msg';
+    try {
+      var res = await fetch('/api/linda-off', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dateKey: from, dateKeyEnd: to || undefined, reason: reason || '' }),
+      });
+      if (res.status === 403) { window.location.reload(); return; }
+      var data = await res.json();
+      if (data.ok){
+        var msg = 'Marked ' + data.added + ' day' + (data.added === 1 ? '' : 's') + ' off.';
+        if (data.affectedBookings) msg += ' ' + data.affectedBookings + ' existing booking' + (data.affectedBookings === 1 ? '' : 's') + ' on those dates — use Reschedule on each to shift.';
+        $('offMsg').textContent = msg; $('offMsg').className = 'avail-msg ok';
+        $('offReason').value = '';
+        loadOff();
+      } else {
+        $('offMsg').textContent = data.reason || 'Failed'; $('offMsg').className = 'avail-msg bad';
+      }
+    } catch(e){
+      $('offMsg').textContent = 'Network error'; $('offMsg').className = 'avail-msg bad';
+    }
+  };
+
+  window.deleteOff = async function(id){
+    if (!confirm('Restore this day — make it bookable again?')) return;
+    try {
+      var res = await fetch('/api/linda-off?id=' + id, { method: 'DELETE' });
+      if (res.status === 403) { window.location.reload(); return; }
+      loadOff();
+    } catch(e){}
+  };
 
   async function loadExtras(){
     var el = $('extraList');
