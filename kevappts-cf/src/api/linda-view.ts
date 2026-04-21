@@ -310,14 +310,17 @@ export async function apiLindaBaseSchedule(req: Request, env: Env): Promise<Resp
 }
 
 // POST /api/linda-base-schedule — Linda edits her own booking window from
-// the /linda page. Body: { windowStart, windowEnd, slotMin? }. Weekly hours
-// stay admin-only (they're per-day config, best edited from /admin).
+// the /linda page. Body: { windowStart, windowEnd, slotMin?, hours? }.
+// hours, if provided, is a WorkingHours-shaped object; each day's value is
+// an array of { start, end } ranges. Same validation rules as the admin
+// endpoint (shape-check + non-empty ranges only).
 export async function apiLindaSaveBaseSchedule(req: Request, env: Env): Promise<Response> {
   if (!await isLindaAuthed(req, env)) return json({ ok: false, reason: 'Access denied.' }, 403);
   const body: any = await req.json();
   const windowStart = String(body.windowStart || '').trim();
   const windowEnd = String(body.windowEnd || '').trim();
   const slotMinRaw = body.slotMin;
+  const hoursRaw = body.hours;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(windowStart)) return json({ ok: false, reason: 'Invalid start date.' }, 400);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(windowEnd)) return json({ ok: false, reason: 'Invalid end date.' }, 400);
   if (windowEnd < windowStart) return json({ ok: false, reason: 'End date must be on or after start date.' }, 400);
@@ -334,6 +337,26 @@ export async function apiLindaSaveBaseSchedule(req: Request, env: Env): Promise<
     }
     await env.DB.prepare('INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)')
       .bind('LINDA_SLOT_MIN', String(slotMin)).run();
+  }
+
+  if (hoursRaw && typeof hoursRaw === 'object') {
+    const validDays = ['MON','TUE','WED','THU','FRI','SAT','SUN'];
+    const clean: Record<string, { start: string; end: string }[]> = {};
+    for (const d of validDays) {
+      const arr = Array.isArray(hoursRaw[d]) ? hoursRaw[d] : [];
+      clean[d] = arr
+        .filter((w: any) => w && typeof w.start === 'string' && typeof w.end === 'string'
+          && /^\d{2}:\d{2}$/.test(w.start) && /^\d{2}:\d{2}$/.test(w.end))
+        .map((w: any) => ({ start: w.start, end: w.end }));
+      // Reject zero- or negative-width ranges.
+      for (const w of clean[d]) {
+        if (parseTimeToMinutes(w.end) <= parseTimeToMinutes(w.start)) {
+          return json({ ok: false, reason: 'Each time range must end after it starts.' }, 400);
+        }
+      }
+    }
+    await env.DB.prepare('INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)')
+      .bind('LINDA_HOURS', JSON.stringify(clean)).run();
   }
 
   await bumpVersion(env.DB);
