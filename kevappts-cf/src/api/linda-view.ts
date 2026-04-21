@@ -1183,6 +1183,21 @@ function lindaMainPage(env: Env): string {
   .avail-msg.ok{color:#059669;}
   .avail-msg.bad{color:#dc2626;}
 
+  /* Availability timeline (inspired by the admin-page bar) */
+  .tl-bar{position:relative;height:64px;background:#f3f4f6;border-radius:12px;border:1px solid var(--line);overflow:hidden;cursor:crosshair;touch-action:none;user-select:none;-webkit-user-select:none;}
+  .tl-seg{position:absolute;top:0;bottom:0;pointer-events:none;}
+  .tl-seg.base{background:var(--accent);opacity:0.55;}
+  .tl-seg.extra{background:var(--accent);opacity:0.85;background-image:repeating-linear-gradient(45deg,transparent,transparent 5px,rgba(255,255,255,0.28) 5px,rgba(255,255,255,0.28) 10px);}
+  .tl-seg.booked{background:#3730a3;opacity:0.9;}
+  .tl-seg.off{background:var(--bad);opacity:0.65;background-image:repeating-linear-gradient(135deg,transparent,transparent 4px,rgba(255,255,255,0.35) 4px,rgba(255,255,255,0.35) 8px);}
+  .tl-seg.sel{background:#0ea5e9;opacity:0.8;border:2px solid #0369a1;border-radius:4px;z-index:5;}
+  .tl-ticks{display:flex;margin-top:2px;}
+  .tl-tick{flex:1 1 0;text-align:center;font-size:10px;color:var(--muted);font-weight:700;letter-spacing:.4px;}
+  .tl-legend{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;font-size:11px;color:var(--muted);}
+  .tl-legend-dot{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:middle;}
+  .tl-sel-txt{font-size:13px;font-weight:700;margin-top:8px;color:var(--text);}
+  .tl-sel-txt.muted{color:var(--muted);font-weight:500;}
+
   .base-row{display:flex;align-items:center;padding:8px 10px;background:#f9fafb;border-radius:8px;margin-bottom:6px;font-size:14px;gap:10px;}
   .base-row .d{flex:0 0 48px;font-weight:800;color:var(--text);text-transform:uppercase;font-size:12px;letter-spacing:.4px;}
   .base-row .h{flex:1 1 auto;color:var(--text);}
@@ -1462,18 +1477,19 @@ function lindaMainPage(env: Env): string {
     </div>
 
     <div class="avail-card">
-      <h3>Open extra availability</h3>
-      <p class="hint">Add a date (or date range) and the hours you'll be there. Patients can then book these slots. Your weekly schedule stays as-is.</p>
-      <div class="avail-row"><label>From date</label><button type="button" class="date-btn empty" id="avDateFromBtn" onclick="pickDate('avDateFrom')"><span class="date-icon">📅</span><span class="date-val" id="avDateFromLabel">Pick a date</span></button><input type="hidden" id="avDateFrom"></div>
-      <div class="avail-row"><label>To date</label><button type="button" class="date-btn empty" id="avDateToBtn" onclick="pickDate('avDateTo')"><span class="date-icon">📅</span><span class="date-val" id="avDateToLabel">Same day</span></button><input type="hidden" id="avDateTo"></div>
-      <div style="font-size:12px;color:var(--muted);font-weight:800;text-transform:uppercase;letter-spacing:.4px;margin:8px 0 4px;">Morning</div>
-      <div class="avail-row"><label>Start</label><input type="time" id="avStart" step="1800" value="09:30"></div>
-      <div class="avail-row"><label>End</label><input type="time" id="avEnd" step="1800" value="13:00"></div>
-      <div style="font-size:12px;color:var(--muted);font-weight:800;text-transform:uppercase;letter-spacing:.4px;margin:12px 0 4px;">Evening (optional)</div>
-      <div class="avail-row"><label>Start</label><input type="time" id="avEveningStart" step="1800" value="16:00"></div>
-      <div class="avail-row"><label>End</label><input type="time" id="avEveningEnd" step="1800" value="19:00"></div>
-      <button class="avail-save" onclick="saveAvail()">Open these hours</button>
-      <div class="avail-msg" id="avMsg"></div>
+      <h3>Day timeline</h3>
+      <p class="hint">Pick a day. Drag on the bar to select a time range, then tap <b>Add extra time</b>. Need to cancel the whole day? Use <b>Block full day</b> — patients won't be offered it.</p>
+      <div class="avail-row">
+        <label>Date</label>
+        <button type="button" class="date-btn empty" id="tlDateBtn" onclick="pickDate('tlDate', function(dk){ loadTimeline(); })"><span class="date-icon">📅</span><span class="date-val" id="tlDateLabel">Pick a date</span></button>
+        <input type="hidden" id="tlDate">
+      </div>
+      <div id="tlContainer" style="margin-top:10px;"></div>
+      <div class="avail-row" style="margin-top:10px;gap:6px;flex-wrap:wrap;">
+        <button class="avail-save" style="flex:1 1 auto;min-width:120px;margin:0;background:var(--accent);" id="tlAddBtn" onclick="saveTimelineRange()" disabled>Add extra time</button>
+        <button class="avail-save" style="flex:1 1 auto;min-width:120px;margin:0;background:var(--bad);" onclick="blockTimelineDay()">Block full day</button>
+      </div>
+      <div class="avail-msg" id="tlMsg"></div>
     </div>
 
     <div class="avail-card">
@@ -1837,7 +1853,7 @@ function lindaMainPage(env: Env): string {
     $('tabDayBtn').classList.toggle('active', which === 'day');
     $('tabWeekBtn').classList.toggle('active', which === 'week');
     $('tabAvailBtn').classList.toggle('active', which === 'avail');
-    if (which === 'avail') { loadBaseSchedule(); loadExtras(); loadOff(); }
+    if (which === 'avail') { loadBaseSchedule(); loadExtras(); loadOff(); initTimeline(); }
     if (which === 'week') loadWeek();
   };
 
@@ -1970,6 +1986,213 @@ function lindaMainPage(env: Env): string {
     } catch(e){
       $('offMsg').textContent = 'Network error'; $('offMsg').className = 'avail-msg bad';
     }
+  };
+
+  // ── Day timeline (tap-drag to add extra / block full day) ──
+  var TL_START_MIN = 7 * 60;   // 07:00
+  var TL_END_MIN = 22 * 60;    // 22:00
+  var TL_TOTAL_MIN = TL_END_MIN - TL_START_MIN; // 900
+  var TL_SNAP_MIN = 15;
+  var tl = { sel: null, baseHours: null, extras: [], booked: [], dayOff: false };
+
+  function minToTime(m){ return pad(Math.floor(m/60)) + ':' + pad(m%60); }
+  function timeToMin(s){ var p = String(s).split(':'); return parseInt(p[0],10)*60 + parseInt(p[1],10); }
+
+  function initTimeline(){
+    // First-time init: default the date to today.
+    if (!$('tlDate').value){
+      var t = today();
+      setHiddenDate('tlDate', t);
+      loadTimeline();
+    } else {
+      loadTimeline();
+    }
+  }
+
+  async function loadTimeline(){
+    var dk = $('tlDate').value; if (!dk) return;
+    $('tlMsg').textContent = '';
+    var wrap = $('tlContainer');
+    wrap.innerHTML = '<div class="empty" style="margin:0;border:none;padding:14px 0;">Loading…</div>';
+    try {
+      // One request for hours + extras + existing bookings + off-flag.
+      var [slotsRes, dayRes, offRes] = await Promise.all([
+        fetch('/api/linda-slots?date=' + encodeURIComponent(dk)).then(function(r){ return r.json(); }),
+        fetch('/api/linda-day?date=' + encodeURIComponent(dk)).then(function(r){ return r.json(); }),
+        fetch('/api/linda-base-schedule').then(function(r){ return r.json(); }),
+      ]);
+      if (slotsRes && slotsRes.ok){
+        tl.extras = slotsRes.extras || [];
+        tl.dayOff = !!slotsRes.dayOff;
+      } else {
+        tl.extras = []; tl.dayOff = false;
+      }
+      tl.booked = ((dayRes && dayRes.appointments) || [])
+        .filter(function(a){ return !a.status || String(a.status).indexOf('CANCELLED') < 0; })
+        .map(function(a){ return { start: a.start_time, end: a.end_time, name: a.full_name }; });
+      // Use today's day-of-week to pick base hours.
+      var dow = ['SUN','MON','TUE','WED','THU','FRI','SAT'][parseKey(dk).getDay()];
+      var hours = ((offRes && offRes.hours) || {})[dow] || [];
+      tl.baseHours = hours;
+
+      tl.sel = null;
+      renderTimeline();
+    } catch(e){
+      wrap.innerHTML = '<div class="err" style="margin:0;">Network error.</div>';
+    }
+  }
+
+  function pctOf(min){
+    var clamped = Math.max(TL_START_MIN, Math.min(TL_END_MIN, min));
+    return ((clamped - TL_START_MIN) / TL_TOTAL_MIN) * 100;
+  }
+  function renderTimeline(){
+    var wrap = $('tlContainer');
+    var html = '<div class="tl-bar" id="tlBar">';
+    // Base hours
+    for (var i = 0; i < (tl.baseHours || []).length; i++){
+      var b = tl.baseHours[i];
+      var l = pctOf(timeToMin(b.start));
+      var r = pctOf(timeToMin(b.end));
+      html += '<div class="tl-seg base" style="left:' + l + '%;width:' + (r - l) + '%;"></div>';
+    }
+    // Extras
+    for (var i = 0; i < tl.extras.length; i++){
+      var e = tl.extras[i];
+      var l = pctOf(timeToMin(e.start || e.start_time));
+      var r = pctOf(timeToMin(e.end || e.end_time));
+      html += '<div class="tl-seg extra" style="left:' + l + '%;width:' + (r - l) + '%;"></div>';
+    }
+    // Bookings
+    for (var i = 0; i < tl.booked.length; i++){
+      var b = tl.booked[i];
+      var l = pctOf(timeToMin(b.start));
+      var r = pctOf(timeToMin(b.end));
+      html += '<div class="tl-seg booked" style="left:' + l + '%;width:' + (r - l) + '%;" title="' + esc(b.name || '') + '"></div>';
+    }
+    // Day-off hatch
+    if (tl.dayOff){
+      html += '<div class="tl-seg off" style="left:0;width:100%;"></div>';
+    }
+    // Selection
+    if (tl.sel){
+      var l = pctOf(tl.sel.start);
+      var r = pctOf(tl.sel.end);
+      html += '<div class="tl-seg sel" style="left:' + l + '%;width:' + (r - l) + '%;"></div>';
+    }
+    html += '</div>';
+    // Ticks
+    html += '<div class="tl-ticks">';
+    for (var h = 7; h <= 22; h += 3){
+      html += '<div class="tl-tick">' + pad(h) + ':00</div>';
+    }
+    html += '</div>';
+    html += '<div class="tl-legend">' +
+      '<span><span class="tl-legend-dot" style="background:var(--accent);opacity:.55;"></span>Weekly</span>' +
+      '<span><span class="tl-legend-dot" style="background:var(--accent);opacity:.85;background-image:repeating-linear-gradient(45deg,transparent,transparent 3px,rgba(255,255,255,.35) 3px,rgba(255,255,255,.35) 6px);"></span>Extra</span>' +
+      '<span><span class="tl-legend-dot" style="background:#3730a3;"></span>Booked</span>' +
+      '<span><span class="tl-legend-dot" style="background:var(--bad);"></span>Day off</span>' +
+      '</div>';
+    html += '<div class="tl-sel-txt ' + (tl.sel ? '' : 'muted') + '" id="tlSelTxt">' +
+      (tl.sel ? 'Selected: ' + minToTime(tl.sel.start) + ' – ' + minToTime(tl.sel.end) : 'Drag on the bar to select a range.') +
+      '</div>';
+    wrap.innerHTML = html;
+    $('tlAddBtn').disabled = !tl.sel;
+
+    // Wire drag
+    var bar = $('tlBar');
+    if (!bar) return;
+    var dragging = false;
+    var startMin = 0;
+    function xToMin(clientX){
+      var rect = bar.getBoundingClientRect();
+      var pct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+      var m = TL_START_MIN + pct * TL_TOTAL_MIN;
+      return Math.round(m / TL_SNAP_MIN) * TL_SNAP_MIN;
+    }
+    function onDown(x){
+      dragging = true;
+      startMin = xToMin(x);
+      tl.sel = { start: startMin, end: startMin + TL_SNAP_MIN };
+      renderTimeline();
+    }
+    function onMove(x){
+      if (!dragging) return;
+      var cur = xToMin(x);
+      var s = Math.min(startMin, cur), e = Math.max(startMin, cur);
+      if (e - s < TL_SNAP_MIN) e = s + TL_SNAP_MIN;
+      tl.sel = { start: s, end: e };
+      // Avoid full re-render while dragging — just adjust the .sel element width.
+      var sel = bar.querySelector('.tl-seg.sel');
+      if (sel){
+        sel.style.left = pctOf(s) + '%';
+        sel.style.width = (pctOf(e) - pctOf(s)) + '%';
+        var txt = document.getElementById('tlSelTxt');
+        if (txt){ txt.classList.remove('muted'); txt.textContent = 'Selected: ' + minToTime(s) + ' – ' + minToTime(e); }
+      } else {
+        renderTimeline();
+      }
+    }
+    function onUp(){
+      if (!dragging) return;
+      dragging = false;
+      $('tlAddBtn').disabled = !tl.sel;
+    }
+    bar.addEventListener('mousedown', function(ev){ onDown(ev.clientX); });
+    window.addEventListener('mousemove', function(ev){ onMove(ev.clientX); });
+    window.addEventListener('mouseup', onUp);
+    bar.addEventListener('touchstart', function(ev){ if (ev.touches.length) onDown(ev.touches[0].clientX); }, { passive: true });
+    bar.addEventListener('touchmove', function(ev){ if (ev.touches.length) onMove(ev.touches[0].clientX); }, { passive: true });
+    bar.addEventListener('touchend', onUp);
+  }
+
+  function setTlMsg(txt, kind){
+    var m = $('tlMsg');
+    m.textContent = txt || '';
+    m.className = 'avail-msg' + (kind ? ' ' + kind : '');
+  }
+
+  window.saveTimelineRange = async function(){
+    var dk = $('tlDate').value;
+    if (!dk) { setTlMsg('Pick a date first.', 'bad'); return; }
+    if (!tl.sel) { setTlMsg('Drag on the bar to select a range.', 'bad'); return; }
+    setTlMsg('Saving…', '');
+    try {
+      var res = await fetch('/api/linda-extras', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dateKey: dk, startTime: minToTime(tl.sel.start), endTime: minToTime(tl.sel.end) }),
+      });
+      if (res.status === 403) { window.location.reload(); return; }
+      var data = await res.json();
+      if (data.ok){
+        setTlMsg('Added ' + minToTime(tl.sel.start) + '–' + minToTime(tl.sel.end) + '.', 'ok');
+        tl.sel = null;
+        loadTimeline(); loadExtras();
+      } else {
+        setTlMsg(data.reason || 'Failed', 'bad');
+      }
+    } catch(e){ setTlMsg('Network error', 'bad'); }
+  };
+
+  window.blockTimelineDay = async function(){
+    var dk = $('tlDate').value;
+    if (!dk) { setTlMsg('Pick a date first.', 'bad'); return; }
+    if (!confirm('Mark ' + dk + ' as a full day off?\\n\\nExisting bookings on this date stay — use Reschedule on each to shift them.')) return;
+    setTlMsg('Saving…', '');
+    try {
+      var res = await fetch('/api/linda-off', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dateKey: dk, reason: '' }),
+      });
+      if (res.status === 403) { window.location.reload(); return; }
+      var data = await res.json();
+      if (data.ok){
+        setTlMsg('Blocked.' + (data.affectedBookings ? ' ' + data.affectedBookings + ' booking(s) still on this date — reschedule them.' : ''), 'ok');
+        loadTimeline(); loadOff();
+      } else {
+        setTlMsg(data.reason || 'Failed', 'bad');
+      }
+    } catch(e){ setTlMsg('Network error', 'bad'); }
   };
 
   window.deleteOff = async function(id){
