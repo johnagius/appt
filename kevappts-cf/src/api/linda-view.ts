@@ -372,11 +372,11 @@ export async function apiLindaBaseSchedule(req: Request, env: Env): Promise<Resp
   });
 }
 
-// POST /api/linda-base-schedule — Linda edits her own booking window from
-// the /linda page. Body: { windowStart, windowEnd, slotMin?, hours? }.
-// hours, if provided, is a WorkingHours-shaped object; each day's value is
-// an array of { start, end } ranges. Same validation rules as the admin
-// endpoint (shape-check + non-empty ranges only).
+// POST /api/linda-base-schedule — save slot duration and/or weekly hours.
+// Booking periods are now edited via /api/linda-windows (the multi-row
+// table). windowStart / windowEnd are still accepted here for legacy
+// callers but are optional; when sent, they update the legacy config
+// pair — useful as a compatibility shim only.
 export async function apiLindaSaveBaseSchedule(req: Request, env: Env): Promise<Response> {
   if (!await isLindaAuthed(req, env)) return json({ ok: false, reason: 'Access denied.' }, 403);
   const body: any = await req.json();
@@ -384,14 +384,17 @@ export async function apiLindaSaveBaseSchedule(req: Request, env: Env): Promise<
   const windowEnd = String(body.windowEnd || '').trim();
   const slotMinRaw = body.slotMin;
   const hoursRaw = body.hours;
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(windowStart)) return json({ ok: false, reason: 'Invalid start date.' }, 400);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(windowEnd)) return json({ ok: false, reason: 'Invalid end date.' }, 400);
-  if (windowEnd < windowStart) return json({ ok: false, reason: 'End date must be on or after start date.' }, 400);
 
-  await env.DB.prepare('INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)')
-    .bind('LINDA_WINDOW_START', windowStart).run();
-  await env.DB.prepare('INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)')
-    .bind('LINDA_WINDOW_END', windowEnd).run();
+  // Only validate window fields if BOTH were sent (legacy compat path).
+  if (windowStart || windowEnd) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(windowStart)) return json({ ok: false, reason: 'Invalid start date.' }, 400);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(windowEnd)) return json({ ok: false, reason: 'Invalid end date.' }, 400);
+    if (windowEnd < windowStart) return json({ ok: false, reason: 'End date must be on or after start date.' }, 400);
+    await env.DB.prepare('INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)')
+      .bind('LINDA_WINDOW_START', windowStart).run();
+    await env.DB.prepare('INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)')
+      .bind('LINDA_WINDOW_END', windowEnd).run();
+  }
 
   if (slotMinRaw !== undefined && slotMinRaw !== null && slotMinRaw !== '') {
     const slotMin = parseInt(String(slotMinRaw), 10);
