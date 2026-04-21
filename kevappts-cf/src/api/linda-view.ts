@@ -1525,21 +1525,15 @@ function lindaMainPage(env: Env): string {
 <div id="pane-avail" style="display:none;">
   <div class="avail-wrap">
     <div class="avail-card">
-      <h3>Your booking window</h3>
-      <p class="hint">These are the first and last days patients can book you. Shorten or extend them any time — existing bookings aren't touched.</p>
-      <div class="avail-row">
-        <label>From</label>
-        <button type="button" class="date-btn empty" id="winStartBtn" onclick="pickDate('winStart', function(){ markWindowDirty(); })"><span class="date-icon">📅</span><span class="date-val" id="winStartLabel">Loading…</span></button>
-        <input type="hidden" id="winStart">
-      </div>
-      <div class="avail-row">
-        <label>To</label>
-        <button type="button" class="date-btn empty" id="winEndBtn" onclick="pickDate('winEnd', function(){ markWindowDirty(); })"><span class="date-icon">📅</span><span class="date-val" id="winEndLabel">Loading…</span></button>
-        <input type="hidden" id="winEnd">
-      </div>
-      <div class="avail-row"><label>Slots</label><select id="winSlotMin" onchange="markWindowDirty()"><option value="15">15 min</option><option value="20">20 min</option><option value="30" selected>30 min</option><option value="45">45 min</option><option value="60">60 min</option></select></div>
-      <button class="avail-save" id="winSaveBtn" style="display:none;" onclick="saveWindow()">Save window</button>
-      <div class="avail-msg" id="winMsg"></div>
+      <h3>Your booking periods</h3>
+      <p class="hint">Linda's visits. Add a stint for each period you'll be here — each can have its own From / To dates. Patients can book any date covered by any stint.</p>
+      <div id="winList"><div class="empty" style="margin:0;border:none;padding:12px 0;">Loading…</div></div>
+      <button class="avail-save" style="margin-top:8px;" onclick="openAddWindow()">+ Add a stint</button>
+      <div class="avail-msg" id="winListMsg"></div>
+
+      <h3 style="margin-top:18px;">Slot duration</h3>
+      <div class="avail-row"><label>Slots</label><select id="winSlotMin" onchange="saveSlotMin()"><option value="15">15 min</option><option value="20">20 min</option><option value="30" selected>30 min</option><option value="45">45 min</option><option value="60">60 min</option></select></div>
+      <div class="avail-msg" id="slotMinMsg"></div>
 
       <h3 style="margin-top:16px;">Weekly schedule</h3>
       <p class="hint">Morning + evening hours that apply to every weekday (and optionally Saturdays). Saves to all days at once.</p>
@@ -1954,7 +1948,7 @@ function lindaMainPage(env: Env): string {
     $('tabDayBtn').classList.toggle('active', which === 'day');
     $('tabWeekBtn').classList.toggle('active', which === 'week');
     $('tabAvailBtn').classList.toggle('active', which === 'avail');
-    if (which === 'avail') { loadBaseSchedule(); loadExtras(); loadOff(); initTimeline(); }
+    if (which === 'avail') { loadWindows(); loadBaseSchedule(); loadExtras(); loadOff(); initTimeline(); }
     if (which === 'week') loadWeek();
   };
 
@@ -1984,29 +1978,126 @@ function lindaMainPage(env: Env): string {
     if (btn) btn.classList.remove('empty');
   }
 
-  window.markWindowDirty = function(){ $('winSaveBtn').style.display = ''; };
+  // ── Booking windows (stints) ──
+  function setStintMsg(txt, kind){
+    var m = $('winListMsg');
+    m.textContent = txt || '';
+    m.className = 'avail-msg' + (kind ? ' ' + kind : '');
+  }
 
-  window.saveWindow = async function(){
-    var ws = $('winStart').value, we = $('winEnd').value, sm = parseInt($('winSlotMin').value, 10) || 30;
-    if (!ws || !we) { $('winMsg').textContent = 'Pick both dates.'; $('winMsg').className = 'avail-msg bad'; return; }
-    $('winMsg').textContent = 'Saving…'; $('winMsg').className = 'avail-msg';
+  async function loadWindows(){
+    var el = $('winList');
     try {
-      var res = await fetch('/api/linda-base-schedule', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ windowStart: ws, windowEnd: we, slotMin: sm }),
+      var res = await fetch('/api/linda-windows');
+      if (res.status === 403) { window.location.reload(); return; }
+      var data = await res.json();
+      if (!data.ok){ el.innerHTML = '<div class="err" style="margin:0;">' + esc(data.reason || 'Failed') + '</div>'; return; }
+      var wins = data.windows || [];
+      if (!wins.length){
+        el.innerHTML = '<div class="empty" style="margin:0;border:none;padding:12px 0;">No stints yet. Tap + Add a stint.</div>';
+        return;
+      }
+      var html = '';
+      for (var i = 0; i < wins.length; i++){
+        var w = wins[i];
+        var hsId = 'ws' + w.id, heId = 'we' + w.id, hnId = 'wn' + w.id;
+        html += '<div class="extra-row" style="flex-direction:column;align-items:stretch;">';
+        html +=   '<div class="extra-when" style="margin-bottom:6px;">' + esc(formatNiceShort(w.start)) + ' — ' + esc(formatNiceShort(w.end));
+        if (w.note) html +=     ' · <span style="color:var(--muted);font-weight:500;">' + esc(w.note) + '</span>';
+        html +=   '</div>';
+        html +=   '<div class="extra-edit-panel" id="winEdit' + w.id + '" style="display:none;">';
+        html +=     '<button type="button" class="date-btn" id="' + hsId + 'Btn" onclick="pickDate(\\'' + hsId + '\\')"><span class="date-icon">📅</span><span class="date-val" id="' + hsId + 'Label">' + esc(formatNiceShort(w.start)) + '</span></button>';
+        html +=     '<input type="hidden" id="' + hsId + '" value="' + esc(w.start) + '">';
+        html +=     '<button type="button" class="date-btn" id="' + heId + 'Btn" onclick="pickDate(\\'' + heId + '\\')"><span class="date-icon">📅</span><span class="date-val" id="' + heId + 'Label">' + esc(formatNiceShort(w.end)) + '</span></button>';
+        html +=     '<input type="hidden" id="' + heId + '" value="' + esc(w.end) + '">';
+        html +=     '<input type="text" id="' + hnId + '" placeholder="Note (optional)" value="' + esc(w.note || '') + '" style="flex:1 1 100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:14px;">';
+        html +=     '<button class="save" onclick="saveWindowRow(' + w.id + ')">Save</button>';
+        html +=     '<button class="cancel" onclick="toggleWindowEdit(' + w.id + ', false)">Cancel</button>';
+        html +=   '</div>';
+        html +=   '<div style="display:flex;gap:6px;justify-content:flex-end;">';
+        html +=     '<button class="extra-edit" onclick="toggleWindowEdit(' + w.id + ', true)">Edit</button>';
+        html +=     '<button class="extra-del" onclick="deleteWindow(' + w.id + ')">Remove</button>';
+        html +=   '</div>';
+        html += '</div>';
+      }
+      el.innerHTML = html;
+    } catch(e){
+      el.innerHTML = '<div class="err" style="margin:0;">Network error.</div>';
+    }
+  }
+
+  window.toggleWindowEdit = function(id, on){
+    var p = document.getElementById('winEdit' + id);
+    if (p) p.style.display = on ? '' : 'none';
+  };
+
+  window.saveWindowRow = async function(id){
+    var s = ($('ws' + id) || {}).value || '';
+    var e = ($('we' + id) || {}).value || '';
+    var n = ($('wn' + id) || {}).value || '';
+    if (!s || !e) { setStintMsg('Pick start and end dates.', 'bad'); return; }
+    try {
+      var res = await fetch('/api/linda-windows', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: id, startDate: s, endDate: e, note: n }),
       });
       if (res.status === 403) { window.location.reload(); return; }
       var data = await res.json();
-      if (data.ok){
-        $('winMsg').textContent = 'Saved.'; $('winMsg').className = 'avail-msg ok';
-        $('winSaveBtn').style.display = 'none';
-        loadBaseSchedule();
-      } else {
-        $('winMsg').textContent = data.reason || 'Failed'; $('winMsg').className = 'avail-msg bad';
-      }
-    } catch(e){
-      $('winMsg').textContent = 'Network error'; $('winMsg').className = 'avail-msg bad';
-    }
+      if (data.ok){ setStintMsg('Saved.', 'ok'); loadWindows(); }
+      else setStintMsg(data.reason || 'Failed', 'bad');
+    } catch(err){ setStintMsg('Network error', 'bad'); }
+  };
+
+  window.deleteWindow = async function(id){
+    if (!confirm('Remove this stint? Patients will no longer be able to book within it (existing bookings stay).')) return;
+    try {
+      var res = await fetch('/api/linda-windows?id=' + id, { method: 'DELETE' });
+      if (res.status === 403) { window.location.reload(); return; }
+      var data = await res.json();
+      if (data.ok){ setStintMsg('Removed.', 'ok'); loadWindows(); }
+      else setStintMsg(data.reason || 'Failed', 'bad');
+    } catch(e){ setStintMsg('Network error', 'bad'); }
+  };
+
+  window.openAddWindow = function(){
+    // Two-step prompt: pick a from-date, then a to-date, then post.
+    pickDate('stintAddFrom', function(fromDk){
+      if (!fromDk) return;
+      pickDate('stintAddTo', async function(toDk){
+        if (!toDk) return;
+        try {
+          var res = await fetch('/api/linda-windows', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ startDate: fromDk, endDate: toDk, note: '' }),
+          });
+          if (res.status === 403) { window.location.reload(); return; }
+          var data = await res.json();
+          if (data.ok){ setStintMsg('Added.', 'ok'); loadWindows(); }
+          else setStintMsg(data.reason || 'Failed', 'bad');
+        } catch(e){ setStintMsg('Network error', 'bad'); }
+      });
+    });
+  };
+  // Hidden inputs for the two-step add picker.
+  ['stintAddFrom', 'stintAddTo'].forEach(function(id){
+    var input = document.createElement('input'); input.type = 'hidden'; input.id = id; document.body.appendChild(input);
+    var lbl = document.createElement('span'); lbl.id = id + 'Label'; lbl.style.display = 'none'; document.body.appendChild(lbl);
+    var btn = document.createElement('span'); btn.id = id + 'Btn'; btn.style.display = 'none'; document.body.appendChild(btn);
+  });
+
+  // Save slot duration in-place (no separate button — change fires save).
+  window.saveSlotMin = async function(){
+    var sm = parseInt($('winSlotMin').value, 10) || 30;
+    $('slotMinMsg').textContent = 'Saving…'; $('slotMinMsg').className = 'avail-msg';
+    try {
+      var res = await fetch('/api/linda-base-schedule', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slotMin: sm }),
+      });
+      var data = await res.json();
+      if (data.ok){ $('slotMinMsg').textContent = 'Saved.'; $('slotMinMsg').className = 'avail-msg ok'; }
+      else { $('slotMinMsg').textContent = data.reason || 'Failed'; $('slotMinMsg').className = 'avail-msg bad'; }
+    } catch(e){ $('slotMinMsg').textContent = 'Network error'; $('slotMinMsg').className = 'avail-msg bad'; }
   };
 
   window.markHoursDirty = function(){ $('wsSaveBtn').style.display = ''; };
@@ -2018,10 +2109,7 @@ function lindaMainPage(env: Env): string {
       if (res.status === 403) { window.location.reload(); return; }
       var data = await res.json();
       if (!data.ok){ el.innerHTML = '<div class="err" style="margin:0;">' + esc(data.reason || 'Failed') + '</div>'; return; }
-      setHiddenDate('winStart', data.windowStart);
-      setHiddenDate('winEnd', data.windowEnd);
       $('winSlotMin').value = String(data.slotMin || 30);
-      $('winSaveBtn').style.display = 'none';
 
       // Pre-fill the weekly-hours inputs from MON (taken as the canonical
       // weekday template; matches the admin UI's pattern).
@@ -2079,8 +2167,6 @@ function lindaMainPage(env: Env): string {
       var res = await fetch('/api/linda-base-schedule', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          windowStart: $('winStart').value,
-          windowEnd: $('winEnd').value,
           slotMin: parseInt($('winSlotMin').value, 10) || 30,
           hours: hours,
         }),
