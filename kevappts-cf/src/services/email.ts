@@ -493,56 +493,78 @@ export async function sendCustomNotificationEmail(env: Env, appt: Appointment, c
 
 // ─── 10. Google Review Request ────────────────────────────
 
-export async function sendReviewRequestEmail(env: Env, appt: Appointment, location: 'potters' | 'spinola' | 'linda', teamNames: string[]): Promise<void> {
+export async function sendReviewRequestEmail(env: Env, appt: Appointment, location: 'potters' | 'spinola' | 'linda', _teamNames: string[] = []): Promise<void> {
   if (!appt.email) return;
 
   const firstName = (appt.full_name || '').split(' ')[0] || 'there';
-  const isPotters = location === 'potters';
-  const isLinda = location === 'linda';
-  const placeName = isPotters
-    ? "Potter's Pharmacy"
-    : isLinda
-      ? `${env.LINDA_DOCTOR_NAME || 'Linda'} — Physiotherapy`
-      : 'Spinola Clinic';
+  // "placeName" is the clinic/service name that appears in the sign-off and
+  // footer. We shape it per clinic so it reads naturally in the copy.
+  const placeName =
+    location === 'potters' ? "Potter's Pharmacy Clinic"
+    : location === 'spinola' ? 'Spinola Clinic'
+    : "Potter's Pharmacy Clinic";
+  // For Linda we sign off with her name explicitly — she's solo, not "the team".
+  const signOff =
+    location === 'linda'
+      ? `${env.LINDA_DOCTOR_NAME || 'Linda'} at Potter's Pharmacy Clinic`
+      : `The team at ${placeName}`;
+
   const reviewUrl = 'https://search.google.com/local/writereview?placeid=ChIJ3dCu7mtFDhMRYBPbRR0pgtE';
 
-  let teamLine = '';
-  if (teamNames.length === 1) teamLine = teamNames[0];
-  else if (teamNames.length === 2) teamLine = teamNames[0] + ' &amp; ' + teamNames[1];
-  else if (teamNames.length >= 3) teamLine = teamNames.slice(0, -1).join(', ') + ' &amp; ' + teamNames[teamNames.length - 1];
+  const subject = 'A small favour, big impact';
 
-  const accentColor = isPotters ? '#2563eb' : isLinda ? '#10b981' : '#8b5cf6';
-
-  const subject = `We'd love your feedback - ${placeName}`;
   const html = `<!DOCTYPE html>
-<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
-<body style="margin:0;padding:0;background:#f3f4f6;font-family:Arial,Helvetica,sans-serif;">
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<style>
+  /* Mobile: full-width button, tighter padding */
+  @media only screen and (max-width: 480px) {
+    .card-pad { padding: 28px 22px !important; }
+    .cta-btn  { padding: 20px 24px !important; width: 100% !important; box-sizing: border-box; display: block !important; }
+  }
+</style>
+</head>
+<body style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;">
-<tr><td align="center" style="padding:32px 16px;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.06);">
-<tr><td style="height:6px;background:${accentColor};"></td></tr>
-<tr><td style="padding:36px 32px 24px;">
-  <h1 style="margin:0 0 20px;font-size:22px;font-weight:800;color:#111827;line-height:1.3;">Thank you for visiting ${escapeHtml(placeName)}!</h1>
-  <p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#374151;">Hi ${escapeHtml(firstName)},</p>
-  <p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#374151;">We hope you had a great experience with us today. If you were happy with the service, we'd really appreciate it if you could take a moment to leave us a quick Google review.</p>
-  <p style="margin:0 0 24px;font-size:15px;line-height:1.6;color:#374151;">Your feedback helps others discover us and means the world to our team.</p>
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-  <tr><td align="center" style="padding:4px 0 28px;">
-    <a href="${reviewUrl}" style="display:inline-block;background:${accentColor};color:#ffffff;text-decoration:none;padding:14px 32px;border-radius:999px;font-size:15px;font-weight:700;letter-spacing:0.3px;">&#9733; Leave a Review</a>
-  </td></tr></table>
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-  <tr><td style="border-top:1px solid #e5e7eb;padding-top:20px;">
-    <p style="margin:0;font-size:14px;line-height:1.5;color:#6b7280;">Warm regards,</p>
-    <p style="margin:4px 0 0;font-size:15px;font-weight:700;color:#111827;">${teamLine}</p>
-    <p style="margin:2px 0 0;font-size:13px;color:#9ca3af;">The Potter's Pharmacy Team</p>
-  </td></tr></table>
-</td></tr>
-<tr><td style="padding:16px 32px 24px;background:#f9fafb;border-top:1px solid #f3f4f6;">
-  <p style="margin:0;font-size:11px;line-height:1.5;color:#9ca3af;text-align:center;">
-    This email was sent because you visited ${escapeHtml(placeName)} today.<br>
-    If you received this by mistake, please disregard it.
-  </p>
-</td></tr>
+<tr><td align="center" style="padding:40px 16px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#ffffff;border-radius:20px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.08);">
+  <tr><td style="height:6px;background:linear-gradient(90deg,#10b981 0%,#059669 100%);"></td></tr>
+  <tr><td class="card-pad" style="padding:40px 36px 36px;">
+
+    <h1 style="margin:0 0 22px;font-size:22px;font-weight:800;color:#111827;line-height:1.3;letter-spacing:-0.2px;">
+      Hi ${escapeHtml(firstName)},
+    </h1>
+
+    <p style="margin:0 0 18px;font-size:16px;line-height:1.65;color:#374151;">
+      Thank you for trusting us with your care today.
+    </p>
+
+    <p style="margin:0 0 18px;font-size:16px;line-height:1.65;color:#374151;">
+      Your review on Google could be the reason another family finds us when they need care most.
+    </p>
+
+    <p style="margin:0 0 32px;font-size:16px;line-height:1.65;color:#374151;">
+      It only takes <b>20 seconds</b> — but it means the world to us. It encourages us to keep improving and helps us reach more people who need care.
+    </p>
+
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 32px;">
+      <tr><td align="center">
+        <a href="${reviewUrl}" class="cta-btn"
+           style="display:inline-block;text-align:center;background:linear-gradient(135deg,#10b981 0%,#059669 100%);color:#ffffff;text-decoration:none;padding:20px 42px;border-radius:999px;font-size:17px;font-weight:800;letter-spacing:0.3px;box-shadow:0 8px 24px rgba(16,185,129,0.42);min-width:240px;">
+          <span style="display:block;font-size:22px;letter-spacing:8px;margin-bottom:6px;color:#FBBF24;line-height:1;">&#9733;&#9733;&#9733;&#9733;&#9733;</span>
+          <span style="display:block;font-size:17px;line-height:1;">Leave a Google review</span>
+        </a>
+      </td></tr>
+    </table>
+
+    <p style="margin:0;font-size:15px;line-height:1.6;color:#374151;">Thank you,</p>
+    <p style="margin:4px 0 0;font-size:15px;font-weight:700;color:#111827;">${escapeHtml(signOff)}</p>
+
+  </td></tr>
+  <tr><td style="padding:14px 36px 20px;background:#f9fafb;border-top:1px solid #f3f4f6;">
+    <p style="margin:0;font-size:11px;line-height:1.55;color:#9ca3af;text-align:center;">
+      You're getting this because you had an appointment with ${escapeHtml(placeName)}.
+    </p>
+  </td></tr>
 </table>
 </td></tr></table>
 </body></html>`;
