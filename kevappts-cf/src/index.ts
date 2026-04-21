@@ -22,7 +22,7 @@ import {
   apiAdminSendReviewRequests, apiAdminGetWeekOverview, apiAdminSearchAppointments,
   apiAdminGetSettings, apiAdminSaveSettings, apiAdminGetStatistics,
   apiAdminMarkAttendance, apiAdminGetPatientHistory, apiAdminDoctorOffDates,
-  apiAdminCreateTestBooking, apiAdminPurgeTestData, apiAdminTestFollowUp, apiAdminGetFollowUps, apiAdminToggleFollowUpHandled, apiAdminGetReferrals,
+  apiAdminCreateTestBooking, apiAdminPurgeTestData, apiAdminTestFollowUp, apiAdminTestReview, apiAdminGetFollowUps, apiAdminToggleFollowUpHandled, apiAdminGetReferrals,
   apiAdminGetLindaStats, apiAdminGetLindaReviewPatients, apiAdminSendLindaReviewRequests, apiAdminGetLindaFollowUps, apiAdminGetLindaAppointments,
   apiAdminGetLindaConfig, apiAdminSaveLindaConfig,
 } from './api/admin';
@@ -196,6 +196,7 @@ export default {
         if (adminPath === 'test-booking' && method === 'POST') return apiAdminCreateTestBooking(request, env);
         if (adminPath === 'purge-test-data' && method === 'POST') return apiAdminPurgeTestData(request, env);
         if (adminPath === 'test-followup' && method === 'POST') return apiAdminTestFollowUp(request, env);
+        if (adminPath === 'test-review' && method === 'POST') return apiAdminTestReview(request, env);
         if (adminPath === 'follow-ups' && method === 'GET') return apiAdminGetFollowUps(request, env);
         if (adminPath === 'follow-up-handled' && method === 'POST') return apiAdminToggleFollowUpHandled(request, env);
         if (adminPath === 'referrals' && method === 'GET') return apiAdminGetReferrals(request, env);
@@ -562,6 +563,16 @@ function testPage(sig: string): string {
 </div>
 
 <div class="card">
+  <h2>Preview Review Email</h2>
+  <p style="font-size:13px;color:#666;margin-bottom:12px">Sends the production review email to any address so you can preview what patients get. Doesn't create an appointment or mark anything sent.</p>
+  <div class="row">
+    <div><label>Your email</label><input type="email" id="reviewTestEmail" placeholder="you@example.com"></div>
+    <div><label>As clinic</label><select id="reviewTestLocation"><option value="potters">Potter's Pharmacy</option><option value="spinola">Spinola Clinic</option><option value="linda">Linda (Physio)</option></select></div>
+  </div>
+  <button class="btn btn-quick" onclick="testReview()" style="background:#10b981">Send Review Email to Me</button>
+</div>
+
+<div class="card">
   <h2>Log</h2>
   <div class="log" id="log">Ready.\\n</div>
 </div>
@@ -657,6 +668,17 @@ async function testFollowUp() {
   log('Sending test follow-up email to labrint@gmail.com...');
   try {
     var res = await api('test-followup', {});
+    if (res.ok) log('OK: ' + res.message);
+    else log('ERROR: ' + (res.reason || 'Failed'));
+  } catch(e) { log('FAILED: ' + e.message); }
+}
+async function testReview() {
+  var email = document.getElementById('reviewTestEmail').value.trim();
+  var location = document.getElementById('reviewTestLocation').value;
+  if (!email) { log('ERROR: enter your email first.'); return; }
+  log('Sending review email to ' + email + ' (as ' + location + ')...');
+  try {
+    var res = await api('test-review', { email: email, location: location });
     if (res.ok) log('OK: ' + res.message);
     else log('ERROR: ' + (res.reason || 'Failed'));
   } catch(e) { log('FAILED: ' + e.message); }

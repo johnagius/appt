@@ -1594,3 +1594,54 @@ export async function apiAdminSaveLindaConfig(req: Request, env: Env): Promise<R
 
   return json({ ok: true, message: 'Linda availability saved.', config: await loadLindaConfig(env.DB) });
 }
+
+// ─── Test review email ──────────────────────────────────────
+// Sends the production review email template to any address so Linda/Kevin
+// can preview what patients actually receive. Doesn't create an appointment;
+// doesn't insert into review_sent. Body: { email, location? }
+
+export async function apiAdminTestReview(req: Request, env: Env): Promise<Response> {
+  const deny = await requireAdmin(req, env);
+  if (deny) return deny;
+
+  const body: any = await req.json().catch(() => ({}));
+  const email = String(body.email || '').trim();
+  const locRaw = String(body.location || 'potters').trim();
+  const location: 'potters' | 'spinola' | 'linda' =
+    locRaw === 'spinola' ? 'spinola' : locRaw === 'linda' ? 'linda' : 'potters';
+  if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+    return json({ ok: false, reason: 'Invalid email.' }, 400);
+  }
+
+  const fakeAppt: Appointment = {
+    id: 'TEST-REVIEW-' + generateId(),
+    date_key: toDateKey(todayLocal(env.TIMEZONE)),
+    start_time: '10:00',
+    end_time: '10:10',
+    service_id: 'clinic',
+    service_name: 'Clinic Consultation',
+    full_name: 'Test Patient',
+    email,
+    phone: '',
+    comments: '',
+    status: 'ATTENDED',
+    location: "Potter's Pharmacy Clinic",
+    clinic: location === 'spinola' ? 'spinola' : location === 'linda' ? 'linda' : 'potters',
+    created_at: nowIso(env.TIMEZONE),
+    updated_at: nowIso(env.TIMEZONE),
+    token: '',
+    calendar_event_id: '',
+    cancelled_at: '',
+    cancel_reason: '',
+    reminder_sent: '',
+    confirmed: '',
+    booking_source: 'test',
+  };
+
+  try {
+    await sendReviewRequestEmail(env, fakeAppt, location);
+    return json({ ok: true, message: 'Review email sent to ' + email + ' (' + location + ').' });
+  } catch (e: any) {
+    return json({ ok: false, reason: e?.message || 'Send failed.' }, 500);
+  }
+}
