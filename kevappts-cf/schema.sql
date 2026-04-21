@@ -76,8 +76,15 @@ CREATE TABLE IF NOT EXISTS data_version (
 
 CREATE TABLE IF NOT EXISTS review_sent (
   appointment_id TEXT PRIMARY KEY,
-  sent_at TEXT NOT NULL
+  sent_at TEXT NOT NULL,
+  source TEXT DEFAULT 'manual'
 );
+-- Existing DBs that were created before the source column: run once to migrate.
+--   npx wrangler d1 execute kevappts-db --remote \
+--     --command "ALTER TABLE review_sent ADD COLUMN source TEXT DEFAULT 'manual';"
+-- (The ALTER isn't in this file because CREATE TABLE IF NOT EXISTS is a no-op
+-- on existing tables, so it'd never actually add the column; and a standalone
+-- ALTER would fail on fresh DBs where the column already exists.)
 
 CREATE TABLE IF NOT EXISTS follow_ups (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

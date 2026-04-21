@@ -379,9 +379,20 @@ export async function isReviewSent(db: D1Database, appointmentId: string): Promi
   return !!row;
 }
 
-export async function markReviewSent(db: D1Database, appointmentId: string, nowStr: string): Promise<void> {
-  await db.prepare('INSERT OR IGNORE INTO review_sent (appointment_id, sent_at) VALUES (?, ?)')
-    .bind(appointmentId, nowStr).run();
+export async function markReviewSent(
+  db: D1Database,
+  appointmentId: string,
+  nowStr: string,
+  source: 'manual' | 'auto' = 'manual',
+): Promise<void> {
+  await db.prepare('INSERT OR IGNORE INTO review_sent (appointment_id, sent_at, source) VALUES (?, ?, ?)')
+    .bind(appointmentId, nowStr, source).run();
+}
+
+export async function getReviewSent(db: D1Database, appointmentId: string): Promise<{ sent_at: string; source: string } | null> {
+  const row = await db.prepare('SELECT sent_at, source FROM review_sent WHERE appointment_id = ?')
+    .bind(appointmentId).first<{ sent_at: string; source: string }>();
+  return row ? { sent_at: row.sent_at, source: row.source || 'manual' } : null;
 }
 
 // ─── Follow-up Tracking ───────────────────────────────────
