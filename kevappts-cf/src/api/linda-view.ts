@@ -309,6 +309,37 @@ export async function apiLindaBaseSchedule(req: Request, env: Env): Promise<Resp
   });
 }
 
+// POST /api/linda-base-schedule — Linda edits her own booking window from
+// the /linda page. Body: { windowStart, windowEnd, slotMin? }. Weekly hours
+// stay admin-only (they're per-day config, best edited from /admin).
+export async function apiLindaSaveBaseSchedule(req: Request, env: Env): Promise<Response> {
+  if (!await isLindaAuthed(req, env)) return json({ ok: false, reason: 'Access denied.' }, 403);
+  const body: any = await req.json();
+  const windowStart = String(body.windowStart || '').trim();
+  const windowEnd = String(body.windowEnd || '').trim();
+  const slotMinRaw = body.slotMin;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(windowStart)) return json({ ok: false, reason: 'Invalid start date.' }, 400);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(windowEnd)) return json({ ok: false, reason: 'Invalid end date.' }, 400);
+  if (windowEnd < windowStart) return json({ ok: false, reason: 'End date must be on or after start date.' }, 400);
+
+  await env.DB.prepare('INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)')
+    .bind('LINDA_WINDOW_START', windowStart).run();
+  await env.DB.prepare('INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)')
+    .bind('LINDA_WINDOW_END', windowEnd).run();
+
+  if (slotMinRaw !== undefined && slotMinRaw !== null && slotMinRaw !== '') {
+    const slotMin = parseInt(String(slotMinRaw), 10);
+    if (!Number.isFinite(slotMin) || slotMin < 5 || slotMin > 240) {
+      return json({ ok: false, reason: 'Slot duration must be between 5 and 240 minutes.' }, 400);
+    }
+    await env.DB.prepare('INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)')
+      .bind('LINDA_SLOT_MIN', String(slotMin)).run();
+  }
+
+  await bumpVersion(env.DB);
+  return json({ ok: true });
+}
+
 // ─── /api/linda-extras ─────────────────────────────────────
 // List upcoming ad-hoc availability Linda has added.
 
