@@ -1476,8 +1476,20 @@ function lindaMainPage(env: Env): string {
       <div class="avail-msg" id="winMsg"></div>
 
       <h3 style="margin-top:16px;">Weekly schedule</h3>
-      <div id="baseSchedule"></div>
-      <p class="hint" style="margin-top:10px;font-size:12px;">Weekly hours (Mon–Sun templates) are edited from the admin panel.</p>
+      <p class="hint">Morning + evening hours that apply to every weekday (and optionally Saturdays). Saves to all days at once.</p>
+      <div style="font-size:12px;color:var(--muted);font-weight:800;text-transform:uppercase;letter-spacing:.4px;margin:6px 0 4px;">Morning</div>
+      <div class="avail-row"><label>Start</label><input type="time" id="wsMorningStart" step="900" onchange="markHoursDirty()"></div>
+      <div class="avail-row"><label>End</label><input type="time" id="wsMorningEnd" step="900" onchange="markHoursDirty()"></div>
+      <div style="font-size:12px;color:var(--muted);font-weight:800;text-transform:uppercase;letter-spacing:.4px;margin:10px 0 4px;">Evening (optional)</div>
+      <div class="avail-row"><label>Start</label><input type="time" id="wsEveningStart" step="900" onchange="markHoursDirty()"></div>
+      <div class="avail-row"><label>End</label><input type="time" id="wsEveningEnd" step="900" onchange="markHoursDirty()"></div>
+      <label style="display:flex;align-items:center;gap:8px;margin-top:8px;font-size:13px;cursor:pointer;">
+        <input type="checkbox" id="wsIncludeSat" onchange="markHoursDirty()" style="cursor:pointer;">
+        <span>Also open on Saturdays (same hours)</span>
+      </label>
+      <button class="avail-save" id="wsSaveBtn" style="display:none;margin-top:10px;" onclick="saveWeeklyHours()">Save weekly hours</button>
+      <div class="avail-msg" id="wsMsg"></div>
+      <div id="baseSchedule" style="margin-top:12px;"></div>
     </div>
 
     <div class="avail-card">
@@ -1931,6 +1943,8 @@ function lindaMainPage(env: Env): string {
     }
   };
 
+  window.markHoursDirty = function(){ $('wsSaveBtn').style.display = ''; };
+
   async function loadBaseSchedule(){
     var el = $('baseSchedule');
     try {
@@ -1942,6 +1956,20 @@ function lindaMainPage(env: Env): string {
       setHiddenDate('winEnd', data.windowEnd);
       $('winSlotMin').value = String(data.slotMin || 30);
       $('winSaveBtn').style.display = 'none';
+
+      // Pre-fill the weekly-hours inputs from MON (taken as the canonical
+      // weekday template; matches the admin UI's pattern).
+      var mon = ((data.hours || {}).MON) || [];
+      var morning = mon[0] || { start: '', end: '' };
+      var evening = mon[1] || { start: '', end: '' };
+      $('wsMorningStart').value = morning.start || '';
+      $('wsMorningEnd').value = morning.end || '';
+      $('wsEveningStart').value = evening.start || '';
+      $('wsEveningEnd').value = evening.end || '';
+      var sat = ((data.hours || {}).SAT) || [];
+      $('wsIncludeSat').checked = sat.length > 0;
+      $('wsSaveBtn').style.display = 'none';
+
       var html = '';
       for (var i = 0; i < DOW_LABELS.length; i++){
         var d = DOW_LABELS[i];
@@ -1958,6 +1986,52 @@ function lindaMainPage(env: Env): string {
       el.innerHTML = '<div class="err" style="margin:0;">Network error.</div>';
     }
   }
+
+  window.saveWeeklyHours = async function(){
+    var ms = $('wsMorningStart').value, me = $('wsMorningEnd').value;
+    var es = $('wsEveningStart').value, ee = $('wsEveningEnd').value;
+    var sat = $('wsIncludeSat').checked;
+    var blocks = [];
+    if (ms && me) blocks.push({ start: ms, end: me });
+    if (es && ee) blocks.push({ start: es, end: ee });
+    if (!blocks.length){
+      $('wsMsg').textContent = 'Set at least one time range (morning or evening).';
+      $('wsMsg').className = 'avail-msg bad';
+      return;
+    }
+    // Mon-Fri always, Sat optional, Sun closed.
+    var weekday = blocks;
+    var hours = {
+      MON: weekday, TUE: weekday, WED: weekday,
+      THU: weekday, FRI: weekday,
+      SAT: sat ? blocks : [], SUN: [],
+    };
+    $('wsMsg').textContent = 'Saving…'; $('wsMsg').className = 'avail-msg';
+    try {
+      // Re-use the same endpoint. We have to send the current window fields too
+      // because POST treats missing fields as invalid; this keeps everything in sync.
+      var res = await fetch('/api/linda-base-schedule', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          windowStart: $('winStart').value,
+          windowEnd: $('winEnd').value,
+          slotMin: parseInt($('winSlotMin').value, 10) || 30,
+          hours: hours,
+        }),
+      });
+      if (res.status === 403) { window.location.reload(); return; }
+      var data = await res.json();
+      if (data.ok){
+        $('wsMsg').textContent = 'Saved.'; $('wsMsg').className = 'avail-msg ok';
+        $('wsSaveBtn').style.display = 'none';
+        loadBaseSchedule();
+      } else {
+        $('wsMsg').textContent = data.reason || 'Failed'; $('wsMsg').className = 'avail-msg bad';
+      }
+    } catch(e){
+      $('wsMsg').textContent = 'Network error'; $('wsMsg').className = 'avail-msg bad';
+    }
+  };
 
   // ── Days off ──
   async function loadOff(){
