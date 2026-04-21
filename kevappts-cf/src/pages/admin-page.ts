@@ -1538,11 +1538,15 @@ async function loadLindaReviews() {
     var html = '<div class="table-wrap"><table><thead><tr><th><input type="checkbox" onchange="toggleLinda(this)"></th><th>Time</th><th>Name</th><th>Email</th><th>Sent?</th></tr></thead><tbody>';
     res.patients.forEach(function(p){
       var disabled = p.reviewSent ? 'disabled' : '';
+      var sentLabel = 'No';
+      if (p.reviewSent) {
+        sentLabel = p.reviewSource === 'auto' ? 'Yes (auto)' : 'Yes';
+      }
       html += '<tr><td><input type="checkbox" class="linda-cb" data-id="' + esc(p.appointmentId) + '" ' + disabled + '></td>' +
         '<td>' + esc(p.startTime) + '</td>' +
         '<td>' + esc(p.fullName) + '</td>' +
         '<td>' + esc(p.email) + '</td>' +
-        '<td>' + (p.reviewSent ? 'Yes' : 'No') + '</td></tr>';
+        '<td title="' + esc(p.reviewSentAt || '') + '">' + sentLabel + '</td></tr>';
     });
     html += '</tbody></table></div>';
     list.innerHTML = html;
@@ -4045,7 +4049,16 @@ function renderReviewList(loc, patients) {
     html += '</div>';
     html += '</label>';
     if (p.bookingSource) html += '<span class="badge" style="background:#eff6ff;color:#1e40af;">' + esc(p.bookingSource) + '</span>';
-    if (sent) html += '<span class="rev-sent-badge">Sent</span>';
+    if (sent) {
+      // Auto vs manual label + short "sent X min ago" tooltip so Linda/Kevin
+      // can tell at a glance which reviews the cron took care of.
+      var isAuto = p.reviewSource === 'auto';
+      var ts = p.reviewSentAt ? p.reviewSentAt.replace(/\\..*$/, '') : '';
+      var title = isAuto ? 'Automatically sent 1 hour post-visit' : 'Sent manually';
+      html += '<span class="rev-sent-badge" title="' + esc(title + (ts ? ' · ' + ts : '')) + '" ' +
+        (isAuto ? 'style="background:#e0e7ff;color:#3730a3;border-color:rgba(55,48,163,0.25);"' : '') + '>' +
+        (isAuto ? 'Sent (auto)' : 'Sent') + '</span>';
+    }
     html += '</div>';
   }
   el.innerHTML = html;

@@ -14,7 +14,7 @@ import {
   addDoctorOff, deleteDoctorOff, addDoctorExtra, deleteDoctorExtra,
   searchAppointments, getAppointmentsByDateRange, getAllAppointments, getPatientHistory,
   slotBlockedByDoctorOff, doctorOffReason, findNextAvailableDay,
-  setConfigValue, getTakenSlots, isReviewSent, markReviewSent,
+  setConfigValue, getTakenSlots, isReviewSent, getReviewSent, markReviewSent,
   insertFollowUp, getFollowUps, isFollowUpSent, getReferrals,
 } from '../db/queries';
 import { verifyAdminSig, generateId } from '../services/crypto';
@@ -655,7 +655,7 @@ export async function apiAdminGetReviewPatients(req: Request, env: Env): Promise
 
   for (const a of allAppts) {
     if (!a.email || a.status.includes('CANCELLED')) continue;
-    const reviewSent = await isReviewSent(env.DB, a.id);
+    const sent = await getReviewSent(env.DB, a.id);
     const item = {
       appointmentId: a.id,
       fullName: a.full_name,
@@ -663,7 +663,9 @@ export async function apiAdminGetReviewPatients(req: Request, env: Env): Promise
       startTime: a.start_time,
       serviceName: a.service_name,
       status: a.status,
-      reviewSent,
+      reviewSent: !!sent,
+      reviewSource: sent ? sent.source : '',
+      reviewSentAt: sent ? sent.sent_at : '',
       bookingSource: (a as any).booking_source || '',
     };
     if (a.clinic === 'spinola') {
@@ -1490,7 +1492,7 @@ export async function apiAdminGetLindaReviewPatients(req: Request, env: Env): Pr
   const patients: any[] = [];
   for (const a of rows.results) {
     if (!a.email || a.status.includes('CANCELLED')) continue;
-    const reviewSent = await isReviewSent(env.DB, a.id);
+    const sent = await getReviewSent(env.DB, a.id);
     patients.push({
       appointmentId: a.id,
       fullName: a.full_name,
@@ -1498,7 +1500,9 @@ export async function apiAdminGetLindaReviewPatients(req: Request, env: Env): Pr
       startTime: a.start_time,
       serviceName: a.service_name,
       status: a.status,
-      reviewSent,
+      reviewSent: !!sent,
+      reviewSource: sent ? sent.source : '',
+      reviewSentAt: sent ? sent.sent_at : '',
     });
   }
   return json({ ok: true, patients, dateKey });
