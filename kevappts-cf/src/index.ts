@@ -38,7 +38,7 @@ import { doctorPage } from './pages/doctor-page';
 import { reschedulePage } from './pages/reschedule-page';
 import { followupPage } from './pages/followup-page';
 import { physioPage } from './pages/physio-page';
-import { apiLindaGetDay, apiLindaNextDay, apiLindaSlots, apiLindaListExtras, apiLindaAddExtra, apiLindaDeleteExtra, apiLindaUpdateExtra, apiLindaReschedule, apiLindaNewBooking, apiLindaSearch, apiLindaPatientHistory, apiLindaClientsAutocomplete, apiLindaWeek, apiLindaCopyDay, apiLindaCancel, apiLindaCancelDay, apiLindaMarkStatus, apiLindaBaseSchedule, handleLindaLogin, handleLindaLogout, lindaRoute } from './api/linda-view';
+import { apiLindaGetDay, apiLindaNextDay, apiLindaSlots, apiLindaListExtras, apiLindaAddExtra, apiLindaDeleteExtra, apiLindaUpdateExtra, apiLindaListOff, apiLindaAddOff, apiLindaDeleteOff, apiLindaReschedule, apiLindaNewBooking, apiLindaSearch, apiLindaPatientHistory, apiLindaClientsAutocomplete, apiLindaWeek, apiLindaCopyDay, apiLindaCancel, apiLindaCancelDay, apiLindaMarkStatus, apiLindaBaseSchedule, handleLindaLogin, handleLindaLogout, lindaRoute } from './api/linda-view';
 
 export { RealtimeHub };
 
@@ -119,6 +119,9 @@ export default {
       if (path === '/api/linda-extras' && method === 'POST') return apiLindaAddExtra(request, env);
       if (path === '/api/linda-extras' && method === 'DELETE') return apiLindaDeleteExtra(request, env);
       if (path === '/api/linda-extras' && method === 'PUT') return apiLindaUpdateExtra(request, env);
+      if (path === '/api/linda-off' && method === 'GET') return apiLindaListOff(request, env);
+      if (path === '/api/linda-off' && method === 'POST') return apiLindaAddOff(request, env);
+      if (path === '/api/linda-off' && method === 'DELETE') return apiLindaDeleteOff(request, env);
       if (path === '/api/linda-reschedule' && method === 'POST') return apiLindaReschedule(request, env);
       if (path === '/api/linda-new-booking' && method === 'POST') return apiLindaNewBooking(request, env);
       if (path === '/api/linda-search' && method === 'GET') return apiLindaSearch(request, env);

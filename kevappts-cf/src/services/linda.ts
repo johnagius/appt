@@ -59,7 +59,15 @@ export function isInLindaWindow(dateKey: string, cfg: LindaConfig): boolean {
   return dateKey >= cfg.windowStart && dateKey <= cfg.windowEnd;
 }
 
-export function buildLindaSlots(dateKey: string, cfg: LindaConfig, extras?: { start: string; end: string }[] | null): Slot[] {
+export function buildLindaSlots(
+  dateKey: string,
+  cfg: LindaConfig,
+  extras?: { start: string; end: string }[] | null,
+  isDayOff?: boolean,
+): Slot[] {
+  // If Linda has marked this date as a day off, no slots at all — regardless
+  // of her base weekly schedule or any extras.
+  if (isDayOff) return [];
   const d = parseDateKey(dateKey);
   const dow = dayOfWeekKey(d);
   const base = cfg.hours[dow] || [];
@@ -80,6 +88,11 @@ export async function getLindaExtrasForDate(db: D1Database, dateKey: string): Pr
     'SELECT id, start_time AS s, end_time AS e FROM linda_extra WHERE date_key = ? ORDER BY start_time'
   ).bind(dateKey).all<{ id: number; s: string; e: string }>();
   return rows.results.map(r => ({ id: r.id, start: r.s, end: r.e }));
+}
+
+export async function isLindaDayOff(db: D1Database, dateKey: string): Promise<boolean> {
+  const row = await db.prepare('SELECT 1 AS x FROM linda_off WHERE date_key = ?').bind(dateKey).first<{ x: number }>();
+  return !!row;
 }
 
 export function buildLindaDateOptions(tz: string, cfg: LindaConfig): DateOption[] {

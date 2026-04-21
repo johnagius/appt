@@ -72,6 +72,11 @@ describe('buildLindaSlots', () => {
     expect(startTimes.length).toBe(unique.length);
   });
 
+  it('returns no slots when the day is flagged off, even with base hours and extras', () => {
+    const slots = buildLindaSlots('2026-04-28', standardConfig, [{ start: '14:00', end: '15:00' }], true);
+    expect(slots).toEqual([]);
+  });
+
   it('respects a 60-min slotMin', () => {
     const hourly: LindaConfig = { ...standardConfig, slotMin: 60 };
     const slots = buildLindaSlots('2026-04-24', hourly);

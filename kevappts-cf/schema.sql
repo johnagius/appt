@@ -128,6 +128,18 @@ CREATE TABLE IF NOT EXISTS linda_extra (
 );
 CREATE INDEX IF NOT EXISTS idx_linda_extra_date ON linda_extra(date_key);
 
+-- Linda day-off: dates she's cancelled her base availability for. Any booking
+-- already made on that date stays (she'll reschedule via the normal flow);
+-- no NEW bookings are offered. Overrides the base weekly schedule and any
+-- extras on the same date.
+CREATE TABLE IF NOT EXISTS linda_off (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  date_key TEXT NOT NULL UNIQUE,
+  reason TEXT DEFAULT '',
+  created_at TEXT DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS idx_linda_off_date ON linda_off(date_key);
+
 -- Seed data version
 INSERT OR IGNORE INTO data_version (id, version) VALUES (1, 0);
 

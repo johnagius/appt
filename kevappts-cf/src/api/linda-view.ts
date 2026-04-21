@@ -13,7 +13,7 @@
 import type { Env, Appointment } from '../types';
 import { computeLindaSig, verifyLindaSig, verifyAdminSig } from '../services/crypto';
 import { todayKeyLocal, nowIso, nowMinutesLocal, parseTimeToMinutes, toDateKey, todayLocal } from '../services/utils';
-import { buildLindaSlots, getLindaExtrasForDate, loadLindaConfig } from '../services/linda';
+import { buildLindaSlots, getLindaExtrasForDate, isLindaDayOff, loadLindaConfig } from '../services/linda';
 import { getTakenSlots, bumpVersion, getAppointmentById, isSlotTaken, updateAppointmentStatus, insertAppointment, getOrCreateClient } from '../db/queries';
 import { generateId } from '../services/crypto';
 import { createCalendarEvent, deleteCalendarEvent } from '../services/calendar';
@@ -197,7 +197,8 @@ export async function apiLindaSlots(req: Request, env: Env): Promise<Response> {
 
   const cfg = await loadLindaConfig(env.DB);
   const extras = await getLindaExtrasForDate(env.DB, dateKey);
-  const baseSlots = buildLindaSlots(dateKey, cfg, extras);
+  const off = await isLindaDayOff(env.DB, dateKey);
+  const baseSlots = buildLindaSlots(dateKey, cfg, extras, off);
 
   const tz = env.TIMEZONE;
   const todayKey = todayKeyLocal(tz);
@@ -212,7 +213,82 @@ export async function apiLindaSlots(req: Request, env: Env): Promise<Response> {
   });
 
   const isWorkingDay = baseSlots.length > 0;
-  return json({ ok: true, dateKey, slots, isWorkingDay, extras });
+  return json({ ok: true, dateKey, slots, isWorkingDay, extras, dayOff: off });
+}
+
+// ─── /api/linda-off ────────────────────────────────────────
+// Days off — overrides base hours and any extras for that date so no new
+// bookings can happen. Existing bookings on that date are left alone; Linda
+// will Reschedule them manually.
+
+export async function apiLindaListOff(req: Request, env: Env): Promise<Response> {
+  if (!await isLindaAuthed(req, env)) return json({ ok: false, reason: 'Access denied.' }, 403);
+  const todayKey = todayKeyLocal(env.TIMEZONE);
+  const rows = await env.DB.prepare(
+    'SELECT id, date_key, reason FROM linda_off WHERE date_key >= ? ORDER BY date_key'
+  ).bind(todayKey).all<{ id: number; date_key: string; reason: string }>();
+  return json({ ok: true, off: rows.results });
+}
+
+// POST: mark a date off (single date or inclusive range).
+// Body: { dateKey, dateKeyEnd?, reason? }
+export async function apiLindaAddOff(req: Request, env: Env): Promise<Response> {
+  if (!await isLindaAuthed(req, env)) return json({ ok: false, reason: 'Access denied.' }, 403);
+  const body: any = await req.json();
+  const dateKey = String(body.dateKey || '').trim();
+  const dateKeyEnd = String(body.dateKeyEnd || '').trim() || dateKey;
+  const reason = String(body.reason || '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) return json({ ok: false, reason: 'Invalid start date.' }, 400);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKeyEnd)) return json({ ok: false, reason: 'Invalid end date.' }, 400);
+
+  const [y0, m0, d0] = dateKey.split('-').map(Number);
+  const [y1, m1, d1] = dateKeyEnd.split('-').map(Number);
+  const startD = new Date(y0, m0 - 1, d0);
+  const endD = new Date(y1, m1 - 1, d1);
+  if (endD < startD) return json({ ok: false, reason: 'End must be on or after start.' }, 400);
+
+  const now = nowIso(env.TIMEZONE);
+  // Count bookings that would be affected so the UI can show a warning.
+  const rangeRows = await env.DB.prepare(
+    "SELECT date_key, COUNT(*) AS n FROM appointments " +
+    "WHERE clinic='linda' AND date_key >= ? AND date_key <= ? AND status NOT LIKE '%CANCELLED%' " +
+    "GROUP BY date_key"
+  ).bind(dateKey, dateKeyEnd).all<{ date_key: string; n: number }>();
+  const affected = rangeRows.results.reduce((sum, r) => sum + (r.n || 0), 0);
+
+  let added = 0;
+  for (let cur = new Date(startD); cur <= endD; cur.setDate(cur.getDate() + 1)) {
+    const dk = cur.getFullYear() + '-' + String(cur.getMonth() + 1).padStart(2, '0') + '-' + String(cur.getDate()).padStart(2, '0');
+    const res = await env.DB.prepare(
+      'INSERT OR IGNORE INTO linda_off (date_key, reason, created_at) VALUES (?, ?, ?)'
+    ).bind(dk, reason, now).run();
+    if ((res.meta?.changes ?? 0) > 0) added++;
+  }
+
+  await bumpVersion(env.DB);
+
+  // Broadcast so the public physio page's slot grid refreshes if it was open.
+  try {
+    const doId = env.REALTIME.idFromName('global');
+    const stub = env.REALTIME.get(doId);
+    await stub.fetch('http://internal/broadcast', {
+      method: 'POST',
+      body: JSON.stringify({ type: 'slots_updated', dateKey, clinic: 'linda' }),
+    });
+  } catch {}
+
+  return json({ ok: true, added, affectedBookings: affected });
+}
+
+// DELETE /api/linda-off?id=123
+export async function apiLindaDeleteOff(req: Request, env: Env): Promise<Response> {
+  if (!await isLindaAuthed(req, env)) return json({ ok: false, reason: 'Access denied.' }, 403);
+  const url = new URL(req.url);
+  const id = parseInt(url.searchParams.get('id') || '0', 10);
+  if (!id) return json({ ok: false, reason: 'Missing id.' }, 400);
+  await env.DB.prepare('DELETE FROM linda_off WHERE id = ?').bind(id).run();
+  await bumpVersion(env.DB);
+  return json({ ok: true });
 }
 
 // ─── /api/linda-base-schedule ──────────────────────────────
@@ -410,7 +486,9 @@ export async function apiLindaReschedule(req: Request, env: Env): Promise<Respon
 
   const cfg = await loadLindaConfig(env.DB);
   const extras = await getLindaExtrasForDate(env.DB, dateKey);
-  const slots = buildLindaSlots(dateKey, cfg, extras);
+  const off = await isLindaDayOff(env.DB, dateKey);
+  if (off) return json({ ok: false, reason: "That date is marked as a day off — remove the day-off first or pick another date." }, 400);
+  const slots = buildLindaSlots(dateKey, cfg, extras, false);
   const slotFound = slots.find(s => s.start === startTime);
   if (!slotFound) return json({ ok: false, reason: "No hours set for this date \u2014 open availability for it first." }, 400);
 
@@ -498,7 +576,9 @@ export async function apiLindaNewBooking(req: Request, env: Env): Promise<Respon
 
   const cfg = await loadLindaConfig(env.DB);
   const extras = await getLindaExtrasForDate(env.DB, dateKey);
-  const slots = buildLindaSlots(dateKey, cfg, extras);
+  const off = await isLindaDayOff(env.DB, dateKey);
+  if (off) return json({ ok: false, reason: "That date is marked as a day off — remove the day-off first or pick another date." }, 400);
+  const slots = buildLindaSlots(dateKey, cfg, extras, false);
   const slotFound = slots.find(s => s.start === startTime);
   if (!slotFound) return json({ ok: false, reason: "No hours set for this date \u2014 open availability for it first." }, 400);
 
