@@ -385,14 +385,40 @@ export async function markReviewSent(
   nowStr: string,
   source: 'manual' | 'auto' = 'manual',
 ): Promise<void> {
-  await db.prepare('INSERT OR IGNORE INTO review_sent (appointment_id, sent_at, source) VALUES (?, ?, ?)')
-    .bind(appointmentId, nowStr, source).run();
+  // The source column was added in a later migration. On older DBs that
+  // never ran the ALTER, the 3-column INSERT raises "no such column: source"
+  // — which previously got swallowed by callers and caused duplicate auto-
+  // review sends (every cron tick re-sent because the row was never
+  // inserted). Fall back to the pre-migration 2-column insert so the row
+  // always lands; source simply isn't recorded for that row.
+  try {
+    await db.prepare('INSERT OR IGNORE INTO review_sent (appointment_id, sent_at, source) VALUES (?, ?, ?)')
+      .bind(appointmentId, nowStr, source).run();
+  } catch (e: any) {
+    const msg = String(e?.message || '').toLowerCase();
+    if (msg.includes('no such column') || msg.includes('has no column')) {
+      await db.prepare('INSERT OR IGNORE INTO review_sent (appointment_id, sent_at) VALUES (?, ?)')
+        .bind(appointmentId, nowStr).run();
+      return;
+    }
+    throw e;
+  }
 }
 
 export async function getReviewSent(db: D1Database, appointmentId: string): Promise<{ sent_at: string; source: string } | null> {
-  const row = await db.prepare('SELECT sent_at, source FROM review_sent WHERE appointment_id = ?')
-    .bind(appointmentId).first<{ sent_at: string; source: string }>();
-  return row ? { sent_at: row.sent_at, source: row.source || 'manual' } : null;
+  try {
+    const row = await db.prepare('SELECT sent_at, source FROM review_sent WHERE appointment_id = ?')
+      .bind(appointmentId).first<{ sent_at: string; source: string }>();
+    return row ? { sent_at: row.sent_at, source: row.source || 'manual' } : null;
+  } catch (e: any) {
+    const msg = String(e?.message || '').toLowerCase();
+    if (msg.includes('no such column') || msg.includes('has no column')) {
+      const row = await db.prepare('SELECT sent_at FROM review_sent WHERE appointment_id = ?')
+        .bind(appointmentId).first<{ sent_at: string }>();
+      return row ? { sent_at: row.sent_at, source: 'manual' } : null;
+    }
+    throw e;
+  }
 }
 
 // ─── Follow-up Tracking ───────────────────────────────────

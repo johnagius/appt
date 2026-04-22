@@ -651,15 +651,30 @@ export async function apiAdminGetReviewPatients(req: Request, env: Env): Promise
 
   // Batch-fetch review_sent rows for every appointment on this date in one
   // query instead of N sequential lookups. Fixes the stuck-loading bug on
-  // days with lots of bookings.
-  const reviewRows = await env.DB.prepare(
-    "SELECT rs.appointment_id AS id, rs.sent_at AS sent_at, rs.source AS source " +
-    "FROM review_sent rs JOIN appointments a ON a.id = rs.appointment_id " +
-    "WHERE a.date_key = ?"
-  ).bind(dateKey).all<{ id: string; sent_at: string; source: string }>();
+  // days with lots of bookings. Falls back to a 2-column query for older
+  // DBs that never ran the source-column ALTER.
   const reviewMap = new Map<string, { sent_at: string; source: string }>();
-  for (const r of reviewRows.results) {
-    reviewMap.set(r.id, { sent_at: r.sent_at, source: r.source || 'manual' });
+  try {
+    const reviewRows = await env.DB.prepare(
+      "SELECT rs.appointment_id AS id, rs.sent_at AS sent_at, rs.source AS source " +
+      "FROM review_sent rs JOIN appointments a ON a.id = rs.appointment_id " +
+      "WHERE a.date_key = ?"
+    ).bind(dateKey).all<{ id: string; sent_at: string; source: string }>();
+    for (const r of reviewRows.results) {
+      reviewMap.set(r.id, { sent_at: r.sent_at, source: r.source || 'manual' });
+    }
+  } catch (e: any) {
+    const msg = String(e?.message || '').toLowerCase();
+    if (msg.includes('no such column') || msg.includes('has no column')) {
+      const reviewRows = await env.DB.prepare(
+        "SELECT rs.appointment_id AS id, rs.sent_at AS sent_at " +
+        "FROM review_sent rs JOIN appointments a ON a.id = rs.appointment_id " +
+        "WHERE a.date_key = ?"
+      ).bind(dateKey).all<{ id: string; sent_at: string }>();
+      for (const r of reviewRows.results) {
+        reviewMap.set(r.id, { sent_at: r.sent_at, source: 'manual' });
+      }
+    } else { throw e; }
   }
 
   const potters: any[] = [];
@@ -1503,14 +1518,29 @@ export async function apiAdminGetLindaReviewPatients(req: Request, env: Env): Pr
   ).bind(dateKey).all<Appointment>();
 
   // Batch-fetch review_sent rows in one query (not N sequential).
-  const reviewRows = await env.DB.prepare(
-    "SELECT rs.appointment_id AS id, rs.sent_at AS sent_at, rs.source AS source " +
-    "FROM review_sent rs JOIN appointments a ON a.id = rs.appointment_id " +
-    "WHERE a.clinic = 'linda' AND a.date_key = ?"
-  ).bind(dateKey).all<{ id: string; sent_at: string; source: string }>();
+  // Falls back to a 2-column query for older DBs without source.
   const reviewMap = new Map<string, { sent_at: string; source: string }>();
-  for (const r of reviewRows.results) {
-    reviewMap.set(r.id, { sent_at: r.sent_at, source: r.source || 'manual' });
+  try {
+    const reviewRows = await env.DB.prepare(
+      "SELECT rs.appointment_id AS id, rs.sent_at AS sent_at, rs.source AS source " +
+      "FROM review_sent rs JOIN appointments a ON a.id = rs.appointment_id " +
+      "WHERE a.clinic = 'linda' AND a.date_key = ?"
+    ).bind(dateKey).all<{ id: string; sent_at: string; source: string }>();
+    for (const r of reviewRows.results) {
+      reviewMap.set(r.id, { sent_at: r.sent_at, source: r.source || 'manual' });
+    }
+  } catch (e: any) {
+    const msg = String(e?.message || '').toLowerCase();
+    if (msg.includes('no such column') || msg.includes('has no column')) {
+      const reviewRows = await env.DB.prepare(
+        "SELECT rs.appointment_id AS id, rs.sent_at AS sent_at " +
+        "FROM review_sent rs JOIN appointments a ON a.id = rs.appointment_id " +
+        "WHERE a.clinic = 'linda' AND a.date_key = ?"
+      ).bind(dateKey).all<{ id: string; sent_at: string }>();
+      for (const r of reviewRows.results) {
+        reviewMap.set(r.id, { sent_at: r.sent_at, source: 'manual' });
+      }
+    } else { throw e; }
   }
 
   const patients: any[] = [];
