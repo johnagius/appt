@@ -441,7 +441,13 @@ export default {
     // which we haven't already asked. Cron fires every 10 min, so max delay
     // after the 1-hour mark is ~10 min; the look-back window of 3 hours
     // absorbs any skipped ticks without re-sending already-sent rows.
-    try {
+    //
+    // DISABLED BY DEFAULT after a bug caused quota to be blown through — each
+    // appointment was treated independently, so a single patient with 5
+    // bookings in a day got 5 review emails. Dedup is now per-email-per-7-days
+    // in the block below, but we leave the feature gated on env.AUTO_REVIEWS
+    // = '1' so it can't turn itself on without a deliberate flip.
+    if ((env as any).AUTO_REVIEWS === '1') try {
       const appts = await env.DB.prepare(
         "SELECT * FROM appointments " +
         "WHERE date_key = ? AND email != '' AND end_time != '' " +
