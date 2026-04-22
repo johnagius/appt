@@ -437,17 +437,14 @@ export default {
     }
 
     // Automatic review emails — fire ~1 hour after end_time for any appointment
-    // (any clinic) whose status is BOOKED / ATTENDED / RELOCATED_SPINOLA and
-    // which we haven't already asked. Cron fires every 10 min, so max delay
-    // after the 1-hour mark is ~10 min; the look-back window of 3 hours
-    // absorbs any skipped ticks without re-sending already-sent rows.
-    //
-    // DISABLED BY DEFAULT after a bug caused quota to be blown through — each
-    // appointment was treated independently, so a single patient with 5
-    // bookings in a day got 5 review emails. Dedup is now per-email-per-7-days
-    // in the block below, but we leave the feature gated on env.AUTO_REVIEWS
-    // = '1' so it can't turn itself on without a deliberate flip.
-    if ((env as any).AUTO_REVIEWS === '1') try {
+    // (any clinic) whose status is BOOKED / ATTENDED / RELOCATED_SPINOLA.
+    // Dedup is per EMAIL with a 30-day cooldown (see block below) so a
+    // patient with multiple bookings in one day gets one email, and regulars
+    // aren't re-asked week after week.
+    // Cron fires every 10 min; eligible window is 60-180 min after end_time
+    // so a skipped tick still catches up within a couple of hours.
+    // Emergency kill switch: set env.AUTO_REVIEWS_DISABLED = '1' to skip.
+    if ((env as any).AUTO_REVIEWS_DISABLED !== '1') try {
       const appts = await env.DB.prepare(
         "SELECT * FROM appointments " +
         "WHERE date_key = ? AND email != '' AND end_time != '' " +
