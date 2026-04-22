@@ -649,13 +649,26 @@ export async function apiAdminGetReviewPatients(req: Request, env: Env): Promise
 
   const allAppts = await getAppointmentsByDate(env.DB, dateKey);
 
+  // Batch-fetch review_sent rows for every appointment on this date in one
+  // query instead of N sequential lookups. Fixes the stuck-loading bug on
+  // days with lots of bookings.
+  const reviewRows = await env.DB.prepare(
+    "SELECT rs.appointment_id AS id, rs.sent_at AS sent_at, rs.source AS source " +
+    "FROM review_sent rs JOIN appointments a ON a.id = rs.appointment_id " +
+    "WHERE a.date_key = ?"
+  ).bind(dateKey).all<{ id: string; sent_at: string; source: string }>();
+  const reviewMap = new Map<string, { sent_at: string; source: string }>();
+  for (const r of reviewRows.results) {
+    reviewMap.set(r.id, { sent_at: r.sent_at, source: r.source || 'manual' });
+  }
+
   const potters: any[] = [];
   const spinola: any[] = [];
   const linda: any[] = [];
 
   for (const a of allAppts) {
     if (!a.email || a.status.includes('CANCELLED')) continue;
-    const sent = await getReviewSent(env.DB, a.id);
+    const sent = reviewMap.get(a.id) || null;
     const item = {
       appointmentId: a.id,
       fullName: a.full_name,
@@ -1489,10 +1502,21 @@ export async function apiAdminGetLindaReviewPatients(req: Request, env: Env): Pr
     "SELECT * FROM appointments WHERE clinic = 'linda' AND date_key = ?"
   ).bind(dateKey).all<Appointment>();
 
+  // Batch-fetch review_sent rows in one query (not N sequential).
+  const reviewRows = await env.DB.prepare(
+    "SELECT rs.appointment_id AS id, rs.sent_at AS sent_at, rs.source AS source " +
+    "FROM review_sent rs JOIN appointments a ON a.id = rs.appointment_id " +
+    "WHERE a.clinic = 'linda' AND a.date_key = ?"
+  ).bind(dateKey).all<{ id: string; sent_at: string; source: string }>();
+  const reviewMap = new Map<string, { sent_at: string; source: string }>();
+  for (const r of reviewRows.results) {
+    reviewMap.set(r.id, { sent_at: r.sent_at, source: r.source || 'manual' });
+  }
+
   const patients: any[] = [];
   for (const a of rows.results) {
     if (!a.email || a.status.includes('CANCELLED')) continue;
-    const sent = await getReviewSent(env.DB, a.id);
+    const sent = reviewMap.get(a.id) || null;
     patients.push({
       appointmentId: a.id,
       fullName: a.full_name,
