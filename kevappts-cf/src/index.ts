@@ -439,10 +439,21 @@ export default {
     // Automatic review emails — fire ~1 hour after end_time for any appointment
     // (any clinic) whose status is BOOKED / ATTENDED / RELOCATED_SPINOLA.
     //
-    // Dedup rule: one review email per patient email per 30 days.
-    // - Patient with 5 bookings today -> one email.
-    // - Same patient returns next month -> new email, as intended.
-    // - Regulars (weekly physio) aren't pestered.
+    // HARD guarantees:
+    //   1. Max one email per patient email per 30 days.
+    //      (a patient with 5 bookings today -> one email; regulars visiting
+    //       weekly aren't pestered; return in 31+ days -> new email.)
+    //   2. Max one email per appointment ever.
+    //   3. Mark BEFORE send. If mark fails, send never happens. If send
+    //      fails, no retry (but no duplicate either).
+    //
+    // Defence in depth:
+    //   - DB query: emails-with-review-in-last-30-days (skipped entirely)
+    //   - In-memory Set per cron tick (same-email within one run)
+    //   - Per-appointment isReviewSent check right before mark
+    //   - markReviewSent is tolerant to a missing source column (falls back
+    //     to a 2-column INSERT), so a row ALWAYS lands — which was the
+    //     silent-failure bug that caused 20+ duplicate sends last time.
     //
     // Cron fires every 10 min; eligible window is 60-180 min after end_time
     // so a skipped tick still catches up within a couple of hours.
@@ -484,18 +495,22 @@ export default {
         if (emailsWithRecentReview.has(emailLc)) continue;
         if (sentThisRun.has(emailLc)) continue;
 
+        // Belt-and-braces: check this specific appointment hasn't been
+        // marked already. Protects against any race in the email-level
+        // dedup query (e.g. overlapping cron runs).
+        if (await isReviewSent(env.DB, appt.id)) continue;
+
         const location: 'potters' | 'spinola' | 'linda' =
           appt.clinic === 'spinola' ? 'spinola'
           : appt.clinic === 'linda' ? 'linda'
           : 'potters';
 
         try {
-          // Mark BEFORE sending so a transient network blip doesn't let a
-          // second cron tick re-send. Worst case: email fails, we never
-          // retry for this appointment — acceptable vs duplicate sends.
-          // Mark BEFORE sending. markReviewSent is now tolerant of an
-          // older DB without the source column (see queries.ts) so it
-          // won't silently throw and leak duplicates like last time.
+          // Mark BEFORE sending. markReviewSent is tolerant of an older DB
+          // without the source column (see queries.ts) so it can't silently
+          // throw and leak duplicates like last time. Worst case: email
+          // fails, we never retry for this appointment — acceptable vs
+          // duplicate sends.
           await markReviewSent(env.DB, appt.id, nowIso(tz), 'auto');
           sentThisRun.add(emailLc);
           emailsWithRecentReview.add(emailLc);
