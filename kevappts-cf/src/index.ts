@@ -455,13 +455,34 @@ export default {
         "ORDER BY start_time"
       ).bind(todayKey).all<any>();
 
+      // Dedup by EMAIL (not appointment_id). A patient with 5 bookings in
+      // one day must not receive 5 emails. Load every email that's had a
+      // review in the last 30 days — those addresses are skipped entirely.
+      const recentReviews = await env.DB.prepare(
+        "SELECT DISTINCT a.email AS email FROM appointments a " +
+        "JOIN review_sent rs ON rs.appointment_id = a.id " +
+        "WHERE rs.sent_at >= datetime('now', '-30 days')"
+      ).all<{ email: string }>();
+      const emailsWithRecentReview = new Set<string>();
+      for (const r of recentReviews.results) {
+        if (r.email) emailsWithRecentReview.add(r.email.toLowerCase());
+      }
+
+      // Also dedupe within THIS cron run in case a patient has multiple
+      // "eligible" appointments today — only the first one triggers an email.
+      const sentThisRun = new Set<string>();
+
       for (const appt of appts.results) {
         const apptEndMin = parseTimeToMinutes(appt.end_time);
         const minsSinceEnd = maltaMin - apptEndMin;
         // Eligible window: 60-180 min after end_time. Before 60 = too soon;
-        // after 180 we might as well give up to avoid sending days later.
+        // after 180 we give up to avoid sending days later.
         if (minsSinceEnd < 60 || minsSinceEnd > 180) continue;
-        if (await isReviewSent(env.DB, appt.id)) continue;
+
+        const emailLc = String(appt.email || '').toLowerCase();
+        if (!emailLc) continue;
+        if (emailsWithRecentReview.has(emailLc)) continue;
+        if (sentThisRun.has(emailLc)) continue;
 
         const location: 'potters' | 'spinola' | 'linda' =
           appt.clinic === 'spinola' ? 'spinola'
@@ -469,9 +490,14 @@ export default {
           : 'potters';
 
         try {
-          await sendReviewRequestEmail(env, appt, location);
+          // Mark BEFORE sending so a transient network blip doesn't let a
+          // second cron tick re-send. Worst case: email fails, we never
+          // retry for this appointment — acceptable vs duplicate sends.
           await markReviewSent(env.DB, appt.id, nowIso(tz), 'auto');
-          console.log('Auto-review sent:', appt.id, location, appt.email);
+          sentThisRun.add(emailLc);
+          emailsWithRecentReview.add(emailLc);
+          await sendReviewRequestEmail(env, appt, location);
+          console.log('Auto-review sent:', appt.id, location, emailLc);
         } catch (e) {
           console.error('Auto-review send error:', appt.id, e);
         }
