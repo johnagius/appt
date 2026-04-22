@@ -438,12 +438,14 @@ export default {
 
     // Automatic review emails — fire ~1 hour after end_time for any appointment
     // (any clinic) whose status is BOOKED / ATTENDED / RELOCATED_SPINOLA.
-    // Dedup is per EMAIL with a 30-day cooldown (see block below) so a
-    // patient with multiple bookings in one day gets one email, and regulars
-    // aren't re-asked week after week.
+    //
+    // Dedup rule: ONE review email per patient email per day.
+    // - Patient with 5 bookings today -> one email.
+    // - Same patient returns next week -> new email next week, as intended.
+    //
     // Cron fires every 10 min; eligible window is 60-180 min after end_time
     // so a skipped tick still catches up within a couple of hours.
-    // Emergency kill switch: set env.AUTO_REVIEWS_DISABLED = '1' to skip.
+    // Emergency kill switch: env.AUTO_REVIEWS_DISABLED = '1'.
     if ((env as any).AUTO_REVIEWS_DISABLED !== '1') try {
       const appts = await env.DB.prepare(
         "SELECT * FROM appointments " +
@@ -452,21 +454,23 @@ export default {
         "ORDER BY start_time"
       ).bind(todayKey).all<any>();
 
-      // Dedup by EMAIL (not appointment_id). A patient with 5 bookings in
-      // one day must not receive 5 emails. Load every email that's had a
-      // review in the last 30 days — those addresses are skipped entirely.
-      const recentReviews = await env.DB.prepare(
+      // Emails that already had a review sent TODAY (any clinic) are skipped.
+      // Uses `sent_at LIKE todayKey%` — fast + works with our 'YYYY-MM-DD HH:MM:SS'
+      // nowIso format. Re-scoping to today (not 30 days) is the whole point
+      // of this fix: a patient visiting multiple times this month SHOULD get
+      // a review email per visit day.
+      const todaysReviews = await env.DB.prepare(
         "SELECT DISTINCT a.email AS email FROM appointments a " +
         "JOIN review_sent rs ON rs.appointment_id = a.id " +
-        "WHERE rs.sent_at >= datetime('now', '-30 days')"
-      ).all<{ email: string }>();
-      const emailsWithRecentReview = new Set<string>();
-      for (const r of recentReviews.results) {
-        if (r.email) emailsWithRecentReview.add(r.email.toLowerCase());
+        "WHERE rs.sent_at LIKE ?"
+      ).bind(todayKey + '%').all<{ email: string }>();
+      const emailsAlreadySentToday = new Set<string>();
+      for (const r of todaysReviews.results) {
+        if (r.email) emailsAlreadySentToday.add(r.email.toLowerCase());
       }
 
-      // Also dedupe within THIS cron run in case a patient has multiple
-      // "eligible" appointments today — only the first one triggers an email.
+      // Also dedupe within THIS cron tick in case a patient has multiple
+      // eligible appointments ending in the same 10-min window.
       const sentThisRun = new Set<string>();
 
       for (const appt of appts.results) {
@@ -478,7 +482,7 @@ export default {
 
         const emailLc = String(appt.email || '').toLowerCase();
         if (!emailLc) continue;
-        if (emailsWithRecentReview.has(emailLc)) continue;
+        if (emailsAlreadySentToday.has(emailLc)) continue;
         if (sentThisRun.has(emailLc)) continue;
 
         const location: 'potters' | 'spinola' | 'linda' =
@@ -492,7 +496,7 @@ export default {
           // retry for this appointment — acceptable vs duplicate sends.
           await markReviewSent(env.DB, appt.id, nowIso(tz), 'auto');
           sentThisRun.add(emailLc);
-          emailsWithRecentReview.add(emailLc);
+          emailsAlreadySentToday.add(emailLc);
           await sendReviewRequestEmail(env, appt, location);
           console.log('Auto-review sent:', appt.id, location, emailLc);
         } catch (e) {
