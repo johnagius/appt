@@ -3109,7 +3109,9 @@ export function indexPage(env: Env, bookingSource?: string): string {
 
         var hasAvailable = hasAvailableSlots(res.slots || []);
         if (!hasAvailable && autoAdvance && !res.doctorOff) {
-          if (advanceToNextEnabledDate()) {
+          // Don't advance away from a date where Spinola can still take the patient.
+          var spinolaHasAvail = spinolaRes && spinolaRes.ok && hasAvailableSlots(spinolaRes.slots || []);
+          if (!spinolaHasAvail && advanceToNextEnabledDate()) {
             loadAvailability(false, true);
             return;
           }
@@ -3807,9 +3809,15 @@ export function indexPage(env: Env, bookingSource?: string): string {
             var res = data.initialSlots;
             if (res && res.ok) {
               var hasAvailable = hasAvailableSlots(res.slots || []);
-              if (!hasAvailable && !res.doctorOff) {
-                // No slots for first date — fall through to loadAvailability with autoAdvance
+              var prefetchedSpinola = data.initialSpinola;
+              var prefetchedSpinolaHasAvail = prefetchedSpinola && prefetchedSpinola.ok && hasAvailableSlots(prefetchedSpinola.slots || []);
+              if (!hasAvailable && !res.doctorOff && !prefetchedSpinolaHasAvail) {
+                // Both Potter's and Spinola empty for first date — auto-advance
                 loadAvailability(false, true);
+              } else if (!hasAvailable && !res.doctorOff && prefetchedSpinolaHasAvail) {
+                // Potter's empty but Spinola open — show Spinola banner on this date
+                renderSlots(res.slots || []);
+                setStatus('bad', t('unavailable'));
               } else {
                 // Check: Spinola opens earlier than Potter's (e.g. Sat 9:30 vs 10:00)
                 var spinolaRes = data.initialSpinola;
