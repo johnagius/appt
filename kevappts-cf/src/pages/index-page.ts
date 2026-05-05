@@ -2675,7 +2675,7 @@ export function indexPage(env: Env, bookingSource?: string): string {
       loadAvailability(false, false);
     });
 
-    function renderSlots(slots) {
+    function renderSlots(slots, isSilentRefresh) {
       els.timeGrid.innerHTML = '';
       // Preserve Spinola selection during silent refresh — only clear if user has no active Spinola slot
       var hadSpinolaSlot = _spinolaSelectedSlot && _spinolaSelectedSlot.start;
@@ -2684,17 +2684,25 @@ export function indexPage(env: Env, bookingSource?: string): string {
       hideSpinolaInline();
       state.slots = slots || [];
 
-      // Only show available + not past (for today in Europe/Malta)
+      // Only show available + not past (for today in Europe/Malta).
+      // Exception: on a silent refresh (WS slots_updated while the user is
+      // mid-form), keep the slot the user has already picked even if its
+      // start time has just crossed "now" — otherwise the patient loses
+      // their selection mid-typing and has to re-pick.
       const tz = (state.config && state.config.timezone) ? state.config.timezone : 'Europe/Malta';
       const now = getNowInTimeZoneParts(tz);
+      const selStart = (state.selectedSlot && state.selectedSlot.start) || '';
 
       const filtered = (slots || []).filter(slot => {
         if (!slot || !slot.start) return false;
-        if (slot.available !== true) return false;
+        if (slot.available !== true && slot.start !== selStart) return false;
 
         if (state.selectedDateKey && state.selectedDateKey === now.dateKey) {
           const startMin = parseHHMMToMinutes(slot.start);
-          if (startMin < now.minutes) return false;
+          if (startMin < now.minutes) {
+            if (isSilentRefresh && slot.start === selStart) return true;
+            return false;
+          }
         }
         return true;
       });
@@ -3157,7 +3165,7 @@ export function indexPage(env: Env, bookingSource?: string): string {
         // Potter's has no slots at all → show Spinola
         if (!hasAvailable) {
           _pottersSlotsEmpty = true;
-          renderSlots([]);
+          renderSlots([], isSilentRefresh);
           if (spinolaRes) {
             showSpinolaInlineWithData(spinolaRes);
           } else {
@@ -3167,7 +3175,7 @@ export function indexPage(env: Env, bookingSource?: string): string {
           return;
         }
 
-        renderSlots(res.slots || []);
+        renderSlots(res.slots || [], isSilentRefresh);
         setStatus('good', t('slotsLoaded'));
       }).catch(function(err) {
         if (!isSilentRefresh) hideLoading();
@@ -3357,6 +3365,13 @@ export function indexPage(env: Env, bookingSource?: string): string {
         var errEl = document.getElementById(id + 'Error');
         if (errEl) errEl.textContent = '';
         if (id === 'phone') document.getElementById('phoneWrap').closest('.phoneRow').classList.remove('has-error');
+        // Clear the "Did you mean ..." hint as soon as the user keeps editing
+        // the email — checkEmailTypo only re-fires on blur, so without this
+        // the hint persists even after the user deletes the typo'd address.
+        if (id === 'email') {
+          var th = document.getElementById('emailTypoHint');
+          if (th) { th.textContent = ''; th.onclick = null; }
+        }
       });
     });
 
@@ -3755,7 +3770,7 @@ export function indexPage(env: Env, bookingSource?: string): string {
             if (data.type === 'slots_data' && data.dateKey === state.selectedDateKey && data.data) {
               var res = data.data;
               if (res && res.ok) {
-                renderSlots(res.slots || []);
+                renderSlots(res.slots || [], true);
                 setStatus('good', t('slotsLoaded'));
               }
               return;
