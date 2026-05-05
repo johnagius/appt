@@ -132,10 +132,20 @@ export async function apiAdminGetDateAppointments(req: Request, env: Env): Promi
   const dateKey = (url.searchParams.get('date') || '').trim();
   if (!dateKey) return json({ ok: false, reason: 'Missing date.' }, 400);
 
+  // Optional clinic filter so the admin Schedule tab can show separate tables
+  // for each practitioner. Defaults to potters (Dr Kevin's primary view) when
+  // omitted, preserving existing callers.
+  const clinic = (url.searchParams.get('clinic') || 'potters').trim().toLowerCase();
   const appts = await getNonCancelledAppointmentsByDate(env.DB, dateKey);
-  // Doctor page is for Dr Kevin only — exclude Spinola and Linda bookings.
-  const pottersOnly = appts.filter(a => a.clinic !== 'spinola' && a.clinic !== 'linda');
-  return json({ ok: true, dateKey, appointments: pottersOnly });
+  let filtered: typeof appts;
+  if (clinic === 'spinola') {
+    filtered = appts.filter(a => a.clinic === 'spinola');
+  } else if (clinic === 'linda') {
+    filtered = appts.filter(a => a.clinic === 'linda');
+  } else {
+    filtered = appts.filter(a => a.clinic !== 'spinola' && a.clinic !== 'linda');
+  }
+  return json({ ok: true, dateKey, clinic, appointments: filtered });
 }
 
 // ─── Mark Doctor Off ───────────────────────────────────────
@@ -158,7 +168,9 @@ export async function apiAdminMarkDoctorOff(req: Request, env: Env): Promise<Res
   await addDoctorOff(env.DB, { start_date: startDate, end_date: endDate, start_time: startTime, end_time: endTime, reason });
   await bumpVersion(env.DB);
 
-  // Find affected appointments
+  // Find affected appointments. doctor_off applies only to Dr Kevin's Potter's
+  // schedule, so Spinola and Linda bookings must never appear in this list —
+  // otherwise the "process affected" flow could redirect / cancel them.
   const affected: Appointment[] = [];
   let sd = parseDateKey(startDate);
   let ed = parseDateKey(endDate || startDate);
@@ -169,6 +181,7 @@ export async function apiAdminMarkDoctorOff(req: Request, env: Env): Promise<Res
     const dk = toDateKey(d);
     const appts = await getActiveAppointmentsByDate(env.DB, dk);
     for (const a of appts) {
+      if (a.clinic === 'spinola' || a.clinic === 'linda') continue;
       if (!startTime && !endTime) {
         affected.push(a);
       } else {
@@ -278,7 +291,12 @@ export async function apiAdminProcessAppointments(req: Request, env: Env): Promi
   const validActions = ['cancel', 'redirect_spinola', 'push_next_day', 'push_same_day'];
   if (!validActions.includes(action)) return json({ ok: false, reason: 'Invalid action.' }, 400);
 
-  let allAppts = await getActiveAppointmentsByDate(env.DB, dateKey);
+  // This endpoint runs from Dr Kevin's admin page and operates on Potter's
+  // appointments only. Hard-exclude Spinola + Linda so a stale frontend list
+  // (or an empty appointmentIds with action='cancel') can never cancel /
+  // redirect Linda physio bookings or already-relocated Spinola bookings.
+  const allApptsRaw = await getActiveAppointmentsByDate(env.DB, dateKey);
+  const allAppts = allApptsRaw.filter(a => a.clinic !== 'spinola' && a.clinic !== 'linda');
   let appts = appointmentIds.length > 0
     ? allAppts.filter(a => appointmentIds.includes(a.id))
     : allAppts;
@@ -625,7 +643,9 @@ export async function apiAdminNotifyPatients(req: Request, env: Env): Promise<Re
 
   if (!dateKey || !message || !appointmentIds.length) return json({ ok: false, reason: 'Missing fields.' }, 400);
 
-  const allAppts = await getActiveAppointmentsByDate(env.DB, dateKey);
+  // Kevin admin context — Linda physio patients are isolated.
+  const allApptsRaw = await getActiveAppointmentsByDate(env.DB, dateKey);
+  const allAppts = allApptsRaw.filter(a => a.clinic !== 'linda');
   const idSet = new Set(appointmentIds);
   let sent = 0;
 
@@ -1083,9 +1103,12 @@ export async function apiAdminGetStatistics(req: Request, env: Env): Promise<Res
   }
 
   if (period === '28') {
-    // Hourly distribution
+    // Hourly distribution. Exclude cancelled (and Spinola — counted separately
+    // in sHourly) so morning peaks aren't inflated by no-shows / cancellations.
     const byHour: Record<number, number> = {};
     for (const a of periodAppts) {
+      if (a.status.includes('CANCELLED')) continue;
+      if (a.clinic === 'spinola') continue;
       try { const hour = parseTimeToMinutes(a.start_time) / 60 | 0; byHour[hour] = (byHour[hour] || 0) + 1; } catch {}
     }
     hourlyDistribution = [];

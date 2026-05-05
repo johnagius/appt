@@ -163,27 +163,30 @@ export function indexPage(env: Env, bookingSource?: string): string {
     body.compact-top .topRow{ grid-template-columns: 1fr; }
     body.compact-top .topRow .topCard.pickCard{ grid-column: auto; }
 
-    /* Physiotherapy CTA at bottom of page */
+    /* Physiotherapy CTA — secondary, do not compete with the doctor flow.
+       Most users want Dr Kevin (Potter's); this is a side-channel for
+       physiotherapy patients only. Outline style + smaller text keeps it
+       visible without drawing accidental clicks. */
     .physioCta{
-      margin: 18px 0 10px 0;
+      margin: 14px 0 6px 0;
       text-align:center;
     }
     .physioCta a{
       display:inline-block;
-      background:#10b981;
-      color:#fff;
+      background:#fff;
+      color:#047857;
       text-decoration:none;
-      padding:16px 28px;
-      border-radius:999px;
-      font-weight:800;
-      font-size:16px;
-      box-shadow:0 2px 8px rgba(16,185,129,.25);
+      padding:9px 16px;
+      border-radius:8px;
+      border:1px solid #a7f3d0;
+      font-weight:700;
+      font-size:13px;
     }
-    .physioCta a:hover{ background:#059669; }
+    .physioCta a:hover{ background:#ecfdf5; }
     .physioCta .sub{
       color: var(--muted);
-      font-size:13px;
-      margin:8px 0 0 0;
+      font-size:12px;
+      margin:6px 0 0 0;
     }
 
     .topCard{
@@ -877,8 +880,8 @@ export function indexPage(env: Env, bookingSource?: string): string {
         <div style="font-weight:800;font-size:15px;color:#1e40af;margin-bottom:4px;">Morning slots are full at Potter&#39;s</div>
         <div style="font-size:14.5px;color:#3b82f6;margin-bottom:14px;">You can see Dr James at Spinola Clinic now, or wait for Potter&#39;s evening slots.</div>
         <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
-          <button type="button" id="choiceBtnSpinola" onclick="showChoiceSpinola()" style="flex:1;min-width:140px;max-width:240px;padding:12px 16px;border:none;border-radius:12px;background:#8b5cf6;color:#fff;font-weight:800;font-size:14px;cursor:pointer;">See Spinola Slots</button>
-          <button type="button" id="choiceBtnPotters" onclick="showChoicePotters()" style="flex:1;min-width:140px;max-width:240px;padding:12px 16px;border:none;border-radius:12px;background:#f5b301;color:#111827;font-weight:800;font-size:14px;cursor:pointer;">See Potter&#39;s Slots</button>
+          <button type="button" id="choiceBtnPotters" onclick="showChoicePotters()" style="flex:1;min-width:140px;max-width:240px;padding:14px 16px;border:none;border-radius:12px;background:#2563eb;color:#fff;font-weight:800;font-size:15px;cursor:pointer;box-shadow:0 2px 8px rgba(37,99,235,.25);">See Potter&#39;s Slots</button>
+          <button type="button" id="choiceBtnSpinola" onclick="showChoiceSpinola()" style="flex:1;min-width:140px;max-width:240px;padding:14px 16px;border:2px solid #8b5cf6;border-radius:12px;background:#fff;color:#6d28d9;font-weight:700;font-size:14px;cursor:pointer;">See Spinola Slots</button>
         </div>
       </div>
       <div class="sectionTitle" data-i18n="selectTime">Select a time</div>
@@ -2667,6 +2670,7 @@ export function indexPage(env: Env, bookingSource?: string): string {
       hideMsg();
       var _nb = document.getElementById('noSlotsBanner'); if (_nb) _nb.style.display = 'none';
       hideChoiceBanner();
+      _choiceDismissedForDateKey = null; // user picked a new date — re-evaluate fresh
       setStatus('good', t('loadingSlots'));
       loadAvailability(false, false);
     });
@@ -3117,9 +3121,15 @@ export function indexPage(env: Env, bookingSource?: string): string {
           }
         }
 
+        // If the user has already chosen a clinic for this date via the banner,
+        // a background refresh (WS slots_updated, periodic poll) must NOT pop
+        // the banner back up — that's the "banner reappears while typing" bug.
+        var bannerSuppressed = isSilentRefresh
+          && _choiceDismissedForDateKey === state.selectedDateKey;
+
         // Check: Potter's has evening but no morning → offer choice with Spinola
         var periods = getAvailableSlotsByPeriod(res.slots || []);
-        if (periods.morning.length === 0 && periods.evening.length > 0 && spinolaRes) {
+        if (!bannerSuppressed && periods.morning.length === 0 && periods.evening.length > 0 && spinolaRes) {
           var spinolaAvail = hasAvailableSlots((spinolaRes && spinolaRes.slots) || []);
           if (spinolaAvail) {
             showChoiceBanner(res.slots || [], spinolaRes);
@@ -3129,7 +3139,7 @@ export function indexPage(env: Env, bookingSource?: string): string {
         }
 
         // Check: Spinola has EARLIER slots than Potter's (e.g. Sat 9:30 vs 10:00)
-        if (hasAvailable && spinolaRes && spinolaRes.ok && spinolaRes.slots) {
+        if (!bannerSuppressed && hasAvailable && spinolaRes && spinolaRes.ok && spinolaRes.slots) {
           var pottersEarliest = getEarliestAvailableSlot(res.slots || []);
           var spinolaEarliest = getEarliestAvailableSlot(spinolaRes.slots || []);
           if (pottersEarliest && spinolaEarliest) {
@@ -3215,6 +3225,12 @@ export function indexPage(env: Env, bookingSource?: string): string {
 
     var _choiceSpinolaPrefetch = null;
     var _choicePottersSlots = null;
+    // Date key for which the user has already dismissed the clinic-choice
+    // banner via "See Potter's" / "See Spinola". Silent refreshes (e.g. WS
+    // slots_updated while the user is typing into the form) must NOT re-show
+    // the banner once it's been dismissed for this date — that's jarring.
+    // Reset on real date change.
+    var _choiceDismissedForDateKey = null;
 
     function showChoiceBanner(pottersSlots, spinolaRes) {
       _choicePottersSlots = pottersSlots;
@@ -3296,12 +3312,14 @@ export function indexPage(env: Env, bookingSource?: string): string {
 
     // Global functions for choice buttons
     window.showChoiceSpinola = function() {
+      _choiceDismissedForDateKey = state.selectedDateKey;
       hideChoiceBanner();
       _pottersSlotsEmpty = true;
       showSpinolaInlineWithData(_choiceSpinolaPrefetch);
     };
 
     window.showChoicePotters = function() {
+      _choiceDismissedForDateKey = state.selectedDateKey;
       hideChoiceBanner();
       hideSpinolaInline();
       renderSlots(_choicePottersSlots || []);

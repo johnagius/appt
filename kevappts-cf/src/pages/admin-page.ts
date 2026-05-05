@@ -439,10 +439,29 @@ export function adminPage(sig: string): string {
         <button class="btn btn-ghost btn-sm" onclick="changeDay(1)">&rarr;</button>
       </div>
 
-      <!-- Day appointments -->
+      <!-- Day appointments — separate tables per practitioner so blocking
+           Potter's time / running quick actions never confuses Linda's
+           physio bookings or Spinola appointments. -->
       <div class="card">
         <h3 id="schedHeader" class="date-header">Appointments</h3>
+
+        <h4 style="margin:14px 0 6px 0;font-size:14px;color:#1e40af;font-weight:800;letter-spacing:.02em;">
+          <span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#2563eb;margin-right:6px;vertical-align:middle;"></span>
+          Dr Kevin &middot; Potter&#39;s Pharmacy Clinic
+        </h4>
         <div id="schedTable"></div>
+
+        <h4 style="margin:18px 0 6px 0;font-size:14px;color:#6d28d9;font-weight:800;letter-spacing:.02em;">
+          <span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#8b5cf6;margin-right:6px;vertical-align:middle;"></span>
+          Dr Kevin &middot; Spinola Clinic
+        </h4>
+        <div id="schedTableSpinola"></div>
+
+        <h4 style="margin:18px 0 6px 0;font-size:14px;color:#047857;font-weight:800;letter-spacing:.02em;">
+          <span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#10b981;margin-right:6px;vertical-align:middle;"></span>
+          Linda &middot; Physiotherapy
+        </h4>
+        <div id="schedTableLinda"></div>
       </div>
     </div>
   </div>
@@ -1829,20 +1848,30 @@ function onSchedDateChange() { goToDate(document.getElementById('schedDate').val
 function loadSchedAppts() {
   if (!_schedDate) return;
   document.getElementById('schedHeader').textContent = formatDateFull(_schedDate);
-  document.getElementById('schedTable').innerHTML = '<div class="empty">Loading...</div>';
 
-  google.script.run
-    .withSuccessHandler(function(res) {
-      if (!res || !res.ok) {
-        document.getElementById('schedTable').innerHTML = '<div class="empty">' + esc(res.reason || 'Failed.') + '</div>';
-        return;
-      }
-      renderApptTable(res.appointments, 'schedTable', false);
-    })
-    .withFailureHandler(function() {
-      document.getElementById('schedTable').innerHTML = '<div class="empty">Error loading.</div>';
-    })
-    .apiAdminGetDateAppointments(SIG, _schedDate);
+  function loadOne(clinic, containerId) {
+    var el = document.getElementById(containerId);
+    if (!el) return;
+    el.innerHTML = '<div class="empty">Loading...</div>';
+    var url = '/api/admin/appointments?date=' + encodeURIComponent(_schedDate)
+            + '&clinic=' + encodeURIComponent(clinic)
+            + '&sig=' + encodeURIComponent(SIG);
+    fetch(url, { credentials: 'same-origin' })
+      .then(function(r) { return r.json(); })
+      .then(function(res) {
+        if (!res || !res.ok) {
+          el.innerHTML = '<div class="empty">' + esc((res && res.reason) || 'Failed.') + '</div>';
+          return;
+        }
+        var appts = (res.appointments || []).map(transformAppt);
+        renderApptTable(appts, containerId, false);
+      })
+      .catch(function() { el.innerHTML = '<div class="empty">Error loading.</div>'; });
+  }
+
+  loadOne('potters', 'schedTable');
+  loadOne('spinola', 'schedTableSpinola');
+  loadOne('linda', 'schedTableLinda');
 }
 
 // ========== Week Overview ==========
@@ -3529,13 +3558,13 @@ function renderPeakHours(dist) {
   var el = document.getElementById('peakHoursMap');
   if (!dist) { el.innerHTML = '<div class="empty">No data.</div>'; return; }
 
-  // Only show hours that have data or are in working range (7-21)
+  // Backend ships a 14-element array for hours 7..20 (index 0 = 7am).
   var maxCount = 1;
-  for (var h = 0; h < 24; h++) { if (dist[h] > maxCount) maxCount = dist[h]; }
+  for (var i = 0; i < dist.length; i++) { if (dist[i] > maxCount) maxCount = dist[i]; }
 
   var html = '';
   for (var h = 7; h <= 20; h++) {
-    var count = dist[h] || 0;
+    var count = dist[h - 7] || 0;
     var intensity = maxCount > 0 ? count / maxCount : 0;
     var r = Math.round(219 - intensity * 182);
     var g = Math.round(234 - intensity * 135);
@@ -3825,12 +3854,13 @@ function renderSpPeakHours(dist) {
   var el = document.getElementById('spPeakHoursMap');
   if (!dist) { el.innerHTML = '<div class="empty">No data.</div>'; return; }
 
+  // 14-element array for hours 7..20 (index 0 = 7am).
   var maxCount = 1;
-  for (var h = 0; h < 24; h++) { if (dist[h] > maxCount) maxCount = dist[h]; }
+  for (var i = 0; i < dist.length; i++) { if (dist[i] > maxCount) maxCount = dist[i]; }
 
   var html = '';
   for (var h = 7; h <= 20; h++) {
-    var count = dist[h] || 0;
+    var count = dist[h - 7] || 0;
     var intensity = maxCount > 0 ? count / maxCount : 0;
     var r = Math.round(245 - intensity * 106);
     var g = Math.round(243 - intensity * 151);
