@@ -468,6 +468,18 @@ export function adminPage(sig: string): string {
         </h4>
         <div id="schedTableLinda"></div>
       </div>
+
+      <!-- Telemedicine — completely separate from Kevin/Spinola/Linda. Has no
+           slot, no calendar event, no overlap with the appointments table.
+           Shown in the Schedule view so the daily picture is complete. -->
+      <div class="card" style="background:#fff7ed;border-left:4px solid #f97316;">
+        <h3 style="margin:0;color:#9a3412;font-size:15px;">
+          Telemedicine Calls
+          <span style="font-weight:600;color:#7c2d12;font-size:12px;">&middot; 8pm&ndash;midnight &middot; &euro;25 each</span>
+          <span id="schedTelemedSummary" style="font-weight:600;color:#6b7280;font-size:12px;margin-left:6px;"></span>
+        </h3>
+        <div id="schedTableTelemed" style="margin-top:8px;"></div>
+      </div>
     </div>
   </div>
 
@@ -1091,6 +1103,51 @@ export function adminPage(sig: string): string {
   </div>
 </div>
 
+<!-- Telemedicine Prescription modal -->
+<div class="overlay" id="telPrescriptionOverlay" role="dialog" aria-modal="true">
+  <div class="patient-modal" style="max-width:560px;">
+    <div class="patient-modal-header">
+      <h3 style="margin:0;">Prescription &amp; Receipt</h3>
+      <button class="btn btn-ghost btn-sm" onclick="closeTelPrescription()">&#x2715;</button>
+    </div>
+    <div style="padding:18px;">
+      <p style="margin:0 0 12px 0;font-size:13px;color:#6b7280;line-height:1.5;">Issues a professional prescription/receipt to the patient by email. Doctor's fee (€25) and medicine total are listed separately so it can be used for an insurance claim.</p>
+      <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:12px;margin-bottom:14px;">
+        <div style="font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:#6b7280;font-weight:800;margin-bottom:6px;">Patient</div>
+        <div style="font-weight:800;font-size:15px;color:#111827;" id="telRxPatientName">—</div>
+        <div style="font-size:13px;color:#374151;margin-top:2px;" id="telRxPatientPhone">—</div>
+        <div style="font-size:13px;color:#374151;" id="telRxPatientEmail">—</div>
+      </div>
+      <label class="label" style="font-weight:700;">Medicines (one per line)</label>
+      <div id="telRxMedicineList" style="display:flex;flex-direction:column;gap:6px;margin-bottom:6px;"></div>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:14px;">
+        <button type="button" class="btn btn-sm btn-ghost" onclick="addRxMedicineRow()">+ Add medicine</button>
+        <span style="font-size:12px;color:#9ca3af;">No prices per medicine — only the total below is billed.</span>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
+        <div>
+          <label class="label">Medicine total (€)</label>
+          <input type="number" min="0" step="0.01" id="telRxMedTotal" placeholder="0.00">
+        </div>
+        <div>
+          <label class="label">Doctor's fee (€)</label>
+          <input type="text" id="telRxFee" value="25.00" disabled style="background:#f3f4f6;color:#6b7280;">
+        </div>
+      </div>
+      <div style="background:#0f172a;color:#fff;border-radius:10px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;font-weight:800;font-size:15px;">
+        <span>Patient total due</span>
+        <span id="telRxTotal">€25.00</span>
+      </div>
+      <div id="telRxMsg" style="margin-top:12px;font-size:13px;"></div>
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px;flex-wrap:wrap;">
+        <button class="btn btn-ghost" onclick="closeTelPrescription()">Cancel</button>
+        <button class="btn btn-ghost" id="telRxSaveBtn" onclick="saveTelPrescription(false)">Save only</button>
+        <button class="btn btn-dark" id="telRxSendBtn" onclick="saveTelPrescription(true)" style="background:#ea580c;">Save &amp; Email Patient</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Patient History modal -->
 <div class="overlay" id="patientOverlay">
   <div class="patient-modal">
@@ -1571,6 +1628,12 @@ async function loadTelemedicineList() {
         '<td style="padding:8px;border-bottom:1px solid #f3f4f6;font-weight:800;color:#1e40af;" id="telPatTotal_' + escTelHtml(c.id) + '">' + telFormatEur(patientCents) + '</td>' +
         '<td style="padding:8px;border-bottom:1px solid #f3f4f6;">' + escTelHtml(c.status) + '</td>' +
         '<td style="padding:8px;border-bottom:1px solid #f3f4f6;text-align:right;white-space:nowrap;">';
+      // Prescription button — disabled when there's no patient email since
+      // we can't send a receipt anyway, but the modal still opens for
+      // saving medicines so the data is there when an email is added.
+      var rxLabel = c.prescription_sent_at ? 'Re-send Rx' : 'Prescription';
+      var rxStyle = c.prescription_sent_at ? 'background:#10b981;color:#fff;' : 'background:#ea580c;color:#fff;';
+      html += '<button class="btn btn-sm" style="' + rxStyle + 'margin-right:4px;" onclick="openTelPrescription(\'' + escTelHtml(c.id) + '\')">' + rxLabel + '</button>';
       if (c.status === 'BOOKED') {
         html += '<button class="btn btn-sm" style="background:#10b981;color:#fff;margin-right:4px;" onclick="markTelemedicineStatus(\'' + escTelHtml(c.id) + '\',\'COMPLETED\')">Done</button>';
         html += '<button class="btn btn-sm" style="background:#9ca3af;color:#fff;margin-right:4px;" onclick="markTelemedicineStatus(\'' + escTelHtml(c.id) + '\',\'CANCELLED\')">Cancel</button>';
@@ -1669,6 +1732,138 @@ async function markTelemedicineStatus(id, status) {
     loadTelemedicineList();
   } catch(e) {}
 }
+// ── Prescription modal ──────────────────────────────────
+var _telRxCurrent = null;  // currently-edited call object
+function openTelPrescription(callId) {
+  // Look up the call from the most recently rendered list — refetch the
+  // day so we're working with the freshest data even if the row was
+  // updated elsewhere (e.g. Done/Reopen).
+  var dateKey = document.getElementById('telListDate').value || telTodayKey();
+  apiCall('telemedicine?date=' + encodeURIComponent(dateKey)).then(function(res) {
+    if (!res || !res.ok) return;
+    var calls = res.calls || [];
+    var c = calls.filter(function(x) { return x.id === callId; })[0];
+    if (!c) { alert('Call not found.'); return; }
+    _telRxCurrent = c;
+    document.getElementById('telRxPatientName').textContent = c.patient_name || '—';
+    document.getElementById('telRxPatientPhone').textContent = c.phone || '—';
+    document.getElementById('telRxPatientEmail').textContent = c.email || '(no email — add one before sending)';
+    var med = (c.medicine_cents || 0) / 100;
+    document.getElementById('telRxMedTotal').value = med ? med.toFixed(2) : '';
+    document.getElementById('telRxFee').value = ((c.fee_cents || 2500) / 100).toFixed(2);
+    document.getElementById('telRxMsg').textContent = '';
+    // Populate medicines as separate rows for "neat entry".
+    var listEl = document.getElementById('telRxMedicineList');
+    listEl.innerHTML = '';
+    var lines = (c.medicines || '').split(/\r?\n/).filter(function(s) { return s.trim(); });
+    if (!lines.length) lines = [''];
+    for (var i = 0; i < lines.length; i++) addRxMedicineRow(lines[i]);
+    updateRxTotal();
+    document.getElementById('telRxSendBtn').disabled = !c.email;
+    document.getElementById('telPrescriptionOverlay').style.display = 'flex';
+  });
+}
+function closeTelPrescription() {
+  document.getElementById('telPrescriptionOverlay').style.display = 'none';
+  _telRxCurrent = null;
+}
+function addRxMedicineRow(value) {
+  var listEl = document.getElementById('telRxMedicineList');
+  var wrap = document.createElement('div');
+  wrap.style.display = 'flex';
+  wrap.style.gap = '6px';
+  wrap.style.alignItems = 'center';
+  var input = document.createElement('input');
+  input.type = 'text';
+  input.placeholder = 'e.g. Paracetamol 500mg — 1 tablet 3x daily';
+  input.value = (typeof value === 'string') ? value : '';
+  input.style.flex = '1';
+  input.style.padding = '10px 12px';
+  input.style.border = '1px solid #e5e7eb';
+  input.style.borderRadius = '10px';
+  input.style.fontSize = '14px';
+  var btn = document.createElement('button');
+  btn.type = 'button';
+  btn.textContent = '✕';
+  btn.title = 'Remove';
+  btn.style.background = '#fee2e2';
+  btn.style.color = '#991b1b';
+  btn.style.border = 'none';
+  btn.style.borderRadius = '10px';
+  btn.style.padding = '8px 12px';
+  btn.style.cursor = 'pointer';
+  btn.style.fontWeight = '700';
+  btn.onclick = function() {
+    listEl.removeChild(wrap);
+    if (!listEl.children.length) addRxMedicineRow('');
+  };
+  wrap.appendChild(input);
+  wrap.appendChild(btn);
+  listEl.appendChild(wrap);
+}
+function collectRxMedicines() {
+  var inputs = document.querySelectorAll('#telRxMedicineList input');
+  var lines = [];
+  for (var i = 0; i < inputs.length; i++) {
+    var v = (inputs[i].value || '').trim();
+    if (v) lines.push(v);
+  }
+  return lines.join('\n');
+}
+function updateRxTotal() {
+  var med = parseFloat(document.getElementById('telRxMedTotal').value || '0') || 0;
+  if (med < 0) med = 0;
+  var fee = parseFloat(document.getElementById('telRxFee').value || '0') || 0;
+  document.getElementById('telRxTotal').textContent = '€' + (med + fee).toFixed(2);
+}
+async function saveTelPrescription(send) {
+  if (!_telRxCurrent) return;
+  var msg = document.getElementById('telRxMsg');
+  msg.style.color = '#6b7280';
+  msg.textContent = send ? 'Saving and sending…' : 'Saving…';
+  var medicines = collectRxMedicines();
+  var med = parseFloat(document.getElementById('telRxMedTotal').value || '0') || 0;
+  if (med < 0) med = 0;
+  var id = _telRxCurrent.id;
+  try {
+    if (send) {
+      if (!_telRxCurrent.email) {
+        msg.style.color = '#b91c1c';
+        msg.textContent = 'No patient email on file. Add one first.';
+        return;
+      }
+      var res = await apiCall('telemedicine-prescription', { body: { id: id, medicines: medicines, medicineEuros: med } });
+      if (res && res.ok) {
+        msg.style.color = '#059669';
+        msg.textContent = 'Sent to ' + (res.sentTo || _telRxCurrent.email) + '. Patient total ' + (res.patientTotalLabel || '€?');
+        loadTelemedicineStats();
+        loadTelemedicineList();
+        try { loadSchedTelemed(document.getElementById('telListDate').value || telTodayKey()); } catch(e) {}
+      } else {
+        msg.style.color = '#b91c1c';
+        msg.textContent = (res && res.reason) || 'Failed to send.';
+        return;
+      }
+    } else {
+      // Save medicines + medicine total but don't send the email.
+      await apiCall('telemedicine-medicines', { body: { id: id, medicines: medicines } });
+      await apiCall('telemedicine-medicine', { body: { id: id, medicineEuros: med } });
+      msg.style.color = '#059669';
+      msg.textContent = 'Saved.';
+      loadTelemedicineStats();
+      loadTelemedicineList();
+      try { loadSchedTelemed(document.getElementById('telListDate').value || telTodayKey()); } catch(e) {}
+    }
+  } catch(e) {
+    msg.style.color = '#b91c1c';
+    msg.textContent = 'Network error.';
+  }
+}
+// Recompute the patient-total chip whenever the medicine total changes.
+document.addEventListener('input', function(e) {
+  if (e.target && e.target.id === 'telRxMedTotal') updateRxTotal();
+});
+
 async function deleteTelemedicineCall(id) {
   var ok = await styledConfirm('Delete telemedicine call?', 'This permanently removes the record. The fee will no longer be counted.', 'Delete', 'btn-danger');
   if (!ok) return;
@@ -2144,6 +2339,58 @@ function loadSchedAppts() {
   loadOne('potters', 'schedTable');
   loadOne('spinola', 'schedTableSpinola');
   loadOne('linda', 'schedTableLinda');
+  // Telemedicine — separate from Linda. Same date as the rest of the schedule.
+  try { loadSchedTelemed(_schedDate); } catch(e) {}
+}
+
+function loadSchedTelemed(dateKey) {
+  var el = document.getElementById('schedTableTelemed');
+  var sumEl = document.getElementById('schedTelemedSummary');
+  if (!el) return;
+  el.innerHTML = '<div class="empty">Loading...</div>';
+  apiCall('telemedicine?date=' + encodeURIComponent(dateKey)).then(function(res) {
+    if (!res || !res.ok) {
+      el.innerHTML = '<div class="empty">Failed to load.</div>';
+      if (sumEl) sumEl.textContent = '';
+      return;
+    }
+    var calls = res.calls || [];
+    if (sumEl) {
+      sumEl.textContent = calls.length
+        ? '(' + (res.billableCount || 0) + ' billable · doctor ' + (res.totalRevenueLabel || '€0') + ' · medicine ' + (res.totalMedicineLabel || '€0') + ')'
+        : '(none)';
+    }
+    if (!calls.length) {
+      el.innerHTML = '<div class="empty">No telemedicine calls on this date.</div>';
+      return;
+    }
+    var html = '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;">' +
+      '<thead><tr style="background:#fff;text-align:left;">' +
+      '<th style="padding:6px;border-bottom:1px solid #fed7aa;">Time</th>' +
+      '<th style="padding:6px;border-bottom:1px solid #fed7aa;">Patient</th>' +
+      '<th style="padding:6px;border-bottom:1px solid #fed7aa;">Phone</th>' +
+      '<th style="padding:6px;border-bottom:1px solid #fed7aa;">Fee</th>' +
+      '<th style="padding:6px;border-bottom:1px solid #fed7aa;">Status</th>' +
+      '</tr></thead><tbody>';
+    for (var i = 0; i < calls.length; i++) {
+      var c = calls[i];
+      var time = (c.created_at || '').split(' ')[1] || '';
+      time = time.split(':').slice(0,2).join(':');
+      var rowStyle = c.status === 'CANCELLED' ? 'opacity:0.5;' : '';
+      html += '<tr style="' + rowStyle + '">' +
+        '<td style="padding:6px;border-bottom:1px solid #ffedd5;">' + escTelHtml(time) + '</td>' +
+        '<td style="padding:6px;border-bottom:1px solid #ffedd5;"><b>' + escTelHtml(c.patient_name) + '</b></td>' +
+        '<td style="padding:6px;border-bottom:1px solid #ffedd5;"><a href="tel:' + escTelHtml(c.phone) + '">' + escTelHtml(c.phone) + '</a></td>' +
+        '<td style="padding:6px;border-bottom:1px solid #ffedd5;">' + telFormatEur(c.fee_cents) + '</td>' +
+        '<td style="padding:6px;border-bottom:1px solid #ffedd5;">' + escTelHtml(c.status) + '</td>' +
+      '</tr>';
+    }
+    html += '</tbody></table></div>' +
+      '<div style="text-align:right;margin-top:6px;"><a href="#" onclick="switchTab(\'telemedicine\');return false;" style="font-size:12px;color:#9a3412;">Open Telemedicine tab &rarr;</a></div>';
+    el.innerHTML = html;
+  }).catch(function() {
+    el.innerHTML = '<div class="empty">Error loading.</div>';
+  });
 }
 
 // ========== Week Overview ==========

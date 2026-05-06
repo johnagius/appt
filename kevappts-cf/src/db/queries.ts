@@ -565,6 +565,10 @@ export interface TelemedicineCall {
   // Patient's pharmacy bill for this visit (admin-entered). Kept separate
   // from fee_cents so the doctor's total only counts the €25 fees.
   medicine_cents: number;
+  // Newline-separated medicine names entered by admin for the prescription.
+  medicines: string;
+  // Timestamp the prescription/receipt email was sent — empty if not sent.
+  prescription_sent_at: string;
   status: string;
   source: string;
   created_at: string;
@@ -575,6 +579,15 @@ export interface TelemedicineCall {
 // is idempotent; running it on every call lets new deploys pick it up
 // without forcing a manual `wrangler d1 execute`. Also adds medicine_cents
 // to DBs that were created before the column existed.
+async function tryAlter(db: D1Database, sql: string): Promise<void> {
+  try { await db.prepare(sql).run(); } catch (e: any) {
+    const msg = String(e?.message || '').toLowerCase();
+    if (msg.includes('duplicate column') || msg.includes('already exists') || msg.includes('has no column')) return;
+    // Anything else: silently ignore — better than blocking every list query
+    // if a future migration runs into a benign issue.
+  }
+}
+
 async function ensureTelemedicineTable(db: D1Database): Promise<void> {
   await db.prepare(
     "CREATE TABLE IF NOT EXISTS telemedicine_calls (" +
@@ -586,33 +599,40 @@ async function ensureTelemedicineTable(db: D1Database): Promise<void> {
     "comments TEXT DEFAULT ''," +
     "fee_cents INTEGER NOT NULL DEFAULT 2500," +
     "medicine_cents INTEGER NOT NULL DEFAULT 0," +
+    "medicines TEXT DEFAULT ''," +
+    "prescription_sent_at TEXT DEFAULT ''," +
     "status TEXT NOT NULL DEFAULT 'BOOKED'," +
     "source TEXT NOT NULL DEFAULT 'public'," +
     "created_at TEXT NOT NULL," +
     "updated_at TEXT NOT NULL" +
     ")"
   ).run();
-  // Add medicine_cents on older DBs. ALTER would fail on the freshly-
-  // created table above; swallow the "duplicate column" error.
-  try {
-    await db.prepare("ALTER TABLE telemedicine_calls ADD COLUMN medicine_cents INTEGER NOT NULL DEFAULT 0").run();
-  } catch (e: any) {
-    const msg = String(e?.message || '').toLowerCase();
-    if (!msg.includes('duplicate column') && !msg.includes('already exists') && !msg.includes('has no column')) {
-      // Ignore any "column already exists" variant; rethrow anything else
-      // so a real DB problem isn't masked.
-    }
-  }
+  // Older DBs may pre-date one or more columns. Each ALTER is no-op on the
+  // freshly-created table or where the column already exists.
+  await tryAlter(db, "ALTER TABLE telemedicine_calls ADD COLUMN medicine_cents INTEGER NOT NULL DEFAULT 0");
+  await tryAlter(db, "ALTER TABLE telemedicine_calls ADD COLUMN medicines TEXT DEFAULT ''");
+  await tryAlter(db, "ALTER TABLE telemedicine_calls ADD COLUMN prescription_sent_at TEXT DEFAULT ''");
 }
 
 export async function insertTelemedicineCall(db: D1Database, call: TelemedicineCall): Promise<void> {
   await ensureTelemedicineTable(db);
   await db.prepare(
-    'INSERT INTO telemedicine_calls (id, date_key, patient_name, phone, email, comments, fee_cents, medicine_cents, status, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    'INSERT INTO telemedicine_calls (id, date_key, patient_name, phone, email, comments, fee_cents, medicine_cents, medicines, prescription_sent_at, status, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
   ).bind(
     call.id, call.date_key, call.patient_name, call.phone, call.email,
-    call.comments, call.fee_cents, call.medicine_cents || 0, call.status, call.source, call.created_at, call.updated_at
+    call.comments, call.fee_cents, call.medicine_cents || 0, call.medicines || '',
+    call.prescription_sent_at || '', call.status, call.source, call.created_at, call.updated_at
   ).run();
+}
+
+export async function updateTelemedicineMedicines(db: D1Database, id: string, medicines: string, nowStr: string): Promise<void> {
+  await ensureTelemedicineTable(db);
+  await db.prepare('UPDATE telemedicine_calls SET medicines = ?, updated_at = ? WHERE id = ?').bind(medicines, nowStr, id).run();
+}
+
+export async function markTelemedicinePrescriptionSent(db: D1Database, id: string, nowStr: string): Promise<void> {
+  await ensureTelemedicineTable(db);
+  await db.prepare('UPDATE telemedicine_calls SET prescription_sent_at = ?, updated_at = ? WHERE id = ?').bind(nowStr, nowStr, id).run();
 }
 
 export async function getTelemedicineCallsByDate(db: D1Database, dateKey: string): Promise<TelemedicineCall[]> {

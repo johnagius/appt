@@ -178,6 +178,11 @@ CREATE TABLE IF NOT EXISTS telemedicine_calls (
   comments TEXT DEFAULT '',
   fee_cents INTEGER NOT NULL DEFAULT 2500,
   medicine_cents INTEGER NOT NULL DEFAULT 0,
+  -- Newline-separated medicine names (entered in admin). Used to build the
+  -- prescription/receipt email; we never store per-medicine prices, only
+  -- the medicine_cents total above is billed.
+  medicines TEXT DEFAULT '',
+  prescription_sent_at TEXT DEFAULT '',
   status TEXT NOT NULL DEFAULT 'BOOKED',
   source TEXT NOT NULL DEFAULT 'public',
   created_at TEXT NOT NULL,

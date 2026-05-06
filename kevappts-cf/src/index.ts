@@ -43,6 +43,7 @@ import {
   apiTelemedicineStatus, apiBookTelemedicine,
   apiAdminListTelemedicineByDate, apiAdminAddTelemedicine, apiAdminDeleteTelemedicine,
   apiAdminMarkTelemedicineStatus, apiAdminTelemedicineStats, apiAdminSetTelemedicineMedicine,
+  apiAdminSetTelemedicineMedicines, apiAdminSendTelemedicinePrescription,
 } from './api/telemedicine';
 
 export { RealtimeHub };
@@ -225,6 +226,8 @@ export default {
         if (adminPath === 'telemedicine-stats' && method === 'GET') return apiAdminTelemedicineStats(request, env);
         if (adminPath === 'telemedicine-status' && method === 'POST') return apiAdminMarkTelemedicineStatus(request, env);
         if (adminPath === 'telemedicine-medicine' && method === 'POST') return apiAdminSetTelemedicineMedicine(request, env);
+        if (adminPath === 'telemedicine-medicines' && method === 'POST') return apiAdminSetTelemedicineMedicines(request, env);
+        if (adminPath === 'telemedicine-prescription' && method === 'POST') return apiAdminSendTelemedicinePrescription(request, env);
         if (adminPath.startsWith('telemedicine/') && method === 'DELETE') return apiAdminDeleteTelemedicine(request, env);
 
         // Test broadcast — manually trigger a WebSocket notification

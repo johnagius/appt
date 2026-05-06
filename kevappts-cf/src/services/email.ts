@@ -688,6 +688,139 @@ export async function sendTelemedicinePatientEmail(env: Env, call: TelemedicineC
   await sendEmail(env, call.email, subject, html);
 }
 
+// ─── 13b. Telemedicine — Prescription / Receipt ───────────
+//
+// Professional, print-friendly format suitable for an insurance claim.
+// The doctor's fee (€25) and the medicine fee (entered by admin) are
+// always shown as separate line items so the patient can show the bill
+// to their insurer. We never store per-medicine prices — only the
+// `medicineCents` total entered in admin.
+
+export interface TelemedicinePrescriptionPayload {
+  id: string;
+  date_key: string;
+  patient_name: string;
+  phone: string;
+  email: string;
+  fee_cents: number;
+  medicine_cents: number;
+  medicines: string;       // newline-separated medicine names
+  created_at: string;
+}
+
+export async function sendTelemedicinePrescriptionEmail(env: Env, p: TelemedicinePrescriptionPayload): Promise<void> {
+  if (!p.email) throw new Error('Patient email is required to send a prescription.');
+
+  const fee = (p.fee_cents || 0) / 100;
+  const med = (p.medicine_cents || 0) / 100;
+  const total = fee + med;
+  const today = (p.created_at || '').split(' ')[0] || p.date_key;
+
+  // Split the medicines blob into clean lines. Skip empties so admins can
+  // be loose with whitespace; render each as a styled <li>.
+  const items = (p.medicines || '')
+    .split(/\r?\n/)
+    .map(s => s.trim())
+    .filter(Boolean);
+  const medicineList = items.length
+    ? '<ol style="margin:6px 0 0 0;padding-left:22px;font-size:14.5px;line-height:1.7;color:#111827;">' +
+        items.map(m => '<li style="margin-bottom:4px;">' + escapeHtml(m) + '</li>').join('') +
+      '</ol>'
+    : '<p style="margin:8px 0 0 0;color:#6b7280;font-style:italic;">No medicines prescribed.</p>';
+
+  // Doctor identity for the prescription footer. Reg No. is fixed by the
+  // doctor's medical council registration — kept here as a constant so the
+  // patient's prescription matches their insurance paperwork. Falls back to
+  // env.DOCTOR_NAME for the printed name in case it's tweaked.
+  const doctorName = env.DOCTOR_NAME || 'Dr Kevin Navarro Gera';
+  const doctorReg = 'Reg No. 1985';
+
+  const subject = `Prescription & Receipt — Dr Kevin Navarro Gera (${today})`;
+  const html = `
+<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;background:#f9fafb;padding:24px 0;">
+  <div style="max-width:640px;margin:0 auto;background:#ffffff;border:1px solid #e5e7eb;border-radius:14px;overflow:hidden;box-shadow:0 4px 20px rgba(15,23,42,0.06);">
+    <div style="background:#0f172a;color:#fff;padding:22px 28px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;">
+        <div>
+          <div style="font-size:11px;letter-spacing:0.18em;text-transform:uppercase;color:#94a3b8;margin-bottom:4px;">Telemedicine consultation</div>
+          <h1 style="margin:0;font-size:22px;font-weight:800;letter-spacing:-0.01em;">Prescription &amp; Receipt</h1>
+        </div>
+        <div style="text-align:right;font-size:13px;color:#cbd5e1;line-height:1.4;">
+          <div style="font-weight:700;color:#fff;">${escapeHtml(doctorName)}</div>
+          <div>${escapeHtml(doctorReg)}</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="padding:22px 28px 8px;">
+      <table style="width:100%;border-collapse:collapse;font-size:14px;">
+        <tr>
+          <td style="padding:8px 0;color:#6b7280;width:140px;">Date issued</td>
+          <td style="padding:8px 0;color:#111827;font-weight:700;">${escapeHtml(today)}</td>
+        </tr>
+        <tr>
+          <td style="padding:8px 0;color:#6b7280;">Patient</td>
+          <td style="padding:8px 0;color:#111827;font-weight:700;">${escapeHtml(p.patient_name)}</td>
+        </tr>
+        <tr>
+          <td style="padding:8px 0;color:#6b7280;">Phone</td>
+          <td style="padding:8px 0;color:#111827;font-weight:700;">${escapeHtml(p.phone)}</td>
+        </tr>
+        <tr>
+          <td style="padding:8px 0;color:#6b7280;">Reference</td>
+          <td style="padding:8px 0;color:#111827;font-weight:700;">${escapeHtml(p.id)}</td>
+        </tr>
+      </table>
+    </div>
+
+    <div style="padding:14px 28px 6px;">
+      <div style="border-top:1px solid #e5e7eb;padding-top:14px;">
+        <div style="font-size:11px;letter-spacing:0.18em;text-transform:uppercase;color:#9a3412;font-weight:800;">Prescription</div>
+        ${medicineList}
+      </div>
+    </div>
+
+    <div style="padding:18px 28px 6px;">
+      <div style="border-top:1px solid #e5e7eb;padding-top:14px;">
+        <div style="font-size:11px;letter-spacing:0.18em;text-transform:uppercase;color:#1d4ed8;font-weight:800;margin-bottom:8px;">Bill</div>
+        <table style="width:100%;border-collapse:collapse;font-size:14.5px;">
+          <tr>
+            <td style="padding:8px 0;color:#374151;">Doctor's consultation fee (telemedicine)</td>
+            <td style="padding:8px 0;text-align:right;color:#111827;font-weight:700;white-space:nowrap;">€${fee.toFixed(2)}</td>
+          </tr>
+          <tr>
+            <td style="padding:8px 0;color:#374151;border-top:1px dashed #e5e7eb;">Medicines (pharmacy total)</td>
+            <td style="padding:8px 0;text-align:right;color:#111827;font-weight:700;white-space:nowrap;border-top:1px dashed #e5e7eb;">€${med.toFixed(2)}</td>
+          </tr>
+          <tr>
+            <td style="padding:12px 0 4px;border-top:2px solid #0f172a;color:#0f172a;font-weight:800;font-size:15px;">Patient total due</td>
+            <td style="padding:12px 0 4px;border-top:2px solid #0f172a;text-align:right;color:#0f172a;font-weight:900;font-size:17px;white-space:nowrap;">€${total.toFixed(2)}</td>
+          </tr>
+        </table>
+        <p style="margin:10px 0 0 0;color:#6b7280;font-size:12px;line-height:1.55;">The doctor's fee and the medicines are listed separately so this receipt can be used for an insurance claim.</p>
+      </div>
+    </div>
+
+    <div style="padding:18px 28px 24px;">
+      <div style="border-top:1px solid #e5e7eb;padding-top:14px;display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:14px;">
+        <div style="font-size:12px;color:#6b7280;line-height:1.5;max-width:320px;">
+          Please follow the dosage agreed during the call. If your symptoms worsen or you experience any reaction, contact a doctor or call 112 immediately.
+        </div>
+        <div style="text-align:right;">
+          <div style="font-family:'Brush Script MT',cursive;font-size:26px;color:#0f172a;line-height:1;margin-bottom:4px;">${escapeHtml(doctorName)}</div>
+          <div style="font-size:13px;color:#111827;font-weight:800;">${escapeHtml(doctorName)}</div>
+          <div style="font-size:12px;color:#6b7280;">${escapeHtml(doctorReg)}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p style="max-width:640px;margin:14px auto 0;font-size:11px;color:#9ca3af;text-align:center;">This document is computer-generated. Telemedicine consultation issued under the regulations of the Maltese Medical Council.</p>
+</div>`;
+
+  await sendEmail(env, p.email, subject, html);
+}
+
 // ─── 13. Referral Thank You Email ──────────────────────────
 
 export async function sendReferralThankYouEmail(env: Env, referrerEmail: string, referrerName: string, friendName: string): Promise<void> {

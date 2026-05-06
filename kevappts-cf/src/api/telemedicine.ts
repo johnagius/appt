@@ -23,10 +23,13 @@ import { verifyAdminSig, generateId } from '../services/crypto';
 import {
   insertTelemedicineCall, getTelemedicineCallsByDate, getTelemedicineCallsByDateRange,
   getTelemedicineCallById, deleteTelemedicineCall, updateTelemedicineCallStatus,
-  updateTelemedicineMedicine,
+  updateTelemedicineMedicine, updateTelemedicineMedicines, markTelemedicinePrescriptionSent,
   getTelemedicineStats, type TelemedicineCall,
 } from '../db/queries';
-import { sendTelemedicineDoctorEmail, sendTelemedicinePatientEmail } from '../services/email';
+import {
+  sendTelemedicineDoctorEmail, sendTelemedicinePatientEmail,
+  sendTelemedicinePrescriptionEmail,
+} from '../services/email';
 
 const TELEMEDICINE_FEE_CENTS = 2500;
 // Window starts at 20:00, ends at 24:00 (i.e. before 00:00 the next day).
@@ -188,6 +191,98 @@ export async function apiAdminMarkTelemedicineStatus(req: Request, env: Env): Pr
   return json({ ok: true });
 }
 
+// Admin: save the medicines list (newline-separated names) for a call.
+// Used by the prescription editor; doesn't send an email on its own.
+export async function apiAdminSetTelemedicineMedicines(req: Request, env: Env): Promise<Response> {
+  const denied = await requireAdmin(req, env);
+  if (denied) return denied;
+
+  const body: any = await req.json().catch(() => ({}));
+  const id = (body.id || '').toString().trim();
+  const medicines = (body.medicines || '').toString();
+  if (!id) return json({ ok: false, reason: 'Missing id' }, 400);
+
+  const existing = await getTelemedicineCallById(env.DB, id);
+  if (!existing) return json({ ok: false, reason: 'Call not found' }, 404);
+
+  await updateTelemedicineMedicines(env.DB, id, medicines, nowIso(env.TIMEZONE));
+  return json({ ok: true });
+}
+
+// Admin: send prescription/receipt email to the patient. Optionally accepts
+// an updated medicines list and medicine total in the same call so the
+// admin can finalise everything from one button. Doctor's €25 fee is
+// always shown separately on the prescription so insurance can claim it.
+export async function apiAdminSendTelemedicinePrescription(req: Request, env: Env): Promise<Response> {
+  const denied = await requireAdmin(req, env);
+  if (denied) return denied;
+
+  const body: any = await req.json().catch(() => ({}));
+  const id = (body.id || '').toString().trim();
+  if (!id) return json({ ok: false, reason: 'Missing id' }, 400);
+
+  const existing = await getTelemedicineCallById(env.DB, id);
+  if (!existing) return json({ ok: false, reason: 'Call not found' }, 404);
+  if (!existing.email) {
+    return json({ ok: false, reason: 'This call has no patient email — add an email first.' }, 400);
+  }
+
+  const tz = env.TIMEZONE;
+  const now = nowIso(tz);
+
+  // Optional in-place updates so the admin can save and send in one click.
+  let medicines = existing.medicines || '';
+  if (typeof body.medicines === 'string') {
+    medicines = body.medicines;
+    await updateTelemedicineMedicines(env.DB, id, medicines, now);
+  }
+
+  let medicineCents = existing.medicine_cents || 0;
+  if (body.medicineEuros != null) {
+    const n = Number(body.medicineEuros);
+    if (!isFinite(n) || n < 0) return json({ ok: false, reason: 'Invalid medicine amount' }, 400);
+    medicineCents = Math.round(n * 100);
+    await updateTelemedicineMedicine(env.DB, id, medicineCents, now);
+  } else if (typeof body.medicineCents === 'number') {
+    medicineCents = Math.max(0, Math.round(body.medicineCents));
+    await updateTelemedicineMedicine(env.DB, id, medicineCents, now);
+  }
+
+  try {
+    await sendTelemedicinePrescriptionEmail(env, {
+      id: existing.id,
+      date_key: existing.date_key,
+      patient_name: existing.patient_name,
+      phone: existing.phone,
+      email: existing.email,
+      fee_cents: existing.fee_cents || 0,
+      medicine_cents: medicineCents,
+      medicines,
+      created_at: existing.created_at,
+    });
+  } catch (e: any) {
+    console.error('Prescription send error:', e);
+    return json({ ok: false, reason: 'Could not send prescription email.' }, 500);
+  }
+
+  await markTelemedicinePrescriptionSent(env.DB, id, now);
+
+  const fee = existing.fee_cents || 0;
+  const patientTotal = fee + medicineCents;
+  return json({
+    ok: true,
+    id,
+    medicineCents,
+    feeCents: fee,
+    patientTotalCents: patientTotal,
+    patientTotalLabel: '€' + (patientTotal / 100).toFixed(2),
+    medicineLabel: '€' + (medicineCents / 100).toFixed(2),
+    feeLabel: '€' + (fee / 100).toFixed(2),
+    sentAt: now,
+    sentTo: existing.email,
+  });
+}
+
 // Admin: update the pharmacy/medicine bill on a call. Doctor's flat €25 fee
 // is unchanged; the patient bill (medicine + 25) is computed downstream.
 export async function apiAdminSetTelemedicineMedicine(req: Request, env: Env): Promise<Response> {
@@ -277,6 +372,8 @@ async function doInsertCall(env: Env, opts: {
     comments: opts.comments,
     fee_cents: TELEMEDICINE_FEE_CENTS,
     medicine_cents: 0,
+    medicines: '',
+    prescription_sent_at: '',
     status: 'BOOKED',
     source: opts.source,
     created_at: now,
