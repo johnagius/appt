@@ -737,6 +737,86 @@ export async function sendTelemedicineDoctorEmail(
   await sendEmail(env, TELEMEDICINE_RECIPIENT, subject, html);
 }
 
+// Sent when a telemedicine call is cancelled or deleted, so the clinic
+// inbox always has an up-to-date picture of the day's calls and the
+// doctor's running total. Mirrors the layout of the booking email but
+// flags the affected row red and updates the totals to exclude it.
+export async function sendTelemedicineCancellationEmail(
+  env: Env,
+  call: TelemedicineCallSummary,
+  dayList: TelemedicineDayEntry[],
+  reason: 'cancelled' | 'removed' = 'cancelled',
+): Promise<void> {
+  const billable = dayList.filter(c => c.status !== 'CANCELLED');
+  const dayCount = billable.length;
+  const dayTotal = billable.reduce((s, c) => s + (c.fee_cents || 0), 0);
+
+  // The cancelled / deleted call may or may not still be in the dayList
+  // (cancel keeps the row, delete removes it). Show it explicitly at the
+  // top so the doctor can see WHICH one was dropped.
+  const reasonWord = reason === 'removed' ? 'Removed' : 'Cancelled';
+  const reasonNote = reason === 'removed'
+    ? 'This call was removed from the system. It is no longer counted in the doctor’s total below.'
+    : 'This call was cancelled. It is no longer counted in the doctor’s total below.';
+
+  let dayRowsHtml = '';
+  for (const c of billable) {
+    const t = (c.created_at || '').split(' ')[1] || '';
+    const time = t.split(':').slice(0, 2).join(':');
+    dayRowsHtml += `
+      <tr>
+        <td style="padding:8px;border-bottom:1px solid #e5e7eb;">${escapeHtml(time)}</td>
+        <td style="padding:8px;border-bottom:1px solid #e5e7eb;"><b>${escapeHtml(c.patient_name)}</b></td>
+        <td style="padding:8px;border-bottom:1px solid #e5e7eb;">${escapeHtml(c.phone)}</td>
+        <td style="padding:8px;border-bottom:1px solid #e5e7eb;">${escapeHtml(c.email || '—')}</td>
+        <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:right;white-space:nowrap;">${feeLabel(c.fee_cents)}</td>
+      </tr>`;
+  }
+  if (!dayRowsHtml) {
+    dayRowsHtml = '<tr><td colspan="5" style="padding:8px;color:#6b7280;">No remaining billable calls on this date.</td></tr>';
+  }
+
+  const subject = `Telemedicine ${reason}: ${call.patient_name} (${call.date_key}) — €${(dayTotal / 100).toFixed(2)} today`;
+  const html = `
+<div style="font-family:Arial,sans-serif;line-height:1.4;color:#111827;">
+  <h2 style="margin:0 0 10px 0;color:#991b1b;">Telemedicine call ${escapeHtml(reason)}</h2>
+  <p style="margin:0 0 10px 0;">${escapeHtml(reasonNote)}</p>
+
+  <table style="border-collapse:collapse;width:100%;max-width:520px;background:#fef2f2;border:1px solid #fecaca;border-radius:10px;overflow:hidden;">
+    <tr><td style="padding:8px 12px;color:#7f1d1d;width:140px;">${reasonWord} call</td><td style="padding:8px 12px;"><b style="text-decoration:line-through;">${escapeHtml(call.patient_name)}</b></td></tr>
+    <tr><td style="padding:8px 12px;color:#7f1d1d;">Phone</td><td style="padding:8px 12px;">${escapeHtml(call.phone)}</td></tr>
+    <tr><td style="padding:8px 12px;color:#7f1d1d;">Email</td><td style="padding:8px 12px;">${escapeHtml(call.email || '—')}</td></tr>
+    <tr><td style="padding:8px 12px;color:#7f1d1d;">Date</td><td style="padding:8px 12px;">${escapeHtml(call.date_key)}</td></tr>
+    <tr><td style="padding:8px 12px;color:#7f1d1d;">Originally logged</td><td style="padding:8px 12px;">${escapeHtml(call.created_at)}</td></tr>
+  </table>
+
+  <h3 style="margin:18px 0 8px 0;font-size:15px;">Remaining telemedicine calls for ${escapeHtml(call.date_key)}</h3>
+  <table style="border-collapse:collapse;width:100%;max-width:680px;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;">
+    <thead>
+      <tr style="background:#f9fafb;">
+        <th style="padding:8px;text-align:left;font-size:12px;color:#6b7280;border-bottom:1px solid #e5e7eb;">Time</th>
+        <th style="padding:8px;text-align:left;font-size:12px;color:#6b7280;border-bottom:1px solid #e5e7eb;">Patient</th>
+        <th style="padding:8px;text-align:left;font-size:12px;color:#6b7280;border-bottom:1px solid #e5e7eb;">Phone</th>
+        <th style="padding:8px;text-align:left;font-size:12px;color:#6b7280;border-bottom:1px solid #e5e7eb;">Email</th>
+        <th style="padding:8px;text-align:right;font-size:12px;color:#6b7280;border-bottom:1px solid #e5e7eb;">Fee</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${dayRowsHtml}
+    </tbody>
+    <tfoot>
+      <tr style="background:#ecfdf5;">
+        <td colspan="4" style="padding:10px 8px;font-weight:800;color:#065f46;">Doctor's updated total today (${dayCount} call${dayCount === 1 ? '' : 's'})</td>
+        <td style="padding:10px 8px;text-align:right;font-weight:900;color:#047857;font-size:15px;">€${(dayTotal / 100).toFixed(2)}</td>
+      </tr>
+    </tfoot>
+  </table>
+  <p style="margin:8px 0 0 0;font-size:11px;color:#9ca3af;">Doctor's total counts the flat €25 fee per active call only — never the medicine the patient buys at the pharmacy.</p>
+</div>`;
+
+  await sendEmail(env, TELEMEDICINE_RECIPIENT, subject, html);
+}
+
 export async function sendTelemedicinePatientEmail(env: Env, call: TelemedicineCallSummary): Promise<void> {
   if (!call.email) return;
   const subject = `Telemedicine call confirmed (${call.date_key})`;

@@ -28,7 +28,7 @@ import {
 } from '../db/queries';
 import {
   sendTelemedicineDoctorEmail, sendTelemedicinePatientEmail,
-  sendTelemedicinePrescriptionEmail,
+  sendTelemedicinePrescriptionEmail, sendTelemedicineCancellationEmail,
 } from '../services/email';
 
 const TELEMEDICINE_FEE_CENTS = 2500;
@@ -64,6 +64,22 @@ async function broadcastTelemedicine(env: Env, dateKey: string): Promise<void> {
   } catch (e) {
     console.error('Telemedicine broadcast error:', e);
   }
+}
+
+// Fire-and-forget cancellation/removal email to the clinic inbox so
+// info@spinolaclinic.com always has the up-to-date table + total.
+function notifyClinicCancellation(env: Env, call: TelemedicineCall, reason: 'cancelled' | 'removed'): void {
+  const ctx = (globalThis as any).__ctx;
+  const run = async () => {
+    try {
+      const dayList = await getTelemedicineCallsByDate(env.DB, call.date_key);
+      await sendTelemedicineCancellationEmail(env, call, dayList, reason);
+    } catch (e) {
+      console.error('Telemedicine cancel email error:', e);
+    }
+  };
+  if (ctx?.waitUntil) ctx.waitUntil(run());
+  else run().catch(() => {});
 }
 
 // Fire-and-forget wrapper. Uses waitUntil when available so the API
@@ -207,8 +223,17 @@ export async function apiAdminDeleteTelemedicine(req: Request, env: Env): Promis
   const existing = await getTelemedicineCallById(env.DB, id);
   if (!existing) return json({ ok: false, reason: 'Call not found' }, 404);
 
+  // Only fire a cancellation/removal email if the row was actually
+  // billable — deleting an already-cancelled row doesn't change the
+  // doctor's total, so spamming the inbox isn't useful.
+  const wasBillable = existing.status !== 'CANCELLED';
+
   await deleteTelemedicineCall(env.DB, id);
   pushTelemedicineUpdate(env, existing.date_key);
+
+  if (wasBillable) {
+    notifyClinicCancellation(env, existing, 'removed');
+  }
   return json({ ok: true });
 }
 
@@ -222,9 +247,16 @@ export async function apiAdminMarkTelemedicineStatus(req: Request, env: Env): Pr
   if (!id || !['BOOKED', 'COMPLETED', 'CANCELLED'].includes(status)) {
     return json({ ok: false, reason: 'Invalid id or status' }, 400);
   }
+  // Capture pre-update state so we can detect the BOOKED/COMPLETED →
+  // CANCELLED transition (the only one that changes the doctor's total).
+  const before = await getTelemedicineCallById(env.DB, id);
   await updateTelemedicineCallStatus(env.DB, id, status, nowIso(env.TIMEZONE));
   const updated = await getTelemedicineCallById(env.DB, id);
   if (updated) pushTelemedicineUpdate(env, updated.date_key);
+
+  if (before && status === 'CANCELLED' && before.status !== 'CANCELLED' && updated) {
+    notifyClinicCancellation(env, updated, 'cancelled');
+  }
   return json({ ok: true });
 }
 
