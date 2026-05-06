@@ -672,10 +672,201 @@ export async function updateTelemedicineMedicine(db: D1Database, id: string, med
   await db.prepare('UPDATE telemedicine_calls SET medicine_cents = ?, updated_at = ? WHERE id = ?').bind(safe, nowStr, id).run();
 }
 
+export interface PeriodStats {
+  calls: number;          // billable (status != CANCELLED)
+  cancelled: number;
+  doctorRevenueCents: number;   // count × 25 EUR
+  medicineCents: number;        // pharmacy total
+  patientTotalCents: number;    // doctor + medicine
+  avgMedicineCents: number;     // mean per billable call
+  avgPatientCents: number;      // mean patient bill per call
+  prescriptionsSent: number;    // rows with prescription_sent_at != ''
+}
+
+async function safePeriod(
+  db: D1Database,
+  fromKey: string | null,
+  toKey: string | null,
+): Promise<PeriodStats> {
+  await ensureTelemedicineTable(db);
+  const where: string[] = [];
+  const binds: any[] = [];
+  if (fromKey) { where.push('date_key >= ?'); binds.push(fromKey); }
+  if (toKey) { where.push('date_key <= ?'); binds.push(toKey); }
+  const whereClause = where.length ? ' WHERE ' + where.join(' AND ') : '';
+
+  // Old DBs without medicine_cents → fall back to 0. Same trick used by
+  // getTelemedicineStats.
+  const safeQuery = async (sql: string): Promise<any> => {
+    try {
+      return await db.prepare(sql).bind(...binds).first<any>();
+    } catch {
+      const fallback = sql
+        .replace('COALESCE(SUM(medicine_cents), 0) AS m', '0 AS m')
+        .replace("SUM(CASE WHEN prescription_sent_at != '' THEN 1 ELSE 0 END) AS p", '0 AS p');
+      return await db.prepare(fallback).bind(...binds).first<any>();
+    }
+  };
+
+  const billable = await safeQuery(
+    "SELECT COUNT(*) AS c, COALESCE(SUM(fee_cents), 0) AS r, COALESCE(SUM(medicine_cents), 0) AS m, " +
+    "SUM(CASE WHEN prescription_sent_at != '' THEN 1 ELSE 0 END) AS p " +
+    "FROM telemedicine_calls" + whereClause + (whereClause ? ' AND ' : ' WHERE ') + "status != 'CANCELLED'"
+  );
+  const cancelled = await db.prepare(
+    'SELECT COUNT(*) AS c FROM telemedicine_calls' + whereClause + (whereClause ? ' AND ' : ' WHERE ') + "status = 'CANCELLED'"
+  ).bind(...binds).first<{ c: number }>();
+
+  const calls = billable?.c ?? 0;
+  const r = billable?.r ?? 0;
+  const m = billable?.m ?? 0;
+  return {
+    calls,
+    cancelled: cancelled?.c ?? 0,
+    doctorRevenueCents: r,
+    medicineCents: m,
+    patientTotalCents: r + m,
+    avgMedicineCents: calls > 0 ? Math.round(m / calls) : 0,
+    avgPatientCents: calls > 0 ? Math.round((r + m) / calls) : 0,
+    prescriptionsSent: billable?.p ?? 0,
+  };
+}
+
+export interface RichTelemedicineStats {
+  periods: {
+    today: PeriodStats;
+    week: PeriodStats;       // Monday → Sunday of current week
+    last30: PeriodStats;     // rolling 30 days
+    allTime: PeriodStats;
+  };
+  weekStartKey: string;
+  last30StartKey: string;
+  status: { booked: number; completed: number; cancelled: number };
+  source: { public: number; admin: number };
+  hourly: { '20': number; '21': number; '22': number; '23': number; other: number };
+  topPatients: { name: string; phone: string; calls: number; lastCall: string }[];
+  dailyTrend: { dateKey: string; calls: number; revenueCents: number }[];
+  firstCallDate: string;       // earliest date_key seen, for "all time" label
+}
+
+export async function getRichTelemedicineStats(
+  db: D1Database,
+  todayKey: string,
+  weekStartKey: string,
+  last30StartKey: string,
+  last14StartKey: string,
+  last90StartKey: string,
+): Promise<RichTelemedicineStats> {
+  await ensureTelemedicineTable(db);
+
+  const [today, week, last30, allTime] = await Promise.all([
+    safePeriod(db, todayKey, todayKey),
+    safePeriod(db, weekStartKey, null),
+    safePeriod(db, last30StartKey, null),
+    safePeriod(db, null, null),
+  ]);
+
+  // Status breakdown (all time)
+  const statusRows = await db.prepare(
+    'SELECT status, COUNT(*) AS c FROM telemedicine_calls GROUP BY status'
+  ).all<{ status: string; c: number }>();
+  const status = { booked: 0, completed: 0, cancelled: 0 };
+  for (const r of statusRows.results) {
+    if (r.status === 'BOOKED') status.booked = r.c;
+    else if (r.status === 'COMPLETED') status.completed = r.c;
+    else if (r.status === 'CANCELLED') status.cancelled = r.c;
+  }
+
+  // Source breakdown (last 30 days, billable only — what's driving traffic recently)
+  const sourceRows = await db.prepare(
+    "SELECT source, COUNT(*) AS c FROM telemedicine_calls " +
+    "WHERE date_key >= ? AND status != 'CANCELLED' GROUP BY source"
+  ).bind(last30StartKey).all<{ source: string; c: number }>();
+  const source = { public: 0, admin: 0 };
+  for (const r of sourceRows.results) {
+    if (r.source === 'admin') source.admin = r.c;
+    else source.public = r.c;
+  }
+
+  // Hourly distribution (last 30 days). created_at is "YYYY-MM-DD HH:MM:SS"
+  // in the env timezone, so substring 12-13 is the hour. Buckets are 8pm
+  // to 11pm for the 4 active hours, plus "other" for anything outside
+  // (admin entries logged the next morning, etc).
+  const hourly = { '20': 0, '21': 0, '22': 0, '23': 0, other: 0 };
+  const hourRows = await db.prepare(
+    "SELECT substr(created_at, 12, 2) AS h, COUNT(*) AS c FROM telemedicine_calls " +
+    "WHERE date_key >= ? AND status != 'CANCELLED' GROUP BY h"
+  ).bind(last30StartKey).all<{ h: string; c: number }>();
+  for (const r of hourRows.results) {
+    if (r.h === '20' || r.h === '21' || r.h === '22' || r.h === '23') {
+      hourly[r.h as '20' | '21' | '22' | '23'] = r.c;
+    } else {
+      hourly.other += r.c;
+    }
+  }
+
+  // Top patients last 90 days. Group by phone (more reliable than name)
+  // and break ties by name; cap at 5.
+  const topRows = await db.prepare(
+    "SELECT patient_name AS name, phone, COUNT(*) AS calls, MAX(date_key) AS last_call " +
+    "FROM telemedicine_calls WHERE date_key >= ? AND status != 'CANCELLED' " +
+    "GROUP BY phone, patient_name HAVING calls >= 1 ORDER BY calls DESC, last_call DESC LIMIT 5"
+  ).bind(last90StartKey).all<{ name: string; phone: string; calls: number; last_call: string }>();
+  const topPatients = topRows.results.map(r => ({
+    name: r.name || '—',
+    phone: r.phone || '',
+    calls: r.calls,
+    lastCall: r.last_call || '',
+  }));
+
+  // Daily trend: last 14 days, filling missing days with zero so the
+  // chart always has 14 bars.
+  const trendRows = await db.prepare(
+    "SELECT date_key, COUNT(*) AS calls, COALESCE(SUM(fee_cents), 0) AS rev " +
+    "FROM telemedicine_calls WHERE date_key >= ? AND status != 'CANCELLED' GROUP BY date_key"
+  ).bind(last14StartKey).all<{ date_key: string; calls: number; rev: number }>();
+  const trendMap = new Map(trendRows.results.map(r => [r.date_key, r]));
+  const dailyTrend: { dateKey: string; calls: number; revenueCents: number }[] = [];
+  // 14 days ending on todayKey (inclusive). Build by string math to avoid
+  // tz drift — date_keys here are already in the env timezone.
+  let cursor = last14StartKey;
+  while (cursor <= todayKey) {
+    const found = trendMap.get(cursor);
+    dailyTrend.push({
+      dateKey: cursor,
+      calls: found?.calls ?? 0,
+      revenueCents: found?.rev ?? 0,
+    });
+    // Advance by 1 day via Date math.
+    const [y, m, d] = cursor.split('-').map(Number);
+    const next = new Date(y, m - 1, d + 1);
+    cursor = next.getFullYear() + '-' + String(next.getMonth() + 1).padStart(2, '0') + '-' + String(next.getDate()).padStart(2, '0');
+  }
+
+  const firstRow = await db.prepare(
+    'SELECT MIN(date_key) AS d FROM telemedicine_calls'
+  ).first<{ d: string }>();
+
+  return {
+    periods: { today, week, last30, allTime },
+    weekStartKey,
+    last30StartKey,
+    status,
+    source,
+    hourly,
+    topPatients,
+    dailyTrend,
+    firstCallDate: firstRow?.d || '',
+  };
+}
+
+// Legacy shape kept so existing admin code that destructures
+// { todayCalls, weekRevenueCents, totalMedicineCents, ... } stays
+// working. New UI uses getRichTelemedicineStats directly.
 export interface TelemedicineStats {
   totalCalls: number;
-  totalRevenueCents: number;     // doctor's revenue: count * 25 EUR
-  totalMedicineCents: number;    // pharmacy total billed via telemed
+  totalRevenueCents: number;
+  totalMedicineCents: number;
   todayCalls: number;
   todayRevenueCents: number;
   todayMedicineCents: number;
@@ -685,40 +876,20 @@ export interface TelemedicineStats {
 }
 
 export async function getTelemedicineStats(db: D1Database, todayKey: string, weekStartKey: string): Promise<TelemedicineStats> {
-  await ensureTelemedicineTable(db);
-  // medicine_cents may not exist on very old DBs. ensureTelemedicineTable()
-  // tries to ALTER it in, but if for any reason it isn't there the SUM will
-  // throw — fall back to 0 then.
-  const safeSum = async (sql: string, ...binds: any[]): Promise<{ c: number; r: number; m: number }> => {
-    try {
-      const row = await db.prepare(sql).bind(...binds).first<{ c: number; r: number; m: number }>();
-      return { c: row?.c ?? 0, r: row?.r ?? 0, m: row?.m ?? 0 };
-    } catch {
-      const fallback = sql.replace(', COALESCE(SUM(medicine_cents), 0) AS m', ', 0 AS m');
-      const row = await db.prepare(fallback).bind(...binds).first<{ c: number; r: number; m: number }>();
-      return { c: row?.c ?? 0, r: row?.r ?? 0, m: row?.m ?? 0 };
-    }
-  };
-  const totalRow = await safeSum(
-    "SELECT COUNT(*) AS c, COALESCE(SUM(fee_cents), 0) AS r, COALESCE(SUM(medicine_cents), 0) AS m FROM telemedicine_calls WHERE status != 'CANCELLED'"
-  );
-  const todayRow = await safeSum(
-    "SELECT COUNT(*) AS c, COALESCE(SUM(fee_cents), 0) AS r, COALESCE(SUM(medicine_cents), 0) AS m FROM telemedicine_calls WHERE date_key = ? AND status != 'CANCELLED'",
-    todayKey
-  );
-  const weekRow = await safeSum(
-    "SELECT COUNT(*) AS c, COALESCE(SUM(fee_cents), 0) AS r, COALESCE(SUM(medicine_cents), 0) AS m FROM telemedicine_calls WHERE date_key >= ? AND status != 'CANCELLED'",
-    weekStartKey
-  );
+  const [today, week, all] = await Promise.all([
+    safePeriod(db, todayKey, todayKey),
+    safePeriod(db, weekStartKey, null),
+    safePeriod(db, null, null),
+  ]);
   return {
-    totalCalls: totalRow.c,
-    totalRevenueCents: totalRow.r,
-    totalMedicineCents: totalRow.m,
-    todayCalls: todayRow.c,
-    todayRevenueCents: todayRow.r,
-    todayMedicineCents: todayRow.m,
-    weekCalls: weekRow.c,
-    weekRevenueCents: weekRow.r,
-    weekMedicineCents: weekRow.m,
+    totalCalls: all.calls,
+    totalRevenueCents: all.doctorRevenueCents,
+    totalMedicineCents: all.medicineCents,
+    todayCalls: today.calls,
+    todayRevenueCents: today.doctorRevenueCents,
+    todayMedicineCents: today.medicineCents,
+    weekCalls: week.calls,
+    weekRevenueCents: week.doctorRevenueCents,
+    weekMedicineCents: week.medicineCents,
   };
 }

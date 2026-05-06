@@ -24,7 +24,7 @@ import {
   insertTelemedicineCall, getTelemedicineCallsByDate, getTelemedicineCallsByDateRange,
   getTelemedicineCallById, deleteTelemedicineCall, updateTelemedicineCallStatus,
   updateTelemedicineMedicine, updateTelemedicineMedicines, markTelemedicinePrescriptionSent,
-  getTelemedicineStats, type TelemedicineCall,
+  getTelemedicineStats, getRichTelemedicineStats, type TelemedicineCall,
 } from '../db/queries';
 import {
   sendTelemedicineDoctorEmail, sendTelemedicinePatientEmail,
@@ -407,13 +407,38 @@ export async function apiAdminTelemedicineStats(req: Request, env: Env): Promise
   const dow = today.getDay();
   const mondayOffset = dow === 0 ? -6 : 1 - dow;
   const weekStartKey = toDateKey(addDays(today, mondayOffset));
+  const last30StartKey = toDateKey(addDays(today, -29));
+  const last14StartKey = toDateKey(addDays(today, -13));
+  const last90StartKey = toDateKey(addDays(today, -89));
 
-  const stats = await getTelemedicineStats(env.DB, todayKey, weekStartKey);
+  const rich = await getRichTelemedicineStats(
+    env.DB, todayKey, weekStartKey, last30StartKey, last14StartKey, last90StartKey,
+  );
+
+  // Keep legacy `stats` shape too — the top counter on the admin page
+  // and the existing schedule subsection both use it. Cheap to derive
+  // from the rich result.
+  const legacyStats = {
+    totalCalls: rich.periods.allTime.calls,
+    totalRevenueCents: rich.periods.allTime.doctorRevenueCents,
+    totalMedicineCents: rich.periods.allTime.medicineCents,
+    todayCalls: rich.periods.today.calls,
+    todayRevenueCents: rich.periods.today.doctorRevenueCents,
+    todayMedicineCents: rich.periods.today.medicineCents,
+    weekCalls: rich.periods.week.calls,
+    weekRevenueCents: rich.periods.week.doctorRevenueCents,
+    weekMedicineCents: rich.periods.week.medicineCents,
+  };
+
   return json({
     ok: true,
     todayKey,
     weekStartKey,
-    stats,
+    last30StartKey,
+    last14StartKey,
+    last90StartKey,
+    stats: legacyStats,
+    rich,
     feeCents: TELEMEDICINE_FEE_CENTS,
     open: isInTelemedicineWindow(env),
     windowLabel: '8pm – midnight',

@@ -987,14 +987,60 @@ export function adminPage(sig: string): string {
     <p id="telemedWindowState" style="margin:8px 0 0 0;font-size:13px;font-weight:700;"></p>
   </div>
 
-  <div class="stats" style="margin-bottom:14px;">
-    <div class="stat"><div class="num" id="telStatToday">-</div><div class="label">Today</div></div>
-    <div class="stat"><div class="num" id="telStatWeek">-</div><div class="label">This week</div></div>
-    <div class="stat"><div class="num" id="telStatTotal">-</div><div class="label">All time</div></div>
-    <div class="stat" style="background:#ecfdf5;"><div class="num" id="telStatRevenue" style="color:#047857;">€0</div><div class="label" style="color:#065f46;">Doctor's revenue (all time)</div></div>
-    <div class="stat" style="background:#eff6ff;"><div class="num" id="telStatMedicine" style="color:#1d4ed8;">€0</div><div class="label" style="color:#1e3a8a;">Medicine billed (all time)</div></div>
+  <!-- Period table: today / this week / last 30d / all time. -->
+  <div class="card" style="padding:0;margin-bottom:14px;overflow:hidden;">
+    <div style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:13.5px;">
+        <thead>
+          <tr style="background:#f9fafb;text-align:left;">
+            <th style="padding:10px;border-bottom:1px solid #e5e7eb;">Period</th>
+            <th style="padding:10px;border-bottom:1px solid #e5e7eb;text-align:right;">Calls</th>
+            <th style="padding:10px;border-bottom:1px solid #e5e7eb;text-align:right;">Cancelled</th>
+            <th style="padding:10px;border-bottom:1px solid #e5e7eb;text-align:right;color:#047857;">Doctor's revenue</th>
+            <th style="padding:10px;border-bottom:1px solid #e5e7eb;text-align:right;color:#1d4ed8;">Medicine billed</th>
+            <th style="padding:10px;border-bottom:1px solid #e5e7eb;text-align:right;">Patient bills</th>
+            <th style="padding:10px;border-bottom:1px solid #e5e7eb;text-align:right;">Avg / call</th>
+          </tr>
+        </thead>
+        <tbody id="telPeriodTable">
+          <tr><td colspan="7" style="padding:14px;text-align:center;color:#6b7280;">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
   </div>
-  <p style="margin:0 0 14px 0;font-size:12px;color:#6b7280;">Doctor's revenue = number of calls × €25. Medicine billed is what the pharmacy charges for the prescriptions written during these calls — it's added to each patient's combined bill but never counts toward the doctor's take.</p>
+
+  <!-- Side-by-side: status breakdown + source breakdown. -->
+  <div class="stats-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;margin-bottom:14px;">
+    <div class="card" style="padding:16px;">
+      <h4 style="margin:0 0 8px 0;font-size:13px;color:#6b7280;text-transform:uppercase;letter-spacing:0.06em;">Status (all time)</h4>
+      <div id="telStatusBars" style="display:flex;flex-direction:column;gap:8px;font-size:13px;"></div>
+    </div>
+    <div class="card" style="padding:16px;">
+      <h4 style="margin:0 0 8px 0;font-size:13px;color:#6b7280;text-transform:uppercase;letter-spacing:0.06em;">Booking source (last 30d)</h4>
+      <div id="telSourceBars" style="display:flex;flex-direction:column;gap:8px;font-size:13px;"></div>
+    </div>
+    <div class="card" style="padding:16px;">
+      <h4 style="margin:0 0 8px 0;font-size:13px;color:#6b7280;text-transform:uppercase;letter-spacing:0.06em;">Hour of call (last 30d)</h4>
+      <div id="telHourly" style="display:flex;align-items:flex-end;gap:6px;height:88px;"></div>
+      <div id="telHourlyLabels" style="display:flex;gap:6px;justify-content:space-between;font-size:11px;color:#9ca3af;margin-top:6px;"></div>
+    </div>
+  </div>
+
+  <!-- 14-day trend bar chart. -->
+  <div class="card" style="padding:16px;margin-bottom:14px;">
+    <h4 style="margin:0 0 4px 0;font-size:13px;color:#6b7280;text-transform:uppercase;letter-spacing:0.06em;">Daily trend (last 14 days)</h4>
+    <p style="margin:0 0 10px 0;font-size:11px;color:#9ca3af;">Each bar = billable calls that day. Hover for the doctor's revenue.</p>
+    <div id="telDailyTrend" style="display:flex;align-items:flex-end;gap:4px;height:80px;"></div>
+    <div id="telDailyLabels" style="display:flex;gap:4px;justify-content:space-between;font-size:10px;color:#9ca3af;margin-top:6px;"></div>
+  </div>
+
+  <!-- Top patients in last 90 days. -->
+  <div class="card" style="padding:16px;margin-bottom:14px;">
+    <h4 style="margin:0 0 8px 0;font-size:13px;color:#6b7280;text-transform:uppercase;letter-spacing:0.06em;">Most frequent callers (last 90 days)</h4>
+    <div id="telTopPatients" style="font-size:13.5px;"></div>
+  </div>
+
+  <p style="margin:0 0 14px 0;font-size:12px;color:#6b7280;">Doctor's revenue = number of billable calls × €25. Medicine billed is what the pharmacy charges for the prescriptions written during these calls — it's added to each patient's combined bill but never counts toward the doctor's take.</p>
 
   <div class="card" style="padding:18px;margin-bottom:14px;">
     <h3 style="margin:0 0 10px 0;font-size:15px;font-weight:800;">Add a Telemedicine Call</h3>
@@ -1560,13 +1606,15 @@ async function loadTelemedicineStats() {
   try {
     var res = await apiCall('telemedicine-stats');
     if (!res || !res.ok) return;
+
+    // ── Top counter on the stats bar (visible across all tabs)
     var s = res.stats || {};
-    document.getElementById('telStatToday').textContent = s.todayCalls != null ? s.todayCalls : 0;
-    document.getElementById('telStatWeek').textContent = s.weekCalls != null ? s.weekCalls : 0;
-    document.getElementById('telStatTotal').textContent = s.totalCalls != null ? s.totalCalls : 0;
-    document.getElementById('telStatRevenue').textContent = telFormatEur(s.totalRevenueCents || 0);
-    var medEl = document.getElementById('telStatMedicine');
-    if (medEl) medEl.textContent = telFormatEur(s.totalMedicineCents || 0);
+    var topStat = document.getElementById('statTelemed');
+    if (topStat) topStat.textContent = s.todayCalls != null ? s.todayCalls : 0;
+    var liveBadge = document.getElementById('statTelemedLive');
+    if (liveBadge) liveBadge.style.display = res.open ? 'inline-block' : 'none';
+
+    // ── Window state line at the top of the Telemedicine tab
     var ws = document.getElementById('telemedWindowState');
     if (ws) {
       if (res.open) {
@@ -1575,12 +1623,149 @@ async function loadTelemedicineStats() {
         ws.innerHTML = '<span style="color:#6b7280;">&#9675; Booking window closed (opens 8pm). You can still log calls below.</span>';
       }
     }
-    // Top stats bar
-    var topStat = document.getElementById('statTelemed');
-    if (topStat) topStat.textContent = s.todayCalls != null ? s.todayCalls : 0;
-    var liveBadge = document.getElementById('statTelemedLive');
-    if (liveBadge) liveBadge.style.display = res.open ? 'inline-block' : 'none';
+
+    // ── Rich periods table
+    var rich = res.rich || null;
+    if (!rich) return;
+    renderTelPeriods(rich);
+    renderTelStatusBars(rich.status, rich.periods.allTime);
+    renderTelSourceBars(rich.source);
+    renderTelHourly(rich.hourly);
+    renderTelDailyTrend(rich.dailyTrend);
+    renderTelTopPatients(rich.topPatients);
   } catch(e) {}
+}
+
+function renderTelPeriods(rich) {
+  var tbody = document.getElementById('telPeriodTable');
+  if (!tbody) return;
+  // Build a row per period. Date-range strings make it crystal-clear what
+  // the figures cover (the user pointed out the old "today=allTime"
+  // looked confusing when a fresh DB only has one day of data).
+  var rows = [
+    { label: 'Today', range: rich.periods.today.calls === 0 && rich.firstCallDate ? '' : '', stats: rich.periods.today, dateRange: '' },
+    { label: 'This week', range: '', stats: rich.periods.week, dateRange: 'from ' + escTelHtml(rich.weekStartKey) },
+    { label: 'Last 30 days', range: '', stats: rich.periods.last30, dateRange: 'from ' + escTelHtml(rich.last30StartKey) },
+    { label: 'All time', range: '', stats: rich.periods.allTime, dateRange: rich.firstCallDate ? 'since ' + escTelHtml(rich.firstCallDate) : '' },
+  ];
+  var html = '';
+  for (var i = 0; i < rows.length; i++) {
+    var r = rows[i];
+    var s = r.stats;
+    var avg = s.calls > 0 ? telFormatEur(s.avgPatientCents) : '—';
+    html += '<tr>' +
+      '<td style="padding:10px;border-bottom:1px solid #f3f4f6;"><b>' + r.label + '</b>' +
+        (r.dateRange ? ' <span style="font-size:11px;color:#9ca3af;font-weight:400;">' + r.dateRange + '</span>' : '') + '</td>' +
+      '<td style="padding:10px;border-bottom:1px solid #f3f4f6;text-align:right;font-weight:700;">' + s.calls + '</td>' +
+      '<td style="padding:10px;border-bottom:1px solid #f3f4f6;text-align:right;color:' + (s.cancelled ? '#b91c1c' : '#9ca3af') + ';">' + s.cancelled + '</td>' +
+      '<td style="padding:10px;border-bottom:1px solid #f3f4f6;text-align:right;font-weight:800;color:#047857;">' + telFormatEur(s.doctorRevenueCents) + '</td>' +
+      '<td style="padding:10px;border-bottom:1px solid #f3f4f6;text-align:right;color:#1d4ed8;">' + telFormatEur(s.medicineCents) + '</td>' +
+      '<td style="padding:10px;border-bottom:1px solid #f3f4f6;text-align:right;color:#374151;">' + telFormatEur(s.patientTotalCents) + '</td>' +
+      '<td style="padding:10px;border-bottom:1px solid #f3f4f6;text-align:right;color:#6b7280;font-size:12.5px;">' + avg + '</td>' +
+    '</tr>';
+  }
+  tbody.innerHTML = html;
+}
+
+function telBar(label, value, total, color) {
+  var pct = total > 0 ? Math.round((value / total) * 100) : 0;
+  return '<div>' +
+    '<div style="display:flex;justify-content:space-between;font-weight:600;margin-bottom:3px;">' +
+      '<span>' + escTelHtml(label) + '</span>' +
+      '<span style="color:#6b7280;">' + value + (total > 0 ? ' (' + pct + '%)' : '') + '</span>' +
+    '</div>' +
+    '<div style="height:8px;background:#f3f4f6;border-radius:999px;overflow:hidden;">' +
+      '<div style="height:100%;width:' + pct + '%;background:' + color + ';"></div>' +
+    '</div>' +
+  '</div>';
+}
+function renderTelStatusBars(status, allTime) {
+  var el = document.getElementById('telStatusBars');
+  if (!el) return;
+  var total = (status.booked || 0) + (status.completed || 0) + (status.cancelled || 0);
+  if (!total) { el.innerHTML = '<div style="color:#9ca3af;font-style:italic;">No calls yet.</div>'; return; }
+  var html = '';
+  html += telBar('Completed', status.completed || 0, total, '#10b981');
+  html += telBar('Still booked', status.booked || 0, total, '#f59e0b');
+  html += telBar('Cancelled', status.cancelled || 0, total, '#ef4444');
+  el.innerHTML = html;
+}
+function renderTelSourceBars(source) {
+  var el = document.getElementById('telSourceBars');
+  if (!el) return;
+  var pub = source.public || 0;
+  var adm = source.admin || 0;
+  var total = pub + adm;
+  if (!total) { el.innerHTML = '<div style="color:#9ca3af;font-style:italic;">No calls in last 30 days.</div>'; return; }
+  var html = '';
+  html += telBar('Patient booking page', pub, total, '#3b82f6');
+  html += telBar('Logged by admin', adm, total, '#a855f7');
+  el.innerHTML = html;
+}
+function renderTelHourly(hourly) {
+  var el = document.getElementById('telHourly');
+  var lab = document.getElementById('telHourlyLabels');
+  if (!el || !lab) return;
+  var hours = ['20', '21', '22', '23', 'other'];
+  var labels = ['8pm', '9pm', '10pm', '11pm', 'other'];
+  var max = 0;
+  for (var i = 0; i < hours.length; i++) {
+    var v = hourly[hours[i]] || 0;
+    if (v > max) max = v;
+  }
+  var bars = '';
+  var labs = '';
+  for (var i = 0; i < hours.length; i++) {
+    var v = hourly[hours[i]] || 0;
+    var pct = max > 0 ? Math.round((v / max) * 100) : 0;
+    bars += '<div title="' + labels[i] + ': ' + v + ' call(s)" style="flex:1;height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;">' +
+      '<div style="font-size:11px;color:#374151;margin-bottom:2px;">' + (v || '') + '</div>' +
+      '<div style="width:100%;background:#fed7aa;border-radius:6px 6px 0 0;height:' + pct + '%;min-height:' + (v ? 4 : 0) + 'px;"></div>' +
+    '</div>';
+    labs += '<div style="flex:1;text-align:center;">' + labels[i] + '</div>';
+  }
+  el.innerHTML = bars;
+  lab.innerHTML = labs;
+}
+function renderTelDailyTrend(trend) {
+  var el = document.getElementById('telDailyTrend');
+  var lab = document.getElementById('telDailyLabels');
+  if (!el || !lab) return;
+  if (!trend || !trend.length) { el.innerHTML = '<div style="color:#9ca3af;font-style:italic;">No data yet.</div>'; lab.innerHTML = ''; return; }
+  var max = 0;
+  for (var i = 0; i < trend.length; i++) if (trend[i].calls > max) max = trend[i].calls;
+  var bars = '';
+  var labs = '';
+  for (var i = 0; i < trend.length; i++) {
+    var d = trend[i];
+    var pct = max > 0 ? Math.round((d.calls / max) * 100) : 0;
+    var rev = telFormatEur(d.revenueCents || 0);
+    var dayLabel = d.dateKey.slice(8); // DD
+    bars += '<div title="' + escTelHtml(d.dateKey) + ': ' + d.calls + ' call(s) · ' + escTelHtml(rev) + '" style="flex:1;height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;">' +
+      (d.calls ? '<div style="font-size:10px;color:#6b7280;margin-bottom:2px;">' + d.calls + '</div>' : '') +
+      '<div style="width:100%;background:#fdba74;border-radius:4px 4px 0 0;height:' + pct + '%;min-height:' + (d.calls ? 3 : 0) + 'px;"></div>' +
+    '</div>';
+    labs += '<div style="flex:1;text-align:center;">' + dayLabel + '</div>';
+  }
+  el.innerHTML = bars;
+  lab.innerHTML = labs;
+}
+function renderTelTopPatients(top) {
+  var el = document.getElementById('telTopPatients');
+  if (!el) return;
+  if (!top || !top.length) { el.innerHTML = '<div style="color:#9ca3af;font-style:italic;">No frequent callers yet.</div>'; return; }
+  var html = '';
+  for (var i = 0; i < top.length; i++) {
+    var p = top[i];
+    html += '<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f3f4f6;">' +
+      '<div>' +
+        '<div style="font-weight:700;color:#111827;">' + escTelHtml(p.name) + '</div>' +
+        '<div style="font-size:12px;color:#6b7280;">' + escTelHtml(p.phone) + ' &middot; last call ' + escTelHtml(p.lastCall) + '</div>' +
+      '</div>' +
+      '<div style="font-weight:800;color:#9a3412;align-self:center;">' + p.calls + ' call' + (p.calls === 1 ? '' : 's') + '</div>' +
+    '</div>';
+  }
+  el.innerHTML = html;
 }
 async function loadTelemedicineList() {
   var dateKey = document.getElementById('telListDate').value || telTodayKey();
