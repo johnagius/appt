@@ -160,6 +160,32 @@ CREATE TABLE IF NOT EXISTS linda_off (
 );
 CREATE INDEX IF NOT EXISTS idx_linda_off_date ON linda_off(date_key);
 
+-- Telemedicine calls (8pm-midnight phone consults, EUR 25 flat fee).
+-- Tracked separately from appointments because they have no slot, no
+-- doctor-off interaction, no calendar event — just a simple log of who
+-- called and when.
+--   fee_cents       — doctor's flat €25 fee (kept separate so the doctor's
+--                     totals never include medicine the patient bought).
+--   medicine_cents  — pharmacy total for that visit (entered by admin).
+--   The patient's bill = fee_cents + medicine_cents. The doctor's total
+--   stays as SUM(fee_cents) only.
+CREATE TABLE IF NOT EXISTS telemedicine_calls (
+  id TEXT PRIMARY KEY,
+  date_key TEXT NOT NULL,
+  patient_name TEXT NOT NULL,
+  phone TEXT NOT NULL,
+  email TEXT NOT NULL DEFAULT '',
+  comments TEXT DEFAULT '',
+  fee_cents INTEGER NOT NULL DEFAULT 2500,
+  medicine_cents INTEGER NOT NULL DEFAULT 0,
+  status TEXT NOT NULL DEFAULT 'BOOKED',
+  source TEXT NOT NULL DEFAULT 'public',
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_telemed_date ON telemedicine_calls(date_key);
+CREATE INDEX IF NOT EXISTS idx_telemed_created ON telemedicine_calls(created_at);
+
 -- Seed data version
 INSERT OR IGNORE INTO data_version (id, version) VALUES (1, 0);
 

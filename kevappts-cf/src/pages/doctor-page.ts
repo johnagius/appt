@@ -287,6 +287,26 @@ export function doctorPage(sig: string): string {
       <div class="msg" id="calendarMsg"></div>
     </section>
 
+    <section class="card" id="telemedicineSection" style="background:#fff7ed;border:1px solid #fdba74;">
+      <div class="session-head">
+        <div>
+          <div class="session-title" style="color:#9a3412;">Telemedicine Calls</div>
+          <div id="telemedDoctorHint" style="font-size:12px;color:#9a3412;">Evening phone consultations &middot; €25 each</div>
+        </div>
+        <div id="telemedTodayPill" class="status-pill" style="background:#fed7aa;color:#9a3412;">
+          <span class="dot" style="background:#ea580c;"></span><span id="telemedTodayPillText">- today</span>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
+        <button class="day-nav-arrow" onclick="telemedNav(-1)" title="Previous day">&larr;</button>
+        <input type="date" id="telemedDate" onchange="loadTelemedDay()" style="padding:8px;border:1px solid var(--line);border-radius:10px;font-size:14px;">
+        <button class="day-nav-arrow" onclick="telemedNav(1)" title="Next day">&rarr;</button>
+        <button class="btn btn-ghost" style="padding:8px 12px;font-size:13px;border-radius:12px;" onclick="telemedGoToday()">Today</button>
+      </div>
+      <div id="telemedSummary" style="margin-bottom:10px;font-size:13px;color:#374151;"></div>
+      <div id="telemedList" class="patient-list"><div class="empty-session">Loading...</div></div>
+    </section>
+
     <section class="card" id="followUpSection">
       <div class="session-header">
         <div>
@@ -1697,6 +1717,99 @@ _idleOverlay.addEventListener('click', function() {
   resumeDashboardFromIdle();
 });
 
+// ── Telemedicine (doctor view) ─────────────────────────────
+function telemedFmtEur(cents) {
+  if (cents == null) return '€0';
+  return '€' + (cents/100).toFixed(2);
+}
+function telemedDateInput() {
+  return document.getElementById('telemedDate');
+}
+function telemedTodayKey() {
+  var d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+function telemedNav(delta) {
+  var di = telemedDateInput();
+  var d = new Date((di.value || telemedTodayKey()) + 'T00:00:00');
+  d.setDate(d.getDate() + delta);
+  di.value = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  loadTelemedDay();
+}
+function telemedGoToday() {
+  telemedDateInput().value = telemedTodayKey();
+  loadTelemedDay();
+}
+async function loadTelemedDay() {
+  var dateKey = telemedDateInput().value || telemedTodayKey();
+  var listEl = document.getElementById('telemedList');
+  var sumEl = document.getElementById('telemedSummary');
+  listEl.innerHTML = '<div class="empty-session">Loading...</div>';
+  try {
+    var res = await apiCall('telemedicine?date=' + encodeURIComponent(dateKey));
+    if (!res || !res.ok) {
+      listEl.innerHTML = '<div class="empty-session">Could not load telemedicine calls.</div>';
+      sumEl.textContent = '';
+      return;
+    }
+    var calls = res.calls || [];
+    var billable = res.billableCount || 0;
+    sumEl.innerHTML = '<b>' + billable + '</b> billable call(s) on ' + esc(dateKey) +
+      ' &middot; your fees <b>' + esc(res.totalRevenueLabel || '€0') + '</b>' +
+      (res.totalMedicineCents ? ' <span style="color:#6b7280;">(medicine billed separately: ' + esc(res.totalMedicineLabel || '€0') + ')</span>' : '');
+    if (dateKey === telemedTodayKey()) {
+      var pill = document.getElementById('telemedTodayPillText');
+      if (pill) pill.textContent = billable + ' today · ' + (res.totalRevenueLabel || '€0');
+    }
+    if (!calls.length) {
+      listEl.innerHTML = '<div class="empty-session">No telemedicine calls on this date.</div>';
+      return;
+    }
+    var html = '';
+    for (var i = 0; i < calls.length; i++) {
+      var c = calls[i];
+      var time = (c.created_at || '').split(' ')[1] || '';
+      time = time.split(':').slice(0,2).join(':');
+      var statusBadge = c.status === 'COMPLETED'
+        ? '<span class="patient-badge" style="background:#d1fae5;color:#065f46;">Done</span>'
+        : c.status === 'CANCELLED'
+          ? '<span class="patient-badge" style="background:#fee2e2;color:#991b1b;">Cancelled</span>'
+          : '<span class="patient-badge" style="background:#fef3c7;color:#92400e;">Booked</span>';
+      var rowOpacity = c.status === 'CANCELLED' ? 'opacity:0.55;' : '';
+      var commentBlock = c.comments ? '<div class="patient-comment">' + esc(c.comments) + '</div>' : '';
+      html += '<div class="patient-card" style="border-color:#fdba74;background:#fff;' + rowOpacity + '">' +
+        '<div class="patient-main">' +
+          '<div class="patient-name">' + esc(c.patient_name) + ' ' + statusBadge + '</div>' +
+          '<div class="patient-meta">' +
+            '<a class="contact-link" href="tel:' + esc(c.phone) + '">' + esc(c.phone) + '</a>' +
+            (c.email ? ' &bull; <a class="contact-link" href="mailto:' + esc(c.email) + '">' + esc(c.email) + '</a>' : '') +
+          '</div>' +
+          '<div class="patient-meta">' + esc(time) + ' &bull; Fee: <b>' + telemedFmtEur(c.fee_cents) + '</b></div>' +
+          commentBlock +
+        '</div>' +
+        '<div class="patient-time" style="display:flex;flex-direction:column;gap:4px;">' +
+          (c.status !== 'COMPLETED' ? '<button class="btn btn-primary" style="padding:8px 10px;font-size:12px;border-radius:12px;" onclick="markTelemedDone(\'' + esc(c.id) + '\')">Mark Done</button>' : '<button class="btn btn-ghost" style="padding:8px 10px;font-size:12px;border-radius:12px;" onclick="reopenTelemed(\'' + esc(c.id) + '\')">Reopen</button>') +
+        '</div>' +
+      '</div>';
+    }
+    listEl.innerHTML = html;
+  } catch(e) {
+    listEl.innerHTML = '<div class="empty-session">Failed to load.</div>';
+  }
+}
+async function markTelemedDone(id) {
+  try {
+    await apiCall('telemedicine-status', { body: { id: id, status: 'COMPLETED' } });
+    loadTelemedDay();
+  } catch(e) {}
+}
+async function reopenTelemed(id) {
+  try {
+    await apiCall('telemedicine-status', { body: { id: id, status: 'BOOKED' } });
+    loadTelemedDay();
+  } catch(e) {}
+}
+
 async function loadFollowUps() {
   var el = document.getElementById('followUpList');
   try {
@@ -1747,6 +1860,10 @@ function toggleFollowUpHandled(id, checked) {
     showLoading('Loading schedule…');
     await reloadAll();
     loadFollowUps();
+    // Telemedicine subsection — initialise to today, can be moved by the doctor.
+    var telDate = document.getElementById('telemedDate');
+    if (telDate && !telDate.value) telDate.value = telemedTodayKey();
+    loadTelemedDay();
     connectWS();
   } catch (err) {
     showMsg('calendarMsg', 'bad', String(err && err.message ? err.message : err));

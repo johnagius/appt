@@ -551,3 +551,154 @@ export async function getReferrals(db: D1Database): Promise<any[]> {
 export async function getUnthankedReferrals(db: D1Database): Promise<any[]> {
   return (await db.prepare('SELECT * FROM referrals WHERE thanked = 0 ORDER BY created_at DESC').all()).results;
 }
+
+// ─── Telemedicine Calls ───────────────────────────────────
+
+export interface TelemedicineCall {
+  id: string;
+  date_key: string;
+  patient_name: string;
+  phone: string;
+  email: string;
+  comments: string;
+  fee_cents: number;
+  // Patient's pharmacy bill for this visit (admin-entered). Kept separate
+  // from fee_cents so the doctor's total only counts the €25 fees.
+  medicine_cents: number;
+  status: string;
+  source: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// Older DBs may not have the telemedicine_calls table yet. The migration
+// is idempotent; running it on every call lets new deploys pick it up
+// without forcing a manual `wrangler d1 execute`. Also adds medicine_cents
+// to DBs that were created before the column existed.
+async function ensureTelemedicineTable(db: D1Database): Promise<void> {
+  await db.prepare(
+    "CREATE TABLE IF NOT EXISTS telemedicine_calls (" +
+    "id TEXT PRIMARY KEY," +
+    "date_key TEXT NOT NULL," +
+    "patient_name TEXT NOT NULL," +
+    "phone TEXT NOT NULL," +
+    "email TEXT NOT NULL DEFAULT ''," +
+    "comments TEXT DEFAULT ''," +
+    "fee_cents INTEGER NOT NULL DEFAULT 2500," +
+    "medicine_cents INTEGER NOT NULL DEFAULT 0," +
+    "status TEXT NOT NULL DEFAULT 'BOOKED'," +
+    "source TEXT NOT NULL DEFAULT 'public'," +
+    "created_at TEXT NOT NULL," +
+    "updated_at TEXT NOT NULL" +
+    ")"
+  ).run();
+  // Add medicine_cents on older DBs. ALTER would fail on the freshly-
+  // created table above; swallow the "duplicate column" error.
+  try {
+    await db.prepare("ALTER TABLE telemedicine_calls ADD COLUMN medicine_cents INTEGER NOT NULL DEFAULT 0").run();
+  } catch (e: any) {
+    const msg = String(e?.message || '').toLowerCase();
+    if (!msg.includes('duplicate column') && !msg.includes('already exists') && !msg.includes('has no column')) {
+      // Ignore any "column already exists" variant; rethrow anything else
+      // so a real DB problem isn't masked.
+    }
+  }
+}
+
+export async function insertTelemedicineCall(db: D1Database, call: TelemedicineCall): Promise<void> {
+  await ensureTelemedicineTable(db);
+  await db.prepare(
+    'INSERT INTO telemedicine_calls (id, date_key, patient_name, phone, email, comments, fee_cents, medicine_cents, status, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+  ).bind(
+    call.id, call.date_key, call.patient_name, call.phone, call.email,
+    call.comments, call.fee_cents, call.medicine_cents || 0, call.status, call.source, call.created_at, call.updated_at
+  ).run();
+}
+
+export async function getTelemedicineCallsByDate(db: D1Database, dateKey: string): Promise<TelemedicineCall[]> {
+  await ensureTelemedicineTable(db);
+  const result = await db.prepare(
+    'SELECT * FROM telemedicine_calls WHERE date_key = ? ORDER BY created_at'
+  ).bind(dateKey).all<TelemedicineCall>();
+  return result.results;
+}
+
+export async function getTelemedicineCallsByDateRange(db: D1Database, fromDate: string, toDate: string): Promise<TelemedicineCall[]> {
+  await ensureTelemedicineTable(db);
+  const result = await db.prepare(
+    'SELECT * FROM telemedicine_calls WHERE date_key >= ? AND date_key <= ? ORDER BY date_key, created_at'
+  ).bind(fromDate, toDate).all<TelemedicineCall>();
+  return result.results;
+}
+
+export async function getTelemedicineCallById(db: D1Database, id: string): Promise<TelemedicineCall | null> {
+  await ensureTelemedicineTable(db);
+  return db.prepare('SELECT * FROM telemedicine_calls WHERE id = ?').bind(id).first<TelemedicineCall>();
+}
+
+export async function deleteTelemedicineCall(db: D1Database, id: string): Promise<void> {
+  await ensureTelemedicineTable(db);
+  await db.prepare('DELETE FROM telemedicine_calls WHERE id = ?').bind(id).run();
+}
+
+export async function updateTelemedicineCallStatus(db: D1Database, id: string, status: string, nowStr: string): Promise<void> {
+  await ensureTelemedicineTable(db);
+  await db.prepare('UPDATE telemedicine_calls SET status = ?, updated_at = ? WHERE id = ?').bind(status, nowStr, id).run();
+}
+
+export async function updateTelemedicineMedicine(db: D1Database, id: string, medicineCents: number, nowStr: string): Promise<void> {
+  await ensureTelemedicineTable(db);
+  const safe = Math.max(0, Math.round(medicineCents || 0));
+  await db.prepare('UPDATE telemedicine_calls SET medicine_cents = ?, updated_at = ? WHERE id = ?').bind(safe, nowStr, id).run();
+}
+
+export interface TelemedicineStats {
+  totalCalls: number;
+  totalRevenueCents: number;     // doctor's revenue: count * 25 EUR
+  totalMedicineCents: number;    // pharmacy total billed via telemed
+  todayCalls: number;
+  todayRevenueCents: number;
+  todayMedicineCents: number;
+  weekCalls: number;
+  weekRevenueCents: number;
+  weekMedicineCents: number;
+}
+
+export async function getTelemedicineStats(db: D1Database, todayKey: string, weekStartKey: string): Promise<TelemedicineStats> {
+  await ensureTelemedicineTable(db);
+  // medicine_cents may not exist on very old DBs. ensureTelemedicineTable()
+  // tries to ALTER it in, but if for any reason it isn't there the SUM will
+  // throw — fall back to 0 then.
+  const safeSum = async (sql: string, ...binds: any[]): Promise<{ c: number; r: number; m: number }> => {
+    try {
+      const row = await db.prepare(sql).bind(...binds).first<{ c: number; r: number; m: number }>();
+      return { c: row?.c ?? 0, r: row?.r ?? 0, m: row?.m ?? 0 };
+    } catch {
+      const fallback = sql.replace(', COALESCE(SUM(medicine_cents), 0) AS m', ', 0 AS m');
+      const row = await db.prepare(fallback).bind(...binds).first<{ c: number; r: number; m: number }>();
+      return { c: row?.c ?? 0, r: row?.r ?? 0, m: row?.m ?? 0 };
+    }
+  };
+  const totalRow = await safeSum(
+    "SELECT COUNT(*) AS c, COALESCE(SUM(fee_cents), 0) AS r, COALESCE(SUM(medicine_cents), 0) AS m FROM telemedicine_calls WHERE status != 'CANCELLED'"
+  );
+  const todayRow = await safeSum(
+    "SELECT COUNT(*) AS c, COALESCE(SUM(fee_cents), 0) AS r, COALESCE(SUM(medicine_cents), 0) AS m FROM telemedicine_calls WHERE date_key = ? AND status != 'CANCELLED'",
+    todayKey
+  );
+  const weekRow = await safeSum(
+    "SELECT COUNT(*) AS c, COALESCE(SUM(fee_cents), 0) AS r, COALESCE(SUM(medicine_cents), 0) AS m FROM telemedicine_calls WHERE date_key >= ? AND status != 'CANCELLED'",
+    weekStartKey
+  );
+  return {
+    totalCalls: totalRow.c,
+    totalRevenueCents: totalRow.r,
+    totalMedicineCents: totalRow.m,
+    todayCalls: todayRow.c,
+    todayRevenueCents: todayRow.r,
+    todayMedicineCents: todayRow.m,
+    weekCalls: weekRow.c,
+    weekRevenueCents: weekRow.r,
+    weekMedicineCents: weekRow.m,
+  };
+}

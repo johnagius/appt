@@ -389,6 +389,10 @@ export function adminPage(sig: string): string {
       <div><div class="num" id="statToday">-</div><div class="label" id="statTodayLabel">Today</div></div>
     </div>
     <div class="stat"><div class="num" id="statTomorrow">-</div><div class="label">Tomorrow</div></div>
+    <div class="stat" id="statTelemedWrap" style="background:#fff7ed;border:1px solid #fdba74;cursor:pointer;" onclick="switchTab('telemedicine')" title="Telemedicine calls today / week / total · €25 each">
+      <div class="num" id="statTelemed" style="color:#c2410c;">-</div>
+      <div class="label" style="color:#9a3412;">Telemed today <span id="statTelemedLive" style="display:none;background:#ef4444;color:#fff;font-size:9px;padding:1px 6px;border-radius:999px;margin-left:4px;vertical-align:middle;">LIVE</span></div>
+    </div>
   </div>
 
   <div class="tabs">
@@ -400,6 +404,7 @@ export function adminPage(sig: string): string {
     <div class="tab" data-tab="reviews" onclick="switchTab('reviews')">Reviews</div>
     <div class="tab" data-tab="followups" onclick="switchTab('followups')">Follow-ups</div>
     <div class="tab" data-tab="referrals" onclick="switchTab('referrals')">Referrals</div>
+    <div class="tab" data-tab="telemedicine" onclick="switchTab('telemedicine')" style="background:#fff7ed;color:#9a3412;">Telemedicine</div>
     <div class="tab" data-tab="linda" onclick="switchTab('linda')" style="background:#ecfdf5;color:#065f46;">Linda</div>
     <div class="tab" data-tab="settings" onclick="switchTab('settings')">Settings</div>
   </div>
@@ -952,6 +957,57 @@ export function adminPage(sig: string): string {
   </div>
 </div>
 
+<!-- TELEMEDICINE TAB -->
+<div class="tab-content" id="tab-telemedicine" style="display:none;">
+  <div class="card" style="padding:18px;margin-bottom:14px;background:#fff7ed;border-left:4px solid #f97316;">
+    <h3 style="margin:0 0 4px 0;font-size:16px;font-weight:900;color:#9a3412;">Telemedicine Calls</h3>
+    <p style="margin:0;color:#9a3412;font-size:13px;">Evening phone consultations between <b>8pm and midnight</b>. Flat fee <b>€25</b> per call. Notifications go to <b>info@spinolaclinic.com</b>.</p>
+    <p id="telemedWindowState" style="margin:8px 0 0 0;font-size:13px;font-weight:700;"></p>
+  </div>
+
+  <div class="stats" style="margin-bottom:14px;">
+    <div class="stat"><div class="num" id="telStatToday">-</div><div class="label">Today</div></div>
+    <div class="stat"><div class="num" id="telStatWeek">-</div><div class="label">This week</div></div>
+    <div class="stat"><div class="num" id="telStatTotal">-</div><div class="label">All time</div></div>
+    <div class="stat" style="background:#ecfdf5;"><div class="num" id="telStatRevenue" style="color:#047857;">€0</div><div class="label" style="color:#065f46;">Doctor's revenue (all time)</div></div>
+    <div class="stat" style="background:#eff6ff;"><div class="num" id="telStatMedicine" style="color:#1d4ed8;">€0</div><div class="label" style="color:#1e3a8a;">Medicine billed (all time)</div></div>
+  </div>
+  <p style="margin:0 0 14px 0;font-size:12px;color:#6b7280;">Doctor's revenue = number of calls × €25. Medicine billed is what the pharmacy charges for the prescriptions written during these calls — it's added to each patient's combined bill but never counts toward the doctor's take.</p>
+
+  <div class="card" style="padding:18px;margin-bottom:14px;">
+    <h3 style="margin:0 0 10px 0;font-size:15px;font-weight:800;">Add a Telemedicine Call</h3>
+    <p style="margin:0 0 12px 0;color:#6b7280;font-size:13px;">Use this to log a call you've taken. The doctor and patient (if email given) will get a copy of the record.</p>
+    <div class="form-row">
+      <div class="form-group"><label>Patient name *</label><input type="text" id="telAddName" placeholder="Full name"></div>
+      <div class="form-group"><label>Phone *</label><input type="tel" id="telAddPhone" placeholder="+356 ..."></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Email</label><input type="email" id="telAddEmail" placeholder="optional@example.com"></div>
+      <div class="form-group"><label>Date</label><input type="date" id="telAddDate"></div>
+    </div>
+    <div class="form-group">
+      <label>Comments</label>
+      <textarea id="telAddComments" rows="2" placeholder="Optional notes about the call"></textarea>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+      <button class="btn btn-dark" onclick="addTelemedicineCall()">Add Call (€25)</button>
+      <span id="telAddMsg" style="font-size:13px;"></span>
+    </div>
+  </div>
+
+  <div class="card" style="padding:18px;">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+      <h3 style="margin:0;font-size:15px;font-weight:800;flex:1;">Calls on selected date</h3>
+      <button class="btn btn-ghost btn-sm" onclick="changeTelDay(-1)">&larr;</button>
+      <input type="date" id="telListDate" onchange="loadTelemedicineList()">
+      <button class="btn btn-ghost btn-sm" onclick="changeTelDay(1)">&rarr;</button>
+      <button class="btn btn-sm btn-dark" onclick="goTelToday()">Today</button>
+    </div>
+    <div id="telDaySummary" style="margin-bottom:10px;font-size:13px;color:#374151;"></div>
+    <div id="telCallList"><div class="empty">Loading...</div></div>
+  </div>
+</div>
+
 <!-- LINDA (PHYSIOTHERAPY) TAB -->
 <div class="tab-content" id="tab-linda" style="display:none;">
   <div class="card" id="lindaIntroCard" style="padding:18px;margin-bottom:14px;background:#ecfdf5;border-left:4px solid #10b981;">
@@ -1410,7 +1466,222 @@ function switchTab(name) {
   if (name === 'reviews') loadReviewPatients();
   if (name === 'followups') loadAdminFollowUps();
   if (name === 'referrals') loadReferrals();
+  if (name === 'telemedicine') loadTelemedicineData();
   if (name === 'linda') loadLindaData();
+}
+
+// ─── Telemedicine (admin) ─────────────────────────────────
+function telTodayKey() {
+  var d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+function escTelHtml(s) {
+  return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+function telFormatEur(cents) {
+  if (cents == null) return '€0';
+  return '€' + (cents/100).toFixed(2);
+}
+async function loadTelemedicineData() {
+  var dateInput = document.getElementById('telListDate');
+  if (!dateInput.value) dateInput.value = telTodayKey();
+  var addDate = document.getElementById('telAddDate');
+  if (!addDate.value) addDate.value = telTodayKey();
+  await Promise.all([loadTelemedicineStats(), loadTelemedicineList()]);
+}
+async function loadTelemedicineStats() {
+  try {
+    var res = await apiCall('telemedicine-stats');
+    if (!res || !res.ok) return;
+    var s = res.stats || {};
+    document.getElementById('telStatToday').textContent = s.todayCalls != null ? s.todayCalls : 0;
+    document.getElementById('telStatWeek').textContent = s.weekCalls != null ? s.weekCalls : 0;
+    document.getElementById('telStatTotal').textContent = s.totalCalls != null ? s.totalCalls : 0;
+    document.getElementById('telStatRevenue').textContent = telFormatEur(s.totalRevenueCents || 0);
+    var medEl = document.getElementById('telStatMedicine');
+    if (medEl) medEl.textContent = telFormatEur(s.totalMedicineCents || 0);
+    var ws = document.getElementById('telemedWindowState');
+    if (ws) {
+      if (res.open) {
+        ws.innerHTML = '<span style="color:#15803d;">&#9679; Telemedicine bookings are OPEN now (8pm-midnight)</span>';
+      } else {
+        ws.innerHTML = '<span style="color:#6b7280;">&#9675; Booking window closed (opens 8pm). You can still log calls below.</span>';
+      }
+    }
+    // Top stats bar
+    var topStat = document.getElementById('statTelemed');
+    if (topStat) topStat.textContent = s.todayCalls != null ? s.todayCalls : 0;
+    var liveBadge = document.getElementById('statTelemedLive');
+    if (liveBadge) liveBadge.style.display = res.open ? 'inline-block' : 'none';
+  } catch(e) {}
+}
+async function loadTelemedicineList() {
+  var dateKey = document.getElementById('telListDate').value || telTodayKey();
+  var listEl = document.getElementById('telCallList');
+  var sumEl = document.getElementById('telDaySummary');
+  listEl.innerHTML = '<div class="empty">Loading...</div>';
+  try {
+    var res = await apiCall('telemedicine?date=' + encodeURIComponent(dateKey));
+    if (!res || !res.ok) { listEl.innerHTML = '<div class="empty">Failed to load.</div>'; return; }
+    var calls = res.calls || [];
+    sumEl.innerHTML = '<b>' + (res.billableCount || 0) + '</b> billable call(s) on ' + escTelHtml(dateKey) +
+      ' &middot; doctor fees <b>' + escTelHtml(res.totalRevenueLabel || '€0') + '</b>' +
+      ' &middot; medicine billed <b>' + escTelHtml(res.totalMedicineLabel || '€0') + '</b>' +
+      ' &middot; patients pay <b>' + escTelHtml(res.totalPatientLabel || '€0') + '</b> total';
+    if (!calls.length) {
+      listEl.innerHTML = '<div class="empty">No telemedicine calls on this date.</div>';
+      return;
+    }
+    var html = '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13.5px;">' +
+      '<thead><tr style="background:#f9fafb;text-align:left;">' +
+      '<th style="padding:8px;border-bottom:1px solid #e5e7eb;">Time</th>' +
+      '<th style="padding:8px;border-bottom:1px solid #e5e7eb;">Patient</th>' +
+      '<th style="padding:8px;border-bottom:1px solid #e5e7eb;">Phone</th>' +
+      '<th style="padding:8px;border-bottom:1px solid #e5e7eb;">Email</th>' +
+      '<th style="padding:8px;border-bottom:1px solid #e5e7eb;">Comments</th>' +
+      '<th style="padding:8px;border-bottom:1px solid #e5e7eb;">Fee</th>' +
+      '<th style="padding:8px;border-bottom:1px solid #e5e7eb;">Medicine €</th>' +
+      '<th style="padding:8px;border-bottom:1px solid #e5e7eb;">Patient bill</th>' +
+      '<th style="padding:8px;border-bottom:1px solid #e5e7eb;">Status</th>' +
+      '<th style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:right;">Actions</th>' +
+      '</tr></thead><tbody>';
+    for (var i = 0; i < calls.length; i++) {
+      var c = calls[i];
+      var time = (c.created_at || '').split(' ')[1] || '';
+      time = time.split(':').slice(0,2).join(':');
+      var rowStyle = c.status === 'CANCELLED' ? 'opacity:0.5;' : '';
+      var emailCell = c.email ? '<a href="mailto:' + escTelHtml(c.email) + '">' + escTelHtml(c.email) + '</a>' : '<span style="color:#9ca3af;">—</span>';
+      var srcBadge = c.source === 'admin' ? ' <span style="display:inline-block;font-size:10px;background:#fde68a;color:#92400e;padding:1px 6px;border-radius:8px;font-weight:700;">admin</span>' : '';
+      var medCents = c.medicine_cents || 0;
+      var medEur = (medCents / 100).toFixed(2);
+      var patientCents = (c.fee_cents || 0) + medCents;
+      html += '<tr style="' + rowStyle + '" id="telRow_' + escTelHtml(c.id) + '">' +
+        '<td style="padding:8px;border-bottom:1px solid #f3f4f6;">' + escTelHtml(time) + '</td>' +
+        '<td style="padding:8px;border-bottom:1px solid #f3f4f6;"><b>' + escTelHtml(c.patient_name) + '</b>' + srcBadge + '</td>' +
+        '<td style="padding:8px;border-bottom:1px solid #f3f4f6;"><a href="tel:' + escTelHtml(c.phone) + '">' + escTelHtml(c.phone) + '</a></td>' +
+        '<td style="padding:8px;border-bottom:1px solid #f3f4f6;">' + emailCell + '</td>' +
+        '<td style="padding:8px;border-bottom:1px solid #f3f4f6;color:#6b7280;font-style:italic;">' + escTelHtml(c.comments || '') + '</td>' +
+        '<td style="padding:8px;border-bottom:1px solid #f3f4f6;">' + telFormatEur(c.fee_cents) + '</td>' +
+        '<td style="padding:8px;border-bottom:1px solid #f3f4f6;">' +
+          '<div style="display:flex;align-items:center;gap:4px;">' +
+            '<span style="color:#6b7280;">€</span>' +
+            '<input type="number" min="0" step="0.01" value="' + escTelHtml(medEur) + '" id="telMed_' + escTelHtml(c.id) + '" style="width:80px;padding:6px 8px;border:1px solid #e5e7eb;border-radius:8px;font-size:13px;" onchange="saveTelemedMedicine(\'' + escTelHtml(c.id) + '\')">' +
+          '</div>' +
+        '</td>' +
+        '<td style="padding:8px;border-bottom:1px solid #f3f4f6;font-weight:800;color:#1e40af;" id="telPatTotal_' + escTelHtml(c.id) + '">' + telFormatEur(patientCents) + '</td>' +
+        '<td style="padding:8px;border-bottom:1px solid #f3f4f6;">' + escTelHtml(c.status) + '</td>' +
+        '<td style="padding:8px;border-bottom:1px solid #f3f4f6;text-align:right;white-space:nowrap;">';
+      if (c.status === 'BOOKED') {
+        html += '<button class="btn btn-sm" style="background:#10b981;color:#fff;margin-right:4px;" onclick="markTelemedicineStatus(\'' + escTelHtml(c.id) + '\',\'COMPLETED\')">Done</button>';
+        html += '<button class="btn btn-sm" style="background:#9ca3af;color:#fff;margin-right:4px;" onclick="markTelemedicineStatus(\'' + escTelHtml(c.id) + '\',\'CANCELLED\')">Cancel</button>';
+      } else {
+        html += '<button class="btn btn-sm btn-ghost" style="margin-right:4px;" onclick="markTelemedicineStatus(\'' + escTelHtml(c.id) + '\',\'BOOKED\')">Reopen</button>';
+      }
+      html += '<button class="btn btn-sm" style="background:#ef4444;color:#fff;" onclick="deleteTelemedicineCall(\'' + escTelHtml(c.id) + '\')">Delete</button>';
+      html += '</td></tr>';
+    }
+    html += '</tbody></table></div>';
+    listEl.innerHTML = html;
+  } catch(e) {
+    listEl.innerHTML = '<div class="empty">Failed to load calls.</div>';
+  }
+}
+async function saveTelemedMedicine(id) {
+  var input = document.getElementById('telMed_' + id);
+  if (!input) return;
+  var euros = parseFloat(input.value || '0');
+  if (!isFinite(euros) || euros < 0) {
+    input.value = '0.00';
+    euros = 0;
+  }
+  try {
+    var res = await apiCall('telemedicine-medicine', { body: { id: id, medicineEuros: euros } });
+    if (res && res.ok) {
+      var totalEl = document.getElementById('telPatTotal_' + id);
+      if (totalEl) totalEl.textContent = res.patientTotalLabel || telFormatEur(res.patientTotalCents);
+      input.value = (res.medicineCents / 100).toFixed(2);
+      // Refresh stats + summary so the daily/weekly totals update
+      loadTelemedicineStats();
+      // Recompute the summary line by re-fetching — cheaper than reflecting locally
+      var dateKey = document.getElementById('telListDate').value || telTodayKey();
+      try {
+        var listRes = await apiCall('telemedicine?date=' + encodeURIComponent(dateKey));
+        if (listRes && listRes.ok) {
+          var sumEl = document.getElementById('telDaySummary');
+          if (sumEl) sumEl.innerHTML = '<b>' + (listRes.billableCount || 0) + '</b> billable call(s) on ' + escTelHtml(dateKey) +
+            ' &middot; doctor fees <b>' + escTelHtml(listRes.totalRevenueLabel || '€0') + '</b>' +
+            ' &middot; medicine billed <b>' + escTelHtml(listRes.totalMedicineLabel || '€0') + '</b>' +
+            ' &middot; patients pay <b>' + escTelHtml(listRes.totalPatientLabel || '€0') + '</b> total';
+        }
+      } catch(e) {}
+    }
+  } catch(e) {}
+}
+function changeTelDay(delta) {
+  var di = document.getElementById('telListDate');
+  var d = new Date(di.value || telTodayKey());
+  d.setDate(d.getDate() + delta);
+  di.value = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  loadTelemedicineList();
+}
+function goTelToday() {
+  document.getElementById('telListDate').value = telTodayKey();
+  loadTelemedicineList();
+}
+async function addTelemedicineCall() {
+  var msg = document.getElementById('telAddMsg');
+  var name = document.getElementById('telAddName').value.trim();
+  var phone = document.getElementById('telAddPhone').value.trim();
+  var email = document.getElementById('telAddEmail').value.trim();
+  var comments = document.getElementById('telAddComments').value.trim();
+  var dateKey = document.getElementById('telAddDate').value || telTodayKey();
+  if (!name || !phone) {
+    msg.style.color = '#b91c1c';
+    msg.textContent = 'Patient name and phone are required.';
+    return;
+  }
+  msg.style.color = '#6b7280';
+  msg.textContent = 'Saving...';
+  try {
+    var res = await apiCall('telemedicine', { body: { patientName: name, phone: phone, email: email, comments: comments, dateKey: dateKey } });
+    if (res && res.ok) {
+      msg.style.color = '#059669';
+      msg.textContent = 'Saved.';
+      document.getElementById('telAddName').value = '';
+      document.getElementById('telAddPhone').value = '';
+      document.getElementById('telAddEmail').value = '';
+      document.getElementById('telAddComments').value = '';
+      loadTelemedicineStats();
+      loadTelemedicineList();
+    } else {
+      msg.style.color = '#b91c1c';
+      msg.textContent = (res && res.reason) || 'Failed.';
+    }
+  } catch(e) {
+    msg.style.color = '#b91c1c';
+    msg.textContent = 'Network error.';
+  }
+}
+async function markTelemedicineStatus(id, status) {
+  try {
+    await apiCall('telemedicine-status', { body: { id: id, status: status } });
+    loadTelemedicineStats();
+    loadTelemedicineList();
+  } catch(e) {}
+}
+async function deleteTelemedicineCall(id) {
+  var ok = await styledConfirm('Delete telemedicine call?', 'This permanently removes the record. The fee will no longer be counted.', 'Delete', 'btn-danger');
+  if (!ok) return;
+  try {
+    var res = await fetch('/api/admin/telemedicine/' + encodeURIComponent(id) + '?sig=' + encodeURIComponent(SIG), {
+      method: 'DELETE', credentials: 'same-origin',
+    });
+    var data = await res.json();
+    if (data && data.ok) {
+      loadTelemedicineStats();
+      loadTelemedicineList();
+    }
+  } catch(e) {}
 }
 
 // ─── Linda (Physiotherapy) admin ─────────────────────────────
@@ -1777,6 +2048,7 @@ function loadDashboard() {
       document.getElementById('statCancelled').textContent = res.stats.weekCancelled;
       document.getElementById('statTomorrow').textContent = res.tomorrowAppointments.length;
       updateFillRing(res.todayAppointments.length, res.stats.todayCapacity || 0);
+      try { loadTelemedicineStats(); } catch(e) {}
 
       renderOverrides(res.doctorOffEntries, res.extraSlotEntries);
 
@@ -2956,6 +3228,7 @@ function doFullRefresh() {
       document.getElementById('statCancelled').textContent = res.stats.weekCancelled;
       document.getElementById('statTomorrow').textContent = res.tomorrowAppointments.length;
       updateFillRing(res.todayAppointments.length, res.stats.todayCapacity || 0);
+      try { loadTelemedicineStats(); } catch(e) {}
 
       renderOverrides(res.doctorOffEntries, res.extraSlotEntries);
 

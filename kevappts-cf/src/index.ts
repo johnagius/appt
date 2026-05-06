@@ -39,6 +39,11 @@ import { reschedulePage } from './pages/reschedule-page';
 import { followupPage } from './pages/followup-page';
 import { physioPage } from './pages/physio-page';
 import { apiLindaGetDay, apiLindaNextDay, apiLindaSlots, apiLindaListExtras, apiLindaAddExtra, apiLindaDeleteExtra, apiLindaUpdateExtra, apiLindaListOff, apiLindaAddOff, apiLindaDeleteOff, apiLindaReschedule, apiLindaRescheduleDay, apiLindaNewBooking, apiLindaSearch, apiLindaPatientHistory, apiLindaClientsAutocomplete, apiLindaWeek, apiLindaCopyDay, apiLindaCancel, apiLindaCancelDay, apiLindaMarkStatus, apiLindaBaseSchedule, apiLindaSaveBaseSchedule, apiLindaListWindows, apiLindaAddWindow, apiLindaUpdateWindow, apiLindaDeleteWindow, handleLindaLogin, handleLindaLogout, lindaRoute } from './api/linda-view';
+import {
+  apiTelemedicineStatus, apiBookTelemedicine,
+  apiAdminListTelemedicineByDate, apiAdminAddTelemedicine, apiAdminDeleteTelemedicine,
+  apiAdminMarkTelemedicineStatus, apiAdminTelemedicineStats, apiAdminSetTelemedicineMedicine,
+} from './api/telemedicine';
 
 export { RealtimeHub };
 
@@ -107,6 +112,10 @@ export default {
       if (path === '/api/spinola' && method === 'GET') return apiGetSpinolaAvailability(request, env);
       if (path === '/api/book' && method === 'POST') return apiBook(request, env);
       if (path === '/api/book-spinola' && method === 'POST') return apiBookSpinola(request, env);
+
+      // ─── Telemedicine (8pm–midnight phone calls, €25) ───
+      if (path === '/api/telemedicine/status' && method === 'GET') return apiTelemedicineStatus(request, env);
+      if (path === '/api/book-telemedicine' && method === 'POST') return apiBookTelemedicine(request, env);
 
       // ─── Linda (Physiotherapy) Public API ─────────
       if (path === '/api/physio-init' && method === 'GET') return apiPhysioInit(env);
@@ -209,6 +218,14 @@ export default {
         if (adminPath === 'linda-appointments' && method === 'GET') return apiAdminGetLindaAppointments(request, env);
         if (adminPath === 'linda-config' && method === 'GET') return apiAdminGetLindaConfig(request, env);
         if (adminPath === 'linda-config' && method === 'POST') return apiAdminSaveLindaConfig(request, env);
+
+        // ─── Telemedicine admin ────────────────────────
+        if (adminPath === 'telemedicine' && method === 'GET') return apiAdminListTelemedicineByDate(request, env);
+        if (adminPath === 'telemedicine' && method === 'POST') return apiAdminAddTelemedicine(request, env);
+        if (adminPath === 'telemedicine-stats' && method === 'GET') return apiAdminTelemedicineStats(request, env);
+        if (adminPath === 'telemedicine-status' && method === 'POST') return apiAdminMarkTelemedicineStatus(request, env);
+        if (adminPath === 'telemedicine-medicine' && method === 'POST') return apiAdminSetTelemedicineMedicine(request, env);
+        if (adminPath.startsWith('telemedicine/') && method === 'DELETE') return apiAdminDeleteTelemedicine(request, env);
 
         // Test broadcast — manually trigger a WebSocket notification
         if (adminPath === 'test-broadcast' && method === 'POST') {

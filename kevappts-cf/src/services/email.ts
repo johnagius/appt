@@ -628,6 +628,66 @@ export async function sendFollowUpEmail(env: Env, appt: Appointment): Promise<vo
   await sendEmail(env, appt.email, subject, html);
 }
 
+// ─── 13a. Telemedicine — Doctor / Clinic Notification ─────
+
+const TELEMEDICINE_RECIPIENT = 'info@spinolaclinic.com';
+
+export interface TelemedicineCallSummary {
+  id: string;
+  date_key: string;
+  patient_name: string;
+  phone: string;
+  email: string;
+  comments: string;
+  fee_cents: number;
+  source: string;
+  created_at: string;
+}
+
+function feeLabel(cents: number): string {
+  const eur = (cents / 100).toFixed(2);
+  return '€' + eur;
+}
+
+export async function sendTelemedicineDoctorEmail(env: Env, call: TelemedicineCallSummary): Promise<void> {
+  const subject = `Telemedicine call: ${call.patient_name} (${call.date_key} ${call.created_at.split(' ')[1] || ''})`;
+  const html = `
+<div style="font-family:Arial,sans-serif;line-height:1.4;color:#111827;">
+  <h2 style="margin:0 0 10px 0;">New Telemedicine Call</h2>
+  <p style="margin:0 0 10px 0;">A patient has booked an evening telemedicine call.</p>
+  <table style="border-collapse:collapse;width:100%;max-width:520px;">
+    <tr><td style="padding:6px 0;color:#6b7280;width:140px;">Patient</td><td style="padding:6px 0;"><b>${escapeHtml(call.patient_name)}</b></td></tr>
+    <tr><td style="padding:6px 0;color:#6b7280;">Phone</td><td style="padding:6px 0;"><b>${escapeHtml(call.phone)}</b></td></tr>
+    <tr><td style="padding:6px 0;color:#6b7280;">Email</td><td style="padding:6px 0;"><b>${escapeHtml(call.email || '—')}</b></td></tr>
+    <tr><td style="padding:6px 0;color:#6b7280;">Date</td><td style="padding:6px 0;"><b>${escapeHtml(call.date_key)}</b></td></tr>
+    <tr><td style="padding:6px 0;color:#6b7280;">Logged at</td><td style="padding:6px 0;"><b>${escapeHtml(call.created_at)}</b></td></tr>
+    <tr><td style="padding:6px 0;color:#6b7280;">Fee</td><td style="padding:6px 0;"><b>${feeLabel(call.fee_cents)}</b></td></tr>
+    <tr><td style="padding:6px 0;color:#6b7280;">Booked via</td><td style="padding:6px 0;"><b>${escapeHtml(call.source === 'admin' ? 'Admin entry' : 'Patient booking page')}</b></td></tr>
+    ${call.comments ? `<tr><td style="padding:6px 0;color:#6b7280;vertical-align:top;">Notes</td><td style="padding:6px 0;">${escapeHtml(call.comments)}</td></tr>` : ''}
+  </table>
+  <p style="margin:16px 0 0 0;color:#6b7280;font-size:13px;">Please call the patient on the number above. Telemedicine calls run 8pm–midnight at the flat rate of €25.</p>
+</div>`;
+
+  await sendEmail(env, TELEMEDICINE_RECIPIENT, subject, html);
+}
+
+export async function sendTelemedicinePatientEmail(env: Env, call: TelemedicineCallSummary): Promise<void> {
+  if (!call.email) return;
+  const subject = `Telemedicine call confirmed (${call.date_key})`;
+  const html = `
+<div style="font-family:Arial,sans-serif;line-height:1.5;color:#111827;max-width:520px;">
+  <h2 style="margin:0 0 12px 0;font-size:18px;">Your telemedicine call is booked</h2>
+  <p style="margin:0 0 12px 0;font-size:15px;">Thanks ${escapeHtml((call.patient_name || '').split(' ')[0] || 'there')}—the doctor will phone you on <b>${escapeHtml(call.phone)}</b> as soon as they’re free this evening (between 8pm and midnight).</p>
+  <table style="border-collapse:collapse;width:100%;max-width:520px;">
+    <tr><td style="padding:6px 0;color:#6b7280;width:140px;">Date</td><td style="padding:6px 0;"><b>${escapeHtml(call.date_key)}</b></td></tr>
+    <tr><td style="padding:6px 0;color:#6b7280;">Service</td><td style="padding:6px 0;"><b>Telemedicine call</b></td></tr>
+    <tr><td style="padding:6px 0;color:#6b7280;">Fee</td><td style="padding:6px 0;"><b>${feeLabel(call.fee_cents)}</b> (paid to doctor on the call)</td></tr>
+  </table>
+  <p style="margin:16px 0 0 0;color:#6b7280;font-size:13px;">If you no longer need the call, please reply to this email so the doctor isn’t calling unnecessarily.</p>
+</div>`;
+  await sendEmail(env, call.email, subject, html);
+}
+
 // ─── 13. Referral Thank You Email ──────────────────────────
 
 export async function sendReferralThankYouEmail(env: Env, referrerEmail: string, referrerName: string, friendName: string): Promise<void> {
