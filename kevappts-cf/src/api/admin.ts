@@ -725,7 +725,57 @@ export async function apiAdminGetReviewPatients(req: Request, env: Env): Promise
     }
   }
 
-  return json({ ok: true, potters, spinola, linda, dateKey });
+  // Telemedicine — listed in the Reviews tab as its own section so the
+  // doctor can manually send a review request for any call too. Auto
+  // reviews are covered by the cron (30-180 min after created_at).
+  const telemedicine: any[] = [];
+  try {
+    const telRows = await env.DB.prepare(
+      "SELECT * FROM telemedicine_calls WHERE date_key = ? AND email != '' " +
+      "AND status != 'CANCELLED' ORDER BY created_at"
+    ).bind(dateKey).all<any>();
+    // Pull review_sent rows for these telemed IDs in one query.
+    const telReviewMap = new Map<string, { sent_at: string; source: string }>();
+    if (telRows.results.length) {
+      const ids = telRows.results.map(r => r.id);
+      // SQLite IN-clause needs explicit placeholders — bind one per id.
+      const placeholders = ids.map(() => '?').join(',');
+      try {
+        const rs = await env.DB.prepare(
+          `SELECT appointment_id AS id, sent_at, source FROM review_sent WHERE appointment_id IN (${placeholders})`
+        ).bind(...ids).all<{ id: string; sent_at: string; source: string }>();
+        for (const r of rs.results) telReviewMap.set(r.id, { sent_at: r.sent_at, source: r.source || 'manual' });
+      } catch (e: any) {
+        const msg = String(e?.message || '').toLowerCase();
+        if (msg.includes('no such column') || msg.includes('has no column')) {
+          const rs = await env.DB.prepare(
+            `SELECT appointment_id AS id, sent_at FROM review_sent WHERE appointment_id IN (${placeholders})`
+          ).bind(...ids).all<{ id: string; sent_at: string }>();
+          for (const r of rs.results) telReviewMap.set(r.id, { sent_at: r.sent_at, source: 'manual' });
+        } else { throw e; }
+      }
+    }
+    for (const c of telRows.results) {
+      const sent = telReviewMap.get(c.id) || null;
+      const created = String(c.created_at || '').split(' ')[1] || '';
+      telemedicine.push({
+        appointmentId: c.id,
+        fullName: c.patient_name,
+        email: c.email,
+        startTime: created.split(':').slice(0, 2).join(':'),
+        serviceName: 'Telemedicine call',
+        status: c.status,
+        reviewSent: !!sent,
+        reviewSource: sent ? sent.source : '',
+        reviewSentAt: sent ? sent.sent_at : '',
+        bookingSource: c.source || 'public',
+      });
+    }
+  } catch (e) {
+    console.error('Telemedicine review list error:', e);
+  }
+
+  return json({ ok: true, potters, spinola, linda, telemedicine, dateKey });
 }
 
 // ─── Send Review Requests ──────────────────────────────────
@@ -744,9 +794,34 @@ export async function apiAdminSendReviewRequests(req: Request, env: Env): Promis
 
   if (!appointmentIds.length || !teamNames.length) return json({ ok: false, reason: 'Missing selections.' }, 400);
 
+  let sent = 0;
+
+  if (location === 'telemedicine') {
+    // Telemedicine IDs come from the telemedicine_calls table — fetch
+    // those rows directly. Reuse the same review email but adapt it to
+    // the call's name/email.
+    const placeholders = appointmentIds.map(() => '?').join(',');
+    const rows = await env.DB.prepare(
+      `SELECT * FROM telemedicine_calls WHERE id IN (${placeholders})`
+    ).bind(...appointmentIds).all<any>();
+    for (const c of rows.results) {
+      if (!c.email) continue;
+      const fakeAppt: any = {
+        id: c.id,
+        full_name: c.patient_name,
+        email: c.email,
+      };
+      try {
+        await sendReviewRequestEmail(env, fakeAppt, 'potters', teamNames);
+        await markReviewSent(env.DB, c.id, nowIso(tz));
+        sent++;
+      } catch (e) { console.error('Telemed review send error:', c.id, e); }
+    }
+    return json({ ok: true, message: `Review request sent to ${sent} patient(s).`, sent });
+  }
+
   const allAppts = await getAppointmentsByDate(env.DB, dateKey);
   const idSet = new Set(appointmentIds);
-  let sent = 0;
 
   for (const a of allAppts) {
     if (!idSet.has(a.id) || !a.email) continue;

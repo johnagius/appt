@@ -489,10 +489,18 @@ export default {
       // Dedup by EMAIL (not appointment_id). A patient with 5 bookings in
       // one day must not receive 5 emails. Load every email that's had a
       // review in the last 30 days — those addresses are skipped entirely.
+      // We UNION across appointments AND telemedicine_calls so a patient
+      // who got a review for either channel isn't pestered for the other.
       const recentReviews = await env.DB.prepare(
-        "SELECT DISTINCT a.email AS email FROM appointments a " +
-        "JOIN review_sent rs ON rs.appointment_id = a.id " +
-        "WHERE rs.sent_at >= datetime('now', '-30 days')"
+        "SELECT DISTINCT email FROM (" +
+          "SELECT a.email AS email FROM appointments a " +
+          "JOIN review_sent rs ON rs.appointment_id = a.id " +
+          "WHERE rs.sent_at >= datetime('now', '-30 days') " +
+          "UNION " +
+          "SELECT t.email AS email FROM telemedicine_calls t " +
+          "JOIN review_sent rs ON rs.appointment_id = t.id " +
+          "WHERE rs.sent_at >= datetime('now', '-30 days')" +
+        ")"
       ).all<{ email: string }>();
       const emailsWithRecentReview = new Set<string>();
       for (const r of recentReviews.results) {
@@ -540,6 +548,56 @@ export default {
           console.error('Auto-review send error:', appt.id, e);
         }
       }
+
+      // Telemedicine reviews — same dedup set + sentThisRun, but anchored
+      // on created_at (calls have no end_time) and with a 30-min wait so
+      // the doctor has time to wrap up before the patient gets the email.
+      try {
+        const telCalls = await env.DB.prepare(
+          "SELECT * FROM telemedicine_calls " +
+          "WHERE date_key = ? AND email != '' " +
+          "AND status IN ('BOOKED', 'COMPLETED') " +
+          "ORDER BY created_at"
+        ).bind(todayKey).all<any>();
+
+        for (const c of telCalls.results) {
+          // created_at is "YYYY-MM-DD HH:MM:SS" in env.TIMEZONE so the
+          // raw HH:MM portion can be diffed against maltaMin directly.
+          const t = String(c.created_at || '').split(' ')[1] || '';
+          if (!t) continue;
+          const callMin = parseTimeToMinutes(t);
+          const minsSince = maltaMin - callMin;
+          // 30-min cool-off so the doctor can finish + write the
+          // prescription; cap at 180 mins so a missed cron tick still
+          // catches up but we don't send days later.
+          if (minsSince < 30 || minsSince > 180) continue;
+
+          const emailLc = String(c.email || '').toLowerCase();
+          if (!emailLc) continue;
+          if (emailsWithRecentReview.has(emailLc)) continue;
+          if (sentThisRun.has(emailLc)) continue;
+          if (await isReviewSent(env.DB, c.id)) continue;
+
+          // Reuse the existing review email — the copy is generic enough
+          // ("Thank you for trusting us with your care today"). Anchor
+          // location to 'potters' since the call is arranged by the
+          // pharmacist there.
+          const fakeAppt: any = {
+            id: c.id,
+            full_name: c.patient_name,
+            email: c.email,
+          };
+          try {
+            await markReviewSent(env.DB, c.id, nowIso(tz), 'auto');
+            sentThisRun.add(emailLc);
+            emailsWithRecentReview.add(emailLc);
+            await sendReviewRequestEmail(env, fakeAppt, 'potters');
+            console.log('Auto-review (telemed) sent:', c.id, emailLc);
+          } catch (e) {
+            console.error('Auto-review (telemed) send error:', c.id, e);
+          }
+        }
+      } catch (e) { console.error('Auto-review telemed loop error:', e); }
     } catch (e) { console.error('Auto-review cron error:', e); }
   },
 };
