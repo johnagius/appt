@@ -1788,7 +1788,7 @@ async function loadTelemedDay() {
           commentBlock +
         '</div>' +
         '<div class="patient-time" style="display:flex;flex-direction:column;gap:4px;">' +
-          (c.status !== 'COMPLETED' ? '<button class="btn btn-primary" style="padding:8px 10px;font-size:12px;border-radius:12px;" onclick="markTelemedDone(\'' + esc(c.id) + '\')">Mark Done</button>' : '<button class="btn btn-ghost" style="padding:8px 10px;font-size:12px;border-radius:12px;" onclick="reopenTelemed(\'' + esc(c.id) + '\')">Reopen</button>') +
+          (c.status !== 'COMPLETED' ? '<button class="btn btn-primary" style="padding:8px 10px;font-size:12px;border-radius:12px;" onclick="markTelemedDone(\\'' + esc(c.id) + '\\')">Mark Done</button>' : '<button class="btn btn-ghost" style="padding:8px 10px;font-size:12px;border-radius:12px;" onclick="reopenTelemed(\\'' + esc(c.id) + '\\')">Reopen</button>') +
         '</div>' +
       '</div>';
     }

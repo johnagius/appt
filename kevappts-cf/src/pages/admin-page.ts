@@ -1622,7 +1622,7 @@ async function loadTelemedicineList() {
         '<td style="padding:8px;border-bottom:1px solid #f3f4f6;">' +
           '<div style="display:flex;align-items:center;gap:4px;">' +
             '<span style="color:#6b7280;">€</span>' +
-            '<input type="number" min="0" step="0.01" value="' + escTelHtml(medEur) + '" id="telMed_' + escTelHtml(c.id) + '" style="width:80px;padding:6px 8px;border:1px solid #e5e7eb;border-radius:8px;font-size:13px;" onchange="saveTelemedMedicine(\'' + escTelHtml(c.id) + '\')">' +
+            '<input type="number" min="0" step="0.01" value="' + escTelHtml(medEur) + '" id="telMed_' + escTelHtml(c.id) + '" style="width:80px;padding:6px 8px;border:1px solid #e5e7eb;border-radius:8px;font-size:13px;" onchange="saveTelemedMedicine(\\'' + escTelHtml(c.id) + '\\')">' +
           '</div>' +
         '</td>' +
         '<td style="padding:8px;border-bottom:1px solid #f3f4f6;font-weight:800;color:#1e40af;" id="telPatTotal_' + escTelHtml(c.id) + '">' + telFormatEur(patientCents) + '</td>' +
@@ -1633,14 +1633,14 @@ async function loadTelemedicineList() {
       // saving medicines so the data is there when an email is added.
       var rxLabel = c.prescription_sent_at ? 'Re-send Rx' : 'Prescription';
       var rxStyle = c.prescription_sent_at ? 'background:#10b981;color:#fff;' : 'background:#ea580c;color:#fff;';
-      html += '<button class="btn btn-sm" style="' + rxStyle + 'margin-right:4px;" onclick="openTelPrescription(\'' + escTelHtml(c.id) + '\')">' + rxLabel + '</button>';
+      html += '<button class="btn btn-sm" style="' + rxStyle + 'margin-right:4px;" onclick="openTelPrescription(\\'' + escTelHtml(c.id) + '\\')">' + rxLabel + '</button>';
       if (c.status === 'BOOKED') {
-        html += '<button class="btn btn-sm" style="background:#10b981;color:#fff;margin-right:4px;" onclick="markTelemedicineStatus(\'' + escTelHtml(c.id) + '\',\'COMPLETED\')">Done</button>';
-        html += '<button class="btn btn-sm" style="background:#9ca3af;color:#fff;margin-right:4px;" onclick="markTelemedicineStatus(\'' + escTelHtml(c.id) + '\',\'CANCELLED\')">Cancel</button>';
+        html += '<button class="btn btn-sm" style="background:#10b981;color:#fff;margin-right:4px;" onclick="markTelemedicineStatus(\\'' + escTelHtml(c.id) + '\\',\\'COMPLETED\\')">Done</button>';
+        html += '<button class="btn btn-sm" style="background:#9ca3af;color:#fff;margin-right:4px;" onclick="markTelemedicineStatus(\\'' + escTelHtml(c.id) + '\\',\\'CANCELLED\\')">Cancel</button>';
       } else {
-        html += '<button class="btn btn-sm btn-ghost" style="margin-right:4px;" onclick="markTelemedicineStatus(\'' + escTelHtml(c.id) + '\',\'BOOKED\')">Reopen</button>';
+        html += '<button class="btn btn-sm btn-ghost" style="margin-right:4px;" onclick="markTelemedicineStatus(\\'' + escTelHtml(c.id) + '\\',\\'BOOKED\\')">Reopen</button>';
       }
-      html += '<button class="btn btn-sm" style="background:#ef4444;color:#fff;" onclick="deleteTelemedicineCall(\'' + escTelHtml(c.id) + '\')">Delete</button>';
+      html += '<button class="btn btn-sm" style="background:#ef4444;color:#fff;" onclick="deleteTelemedicineCall(\\'' + escTelHtml(c.id) + '\\')">Delete</button>';
       html += '</td></tr>';
     }
     html += '</tbody></table></div>';
@@ -1755,7 +1755,7 @@ function openTelPrescription(callId) {
     // Populate medicines as separate rows for "neat entry".
     var listEl = document.getElementById('telRxMedicineList');
     listEl.innerHTML = '';
-    var lines = (c.medicines || '').split(/\r?\n/).filter(function(s) { return s.trim(); });
+    var lines = (c.medicines || '').split(/\\r?\\n/).filter(function(s) { return s.trim(); });
     if (!lines.length) lines = [''];
     for (var i = 0; i < lines.length; i++) addRxMedicineRow(lines[i]);
     updateRxTotal();
@@ -1808,7 +1808,7 @@ function collectRxMedicines() {
     var v = (inputs[i].value || '').trim();
     if (v) lines.push(v);
   }
-  return lines.join('\n');
+  return lines.join('\\n');
 }
 function updateRxTotal() {
   var med = parseFloat(document.getElementById('telRxMedTotal').value || '0') || 0;
@@ -2386,7 +2386,7 @@ function loadSchedTelemed(dateKey) {
       '</tr>';
     }
     html += '</tbody></table></div>' +
-      '<div style="text-align:right;margin-top:6px;"><a href="#" onclick="switchTab(\'telemedicine\');return false;" style="font-size:12px;color:#9a3412;">Open Telemedicine tab &rarr;</a></div>';
+      '<div style="text-align:right;margin-top:6px;"><a href="#" onclick="switchTab(\\'telemedicine\\');return false;" style="font-size:12px;color:#9a3412;">Open Telemedicine tab &rarr;</a></div>';
     el.innerHTML = html;
   }).catch(function() {
     el.innerHTML = '<div class="empty">Error loading.</div>';

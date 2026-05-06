@@ -4036,6 +4036,30 @@ export function indexPage(env: Env, bookingSource?: string): string {
     // disappears at midnight. Cheap endpoint, no DB reads.
     setInterval(refreshTelemedicineStatus, 60000);
 
+    // While the telemedicine modal is open we hide the other banners
+    // (no-slots, choice, Spinola/Kevin alternates) so the user isn't
+    // distracted. We re-show whatever was visible if they cancel out.
+    var _telemedHidden = [];
+    function hideOtherBookingBanners() {
+      _telemedHidden = [];
+      var ids = ['noSlotsBanner', 'choiceBanner', 'spinolaInline', 'kevinNextSection'];
+      for (var i = 0; i < ids.length; i++) {
+        var el = document.getElementById(ids[i]);
+        if (!el) continue;
+        var prev = el.style.display;
+        if (prev !== 'none' && el.offsetParent !== null) {
+          _telemedHidden.push({ el: el, prev: prev });
+          el.style.display = 'none';
+        }
+      }
+    }
+    function restoreOtherBookingBanners() {
+      for (var i = 0; i < _telemedHidden.length; i++) {
+        _telemedHidden[i].el.style.display = _telemedHidden[i].prev;
+      }
+      _telemedHidden = [];
+    }
+
     function openTelemedicineModal() {
       if (!_telemedicineOpen) {
         // Defensive: button only shown when open, but in case of a race
@@ -4056,12 +4080,14 @@ export function indexPage(env: Env, bookingSource?: string): string {
       if (emailEl && emailEl.value) document.getElementById('telemedEmail').value = emailEl.value;
       if (commentsEl && commentsEl.value) document.getElementById('telemedComments').value = commentsEl.value;
       document.getElementById('telemedError').textContent = '';
+      hideOtherBookingBanners();
       var ov = document.getElementById('telemedicineOverlay');
       ov.style.display = 'flex';
     }
     function closeTelemedicineModal() {
       var ov = document.getElementById('telemedicineOverlay');
       ov.style.display = 'none';
+      restoreOtherBookingBanners();
     }
     async function submitTelemedicineCall() {
       var btn = document.getElementById('telemedSubmitBtn');
@@ -4083,13 +4109,26 @@ export function indexPage(env: Env, bookingSource?: string): string {
         });
         var data = await res.json();
         if (data && data.ok) {
-          closeTelemedicineModal();
-          // Reuse the existing confirmation modal so the success flow looks
-          // identical to a regular booking confirmation.
-          var ct = document.getElementById('confirmText');
-          if (ct) ct.textContent = data.message || ('Telemedicine call booked. The doctor will call you on ' + phone + ' between 8pm and midnight. Fee: €25.');
-          var co = document.getElementById('confirmOverlay');
-          if (co) co.style.display = 'flex';
+          // Close our modal first (this also restores hidden banners — but
+          // showConfirmModal triggers goToExecAfterBooking_ which calls
+          // init(), giving us a full reset back to the splash-able state).
+          var ov = document.getElementById('telemedicineOverlay');
+          ov.style.display = 'none';
+          _telemedHidden = []; // don't restore; init() will redraw everything
+
+          var msg = data.message || ('Telemedicine call booked. The doctor will call you on ' + phone + ' between 8pm and midnight. Fee: €25.');
+          // Use the existing confirm modal so the auto-close + form reset
+          // behaviour matches every other booking flow on this page.
+          if (typeof showConfirmModal === 'function') {
+            showConfirmModal(msg);
+          } else {
+            var ct = document.getElementById('confirmText');
+            if (ct) ct.textContent = msg;
+            var co = document.getElementById('confirmOverlay');
+            if (co) co.style.display = 'flex';
+            // Fallback: reload after 5s if showConfirmModal isn't reachable.
+            setTimeout(function() { location.reload(); }, 5000);
+          }
         } else {
           err.textContent = (data && data.reason) || 'Could not book the call.';
         }
