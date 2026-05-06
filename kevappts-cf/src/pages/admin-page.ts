@@ -1581,10 +1581,14 @@ async function loadTelemedicineList() {
     var res = await apiCall('telemedicine?date=' + encodeURIComponent(dateKey));
     if (!res || !res.ok) { listEl.innerHTML = '<div class="empty">Failed to load.</div>'; return; }
     var calls = res.calls || [];
+    // Lead with the DOCTOR'S total (count × €25, no medicine). The
+    // combined patient bill is only relevant when admin is asking the
+    // patient to pay at the counter, so it's shown smaller, in muted
+    // grey, after the prominent doctor figure.
     sumEl.innerHTML = '<b>' + (res.billableCount || 0) + '</b> billable call(s) on ' + escTelHtml(dateKey) +
-      ' &middot; doctor fees <b>' + escTelHtml(res.totalRevenueLabel || '€0') + '</b>' +
-      ' &middot; medicine billed <b>' + escTelHtml(res.totalMedicineLabel || '€0') + '</b>' +
-      ' &middot; patients pay <b>' + escTelHtml(res.totalPatientLabel || '€0') + '</b> total';
+      ' &middot; <span style="font-size:15px;font-weight:800;color:#047857;">Doctor\\'s total: ' + escTelHtml(res.totalRevenueLabel || '€0') + '</span>' +
+      '<span style="display:block;margin-top:2px;color:#6b7280;font-size:12px;">Medicine billed ' + escTelHtml(res.totalMedicineLabel || '€0') +
+      ' &middot; combined patient bills ' + escTelHtml(res.totalPatientLabel || '€0') + ' (medicine + €25 each)</span>';
     if (!calls.length) {
       listEl.innerHTML = '<div class="empty">No telemedicine calls on this date.</div>';
       return;
@@ -1672,9 +1676,9 @@ async function saveTelemedMedicine(id) {
         if (listRes && listRes.ok) {
           var sumEl = document.getElementById('telDaySummary');
           if (sumEl) sumEl.innerHTML = '<b>' + (listRes.billableCount || 0) + '</b> billable call(s) on ' + escTelHtml(dateKey) +
-            ' &middot; doctor fees <b>' + escTelHtml(listRes.totalRevenueLabel || '€0') + '</b>' +
-            ' &middot; medicine billed <b>' + escTelHtml(listRes.totalMedicineLabel || '€0') + '</b>' +
-            ' &middot; patients pay <b>' + escTelHtml(listRes.totalPatientLabel || '€0') + '</b> total';
+            ' &middot; <span style="font-size:15px;font-weight:800;color:#047857;">Doctor\\'s total: ' + escTelHtml(listRes.totalRevenueLabel || '€0') + '</span>' +
+            '<span style="display:block;margin-top:2px;color:#6b7280;font-size:12px;">Medicine billed ' + escTelHtml(listRes.totalMedicineLabel || '€0') +
+            ' &middot; combined patient bills ' + escTelHtml(listRes.totalPatientLabel || '€0') + ' (medicine + €25 each)</span>';
         }
       } catch(e) {}
     }
@@ -4687,13 +4691,27 @@ function connectWS() {
     try {
       if (ev.data === 'pong' || ev.data === 'ping') return;
       var msg = JSON.parse(ev.data);
-      if (msg.type === 'slots_updated' || msg.type === 'slots_data' || msg.type === 'dashboard_data' || msg.type === 'appointment_changed') {
-        showLiveToast('New booking or schedule change detected');
+      var isTelemed = msg.type === 'telemedicine_updated';
+      if (isTelemed || msg.type === 'slots_updated' || msg.type === 'slots_data' || msg.type === 'dashboard_data' || msg.type === 'appointment_changed') {
+        showLiveToast(isTelemed ? 'New telemedicine call' : 'New booking or schedule change detected');
         playNotifSound();
         _silentRefresh = true;
         if (typeof loadDashboard === 'function') loadDashboard();
         if (document.getElementById('tab-followups').style.display !== 'none') loadAdminFollowUps();
         if (document.getElementById('tab-referrals').style.display !== 'none') loadReferrals();
+        // Telemedicine sections live in two places: the dedicated tab
+        // and the schedule-view subsection. Refresh whichever is visible.
+        try {
+          if (typeof loadTelemedicineStats === 'function') loadTelemedicineStats();
+          var telTab = document.getElementById('tab-telemedicine');
+          if (telTab && telTab.style.display !== 'none' && typeof loadTelemedicineList === 'function') {
+            loadTelemedicineList();
+          }
+          var schedTab = document.getElementById('tab-schedule');
+          if (schedTab && schedTab.style.display !== 'none' && typeof loadSchedTelemed === 'function') {
+            loadSchedTelemed(_schedDate || telTodayKey());
+          }
+        } catch(e) {}
         var lastEl = document.getElementById('refreshLastText');
         if (lastEl) lastEl.textContent = 'Live update received';
         _lastRefreshTime = Date.now();

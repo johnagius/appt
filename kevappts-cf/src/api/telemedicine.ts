@@ -43,6 +43,40 @@ function json(data: any, status = 200): Response {
   });
 }
 
+// Push a "telemedicine_updated" event over the realtime hub. Admin and doctor
+// pages listen for this and refresh their telemedicine sections so a new
+// booking from the public page appears live without a manual reload.
+async function broadcastTelemedicine(env: Env, dateKey: string): Promise<void> {
+  try {
+    const id = env.REALTIME.idFromName('global');
+    const stub = env.REALTIME.get(id);
+    // Send BOTH a dedicated event (for telemed-aware clients) AND the
+    // generic slots_updated event so existing dashboards still know to
+    // refresh — they already listen for that.
+    await stub.fetch('http://internal/broadcast', {
+      method: 'POST',
+      body: JSON.stringify({ type: 'telemedicine_updated', dateKey }),
+    });
+    await stub.fetch('http://internal/broadcast', {
+      method: 'POST',
+      body: JSON.stringify({ type: 'slots_updated', dateKey }),
+    });
+  } catch (e) {
+    console.error('Telemedicine broadcast error:', e);
+  }
+}
+
+// Fire-and-forget wrapper. Uses waitUntil when available so the API
+// response is returned immediately and the broadcast runs after.
+function pushTelemedicineUpdate(env: Env, dateKey: string): void {
+  const ctx = (globalThis as any).__ctx;
+  if (ctx?.waitUntil) {
+    ctx.waitUntil(broadcastTelemedicine(env, dateKey));
+  } else {
+    broadcastTelemedicine(env, dateKey).catch(() => {});
+  }
+}
+
 async function requireAdmin(req: Request, env: Env): Promise<Response | null> {
   const url = new URL(req.url);
   const sig = (url.searchParams.get('sig') || '').trim();
@@ -174,6 +208,7 @@ export async function apiAdminDeleteTelemedicine(req: Request, env: Env): Promis
   if (!existing) return json({ ok: false, reason: 'Call not found' }, 404);
 
   await deleteTelemedicineCall(env.DB, id);
+  pushTelemedicineUpdate(env, existing.date_key);
   return json({ ok: true });
 }
 
@@ -188,6 +223,8 @@ export async function apiAdminMarkTelemedicineStatus(req: Request, env: Env): Pr
     return json({ ok: false, reason: 'Invalid id or status' }, 400);
   }
   await updateTelemedicineCallStatus(env.DB, id, status, nowIso(env.TIMEZONE));
+  const updated = await getTelemedicineCallById(env.DB, id);
+  if (updated) pushTelemedicineUpdate(env, updated.date_key);
   return json({ ok: true });
 }
 
@@ -206,6 +243,7 @@ export async function apiAdminSetTelemedicineMedicines(req: Request, env: Env): 
   if (!existing) return json({ ok: false, reason: 'Call not found' }, 404);
 
   await updateTelemedicineMedicines(env.DB, id, medicines, nowIso(env.TIMEZONE));
+  pushTelemedicineUpdate(env, existing.date_key);
   return json({ ok: true });
 }
 
@@ -266,6 +304,7 @@ export async function apiAdminSendTelemedicinePrescription(req: Request, env: En
   }
 
   await markTelemedicinePrescriptionSent(env.DB, id, now);
+  pushTelemedicineUpdate(env, existing.date_key);
 
   const fee = existing.fee_cents || 0;
   const patientTotal = fee + medicineCents;
@@ -310,6 +349,7 @@ export async function apiAdminSetTelemedicineMedicine(req: Request, env: Env): P
   if (!existing) return json({ ok: false, reason: 'Call not found' }, 404);
 
   await updateTelemedicineMedicine(env.DB, id, cents, nowIso(env.TIMEZONE));
+  pushTelemedicineUpdate(env, existing.date_key);
   const fee = existing.fee_cents || 0;
   const patientTotal = fee + cents;
   return json({
@@ -381,6 +421,11 @@ async function doInsertCall(env: Env, opts: {
   };
 
   await insertTelemedicineCall(env.DB, call);
+  // Push a realtime update synchronously BEFORE the response is returned
+  // so admin and doctor pages already-listening on the WebSocket can
+  // refresh as soon as the booking lands. The broadcast itself is small
+  // and fast; the email send below is deferred via waitUntil.
+  pushTelemedicineUpdate(env, call.date_key);
 
   // Fire-and-forget email notifications. Use waitUntil so the response is
   // returned immediately, matching the rest of the booking flow.

@@ -1663,16 +1663,25 @@ function connectWS() {
   _ws.onmessage = function(ev) {
     try {
       var msg = JSON.parse(ev.data);
-      if (msg.type === 'slots_updated' || msg.type === 'slots_data' || msg.type === 'dashboard_data') {
+      var isTelemed = msg.type === 'telemedicine_updated';
+      if (isTelemed || msg.type === 'slots_updated' || msg.type === 'slots_data' || msg.type === 'dashboard_data') {
         var toast = document.getElementById('liveToast');
         var toastTxt = document.getElementById('liveToastText');
         if (toast && toastTxt) {
-          toastTxt.textContent = 'Schedule updated \u2014 new booking or change';
+          toastTxt.textContent = isTelemed ? 'New telemedicine call' : 'Schedule updated \u2014 new booking or change';
           toast.style.display = 'block'; toast.style.opacity = '1';
           setTimeout(function(){ toast.style.opacity = '0'; setTimeout(function(){ toast.style.display = 'none'; }, 300); }, 4000);
         }
         playNotifSound();
-        if (!_idlePaused && !_refreshInFlight) {
+        // Always refresh the telemedicine section \u2014 it's independent of
+        // the slot-based appointment data and has its own date selector.
+        if (typeof loadTelemedDay === 'function') {
+          try { loadTelemedDay(); } catch(e) {}
+        }
+        // Skip the heavy schedule reload when ONLY telemedicine changed \u2014
+        // the morning/evening session lists don't include telemed calls,
+        // so a full reloadAll would be wasted work.
+        if (!isTelemed && !_idlePaused && !_refreshInFlight) {
           _refreshInFlight = true;
           _cachedDateAppointments = {};
           reloadAll().catch(function(){}).finally(function(){ _refreshInFlight = false; });
