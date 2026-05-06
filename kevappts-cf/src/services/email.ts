@@ -676,14 +676,14 @@ export async function sendTelemedicinePatientEmail(env: Env, call: TelemedicineC
   const subject = `Telemedicine call confirmed (${call.date_key})`;
   const html = `
 <div style="font-family:Arial,sans-serif;line-height:1.5;color:#111827;max-width:520px;">
-  <h2 style="margin:0 0 12px 0;font-size:18px;">Your telemedicine call is booked</h2>
-  <p style="margin:0 0 12px 0;font-size:15px;">Thanks ${escapeHtml((call.patient_name || '').split(' ')[0] || 'there')}—the doctor will phone you on <b>${escapeHtml(call.phone)}</b> as soon as they’re free this evening (between 8pm and midnight).</p>
+  <h2 style="margin:0 0 12px 0;font-size:18px;">Your telemedicine booking is confirmed</h2>
+  <p style="margin:0 0 12px 0;font-size:15px;">Thanks ${escapeHtml((call.patient_name || '').split(' ')[0] || 'there')} — please speak to the pharmacist at Potter&apos;s Pharmacy. They will arrange your telemedicine call with the doctor.</p>
   <table style="border-collapse:collapse;width:100%;max-width:520px;">
     <tr><td style="padding:6px 0;color:#6b7280;width:140px;">Date</td><td style="padding:6px 0;"><b>${escapeHtml(call.date_key)}</b></td></tr>
-    <tr><td style="padding:6px 0;color:#6b7280;">Service</td><td style="padding:6px 0;"><b>Telemedicine call</b></td></tr>
-    <tr><td style="padding:6px 0;color:#6b7280;">Fee</td><td style="padding:6px 0;"><b>${feeLabel(call.fee_cents)}</b> (paid to doctor on the call)</td></tr>
+    <tr><td style="padding:6px 0;color:#6b7280;">Service</td><td style="padding:6px 0;"><b>Telemedicine call (8pm–midnight)</b></td></tr>
+    <tr><td style="padding:6px 0;color:#6b7280;">Fee</td><td style="padding:6px 0;"><b>${feeLabel(call.fee_cents)}</b> (paid to the doctor on the call)</td></tr>
   </table>
-  <p style="margin:16px 0 0 0;color:#6b7280;font-size:13px;">If you no longer need the call, please reply to this email so the doctor isn’t calling unnecessarily.</p>
+  <p style="margin:16px 0 0 0;color:#6b7280;font-size:13px;">If you no longer need the call, please let the pharmacist know so the doctor isn&apos;t contacted unnecessarily.</p>
 </div>`;
   await sendEmail(env, call.email, subject, html);
 }

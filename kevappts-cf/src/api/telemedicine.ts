@@ -408,6 +408,9 @@ async function doInsertCall(env: Env, opts: {
     dateKey: call.date_key,
     feeCents: call.fee_cents,
     feeLabel: '€25',
-    message: 'Telemedicine call booked. The doctor will phone you on ' + call.phone + ' between 8pm and midnight.',
+    // Don't echo the patient's phone number back on screen — the actual
+    // call is placed by the pharmacist, not directly from the doctor to
+    // the patient. Tell the patient to speak to the pharmacist instead.
+    message: 'Telemedicine booking confirmed. Please speak to the pharmacist who will arrange your call with the doctor. Fee: €25 (paid to the doctor on the call).',
   });
 }

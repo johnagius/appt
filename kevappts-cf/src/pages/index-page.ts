@@ -4060,6 +4060,18 @@ export function indexPage(env: Env, bookingSource?: string): string {
       _telemedHidden = [];
     }
 
+    function clearTelemedicineForm() {
+      // Wipe every field — must run after every successful booking and
+      // every modal open so a previous patient's name / phone / email
+      // never lingers on a shared kiosk (data protection).
+      var ids = ['telemedName', 'telemedPhone', 'telemedEmail', 'telemedComments'];
+      for (var i = 0; i < ids.length; i++) {
+        var el = document.getElementById(ids[i]);
+        if (el) el.value = '';
+      }
+      var err = document.getElementById('telemedError');
+      if (err) err.textContent = '';
+    }
     function openTelemedicineModal() {
       if (!_telemedicineOpen) {
         // Defensive: button only shown when open, but in case of a race
@@ -4067,11 +4079,15 @@ export function indexPage(env: Env, bookingSource?: string): string {
         showMsg('bad', 'Telemedicine bookings are open between 8pm and midnight only.');
         return;
       }
+      // Always start fresh — no stale data from a previous session.
+      clearTelemedicineForm();
       var nameEl = document.getElementById('fullName');
       var phoneEl = document.getElementById('phone');
       var emailEl = document.getElementById('email');
       var commentsEl = document.getElementById('comments');
-      // Pre-fill from the regular booking form if the user has already started typing.
+      // Pre-fill from the regular booking form ONLY if the user has just
+      // typed there in this session. After a successful booking the main
+      // form is cleared too, so this won't carry data across patients.
       if (nameEl && nameEl.value) document.getElementById('telemedName').value = nameEl.value;
       if (phoneEl && phoneEl.value) {
         var dial = (document.getElementById('dialCode') && document.getElementById('dialCode').textContent) || '';
@@ -4079,7 +4095,6 @@ export function indexPage(env: Env, bookingSource?: string): string {
       }
       if (emailEl && emailEl.value) document.getElementById('telemedEmail').value = emailEl.value;
       if (commentsEl && commentsEl.value) document.getElementById('telemedComments').value = commentsEl.value;
-      document.getElementById('telemedError').textContent = '';
       hideOtherBookingBanners();
       // The overlay starts at opacity:0 with a transition. Just setting
       // display:flex leaves it invisible-but-on-top, so the user types into
@@ -4109,6 +4124,9 @@ export function indexPage(env: Env, bookingSource?: string): string {
         ov.classList.remove('show');
         setTimeout(function() { ov.style.display = 'none'; }, 200);
       }
+      // Clear so a Cancel never leaves a previous patient's data behind
+      // (data protection on a shared kiosk).
+      clearTelemedicineForm();
       restoreOtherBookingBanners();
     }
     async function submitTelemedicineCall() {
@@ -4131,6 +4149,9 @@ export function indexPage(env: Env, bookingSource?: string): string {
         });
         var data = await res.json();
         if (data && data.ok) {
+          // Wipe the modal form IMMEDIATELY so no patient details linger,
+          // even before the close animation finishes (data protection).
+          clearTelemedicineForm();
           // Close our modal cleanly (matches the .show + transition flow
           // used everywhere else). showConfirmModal then runs init() which
           // resets the page to the post-booking state.
@@ -4139,7 +4160,7 @@ export function indexPage(env: Env, bookingSource?: string): string {
           else { ov.classList.remove('show'); setTimeout(function() { ov.style.display = 'none'; }, 200); }
           _telemedHidden = []; // don't restore; init() will redraw everything
 
-          var msg = data.message || ('Telemedicine call booked. The doctor will call you on ' + phone + ' between 8pm and midnight. Fee: €25.');
+          var msg = data.message || 'Telemedicine booking confirmed. Please speak to the pharmacist who will arrange your call with the doctor. Fee: €25 (paid to the doctor on the call).';
           if (typeof showConfirmModal === 'function') {
             showConfirmModal(msg);
           } else {
