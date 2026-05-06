@@ -1731,10 +1731,19 @@ async function addTelemedicineCall() {
 }
 async function markTelemedicineStatus(id, status) {
   try {
-    await apiCall('telemedicine-status', { body: { id: id, status: status } });
+    var res = await apiCall('telemedicine-status', { body: { id: id, status: status } });
+    if (res && res.ok) {
+      // Visible toast so the user knows the click registered, plus the
+      // row will re-render with the new status from the reload below.
+      showLiveToast('Marked ' + status.toLowerCase());
+    } else {
+      showLiveToast('Could not update status');
+    }
     loadTelemedicineStats();
     loadTelemedicineList();
-  } catch(e) {}
+  } catch(e) {
+    showLiveToast('Network error');
+  }
 }
 // ── Prescription modal ──────────────────────────────────
 var _telRxCurrent = null;  // currently-edited call object
@@ -1764,11 +1773,28 @@ function openTelPrescription(callId) {
     for (var i = 0; i < lines.length; i++) addRxMedicineRow(lines[i]);
     updateRxTotal();
     document.getElementById('telRxSendBtn').disabled = !c.email;
-    document.getElementById('telPrescriptionOverlay').style.display = 'flex';
+    // Same overlay pattern the patient-history modal uses — set display
+    // first, then add .show on the next frame so the opacity transition
+    // runs and the inputs can take focus.
+    var ov = document.getElementById('telPrescriptionOverlay');
+    ov.style.display = 'flex';
+    requestAnimationFrame(function() { requestAnimationFrame(function() { ov.classList.add('show'); }); });
+    // Focus the medicine total field — most common edit. (Use a small
+    // timeout so the show transition has started.)
+    setTimeout(function() {
+      var first = document.querySelector('#telRxMedicineList input');
+      if (first && !first.value) try { first.focus(); } catch(e) {}
+      else {
+        var med = document.getElementById('telRxMedTotal');
+        if (med) try { med.focus(); med.select && med.select(); } catch(e) {}
+      }
+    }, 80);
   });
 }
 function closeTelPrescription() {
-  document.getElementById('telPrescriptionOverlay').style.display = 'none';
+  var ov = document.getElementById('telPrescriptionOverlay');
+  ov.classList.remove('show');
+  setTimeout(function() { ov.style.display = 'none'; }, 200);
   _telRxCurrent = null;
 }
 function addRxMedicineRow(value) {
@@ -1877,10 +1903,15 @@ async function deleteTelemedicineCall(id) {
     });
     var data = await res.json();
     if (data && data.ok) {
+      showLiveToast('Call deleted');
       loadTelemedicineStats();
       loadTelemedicineList();
+    } else {
+      showLiveToast('Delete failed');
     }
-  } catch(e) {}
+  } catch(e) {
+    showLiveToast('Network error');
+  }
 }
 
 // ─── Linda (Physiotherapy) admin ─────────────────────────────

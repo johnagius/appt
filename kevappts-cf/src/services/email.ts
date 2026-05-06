@@ -649,8 +649,50 @@ function feeLabel(cents: number): string {
   return '€' + eur;
 }
 
-export async function sendTelemedicineDoctorEmail(env: Env, call: TelemedicineCallSummary): Promise<void> {
-  const subject = `Telemedicine call: ${call.patient_name} (${call.date_key} ${call.created_at.split(' ')[1] || ''})`;
+// Used to render the day-list inside the doctor notification email so
+// every booking also shows the running total for the evening.
+export interface TelemedicineDayEntry {
+  patient_name: string;
+  phone: string;
+  email: string;
+  comments: string;
+  fee_cents: number;
+  status: string;
+  source: string;
+  created_at: string;
+}
+
+export async function sendTelemedicineDoctorEmail(
+  env: Env,
+  call: TelemedicineCallSummary,
+  dayList: TelemedicineDayEntry[] = [],
+): Promise<void> {
+  // Doctor's running total for the day. Cancelled calls excluded so the
+  // figure matches the admin/doctor dashboards.
+  const billable = dayList.filter(c => c.status !== 'CANCELLED');
+  const dayCount = billable.length;
+  const dayTotal = billable.reduce((s, c) => s + (c.fee_cents || 0), 0);
+
+  let dayRowsHtml = '';
+  for (const c of billable) {
+    const t = (c.created_at || '').split(' ')[1] || '';
+    const time = t.split(':').slice(0, 2).join(':');
+    const isCurrent = c.created_at === call.created_at && c.patient_name === call.patient_name && c.phone === call.phone;
+    const rowBg = isCurrent ? 'background:#fff7ed;' : '';
+    dayRowsHtml += `
+      <tr style="${rowBg}">
+        <td style="padding:8px;border-bottom:1px solid #e5e7eb;">${escapeHtml(time)}${isCurrent ? ' <span style="font-size:10px;color:#9a3412;font-weight:800;">NEW</span>' : ''}</td>
+        <td style="padding:8px;border-bottom:1px solid #e5e7eb;"><b>${escapeHtml(c.patient_name)}</b></td>
+        <td style="padding:8px;border-bottom:1px solid #e5e7eb;">${escapeHtml(c.phone)}</td>
+        <td style="padding:8px;border-bottom:1px solid #e5e7eb;">${escapeHtml(c.email || '—')}</td>
+        <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:right;white-space:nowrap;">${feeLabel(c.fee_cents)}</td>
+      </tr>`;
+  }
+  if (!dayRowsHtml) {
+    dayRowsHtml = '<tr><td colspan="5" style="padding:8px;color:#6b7280;">No billable calls on this date.</td></tr>';
+  }
+
+  const subject = `Telemedicine call: ${call.patient_name} (${call.date_key} ${call.created_at.split(' ')[1] || ''}) — €${(dayTotal / 100).toFixed(2)} today`;
   const html = `
 <div style="font-family:Arial,sans-serif;line-height:1.4;color:#111827;">
   <h2 style="margin:0 0 10px 0;">New Telemedicine Call</h2>
@@ -665,7 +707,31 @@ export async function sendTelemedicineDoctorEmail(env: Env, call: TelemedicineCa
     <tr><td style="padding:6px 0;color:#6b7280;">Booked via</td><td style="padding:6px 0;"><b>${escapeHtml(call.source === 'admin' ? 'Admin entry' : 'Patient booking page')}</b></td></tr>
     ${call.comments ? `<tr><td style="padding:6px 0;color:#6b7280;vertical-align:top;">Notes</td><td style="padding:6px 0;">${escapeHtml(call.comments)}</td></tr>` : ''}
   </table>
-  <p style="margin:16px 0 0 0;color:#6b7280;font-size:13px;">Please call the patient on the number above. Telemedicine calls run 8pm–midnight at the flat rate of €25.</p>
+
+  <h3 style="margin:18px 0 8px 0;font-size:15px;">All telemedicine calls for ${escapeHtml(call.date_key)}</h3>
+  <table style="border-collapse:collapse;width:100%;max-width:680px;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;">
+    <thead>
+      <tr style="background:#f9fafb;">
+        <th style="padding:8px;text-align:left;font-size:12px;color:#6b7280;border-bottom:1px solid #e5e7eb;">Time</th>
+        <th style="padding:8px;text-align:left;font-size:12px;color:#6b7280;border-bottom:1px solid #e5e7eb;">Patient</th>
+        <th style="padding:8px;text-align:left;font-size:12px;color:#6b7280;border-bottom:1px solid #e5e7eb;">Phone</th>
+        <th style="padding:8px;text-align:left;font-size:12px;color:#6b7280;border-bottom:1px solid #e5e7eb;">Email</th>
+        <th style="padding:8px;text-align:right;font-size:12px;color:#6b7280;border-bottom:1px solid #e5e7eb;">Fee</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${dayRowsHtml}
+    </tbody>
+    <tfoot>
+      <tr style="background:#ecfdf5;">
+        <td colspan="4" style="padding:10px 8px;font-weight:800;color:#065f46;">Doctor's total today (${dayCount} call${dayCount === 1 ? '' : 's'})</td>
+        <td style="padding:10px 8px;text-align:right;font-weight:900;color:#047857;font-size:15px;">€${(dayTotal / 100).toFixed(2)}</td>
+      </tr>
+    </tfoot>
+  </table>
+  <p style="margin:8px 0 0 0;font-size:11px;color:#9ca3af;">Doctor's total counts the flat €25 fee per call only — never the medicine the patient buys at the pharmacy.</p>
+
+  <p style="margin:16px 0 0 0;color:#6b7280;font-size:13px;">Telemedicine calls run 8pm–midnight at the flat rate of €25. Please refer the patient to the pharmacist who will arrange the call.</p>
 </div>`;
 
   await sendEmail(env, TELEMEDICINE_RECIPIENT, subject, html);

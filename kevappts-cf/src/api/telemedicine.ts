@@ -428,11 +428,18 @@ async function doInsertCall(env: Env, opts: {
   pushTelemedicineUpdate(env, call.date_key);
 
   // Fire-and-forget email notifications. Use waitUntil so the response is
-  // returned immediately, matching the rest of the booking flow.
+  // returned immediately, matching the rest of the booking flow. Each
+  // notification email includes the full table for the day plus the
+  // running doctor's total — so the latest email always shows where the
+  // doctor stands for the evening.
   const ctx = (globalThis as any).__ctx;
   const sendEmails = async () => {
+    let dayList: TelemedicineCall[] = [];
     try {
-      await sendTelemedicineDoctorEmail(env, call);
+      dayList = await getTelemedicineCallsByDate(env.DB, call.date_key);
+    } catch (e) { console.error('Telemed day-list fetch error:', e); }
+    try {
+      await sendTelemedicineDoctorEmail(env, call, dayList);
     } catch (e) { console.error('Telemed doctor email error:', e); }
     if (!opts.skipPatientEmail) {
       try {
