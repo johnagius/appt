@@ -4081,12 +4081,34 @@ export function indexPage(env: Env, bookingSource?: string): string {
       if (commentsEl && commentsEl.value) document.getElementById('telemedComments').value = commentsEl.value;
       document.getElementById('telemedError').textContent = '';
       hideOtherBookingBanners();
+      // The overlay starts at opacity:0 with a transition. Just setting
+      // display:flex leaves it invisible-but-on-top, so the user types into
+      // the page below and the auto-refresh re-renders the banners. Use
+      // showOverlay so the .show class is added → opacity:1 → focus works.
       var ov = document.getElementById('telemedicineOverlay');
-      ov.style.display = 'flex';
+      if (typeof showOverlay === 'function') {
+        showOverlay(ov);
+      } else {
+        ov.style.display = 'flex';
+        requestAnimationFrame(function() { requestAnimationFrame(function() { ov.classList.add('show'); }); });
+      }
+      // Move keyboard focus into the first empty field so the user can type
+      // straight away.
+      setTimeout(function() {
+        var first = ['telemedName', 'telemedPhone', 'telemedEmail', 'telemedComments']
+          .map(function(id) { return document.getElementById(id); })
+          .find(function(el) { return el && !el.value; });
+        if (first) try { first.focus(); } catch (e) {}
+      }, 60);
     }
     function closeTelemedicineModal() {
       var ov = document.getElementById('telemedicineOverlay');
-      ov.style.display = 'none';
+      if (typeof hideOverlay === 'function') {
+        hideOverlay(ov);
+      } else {
+        ov.classList.remove('show');
+        setTimeout(function() { ov.style.display = 'none'; }, 200);
+      }
       restoreOtherBookingBanners();
     }
     async function submitTelemedicineCall() {
@@ -4109,24 +4131,22 @@ export function indexPage(env: Env, bookingSource?: string): string {
         });
         var data = await res.json();
         if (data && data.ok) {
-          // Close our modal first (this also restores hidden banners — but
-          // showConfirmModal triggers goToExecAfterBooking_ which calls
-          // init(), giving us a full reset back to the splash-able state).
+          // Close our modal cleanly (matches the .show + transition flow
+          // used everywhere else). showConfirmModal then runs init() which
+          // resets the page to the post-booking state.
           var ov = document.getElementById('telemedicineOverlay');
-          ov.style.display = 'none';
+          if (typeof hideOverlay === 'function') hideOverlay(ov);
+          else { ov.classList.remove('show'); setTimeout(function() { ov.style.display = 'none'; }, 200); }
           _telemedHidden = []; // don't restore; init() will redraw everything
 
           var msg = data.message || ('Telemedicine call booked. The doctor will call you on ' + phone + ' between 8pm and midnight. Fee: €25.');
-          // Use the existing confirm modal so the auto-close + form reset
-          // behaviour matches every other booking flow on this page.
           if (typeof showConfirmModal === 'function') {
             showConfirmModal(msg);
           } else {
             var ct = document.getElementById('confirmText');
             if (ct) ct.textContent = msg;
             var co = document.getElementById('confirmOverlay');
-            if (co) co.style.display = 'flex';
-            // Fallback: reload after 5s if showConfirmModal isn't reachable.
+            if (co) { co.style.display = 'flex'; co.classList.add('show'); }
             setTimeout(function() { location.reload(); }, 5000);
           }
         } else {
