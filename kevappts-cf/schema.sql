@@ -160,6 +160,22 @@ CREATE TABLE IF NOT EXISTS linda_off (
 );
 CREATE INDEX IF NOT EXISTS idx_linda_off_date ON linda_off(date_key);
 
+-- Linda partial-day blocks. Distinct from linda_off (which always blocks the
+-- whole date) so the data model stays unambiguous: a row here ALWAYS has both
+-- start_time and end_time and only knocks out slots in that range. Multiple
+-- rows per date are allowed. Existing bookings inside the range are NOT
+-- cancelled — Linda will reschedule them via the normal flow, same as
+-- full-day off.
+CREATE TABLE IF NOT EXISTS linda_block (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  date_key TEXT NOT NULL,
+  start_time TEXT NOT NULL,
+  end_time TEXT NOT NULL,
+  reason TEXT DEFAULT '',
+  created_at TEXT DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS idx_linda_block_date ON linda_block(date_key);
+
 -- Telemedicine calls (8pm-midnight phone consults, EUR 25 flat fee).
 -- Tracked separately from appointments because they have no slot, no
 -- doctor-off interaction, no calendar event — just a simple log of who

@@ -13,7 +13,7 @@
 import type { Env, Appointment } from '../types';
 import { computeLindaSig, verifyLindaSig, verifyAdminSig } from '../services/crypto';
 import { todayKeyLocal, nowIso, nowMinutesLocal, parseTimeToMinutes, toDateKey, todayLocal } from '../services/utils';
-import { buildLindaSlots, getLindaExtrasForDate, isLindaDayOff, loadLindaConfig } from '../services/linda';
+import { buildLindaSlots, getLindaBlocksForDate, getLindaExtrasForDate, isLindaDayOff, loadLindaConfig } from '../services/linda';
 import { getTakenSlots, bumpVersion, getAppointmentById, isSlotTaken, updateAppointmentStatus, insertAppointment, getOrCreateClient } from '../db/queries';
 import { generateId } from '../services/crypto';
 import { createCalendarEvent, deleteCalendarEvent } from '../services/calendar';
@@ -198,7 +198,8 @@ export async function apiLindaSlots(req: Request, env: Env): Promise<Response> {
   const cfg = await loadLindaConfig(env.DB);
   const extras = await getLindaExtrasForDate(env.DB, dateKey);
   const off = await isLindaDayOff(env.DB, dateKey);
-  const baseSlots = buildLindaSlots(dateKey, cfg, extras, off);
+  const blocks = await getLindaBlocksForDate(env.DB, dateKey);
+  const baseSlots = buildLindaSlots(dateKey, cfg, extras, off, blocks);
 
   const tz = env.TIMEZONE;
   const todayKey = todayKeyLocal(tz);
@@ -213,7 +214,7 @@ export async function apiLindaSlots(req: Request, env: Env): Promise<Response> {
   });
 
   const isWorkingDay = baseSlots.length > 0;
-  return json({ ok: true, dateKey, slots, isWorkingDay, extras, dayOff: off });
+  return json({ ok: true, dateKey, slots, isWorkingDay, extras, dayOff: off, blocks });
 }
 
 // ─── /api/linda-off ────────────────────────────────────────
@@ -287,6 +288,72 @@ export async function apiLindaDeleteOff(req: Request, env: Env): Promise<Respons
   const id = parseInt(url.searchParams.get('id') || '0', 10);
   if (!id) return json({ ok: false, reason: 'Missing id.' }, 400);
   await env.DB.prepare('DELETE FROM linda_off WHERE id = ?').bind(id).run();
+  await bumpVersion(env.DB);
+  return json({ ok: true });
+}
+
+// ─── /api/linda-blocks ─────────────────────────────────────
+// Partial-day blocks: ranges within a day where new bookings are blocked.
+// Distinct from linda_off (which blocks the entire date).
+
+export async function apiLindaListBlocks(req: Request, env: Env): Promise<Response> {
+  if (!await isLindaAuthed(req, env)) return json({ ok: false, reason: 'Access denied.' }, 403);
+  const todayKey = todayKeyLocal(env.TIMEZONE);
+  const rows = await env.DB.prepare(
+    'SELECT id, date_key, start_time, end_time, reason FROM linda_block WHERE date_key >= ? ORDER BY date_key, start_time'
+  ).bind(todayKey).all<{ id: number; date_key: string; start_time: string; end_time: string; reason: string }>();
+  return json({ ok: true, blocks: rows.results });
+}
+
+// POST /api/linda-blocks { dateKey, startTime, endTime, reason? }
+export async function apiLindaAddBlock(req: Request, env: Env): Promise<Response> {
+  if (!await isLindaAuthed(req, env)) return json({ ok: false, reason: 'Access denied.' }, 403);
+  const body: any = await req.json();
+  const dateKey = String(body.dateKey || '').trim();
+  const startTime = String(body.startTime || '').trim();
+  const endTime = String(body.endTime || '').trim();
+  const reason = String(body.reason || '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) return json({ ok: false, reason: 'Invalid date.' }, 400);
+  if (!/^\d{2}:\d{2}$/.test(startTime) || !/^\d{2}:\d{2}$/.test(endTime)) return json({ ok: false, reason: 'Invalid time.' }, 400);
+  if (parseTimeToMinutes(endTime) <= parseTimeToMinutes(startTime)) return json({ ok: false, reason: 'End must be after start.' }, 400);
+
+  // Count bookings that fall inside the blocked range so the UI can warn.
+  const apptRows = await env.DB.prepare(
+    "SELECT start_time FROM appointments WHERE clinic = 'linda' AND date_key = ? AND status NOT LIKE '%CANCELLED%'"
+  ).bind(dateKey).all<{ start_time: string }>();
+  const blockStart = parseTimeToMinutes(startTime);
+  const blockEnd = parseTimeToMinutes(endTime);
+  const affected = apptRows.results.filter(r => {
+    const m = parseTimeToMinutes(r.start_time);
+    return m >= blockStart && m < blockEnd;
+  }).length;
+
+  const now = nowIso(env.TIMEZONE);
+  const res = await env.DB.prepare(
+    'INSERT INTO linda_block (date_key, start_time, end_time, reason, created_at) VALUES (?, ?, ?, ?, ?)'
+  ).bind(dateKey, startTime, endTime, reason, now).run();
+
+  await bumpVersion(env.DB);
+
+  try {
+    const doId = env.REALTIME.idFromName('global');
+    const stub = env.REALTIME.get(doId);
+    await stub.fetch('http://internal/broadcast', {
+      method: 'POST',
+      body: JSON.stringify({ type: 'slots_updated', dateKey, clinic: 'linda' }),
+    });
+  } catch {}
+
+  return json({ ok: true, id: res.meta?.last_row_id, affectedBookings: affected });
+}
+
+// DELETE /api/linda-blocks?id=123
+export async function apiLindaDeleteBlock(req: Request, env: Env): Promise<Response> {
+  if (!await isLindaAuthed(req, env)) return json({ ok: false, reason: 'Access denied.' }, 403);
+  const url = new URL(req.url);
+  const id = parseInt(url.searchParams.get('id') || '0', 10);
+  if (!id) return json({ ok: false, reason: 'Missing id.' }, 400);
+  await env.DB.prepare('DELETE FROM linda_block WHERE id = ?').bind(id).run();
   await bumpVersion(env.DB);
   return json({ ok: true });
 }
@@ -608,9 +675,10 @@ export async function apiLindaReschedule(req: Request, env: Env): Promise<Respon
   const extras = await getLindaExtrasForDate(env.DB, dateKey);
   const off = await isLindaDayOff(env.DB, dateKey);
   if (off) return json({ ok: false, reason: "That date is marked as a day off — remove the day-off first or pick another date." }, 400);
-  const slots = buildLindaSlots(dateKey, cfg, extras, false);
+  const blocks = await getLindaBlocksForDate(env.DB, dateKey);
+  const slots = buildLindaSlots(dateKey, cfg, extras, false, blocks);
   const slotFound = slots.find(s => s.start === startTime);
-  if (!slotFound) return json({ ok: false, reason: "No hours set for this date \u2014 open availability for it first." }, 400);
+  if (!slotFound) return json({ ok: false, reason: "No hours set for this time \u2014 open availability or remove a block first." }, 400);
 
   // Don't bump into the same appointment itself; only reject if a DIFFERENT booking has it.
   if (await isSlotTaken(env.DB, dateKey, startTime, 'linda')) {
@@ -698,9 +766,10 @@ export async function apiLindaNewBooking(req: Request, env: Env): Promise<Respon
   const extras = await getLindaExtrasForDate(env.DB, dateKey);
   const off = await isLindaDayOff(env.DB, dateKey);
   if (off) return json({ ok: false, reason: "That date is marked as a day off — remove the day-off first or pick another date." }, 400);
-  const slots = buildLindaSlots(dateKey, cfg, extras, false);
+  const blocks = await getLindaBlocksForDate(env.DB, dateKey);
+  const slots = buildLindaSlots(dateKey, cfg, extras, false, blocks);
   const slotFound = slots.find(s => s.start === startTime);
-  if (!slotFound) return json({ ok: false, reason: "No hours set for this date \u2014 open availability for it first." }, 400);
+  if (!slotFound) return json({ ok: false, reason: "No hours set for this time \u2014 open availability or remove a block first." }, 400);
 
   if (await isSlotTaken(env.DB, dateKey, startTime, 'linda')) {
     return json({ ok: false, reason: 'That slot is already taken.' }, 400);
@@ -825,7 +894,8 @@ export async function apiLindaRescheduleDay(req: Request, env: Env): Promise<Res
   }
 
   const extras = await getLindaExtrasForDate(env.DB, toDateKey);
-  const targetSlots = buildLindaSlots(toDateKey, cfg, extras, false);
+  const targetBlocks = await getLindaBlocksForDate(env.DB, toDateKey);
+  const targetSlots = buildLindaSlots(toDateKey, cfg, extras, false, targetBlocks);
   if (!targetSlots.length) {
     return json({ ok: false, reason: 'Target date has no working hours. Open availability for it first.' }, 400);
   }
@@ -1273,13 +1343,43 @@ function lindaMainPage(env: Env): string {
   .avail-msg.bad{color:#dc2626;}
 
   /* Availability timeline (inspired by the admin-page bar) */
+  .tl-date-nav{display:flex;gap:6px;align-items:center;margin-bottom:4px;}
+  .tl-nav-btn{flex:0 0 auto;width:40px;min-height:44px;border:1px solid var(--line);background:#fff;border-radius:10px;font-size:20px;font-weight:800;cursor:pointer;color:var(--text);}
+  .tl-nav-btn:active{background:#f3f4f6;}
+  .tl-today-btn{flex:0 0 auto;height:44px;padding:0 12px;border:1px solid var(--accent);background:#ecfdf5;color:#065f46;border-radius:10px;font-size:12px;font-weight:800;cursor:pointer;}
+  .tl-today-btn:active{background:#d1fae5;}
   .tl-bar{position:relative;height:64px;background:#f3f4f6;border-radius:12px;border:1px solid var(--line);overflow:hidden;cursor:crosshair;touch-action:none;user-select:none;-webkit-user-select:none;}
   .tl-seg{position:absolute;top:0;bottom:0;pointer-events:none;}
   .tl-seg.base{background:var(--accent);opacity:0.55;}
   .tl-seg.extra{background:var(--accent);opacity:0.85;background-image:repeating-linear-gradient(45deg,transparent,transparent 5px,rgba(255,255,255,0.28) 5px,rgba(255,255,255,0.28) 10px);}
   .tl-seg.booked{background:#3730a3;opacity:0.9;}
   .tl-seg.off{background:var(--bad);opacity:0.65;background-image:repeating-linear-gradient(135deg,transparent,transparent 4px,rgba(255,255,255,0.35) 4px,rgba(255,255,255,0.35) 8px);}
+  .tl-seg.block{background:var(--bad);opacity:0.78;background-image:repeating-linear-gradient(45deg,transparent,transparent 4px,rgba(255,255,255,0.32) 4px,rgba(255,255,255,0.32) 8px);}
   .tl-seg.sel{background:#0ea5e9;opacity:0.8;border:2px solid #0369a1;border-radius:4px;z-index:5;}
+  .tl-action-row{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;}
+  .tl-action-btn{flex:1 1 0;min-width:130px;padding:13px 12px;border:none;border-radius:10px;font-size:14px;font-weight:800;cursor:pointer;min-height:46px;display:inline-flex;align-items:center;justify-content:center;gap:6px;transition:transform .18s var(--ease),opacity .18s ease;}
+  .tl-action-btn:active{transform:scale(.97);}
+  .tl-action-btn:disabled{opacity:.45;cursor:not-allowed;}
+  .tl-action-btn .tl-icon{font-size:16px;font-weight:900;}
+  .tl-action-btn.add{background:var(--accent);color:#fff;}
+  .tl-action-btn.add:active{background:#059669;}
+  .tl-action-btn.block{background:#fee2e2;color:#991b1b;border:1px solid #fecaca;}
+  .tl-action-btn.block:active{background:#fecaca;}
+  .tl-action-btn.block-full{background:var(--bad);color:#fff;flex:1 1 100%;}
+  .tl-action-btn.block-full:active{background:#b91c1c;}
+  .ovr-row{display:flex;align-items:center;justify-content:space-between;padding:12px;background:#f9fafb;border-radius:10px;margin-bottom:8px;gap:10px;animation:fadeUp .25s var(--ease) both;}
+  .ovr-tag{flex:0 0 auto;font-size:11px;font-weight:800;text-transform:uppercase;padding:4px 8px;border-radius:999px;letter-spacing:.4px;}
+  .ovr-tag.extra{background:#ecfdf5;color:#065f46;}
+  .ovr-tag.block{background:#fef2f2;color:#991b1b;}
+  .ovr-when{flex:1 1 auto;min-width:0;}
+  .ovr-when .top{font-size:14px;font-weight:800;}
+  .ovr-when .sub{font-size:12px;color:var(--muted);margin-top:2px;}
+  @media (prefers-color-scheme: dark){
+    .tl-nav-btn{background:#0f172a;color:#e2e8f0;border-color:#334155;}
+    .tl-today-btn{background:#022c22;color:#6ee7b7;border-color:#10b981;}
+    .ovr-row{background:#0f172a;}
+    .tl-action-btn.block{background:#450a0a;color:#fecaca;border-color:#7f1d1d;}
+  }
   .tl-ticks{display:flex;margin-top:2px;}
   .tl-tick{flex:1 1 0;text-align:center;font-size:10px;color:var(--muted);font-weight:700;letter-spacing:.4px;}
   .tl-legend{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;font-size:11px;color:var(--muted);}
@@ -1572,24 +1672,28 @@ function lindaMainPage(env: Env): string {
     </div>
 
     <div class="avail-card">
-      <h3>Day timeline</h3>
-      <p class="hint">Pick a day. Drag on the bar to select a time range, then tap <b>Add extra time</b>. Need to cancel the whole day? Use <b>Block full day</b> — patients won't be offered it.</p>
-      <div class="avail-row">
-        <label>Date</label>
-        <button type="button" class="date-btn empty" id="tlDateBtn" onclick="pickDate('tlDate', function(dk){ loadTimeline(); })"><span class="date-icon">📅</span><span class="date-val" id="tlDateLabel">Pick a date</span></button>
+      <h3>Daily availability</h3>
+      <p class="hint">Pick a day, then drag on the bar to pick a time range. Tap <b>Add extra time</b> to open extra hours, or <b>Block this time</b> to close just those hours. <b>Block full day</b> closes the whole day with no selection needed.</p>
+      <div class="tl-date-nav">
+        <button class="tl-nav-btn" onclick="navTimelineDay(-1)" aria-label="Previous day">‹</button>
+        <button type="button" class="date-btn empty" id="tlDateBtn" onclick="pickDate('tlDate', function(dk){ loadTimeline(); })" style="flex:1 1 auto;"><span class="date-icon">📅</span><span class="date-val" id="tlDateLabel">Pick a date</span></button>
+        <button class="tl-nav-btn" onclick="navTimelineDay(1)" aria-label="Next day">›</button>
+        <button class="tl-today-btn" onclick="goTimelineToday()">Today</button>
         <input type="hidden" id="tlDate">
       </div>
       <div id="tlContainer" style="margin-top:10px;"></div>
-      <div class="avail-row" style="margin-top:10px;gap:6px;flex-wrap:wrap;">
-        <button class="avail-save" style="flex:1 1 auto;min-width:120px;margin:0;background:var(--accent);" id="tlAddBtn" onclick="saveTimelineRange()" disabled>Add extra time</button>
-        <button class="avail-save" style="flex:1 1 auto;min-width:120px;margin:0;background:var(--bad);" onclick="blockTimelineDay()">Block full day</button>
+      <div class="tl-action-row">
+        <button class="tl-action-btn add" id="tlAddBtn" onclick="saveTimelineRange()" disabled><span class="tl-icon">＋</span>Add extra time</button>
+        <button class="tl-action-btn block" id="tlBlockBtn" onclick="saveTimelineBlock()" disabled><span class="tl-icon">⏸</span>Block this time</button>
+        <button class="tl-action-btn block-full" onclick="blockTimelineDay()"><span class="tl-icon">✕</span>Block full day</button>
       </div>
       <div class="avail-msg" id="tlMsg"></div>
     </div>
 
     <div class="avail-card">
-      <h3>Upcoming extra hours</h3>
-      <div id="extraList"><div class="empty" style="margin:0;border:none;padding:20px 0;">Loading…</div></div>
+      <h3>Active overrides</h3>
+      <p class="hint">All upcoming extras and partial-day blocks for Linda. Tap <b>Remove</b> to undo any of them.</p>
+      <div id="overridesList"><div class="empty" style="margin:0;border:none;padding:20px 0;">Loading…</div></div>
     </div>
   </div>
 </div>
@@ -1948,7 +2052,7 @@ function lindaMainPage(env: Env): string {
     $('tabDayBtn').classList.toggle('active', which === 'day');
     $('tabWeekBtn').classList.toggle('active', which === 'week');
     $('tabAvailBtn').classList.toggle('active', which === 'avail');
-    if (which === 'avail') { loadWindows(); loadBaseSchedule(); loadExtras(); loadOff(); initTimeline(); }
+    if (which === 'avail') { loadWindows(); loadBaseSchedule(); loadOverrides(); loadOff(); initTimeline(); }
     if (which === 'week') loadWeek();
   };
 
@@ -2242,7 +2346,7 @@ function lindaMainPage(env: Env): string {
   var TL_END_MIN = 22 * 60;    // 22:00
   var TL_TOTAL_MIN = TL_END_MIN - TL_START_MIN; // 900
   var TL_SNAP_MIN = 15;
-  var tl = { sel: null, baseHours: null, extras: [], booked: [], dayOff: false };
+  var tl = { sel: null, baseHours: null, extras: [], blocks: [], booked: [], dayOff: false };
 
   function minToTime(m){ return pad(Math.floor(m/60)) + ':' + pad(m%60); }
   function timeToMin(s){ var p = String(s).split(':'); return parseInt(p[0],10)*60 + parseInt(p[1],10); }
@@ -2272,9 +2376,10 @@ function lindaMainPage(env: Env): string {
       ]);
       if (slotsRes && slotsRes.ok){
         tl.extras = slotsRes.extras || [];
+        tl.blocks = slotsRes.blocks || [];
         tl.dayOff = !!slotsRes.dayOff;
       } else {
-        tl.extras = []; tl.dayOff = false;
+        tl.extras = []; tl.blocks = []; tl.dayOff = false;
       }
       tl.booked = ((dayRes && dayRes.appointments) || [])
         .filter(function(a){ return !a.status || String(a.status).indexOf('CANCELLED') < 0; })
@@ -2312,6 +2417,13 @@ function lindaMainPage(env: Env): string {
       var r = pctOf(timeToMin(e.end || e.end_time));
       html += '<div class="tl-seg extra" style="left:' + l + '%;width:' + (r - l) + '%;"></div>';
     }
+    // Partial blocks
+    for (var i = 0; i < (tl.blocks || []).length; i++){
+      var b2 = tl.blocks[i];
+      var lb = pctOf(timeToMin(b2.start || b2.start_time));
+      var rb = pctOf(timeToMin(b2.end || b2.end_time));
+      html += '<div class="tl-seg block" style="left:' + lb + '%;width:' + (rb - lb) + '%;" title="Block: ' + esc((b2.start || b2.start_time) + '–' + (b2.end || b2.end_time)) + '"></div>';
+    }
     // Bookings
     for (var i = 0; i < tl.booked.length; i++){
       var b = tl.booked[i];
@@ -2340,13 +2452,15 @@ function lindaMainPage(env: Env): string {
       '<span><span class="tl-legend-dot" style="background:var(--accent);opacity:.55;"></span>Weekly</span>' +
       '<span><span class="tl-legend-dot" style="background:var(--accent);opacity:.85;background-image:repeating-linear-gradient(45deg,transparent,transparent 3px,rgba(255,255,255,.35) 3px,rgba(255,255,255,.35) 6px);"></span>Extra</span>' +
       '<span><span class="tl-legend-dot" style="background:#3730a3;"></span>Booked</span>' +
+      '<span><span class="tl-legend-dot" style="background:var(--bad);opacity:.78;background-image:repeating-linear-gradient(45deg,transparent,transparent 3px,rgba(255,255,255,.35) 3px,rgba(255,255,255,.35) 6px);"></span>Block</span>' +
       '<span><span class="tl-legend-dot" style="background:var(--bad);"></span>Day off</span>' +
       '</div>';
     html += '<div class="tl-sel-txt ' + (tl.sel ? '' : 'muted') + '" id="tlSelTxt">' +
       (tl.sel ? 'Selected: ' + minToTime(tl.sel.start) + ' – ' + minToTime(tl.sel.end) : 'Drag on the bar to select a range.') +
       '</div>';
     wrap.innerHTML = html;
-    $('tlAddBtn').disabled = !tl.sel;
+    var btnAdd = $('tlAddBtn'); if (btnAdd) btnAdd.disabled = !tl.sel;
+    var btnBlock = $('tlBlockBtn'); if (btnBlock) btnBlock.disabled = !tl.sel;
 
     // Wire drag
     var bar = $('tlBar');
@@ -2385,7 +2499,8 @@ function lindaMainPage(env: Env): string {
     function onUp(){
       if (!dragging) return;
       dragging = false;
-      $('tlAddBtn').disabled = !tl.sel;
+      var btnAdd = $('tlAddBtn'); if (btnAdd) btnAdd.disabled = !tl.sel;
+      var btnBlock = $('tlBlockBtn'); if (btnBlock) btnBlock.disabled = !tl.sel;
     }
     bar.addEventListener('mousedown', function(ev){ onDown(ev.clientX); });
     window.addEventListener('mousemove', function(ev){ onMove(ev.clientX); });
@@ -2416,11 +2531,49 @@ function lindaMainPage(env: Env): string {
       if (data.ok){
         setTlMsg('Added ' + minToTime(tl.sel.start) + '–' + minToTime(tl.sel.end) + '.', 'ok');
         tl.sel = null;
-        loadTimeline(); loadExtras();
+        loadTimeline(); loadOverrides();
       } else {
         setTlMsg(data.reason || 'Failed', 'bad');
       }
     } catch(e){ setTlMsg('Network error', 'bad'); }
+  };
+
+  window.saveTimelineBlock = async function(){
+    var dk = $('tlDate').value;
+    if (!dk) { setTlMsg('Pick a date first.', 'bad'); return; }
+    if (!tl.sel) { setTlMsg('Drag on the bar to select a range.', 'bad'); return; }
+    var s = minToTime(tl.sel.start), e = minToTime(tl.sel.end);
+    if (!confirm('Block ' + s + '–' + e + ' on ' + dk + '?\\n\\nAny existing bookings inside this range stay — use Reschedule on each card to shift them.')) return;
+    setTlMsg('Saving…', '');
+    try {
+      var res = await fetch('/api/linda-blocks', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dateKey: dk, startTime: s, endTime: e }),
+      });
+      if (res.status === 403) { window.location.reload(); return; }
+      var data = await res.json();
+      if (data.ok){
+        var msg = 'Blocked ' + s + '–' + e + '.';
+        if (data.affectedBookings) msg += ' ' + data.affectedBookings + ' existing booking' + (data.affectedBookings === 1 ? '' : 's') + ' inside the range — reschedule them.';
+        setTlMsg(msg, 'ok');
+        tl.sel = null;
+        loadTimeline(); loadOverrides();
+      } else {
+        setTlMsg(data.reason || 'Failed', 'bad');
+      }
+    } catch(err){ setTlMsg('Network error', 'bad'); }
+  };
+
+  window.navTimelineDay = function(delta){
+    var dk = $('tlDate').value || today();
+    var d = parseKey(dk);
+    d.setDate(d.getDate() + (delta|0));
+    setHiddenDate('tlDate', toKey(d));
+    loadTimeline();
+  };
+  window.goTimelineToday = function(){
+    setHiddenDate('tlDate', today());
+    loadTimeline();
   };
 
   window.blockTimelineDay = async function(){
@@ -2453,36 +2606,65 @@ function lindaMainPage(env: Env): string {
     } catch(e){}
   };
 
-  async function loadExtras(){
-    var el = $('extraList');
+  // Unified Active overrides — both extras (linda_extra) and partial blocks
+  // (linda_block) shown in chronological order with a kind tag. Full days off
+  // (linda_off) stay in their own card above; this list is just the in-day
+  // overrides because that's what gets confused most easily.
+  async function loadOverrides(){
+    var el = $('overridesList');
+    if (!el) return;
     el.innerHTML = '<div class="empty" style="margin:0;border:none;padding:20px 0;">Loading…</div>';
     try {
-      var res = await fetch('/api/linda-extras');
-      if (res.status === 403) { window.location.reload(); return; }
-      var data = await res.json();
-      if (!data.ok) { el.innerHTML = '<div class="err" style="margin:0;">' + esc(data.reason || 'Failed') + '</div>'; return; }
-      if (!data.extras || !data.extras.length) {
-        el.innerHTML = '<div class="empty" style="margin:0;border:none;padding:20px 0;">🌱 Nothing extra open yet. Use the form above to add hours.</div>';
+      var [exRes, blRes] = await Promise.all([
+        fetch('/api/linda-extras').then(function(r){ return r.json(); }),
+        fetch('/api/linda-blocks').then(function(r){ return r.json(); }),
+      ]);
+      var extras = (exRes && exRes.ok && exRes.extras) ? exRes.extras : [];
+      var blocks = (blRes && blRes.ok && blRes.blocks) ? blRes.blocks : [];
+      var rows = [];
+      for (var i = 0; i < extras.length; i++){
+        var x = extras[i];
+        rows.push({ kind: 'extra', id: x.id, date_key: x.date_key, start_time: x.start_time, end_time: x.end_time, reason: x.reason || '' });
+      }
+      for (var j = 0; j < blocks.length; j++){
+        var b = blocks[j];
+        rows.push({ kind: 'block', id: b.id, date_key: b.date_key, start_time: b.start_time, end_time: b.end_time, reason: b.reason || '' });
+      }
+      rows.sort(function(a, b){
+        if (a.date_key !== b.date_key) return a.date_key < b.date_key ? -1 : 1;
+        return a.start_time < b.start_time ? -1 : (a.start_time > b.start_time ? 1 : 0);
+      });
+      if (!rows.length){
+        el.innerHTML = '<div class="empty" style="margin:0;border:none;padding:20px 0;">🌱 Nothing overriding the weekly schedule. Use the timeline above to add an extra slot or block a time.</div>';
         return;
       }
       var html = '';
-      for (var i = 0; i < data.extras.length; i++){
-        var x = data.extras[i];
-        html += '<div class="extra-row" id="extra-row-' + x.id + '">';
-        html +=   '<div style="flex:1 1 auto;min-width:0;">';
-        html +=     '<div class="extra-when">' + esc(formatNiceShort(x.date_key)) + ' · <span id="extra-time-' + x.id + '">' + esc(x.start_time) + '–' + esc(x.end_time) + '</span></div>';
-        if (x.reason) html += '<div class="extra-dim">' + esc(x.reason) + '</div>';
-        html +=     '<div class="extra-edit-panel" id="extra-edit-' + x.id + '" style="display:none;">';
-        html +=       '<input type="time" step="1800" id="extra-s-' + x.id + '" value="' + esc(x.start_time) + '">';
-        html +=       '<span>→</span>';
-        html +=       '<input type="time" step="1800" id="extra-e-' + x.id + '" value="' + esc(x.end_time) + '">';
-        html +=       '<button class="save" onclick="saveExtraEdit(' + x.id + ')">Save</button>';
-        html +=       '<button class="cancel" onclick="toggleExtraEdit(' + x.id + ',false)">Cancel</button>';
-        html +=     '</div>';
+      for (var k = 0; k < rows.length; k++){
+        var r = rows[k];
+        var isExtra = r.kind === 'extra';
+        var tagLabel = isExtra ? 'Extra' : 'Block';
+        html += '<div class="ovr-row" id="ovr-row-' + r.kind + '-' + r.id + '">';
+        html +=   '<span class="ovr-tag ' + (isExtra ? 'extra' : 'block') + '">' + tagLabel + '</span>';
+        html +=   '<div class="ovr-when">';
+        html +=     '<div class="top">' + esc(formatNiceShort(r.date_key)) + ' · <span id="ovr-time-' + r.kind + '-' + r.id + '">' + esc(r.start_time) + '–' + esc(r.end_time) + '</span></div>';
+        if (r.reason) html += '<div class="sub">' + esc(r.reason) + '</div>';
+        if (isExtra){
+          html += '<div class="extra-edit-panel" id="extra-edit-' + r.id + '" style="display:none;">';
+          html +=   '<input type="time" step="1800" id="extra-s-' + r.id + '" value="' + esc(r.start_time) + '">';
+          html +=   '<span>→</span>';
+          html +=   '<input type="time" step="1800" id="extra-e-' + r.id + '" value="' + esc(r.end_time) + '">';
+          html +=   '<button class="save" onclick="saveExtraEdit(' + r.id + ')">Save</button>';
+          html +=   '<button class="cancel" onclick="toggleExtraEdit(' + r.id + ',false)">Cancel</button>';
+          html += '</div>';
+        }
         html +=   '</div>';
-        html +=   '<div>';
-        html +=     '<button class="extra-edit" onclick="toggleExtraEdit(' + x.id + ',true)">Edit</button>';
-        html +=     '<button class="extra-del" onclick="deleteExtra(' + x.id + ')">Remove</button>';
+        html +=   '<div style="flex:0 0 auto;display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;">';
+        if (isExtra) html += '<button class="extra-edit" onclick="toggleExtraEdit(' + r.id + ',true)">Edit</button>';
+        if (isExtra){
+          html += '<button class="extra-del" onclick="deleteExtra(' + r.id + ')">Remove</button>';
+        } else {
+          html += '<button class="extra-del" onclick="deleteBlock(' + r.id + ')">Remove</button>';
+        }
         html +=   '</div>';
         html += '</div>';
       }
@@ -2491,6 +2673,8 @@ function lindaMainPage(env: Env): string {
       el.innerHTML = '<div class="err" style="margin:0;">Network error.</div>';
     }
   }
+  // Back-compat alias so any older code paths still work without renaming.
+  function loadExtras(){ return loadOverrides(); }
 
   function setAvMsg(text, kind){
     var m = $('avMsg');
@@ -2555,7 +2739,18 @@ function lindaMainPage(env: Env): string {
     try {
       var res = await fetch('/api/linda-extras?id=' + id, { method: 'DELETE' });
       if (res.status === 403) { window.location.reload(); return; }
-      loadExtras();
+      loadOverrides();
+      loadTimeline();
+    } catch(e){}
+  };
+
+  window.deleteBlock = async function(id){
+    if (!confirm('Remove this block — re-open these hours for booking?')) return;
+    try {
+      var res = await fetch('/api/linda-blocks?id=' + id, { method: 'DELETE' });
+      if (res.status === 403) { window.location.reload(); return; }
+      loadOverrides();
+      loadTimeline();
     } catch(e){}
   };
 

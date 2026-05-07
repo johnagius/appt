@@ -8,7 +8,7 @@
 import type { Slot, WorkingHours, DateOption } from '../types';
 import {
   addDays, buildSlotsForDate, dayOfWeekKey, formatDateLabel, parseDateKey,
-  todayLocal, toDateKey,
+  parseTimeToMinutes, todayLocal, toDateKey,
 } from './utils';
 
 // Defaults only apply if a config key is missing (shouldn't happen after schema seed).
@@ -105,6 +105,7 @@ export function buildLindaSlots(
   cfg: LindaConfig,
   extras?: { start: string; end: string }[] | null,
   isDayOff?: boolean,
+  blocks?: { start: string; end: string }[] | null,
 ): Slot[] {
   // If Linda has marked this date as a day off, no slots at all — regardless
   // of her base weekly schedule or any extras.
@@ -121,7 +122,21 @@ export function buildLindaSlots(
   const hoursOverride = hasBase
     ? cfg.hours
     : ({ MON: [], TUE: [], WED: [], THU: [], FRI: [], SAT: [], SUN: [], [dow]: [] } as any);
-  return buildSlotsForDate(d, cfg.slotMin, extras || null, hoursOverride);
+  const slots = buildSlotsForDate(d, cfg.slotMin, extras || null, hoursOverride);
+  if (!blocks || !blocks.length) return slots;
+  // Drop any slot whose [start,end) overlaps any block range.
+  const blockRanges = blocks.map(b => ({
+    s: parseTimeToMinutes(b.start),
+    e: parseTimeToMinutes(b.end),
+  }));
+  return slots.filter(s => {
+    const ss = parseTimeToMinutes(s.start);
+    const se = parseTimeToMinutes(s.end);
+    for (const r of blockRanges) {
+      if (ss < r.e && se > r.s) return false;
+    }
+    return true;
+  });
 }
 
 export async function getLindaExtrasForDate(db: D1Database, dateKey: string): Promise<{ id: number; start: string; end: string }[]> {
@@ -134,6 +149,13 @@ export async function getLindaExtrasForDate(db: D1Database, dateKey: string): Pr
 export async function isLindaDayOff(db: D1Database, dateKey: string): Promise<boolean> {
   const row = await db.prepare('SELECT 1 AS x FROM linda_off WHERE date_key = ?').bind(dateKey).first<{ x: number }>();
   return !!row;
+}
+
+export async function getLindaBlocksForDate(db: D1Database, dateKey: string): Promise<{ id: number; start: string; end: string; reason: string }[]> {
+  const rows = await db.prepare(
+    'SELECT id, start_time AS s, end_time AS e, reason FROM linda_block WHERE date_key = ? ORDER BY start_time'
+  ).bind(dateKey).all<{ id: number; s: string; e: string; reason: string }>();
+  return rows.results.map(r => ({ id: r.id, start: r.s, end: r.e, reason: r.reason || '' }));
 }
 
 export function buildLindaDateOptions(tz: string, cfg: LindaConfig): DateOption[] {

@@ -98,6 +98,36 @@ describe('buildLindaSlots', () => {
     expect(slots).toEqual([]);
   });
 
+  it('drops slots that overlap a partial-day block', () => {
+    // Friday morning 09:30-13:00 → 7 slots. Block 11:00-12:00 should remove
+    // the 11:00, 11:30 slots (whose [start,end) overlaps the block range).
+    const slots = buildLindaSlots('2026-04-24', standardConfig, null, false, [{ start: '11:00', end: '12:00' }]);
+    const morning = slots.filter(s => s.start < '13:00').map(s => s.start);
+    expect(morning).toEqual(['09:30', '10:00', '10:30', '12:00', '12:30']);
+  });
+
+  it('multiple partial-day blocks all remove their slots', () => {
+    const slots = buildLindaSlots('2026-04-24', standardConfig, null, false, [
+      { start: '09:30', end: '10:30' },
+      { start: '17:00', end: '18:00' },
+    ]);
+    const starts = slots.map(s => s.start);
+    expect(starts).not.toContain('09:30');
+    expect(starts).not.toContain('10:00');
+    expect(starts).not.toContain('17:00');
+    expect(starts).not.toContain('17:30');
+    // 10:30 sits flush against the block end so it stays.
+    expect(starts).toContain('10:30');
+    // 16:30 ends at 17:00 (flush with block start) so it stays.
+    expect(starts).toContain('16:30');
+  });
+
+  it('partial blocks ignored when no slots exist (closed day)', () => {
+    // Saturday is closed in standardConfig and no extras passed, so blocks shouldn't matter.
+    const slots = buildLindaSlots('2026-04-25', standardConfig, null, false, [{ start: '10:00', end: '12:00' }]);
+    expect(slots).toEqual([]);
+  });
+
   it('respects a 60-min slotMin', () => {
     const hourly: LindaConfig = { ...standardConfig, slotMin: 60 };
     const slots = buildLindaSlots('2026-04-24', hourly);

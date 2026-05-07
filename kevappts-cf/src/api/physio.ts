@@ -19,7 +19,7 @@ import { generateId } from '../services/crypto';
 import { sendDoctorBookingEmail, sendLindaConfirmationEmail } from '../services/email';
 import { createCalendarEvent } from '../services/calendar';
 import {
-  buildLindaDateOptions, buildLindaSlots, getLindaExtrasForDate, isInLindaWindow, isLindaDayOff, loadLindaConfig,
+  buildLindaDateOptions, buildLindaSlots, getLindaBlocksForDate, getLindaExtrasForDate, isInLindaWindow, isLindaDayOff, loadLindaConfig,
   type LindaConfig,
 } from '../services/linda';
 
@@ -88,7 +88,8 @@ async function buildLindaAvailability(dateKey: string, env: Env, cfg: LindaConfi
 
   const extras = await getLindaExtrasForDate(env.DB, dateKey);
   const off = await isLindaDayOff(env.DB, dateKey);
-  const baseSlots = buildLindaSlots(dateKey, cfg, extras, off);
+  const blocks = await getLindaBlocksForDate(env.DB, dateKey);
+  const baseSlots = buildLindaSlots(dateKey, cfg, extras, off, blocks);
   if (!baseSlots.length) return { ok: false, reason: off ? 'Day off' : 'Closed', dateKey, slots: [] };
 
   const taken = await getTakenSlots(env.DB, dateKey, 'linda');
@@ -131,11 +132,12 @@ export async function apiPhysioBook(req: Request, env: Env): Promise<Response> {
   const todayKey = todayKeyLocal(tz);
   if (dateKey < todayKey) return json({ ok: false, reason: 'You cannot book a past date.' }, 400);
 
-  // Validate slot against Linda's hours (including ad-hoc extras + day-off check)
+  // Validate slot against Linda's hours (including ad-hoc extras + day-off + partial blocks)
   const extras = await getLindaExtrasForDate(env.DB, dateKey);
   const off = await isLindaDayOff(env.DB, dateKey);
   if (off) return json({ ok: false, reason: "Linda isn’t working that day." }, 400);
-  const slots = buildLindaSlots(dateKey, cfg, extras, false);
+  const blocks = await getLindaBlocksForDate(env.DB, dateKey);
+  const slots = buildLindaSlots(dateKey, cfg, extras, false, blocks);
   const slotFound = slots.find(s => s.start === startTime);
   if (!slotFound) return json({ ok: false, reason: 'Invalid slot' }, 400);
 
