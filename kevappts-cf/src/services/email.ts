@@ -717,7 +717,7 @@ export async function sendTelemedicineDoctorEmail(
   const html = `
 <div style="font-family:Arial,sans-serif;line-height:1.4;color:#111827;">
   <h2 style="margin:0 0 10px 0;">New Telemedicine Call</h2>
-  <p style="margin:0 0 10px 0;">A patient has booked a telemedicine call — please call them back as soon as possible.</p>
+  <p style="margin:0 0 10px 0;">A patient has booked a telemedicine call. They&apos;ll arrive at Potter&apos;s Pharmacy and the pharmacist will start the video call with you.</p>
   <table style="border-collapse:collapse;width:100%;max-width:520px;">
     <tr><td style="padding:6px 0;color:#6b7280;width:140px;">Patient</td><td style="padding:6px 0;"><b>${escapeHtml(call.patient_name)}</b></td></tr>
     <tr><td style="padding:6px 0;color:#6b7280;">Phone</td><td style="padding:6px 0;"><b>${escapeHtml(call.phone)}</b></td></tr>
@@ -752,7 +752,7 @@ export async function sendTelemedicineDoctorEmail(
   </table>
   <p style="margin:8px 0 0 0;font-size:11px;color:#9ca3af;">Doctor's total counts the flat €25 fee per call only — never the medicine the patient buys at the pharmacy.</p>
 
-  <p style="margin:16px 0 0 0;color:#6b7280;font-size:13px;">Telemedicine calls are charged at the flat rate of €25. Please call the patient back as soon as possible.</p>
+  <p style="margin:16px 0 0 0;color:#6b7280;font-size:13px;">Flat €25 per call. The pharmacist at Potter&apos;s will start the video call when the patient arrives.</p>
 </div>`;
 
   await sendEmail(env, TELEMEDICINE_RECIPIENT, subject, html);
@@ -844,13 +844,14 @@ export async function sendTelemedicinePatientEmail(env: Env, call: TelemedicineC
   const html = `
 <div style="font-family:Arial,sans-serif;line-height:1.5;color:#111827;max-width:520px;">
   <h2 style="margin:0 0 12px 0;font-size:18px;">Your telemedicine booking is confirmed</h2>
-  <p style="margin:0 0 12px 0;font-size:15px;">Thanks ${escapeHtml((call.patient_name || '').split(' ')[0] || 'there')} — the doctor will call you back as soon as possible on the number you provided.</p>
+  <p style="margin:0 0 12px 0;font-size:15px;">Thanks ${escapeHtml((call.patient_name || '').split(' ')[0] || 'there')} — please come to <b>Potter&apos;s Pharmacy</b>. The pharmacist will set up a video call with the doctor while you&apos;re there.</p>
   <table style="border-collapse:collapse;width:100%;max-width:520px;">
     <tr><td style="padding:6px 0;color:#6b7280;width:140px;">Date</td><td style="padding:6px 0;"><b>${escapeHtml(call.date_key)}</b></td></tr>
+    <tr><td style="padding:6px 0;color:#6b7280;">Where</td><td style="padding:6px 0;"><b>Potter&apos;s Pharmacy</b> (the pharmacist arranges the video call)</td></tr>
     <tr><td style="padding:6px 0;color:#6b7280;">Service</td><td style="padding:6px 0;"><b>Telemedicine call</b></td></tr>
     <tr><td style="padding:6px 0;color:#6b7280;">Fee</td><td style="padding:6px 0;"><b>${feeLabel(call.fee_cents)}</b> (paid to the doctor on the call)</td></tr>
   </table>
-  <p style="margin:16px 0 0 0;color:#6b7280;font-size:13px;">If you no longer need the call, please reply so the doctor isn&apos;t contacted unnecessarily.</p>
+  <p style="margin:16px 0 0 0;color:#6b7280;font-size:13px;">If you can&apos;t make it, please let the pharmacist at Potter&apos;s know.</p>
 </div>`;
   await sendEmail(env, call.email, subject, html);
 }

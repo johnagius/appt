@@ -517,6 +517,6 @@ async function doInsertCall(env: Env, opts: {
     // Don't echo the patient's phone number back on screen — the actual
     // call is placed by the pharmacist, not directly from the doctor to
     // the patient. Tell the patient to speak to the pharmacist instead.
-    message: 'Telemedicine booking confirmed. The doctor will call you back as soon as possible. Fee: €25 (paid to the doctor on the call).',
+    message: "Telemedicine booking confirmed. Please come to Potter's Pharmacy — the pharmacist will set up a video call with the doctor. Fee: €25 (paid to the doctor on the call).",
   });
 }
