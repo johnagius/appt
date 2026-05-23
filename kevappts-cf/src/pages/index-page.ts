@@ -4079,12 +4079,9 @@ export function indexPage(env: Env, bookingSource?: string): string {
       if (err) err.textContent = '';
     }
     function openTelemedicineModal() {
-      if (!_telemedicineOpen) {
-        // Defensive: button only shown when open, but in case of a race
-        // tell the user clearly rather than letting the request fail.
-        showMsg('bad', 'Telemedicine bookings are open between 8pm and midnight only.');
-        return;
-      }
+      // Bookings are accepted at any time of day — the doctor calls back as
+      // soon as possible. The 8pm-midnight `_telemedicineOpen` flag is only
+      // used to surface the "live now" banner, not to gate the modal.
       // Always start fresh — no stale data from a previous session.
       clearTelemedicineForm();
       var nameEl = document.getElementById('fullName');
