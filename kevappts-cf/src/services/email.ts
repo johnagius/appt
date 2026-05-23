@@ -844,10 +844,11 @@ export async function sendTelemedicinePatientEmail(env: Env, call: TelemedicineC
   const html = `
 <div style="font-family:Arial,sans-serif;line-height:1.5;color:#111827;max-width:520px;">
   <h2 style="margin:0 0 12px 0;font-size:18px;">Your telemedicine booking is confirmed</h2>
-  <p style="margin:0 0 12px 0;font-size:15px;">Thanks ${escapeHtml((call.patient_name || '').split(' ')[0] || 'there')} — please come to <b>Potter&apos;s Pharmacy</b>. The pharmacist will set up a video call with the doctor while you&apos;re there.</p>
+  <p style="margin:0 0 12px 0;font-size:15px;">Hi ${escapeHtml((call.patient_name || '').split(' ')[0] || 'there')},</p>
+  <p style="margin:0 0 12px 0;font-size:15px;"><b>All telemedicine calls require you to be at Potter&apos;s Pharmacy. The pharmacist will contact the doctor via video call following this booking.</b></p>
   <table style="border-collapse:collapse;width:100%;max-width:520px;">
     <tr><td style="padding:6px 0;color:#6b7280;width:140px;">Date</td><td style="padding:6px 0;"><b>${escapeHtml(call.date_key)}</b></td></tr>
-    <tr><td style="padding:6px 0;color:#6b7280;">Where</td><td style="padding:6px 0;"><b>Potter&apos;s Pharmacy</b> (the pharmacist arranges the video call)</td></tr>
+    <tr><td style="padding:6px 0;color:#6b7280;">Where</td><td style="padding:6px 0;"><b>Potter&apos;s Pharmacy</b></td></tr>
     <tr><td style="padding:6px 0;color:#6b7280;">Service</td><td style="padding:6px 0;"><b>Telemedicine call</b></td></tr>
     <tr><td style="padding:6px 0;color:#6b7280;">Fee</td><td style="padding:6px 0;"><b>${feeLabel(call.fee_cents)}</b> (paid to the doctor on the call)</td></tr>
   </table>

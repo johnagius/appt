@@ -893,7 +893,7 @@ export function indexPage(env: Env, bookingSource?: string): string {
               <span style="font-weight:900;color:#9a3412;font-size:16px;">Telemedicine is available now</span>
             </div>
             <div style="color:#7c2d12;font-size:14px;line-height:1.5;">
-              Come to Potter&#39;s Pharmacy &mdash; the pharmacist sets up a video call with the doctor (available <b>8pm to midnight</b>).
+              All telemedicine calls require you to be at <b>Potter&#39;s Pharmacy</b>. The pharmacist will contact the doctor via video call following this booking.
               Flat fee <b style="background:#fff;padding:2px 8px;border-radius:6px;border:1px solid #fdba74;color:#9a3412;">€25</b> — paid to the doctor on the call.
             </div>
             <div style="color:#92400e;font-size:13px;margin-top:6px;">You can also book a regular daytime appointment for tomorrow below.</div>
@@ -1008,7 +1008,7 @@ export function indexPage(env: Env, bookingSource?: string): string {
       <div id="splashTelemedNotice" style="display:none;background:#fff7ed;border:2px solid #f97316;border-radius:14px;padding:14px 18px;margin-bottom:18px;text-align:center;">
         <div style="font-size:22px;margin-bottom:4px;">📹</div>
         <div style="font-weight:900;color:#9a3412;font-size:16px;">Telemedicine open now (8pm–midnight)</div>
-        <div style="color:#7c2d12;font-size:14px;margin-top:4px;">Come to Potter&#39;s Pharmacy &mdash; pharmacist sets up the video call. Flat fee <b>€25</b>.</div>
+        <div style="color:#7c2d12;font-size:14px;margin-top:4px;">All telemedicine calls require you to be at Potter&#39;s Pharmacy. The pharmacist will contact the doctor via video call following this booking. Flat fee <b>€25</b>.</div>
       </div>
       <div class="idle-icon">🩺</div>
       <div class="idle-title">BOOK YOUR DOCTOR'S<br>APPOINTMENT HERE</div>
@@ -1027,7 +1027,7 @@ export function indexPage(env: Env, bookingSource?: string): string {
   <div class="overlay" id="telemedicineOverlay" role="dialog" aria-modal="true">
     <div class="modal" style="max-width:460px;">
       <h3 style="font-size:18px;margin-bottom:6px;color:#9a3412;">Book Telemedicine Call</h3>
-      <p style="font-size:14px;color:#374151;margin-bottom:8px;line-height:1.45;">Come to Potter&#39;s Pharmacy &mdash; the pharmacist will set up a video call with the doctor while you&#39;re there.</p>
+      <p style="font-size:14px;color:#374151;margin-bottom:8px;line-height:1.45;">All telemedicine calls require you to be at Potter&#39;s Pharmacy. The pharmacist will contact the doctor via video call following this booking.</p>
       <div style="background:#fff7ed;border:1px solid #fdba74;border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:14px;color:#9a3412;font-weight:700;">Doctor's fee: €25 (paid to the doctor on the call)</div>
       <div style="display:flex;flex-direction:column;gap:10px;">
         <div>
