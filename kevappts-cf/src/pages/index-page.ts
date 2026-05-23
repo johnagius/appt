@@ -4080,8 +4080,8 @@ export function indexPage(env: Env, bookingSource?: string): string {
     }
     function openTelemedicineModal() {
       // Bookings are accepted at any time of day — the doctor calls back as
-      // soon as possible. The 8pm-midnight `_telemedicineOpen` flag is only
-      // used to surface the "live now" banner, not to gate the modal.
+      // soon as possible. The 8pm-midnight window flag is only used to
+      // surface the "live now" banner, not to gate the modal.
       // Always start fresh — no stale data from a previous session.
       clearTelemedicineForm();
       var nameEl = document.getElementById('fullName');
