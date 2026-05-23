@@ -147,7 +147,18 @@ export async function personAlreadyBookedSameSlot(
   return (result?.cnt ?? 0) > 0;
 }
 
-export async function isSlotTaken(db: D1Database, dateKey: string, startTime: string, clinic: string): Promise<boolean> {
+// Optional serviceId scopes the check to a single service so a doctor visit
+// at 08:30 and a blood-test at 08:30 (both clinic='potters') can coexist.
+// Callers that want the old behaviour (any service) simply omit it.
+export async function isSlotTaken(db: D1Database, dateKey: string, startTime: string, clinic: string, serviceId?: string): Promise<boolean> {
+  if (serviceId) {
+    const r = await db.prepare(`
+      SELECT COUNT(*) as cnt FROM appointments
+      WHERE date_key = ? AND start_time = ? AND clinic = ? AND service_id = ?
+      AND status = 'BOOKED'
+    `).bind(dateKey, startTime, clinic, serviceId).first<{ cnt: number }>();
+    return (r?.cnt ?? 0) > 0;
+  }
   const result = await db.prepare(`
     SELECT COUNT(*) as cnt FROM appointments
     WHERE date_key = ? AND start_time = ? AND clinic = ?
@@ -156,13 +167,39 @@ export async function isSlotTaken(db: D1Database, dateKey: string, startTime: st
   return (result?.cnt ?? 0) > 0;
 }
 
-export async function getTakenSlots(db: D1Database, dateKey: string, clinic: string): Promise<Set<string>> {
+export async function getTakenSlots(db: D1Database, dateKey: string, clinic: string, serviceId?: string): Promise<Set<string>> {
+  if (serviceId) {
+    const r = await db.prepare(`
+      SELECT start_time FROM appointments
+      WHERE date_key = ? AND clinic = ? AND service_id = ?
+      AND status = 'BOOKED'
+    `).bind(dateKey, clinic, serviceId).all<{ start_time: string }>();
+    return new Set(r.results.map(x => x.start_time));
+  }
   const result = await db.prepare(`
     SELECT start_time FROM appointments
     WHERE date_key = ? AND clinic = ?
     AND status = 'BOOKED'
   `).bind(dateKey, clinic).all<{ start_time: string }>();
   return new Set(result.results.map(r => r.start_time));
+}
+
+// Blood-test off-day helpers (admin-managed via blood_test_off table).
+export async function getBloodTestOffRows(db: D1Database): Promise<{ id: number; date_key: string; reason: string }[]> {
+  const r = await db.prepare(
+    'SELECT id, date_key, reason FROM blood_test_off ORDER BY date_key'
+  ).all<{ id: number; date_key: string; reason: string }>();
+  return r.results;
+}
+
+export async function addBloodTestOff(db: D1Database, dateKey: string, reason: string, now: string): Promise<void> {
+  await db.prepare(
+    "INSERT OR REPLACE INTO blood_test_off (date_key, reason, created_at) VALUES (?, ?, ?)"
+  ).bind(dateKey, reason, now).run();
+}
+
+export async function deleteBloodTestOff(db: D1Database, id: number): Promise<void> {
+  await db.prepare('DELETE FROM blood_test_off WHERE id = ?').bind(id).run();
 }
 
 export async function getCancelledSlots(db: D1Database, dateKey: string, clinic: string): Promise<Set<string>> {

@@ -38,6 +38,13 @@ import { doctorPage } from './pages/doctor-page';
 import { reschedulePage } from './pages/reschedule-page';
 import { followupPage } from './pages/followup-page';
 import { physioPage } from './pages/physio-page';
+import { bloodTestPage } from './pages/blood-test-page';
+import { apiBloodTestInit, apiBloodTestAvailability, apiBloodTestBook } from './api/blood-test';
+import {
+  apiAdminGetBloodTestConfig, apiAdminSaveBloodTestConfig, apiAdminGetBloodTestAppointments,
+  apiAdminListBloodTestOff, apiAdminAddBloodTestOff, apiAdminDeleteBloodTestOff,
+  apiAdminBloodTestSendToSpinola,
+} from './api/admin';
 import { apiLindaGetDay, apiLindaNextDay, apiLindaSlots, apiLindaListExtras, apiLindaAddExtra, apiLindaDeleteExtra, apiLindaUpdateExtra, apiLindaListOff, apiLindaAddOff, apiLindaDeleteOff, apiLindaListBlocks, apiLindaAddBlock, apiLindaDeleteBlock, apiLindaReschedule, apiLindaRescheduleDay, apiLindaNewBooking, apiLindaSearch, apiLindaPatientHistory, apiLindaClientsAutocomplete, apiLindaWeek, apiLindaCopyDay, apiLindaCancel, apiLindaCancelDay, apiLindaMarkStatus, apiLindaBaseSchedule, apiLindaSaveBaseSchedule, apiLindaListWindows, apiLindaAddWindow, apiLindaUpdateWindow, apiLindaDeleteWindow, handleLindaLogin, handleLindaLogout, lindaRoute } from './api/linda-view';
 import {
   apiTelemedicineStatus, apiBookTelemedicine,
@@ -114,9 +121,14 @@ export default {
       if (path === '/api/book' && method === 'POST') return apiBook(request, env);
       if (path === '/api/book-spinola' && method === 'POST') return apiBookSpinola(request, env);
 
-      // ─── Telemedicine (8pm–midnight phone calls, €25) ───
+      // ─── Telemedicine (instant phone calls, €25) ───
       if (path === '/api/telemedicine/status' && method === 'GET') return apiTelemedicineStatus(request, env);
       if (path === '/api/book-telemedicine' && method === 'POST') return apiBookTelemedicine(request, env);
+
+      // ─── Blood Tests (Potter's pharmacy 8-9am) ───
+      if (path === '/api/blood-test-init' && method === 'GET') return apiBloodTestInit(env);
+      if (path === '/api/blood-test-availability' && method === 'GET') return apiBloodTestAvailability(request, env);
+      if (path === '/api/blood-test-book' && method === 'POST') return apiBloodTestBook(request, env);
 
       // ─── Linda (Physiotherapy) Public API ─────────
       if (path === '/api/physio-init' && method === 'GET') return apiPhysioInit(env);
@@ -223,6 +235,15 @@ export default {
         if (adminPath === 'linda-config' && method === 'GET') return apiAdminGetLindaConfig(request, env);
         if (adminPath === 'linda-config' && method === 'POST') return apiAdminSaveLindaConfig(request, env);
 
+        // ─── Blood Tests admin ────────────────────────
+        if (adminPath === 'blood-test-config' && method === 'GET') return apiAdminGetBloodTestConfig(request, env);
+        if (adminPath === 'blood-test-config' && method === 'POST') return apiAdminSaveBloodTestConfig(request, env);
+        if (adminPath === 'blood-test-appointments' && method === 'GET') return apiAdminGetBloodTestAppointments(request, env);
+        if (adminPath === 'blood-test-off' && method === 'GET') return apiAdminListBloodTestOff(request, env);
+        if (adminPath === 'blood-test-off' && method === 'POST') return apiAdminAddBloodTestOff(request, env);
+        if (adminPath.startsWith('blood-test-off/') && method === 'DELETE') return apiAdminDeleteBloodTestOff(request, env);
+        if (adminPath === 'blood-test-send-spinola' && method === 'POST') return apiAdminBloodTestSendToSpinola(request, env);
+
         // ─── Telemedicine admin ────────────────────────
         if (adminPath === 'telemedicine' && method === 'GET') return apiAdminListTelemedicineByDate(request, env);
         if (adminPath === 'telemedicine' && method === 'POST') return apiAdminAddTelemedicine(request, env);
@@ -328,6 +349,7 @@ export default {
           return html('<div style="font-family:Arial,sans-serif;max-width:500px;margin:60px auto;text-align:center;"><h1>Appointment Not Found</h1><p>This link may have expired or the appointment was already cancelled.</p></div>');
         }
         if (path === '/physio') return html(physioPage(env));
+        if (path === '/blood-tests') return html(bloodTestPage(env));
         if (path === '/cancel') return html(cancelPage());
         if (path === '/reschedule') return html(reschedulePage());
         if (path === '/followup') return html(followupPage());

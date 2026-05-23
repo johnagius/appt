@@ -141,18 +141,39 @@ export async function sendClientConfirmationEmail(env: Env, appt: Appointment): 
   const cancelUrl = await buildCancelLink(env, appt.token);
   const rescheduleUrl = await buildRescheduleLink(env, appt.token);
 
-  const subject = `Appointment Confirmed - ${appt.service_name} (${appt.date_key} ${appt.start_time})`;
+  // Blood tests are a pharmacy-staff service — different subject + copy,
+  // no "Dr Kevin" row, plus a "what to expect" note. Reuses the same
+  // confirmation function so cancel/reschedule links stay consistent.
+  const isBloodTest = appt.service_id === 'blood-test';
+
+  const subject = isBloodTest
+    ? `Blood Test Confirmed - ${appt.date_key} ${appt.start_time}`
+    : `Appointment Confirmed - ${appt.service_name} (${appt.date_key} ${appt.start_time})`;
+
+  const headerLine = isBloodTest
+    ? 'Your blood test has been confirmed at <b>' + escapeHtml(appt.location) + '</b>.'
+    : 'Your appointment with <b>Dr Kevin</b> has been confirmed.';
+
+  const middleRowHtml = isBloodTest
+    ? `<tr><td style="padding:6px 0;color:#6b7280;">Window</td><td style="padding:6px 0;"><b>Blood-test slot, 08:00–09:00</b></td></tr>`
+    : `<tr><td style="padding:6px 0;color:#6b7280;">Doctor</td><td style="padding:6px 0;"><b>Dr Kevin</b></td></tr>`;
+
+  const bloodTestNote = isBloodTest
+    ? `<p style="margin:14px 0 0;padding:10px 12px;background:#fef2f2;border:1px solid #fecaca;border-radius:10px;color:#7f1d1d;font-size:13px;line-height:1.5;">Please arrive 5 minutes early. Pharmacy staff will take the sample. Pricing and any preparation (e.g. fasting) will be confirmed at the clinic.</p>`
+    : '';
+
   const html = `
 <div style="font-family:Arial,sans-serif;line-height:1.4;color:#111827;">
-  <h2 style="margin:0 0 10px 0;">Appointment Confirmed</h2>
-  <p style="margin:0 0 10px 0;">Your appointment with <b>Dr Kevin</b> has been confirmed.</p>
+  <h2 style="margin:0 0 10px 0;">${isBloodTest ? 'Blood Test Confirmed' : 'Appointment Confirmed'}</h2>
+  <p style="margin:0 0 10px 0;">${headerLine}</p>
   <table style="border-collapse:collapse;width:100%;max-width:520px;">
     <tr><td style="padding:6px 0;color:#6b7280;">Service</td><td style="padding:6px 0;"><b>${escapeHtml(appt.service_name)}</b></td></tr>
-    <tr><td style="padding:6px 0;color:#6b7280;">Doctor</td><td style="padding:6px 0;"><b>Dr Kevin</b></td></tr>
+    ${middleRowHtml}
     <tr><td style="padding:6px 0;color:#6b7280;">Date</td><td style="padding:6px 0;"><b>${escapeHtml(appt.date_key)}</b></td></tr>
     <tr><td style="padding:6px 0;color:#6b7280;">Time</td><td style="padding:6px 0;"><b>${escapeHtml(appt.start_time)} - ${escapeHtml(appt.end_time)}</b></td></tr>
     <tr><td style="padding:6px 0;color:#6b7280;">Location</td><td style="padding:6px 0;"><b>${escapeHtml(appt.location)}</b></td></tr>
   </table>
+  ${bloodTestNote}
   ${getMapHtml(appt.location)}
   ${buildManageSection(cancelUrl, rescheduleUrl)}
   ${buildCalendarLinks(appt)}
@@ -696,7 +717,7 @@ export async function sendTelemedicineDoctorEmail(
   const html = `
 <div style="font-family:Arial,sans-serif;line-height:1.4;color:#111827;">
   <h2 style="margin:0 0 10px 0;">New Telemedicine Call</h2>
-  <p style="margin:0 0 10px 0;">A patient has booked an evening telemedicine call.</p>
+  <p style="margin:0 0 10px 0;">A patient has booked a telemedicine call — please call them back as soon as possible.</p>
   <table style="border-collapse:collapse;width:100%;max-width:520px;">
     <tr><td style="padding:6px 0;color:#6b7280;width:140px;">Patient</td><td style="padding:6px 0;"><b>${escapeHtml(call.patient_name)}</b></td></tr>
     <tr><td style="padding:6px 0;color:#6b7280;">Phone</td><td style="padding:6px 0;"><b>${escapeHtml(call.phone)}</b></td></tr>
@@ -731,7 +752,7 @@ export async function sendTelemedicineDoctorEmail(
   </table>
   <p style="margin:8px 0 0 0;font-size:11px;color:#9ca3af;">Doctor's total counts the flat €25 fee per call only — never the medicine the patient buys at the pharmacy.</p>
 
-  <p style="margin:16px 0 0 0;color:#6b7280;font-size:13px;">Telemedicine calls run 8pm–midnight at the flat rate of €25. Please refer the patient to the pharmacist who will arrange the call.</p>
+  <p style="margin:16px 0 0 0;color:#6b7280;font-size:13px;">Telemedicine calls are charged at the flat rate of €25. Please call the patient back as soon as possible.</p>
 </div>`;
 
   await sendEmail(env, TELEMEDICINE_RECIPIENT, subject, html);
@@ -823,13 +844,13 @@ export async function sendTelemedicinePatientEmail(env: Env, call: TelemedicineC
   const html = `
 <div style="font-family:Arial,sans-serif;line-height:1.5;color:#111827;max-width:520px;">
   <h2 style="margin:0 0 12px 0;font-size:18px;">Your telemedicine booking is confirmed</h2>
-  <p style="margin:0 0 12px 0;font-size:15px;">Thanks ${escapeHtml((call.patient_name || '').split(' ')[0] || 'there')} — please speak to the pharmacist at Potter&apos;s Pharmacy. They will arrange your telemedicine call with the doctor.</p>
+  <p style="margin:0 0 12px 0;font-size:15px;">Thanks ${escapeHtml((call.patient_name || '').split(' ')[0] || 'there')} — the doctor will call you back as soon as possible on the number you provided.</p>
   <table style="border-collapse:collapse;width:100%;max-width:520px;">
     <tr><td style="padding:6px 0;color:#6b7280;width:140px;">Date</td><td style="padding:6px 0;"><b>${escapeHtml(call.date_key)}</b></td></tr>
-    <tr><td style="padding:6px 0;color:#6b7280;">Service</td><td style="padding:6px 0;"><b>Telemedicine call (8pm–midnight)</b></td></tr>
+    <tr><td style="padding:6px 0;color:#6b7280;">Service</td><td style="padding:6px 0;"><b>Telemedicine call</b></td></tr>
     <tr><td style="padding:6px 0;color:#6b7280;">Fee</td><td style="padding:6px 0;"><b>${feeLabel(call.fee_cents)}</b> (paid to the doctor on the call)</td></tr>
   </table>
-  <p style="margin:16px 0 0 0;color:#6b7280;font-size:13px;">If you no longer need the call, please let the pharmacist know so the doctor isn&apos;t contacted unnecessarily.</p>
+  <p style="margin:16px 0 0 0;color:#6b7280;font-size:13px;">If you no longer need the call, please reply so the doctor isn&apos;t contacted unnecessarily.</p>
 </div>`;
   await sendEmail(env, call.email, subject, html);
 }

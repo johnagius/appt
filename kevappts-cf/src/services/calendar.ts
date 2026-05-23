@@ -46,7 +46,11 @@ export async function createCalendarEvent(env: Env, appt: Appointment): Promise<
   try {
     const token = await getAccessToken(env);
     const tz = env.TIMEZONE;
-    const title = appt.service_name + ' - ' + appt.full_name;
+    // Blood tests share Potter's calendar — prefix the title so staff and
+    // doctor can spot them at a glance without opening the event.
+    const title = appt.service_id === 'blood-test'
+      ? 'BLOOD TEST: ' + appt.full_name
+      : appt.service_name + ' - ' + appt.full_name;
     const description = [
       'Patient: ' + appt.full_name,
       'Email: ' + appt.email,

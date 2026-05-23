@@ -219,8 +219,9 @@ async function doBook(req: Request, env: Env, clinic: 'potters' | 'spinola'): Pr
     return json({ ok: false, reason: 'You already booked this exact time slot.' }, 400);
   }
 
-  // Slot taken check
-  if (await isSlotTaken(env.DB, dateKey, startTime, clinic)) {
+  // Slot taken check — scoped to service_id='clinic' so blood-test bookings
+  // at the same time at Potter's don't block a doctor visit (and vice versa).
+  if (await isSlotTaken(env.DB, dateKey, startTime, clinic, 'clinic')) {
     return json({ ok: false, reason: 'That slot was just taken. Please pick another.' }, 400);
   }
 
@@ -502,7 +503,9 @@ async function buildAvailabilityResponse(
     const extras = extraMap[dateKey] || null;
     const baseSlots = buildSlotsForDate(d, cfg.apptDurationMin, extras, cfg.workingHours);
 
-    const taken = await getTakenSlots(env.DB, dateKey, 'potters');
+    // Scope to doctor's own service_id so blood-test bookings (also
+    // clinic='potters' but service_id='blood-test') never block doctor slots.
+    const taken = await getTakenSlots(env.DB, dateKey, 'potters', 'clinic');
     const nowMin = nowMinutesLocal(tz);
 
     const outSlots = baseSlots.map(slot => {

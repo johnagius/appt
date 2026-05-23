@@ -1,9 +1,10 @@
 /**
- * Telemedicine API — evening (8pm–midnight) phone consultations.
+ * Telemedicine API — instant phone consultations (€25 flat fee).
  *
- * The window is intentionally enforced for PUBLIC bookings only: admin
- * entries can be logged at any time so the receptionist can record a call
- * after the fact (e.g. doctor took the call, admin logs it next morning).
+ * Bookings are accepted at any time of day: the patient submits and the
+ * doctor calls back as soon as possible. The 8pm–midnight window is kept
+ * as an informational "live now" banner on the booking page, but it no
+ * longer gates the public booking endpoint.
  *
  * Telemedicine is deliberately a separate table from `appointments`:
  *  - no slot, no doctor-off interaction, no calendar event
@@ -138,13 +139,9 @@ export async function apiBookTelemedicine(req: Request, env: Env): Promise<Respo
     return json({ ok: false, reason: 'Please enter your email address.' }, 400);
   }
 
-  if (!isInTelemedicineWindow(env)) {
-    return json({
-      ok: false,
-      reason: 'Telemedicine calls are only booked between 8pm and midnight. Please book a regular appointment for tomorrow.',
-    }, 400);
-  }
-
+  // Window check intentionally removed — doctor handles instant calls at any
+  // time of day. The 8pm–midnight window is retained only as a "live now"
+  // banner on the booking page (isInTelemedicineWindow + /api/telemedicine/status).
   return doInsertCall(env, {
     fullName, phone, email, comments,
     source: 'public',
@@ -520,6 +517,6 @@ async function doInsertCall(env: Env, opts: {
     // Don't echo the patient's phone number back on screen — the actual
     // call is placed by the pharmacist, not directly from the doctor to
     // the patient. Tell the patient to speak to the pharmacist instead.
-    message: 'Telemedicine booking confirmed. Please speak to the pharmacist who will arrange your call with the doctor. Fee: €25 (paid to the doctor on the call).',
+    message: 'Telemedicine booking confirmed. The doctor will call you back as soon as possible. Fee: €25 (paid to the doctor on the call).',
   });
 }

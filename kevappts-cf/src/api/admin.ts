@@ -16,6 +16,7 @@ import {
   slotBlockedByDoctorOff, doctorOffReason, findNextAvailableDay,
   setConfigValue, getTakenSlots, isReviewSent, getReviewSent, markReviewSent,
   insertFollowUp, getFollowUps, isFollowUpSent, getReferrals,
+  getBloodTestOffRows, addBloodTestOff, deleteBloodTestOff,
 } from '../db/queries';
 import { verifyAdminSig, generateId } from '../services/crypto';
 import {
@@ -25,6 +26,7 @@ import {
 } from '../services/email';
 import { createCalendarEvent, deleteCalendarEvent } from '../services/calendar';
 import { loadLindaConfig } from '../services/linda';
+import { loadBloodTestConfig } from '../services/blood-test';
 
 function json(data: any, status = 200): Response {
   return new Response(JSON.stringify(data), {
@@ -181,7 +183,10 @@ export async function apiAdminMarkDoctorOff(req: Request, env: Env): Promise<Res
     const dk = toDateKey(d);
     const appts = await getActiveAppointmentsByDate(env.DB, dk);
     for (const a of appts) {
-      if (a.clinic === 'spinola' || a.clinic === 'linda') continue;
+      // Doctor-off applies to Dr Kevin's consultations only. Spinola + Linda
+      // are independent clinics; blood tests at Potter's are pharmacy-staff
+      // service and not affected by doctor availability.
+      if (a.clinic === 'spinola' || a.clinic === 'linda' || a.service_id === 'blood-test') continue;
       if (!startTime && !endTime) {
         affected.push(a);
       } else {
@@ -296,7 +301,13 @@ export async function apiAdminProcessAppointments(req: Request, env: Env): Promi
   // (or an empty appointmentIds with action='cancel') can never cancel /
   // redirect Linda physio bookings or already-relocated Spinola bookings.
   const allApptsRaw = await getActiveAppointmentsByDate(env.DB, dateKey);
-  const allAppts = allApptsRaw.filter(a => a.clinic !== 'spinola' && a.clinic !== 'linda');
+  // Bulk actions operate on Dr Kevin's Potter's consultations only.
+  // Spinola + Linda + blood tests are excluded — blood tests are pharmacy
+  // staff service, not affected by doctor availability. Admin can move a
+  // single blood-test manually via the Blood Tests tab.
+  const allAppts = allApptsRaw.filter(a =>
+    a.clinic !== 'spinola' && a.clinic !== 'linda' && a.service_id !== 'blood-test'
+  );
   let appts = appointmentIds.length > 0
     ? allAppts.filter(a => appointmentIds.includes(a.id))
     : allAppts;
@@ -413,7 +424,9 @@ export async function apiAdminProcessAppointments(req: Request, env: Env): Promi
     const extraMap = buildExtraMap(extraRows);
     const availableSlots = buildSlotsForDate(nextDateObj, cfg.apptDurationMin, extraMap[nextDay] || null, cfg.workingHours);
 
-    const takenOnNextDay = await getTakenSlots(env.DB, nextDay, 'potters');
+    // Scope to doctor's own service so blood-test bookings can't block
+    // a doctor push to that slot.
+    const takenOnNextDay = await getTakenSlots(env.DB, nextDay, 'potters', 'clinic');
 
     for (const appt of appts) {
       // Try same time first
@@ -443,7 +456,7 @@ export async function apiAdminProcessAppointments(req: Request, env: Env): Promi
           if (offEntry?.allDay) continue;
 
           const daySlots = buildSlotsForDate(searchDateObj, cfg.apptDurationMin, extraMap[searchDate] || null, cfg.workingHours);
-          const dayTaken = await getTakenSlots(env.DB, searchDate, 'potters');
+          const dayTaken = await getTakenSlots(env.DB, searchDate, 'potters', 'clinic');
           newSlot = daySlots.find(s =>
             !dayTaken.has(s.start) &&
             !slotBlockedByDoctorOff(offMap[searchDate], s.start, s.end)
@@ -536,7 +549,7 @@ export async function apiAdminProcessAppointments(req: Request, env: Env): Promi
     const offEntry = offMap2[dateKey];
     const sameDaySlots = buildSlotsForDate(sameDateObj, cfg.apptDurationMin, extraMap[dateKey] || null, cfg.workingHours);
 
-    const takenSameDay = await getTakenSlots(env.DB, dateKey, 'potters');
+    const takenSameDay = await getTakenSlots(env.DB, dateKey, 'potters', 'clinic');
 
     let availableAfterBreak = sameDaySlots.filter(s => {
       const slotStartMin = parseTimeToMinutes(s.start);
@@ -700,6 +713,7 @@ export async function apiAdminGetReviewPatients(req: Request, env: Env): Promise
   const potters: any[] = [];
   const spinola: any[] = [];
   const linda: any[] = [];
+  const bloodTest: any[] = [];
 
   for (const a of allAppts) {
     if (!a.email || a.status.includes('CANCELLED')) continue;
@@ -720,6 +734,10 @@ export async function apiAdminGetReviewPatients(req: Request, env: Env): Promise
       spinola.push(item);
     } else if (a.clinic === 'linda') {
       linda.push(item);
+    } else if (a.service_id === 'blood-test') {
+      // Pharmacy-staff service — broken out into its own card so the admin
+      // can send blood-test review requests separately from Dr Kevin's.
+      bloodTest.push(item);
     } else if (a.status !== 'RELOCATED_SPINOLA') {
       potters.push(item);
     }
@@ -775,7 +793,7 @@ export async function apiAdminGetReviewPatients(req: Request, env: Env): Promise
     console.error('Telemedicine review list error:', e);
   }
 
-  return json({ ok: true, potters, spinola, linda, telemedicine, dateKey });
+  return json({ ok: true, potters, spinola, linda, bloodTest, telemedicine, dateKey });
 }
 
 // ─── Send Review Requests ──────────────────────────────────
@@ -1796,4 +1814,177 @@ export async function apiAdminTestReview(req: Request, env: Env): Promise<Respon
   } catch (e: any) {
     return json({ ok: false, reason: e?.message || 'Send failed.' }, 500);
   }
+}
+
+// ─── Blood Tests admin ─────────────────────────────────────
+//
+// Config (hours / slot-min / price / test types / enabled) lives in the
+// `config` table prefixed BLOOD_TEST_. Off-days live in `blood_test_off`.
+// Bookings are stored in the main `appointments` table with clinic='potters'
+// and service_id='blood-test', so listing is a filtered query against the
+// existing table — no separate bookings table needed.
+
+export async function apiAdminGetBloodTestConfig(req: Request, env: Env): Promise<Response> {
+  const denied = await requireAdmin(req, env);
+  if (denied) return denied;
+  const cfg = await loadBloodTestConfig(env.DB);
+  return json({ ok: true, config: cfg });
+}
+
+export async function apiAdminSaveBloodTestConfig(req: Request, env: Env): Promise<Response> {
+  const denied = await requireAdmin(req, env);
+  if (denied) return denied;
+  const payload: any = await req.json();
+
+  if (payload.enabled !== undefined) {
+    await setConfigValue(env.DB, 'BLOOD_TEST_ENABLED', payload.enabled ? '1' : '0');
+  }
+  if (typeof payload.slotMin === 'number' && payload.slotMin > 0) {
+    await setConfigValue(env.DB, 'BLOOD_TEST_SLOT_MIN', String(Math.round(payload.slotMin)));
+  }
+  if (payload.priceCents !== undefined) {
+    const n = Number(payload.priceCents);
+    if (isFinite(n) && n >= 0) {
+      await setConfigValue(env.DB, 'BLOOD_TEST_PRICE_CENTS', String(Math.round(n)));
+    }
+  }
+  if (Array.isArray(payload.types)) {
+    const clean = payload.types.map((t: any) => String(t || '').trim()).filter((t: string) => !!t);
+    await setConfigValue(env.DB, 'BLOOD_TEST_TYPES', JSON.stringify(clean));
+  }
+  if (payload.hours && typeof payload.hours === 'object') {
+    await setConfigValue(env.DB, 'BLOOD_TEST_HOURS', JSON.stringify(payload.hours));
+  }
+
+  await bumpVersion(env.DB);
+  const cfg = await loadBloodTestConfig(env.DB);
+  return json({ ok: true, config: cfg });
+}
+
+export async function apiAdminGetBloodTestAppointments(req: Request, env: Env): Promise<Response> {
+  const denied = await requireAdmin(req, env);
+  if (denied) return denied;
+  const url = new URL(req.url);
+  const dateKey = (url.searchParams.get('date') || '').trim() || toDateKey(todayLocal(env.TIMEZONE));
+  const all = await getNonCancelledAppointmentsByDate(env.DB, dateKey);
+  const bt = all.filter(a => a.service_id === 'blood-test');
+  // Pre-sign reschedule + cancel URLs so the admin row's buttons can deep-link
+  // straight into the patient-side flow without a second roundtrip per row.
+  const { computeSig } = await import('../services/crypto');
+  const baseUrl = 'https://kevappts.labrint.workers.dev';
+  const enriched = await Promise.all(bt.map(async a => {
+    const rSig = await computeSig('reschedule|' + a.token, env.SIGNING_SECRET);
+    const cSig = await computeSig('cancel|' + a.token, env.SIGNING_SECRET);
+    return {
+      ...a,
+      rescheduleUrl: `${baseUrl}/reschedule?token=${encodeURIComponent(a.token)}&sig=${encodeURIComponent(rSig)}`,
+      cancelUrl: `${baseUrl}/cancel?token=${encodeURIComponent(a.token)}&sig=${encodeURIComponent(cSig)}`,
+    };
+  }));
+  return json({ ok: true, dateKey, appointments: enriched });
+}
+
+export async function apiAdminListBloodTestOff(req: Request, env: Env): Promise<Response> {
+  const denied = await requireAdmin(req, env);
+  if (denied) return denied;
+  const rows = await getBloodTestOffRows(env.DB);
+  return json({ ok: true, rows });
+}
+
+export async function apiAdminAddBloodTestOff(req: Request, env: Env): Promise<Response> {
+  const denied = await requireAdmin(req, env);
+  if (denied) return denied;
+  const payload: any = await req.json();
+  const dateKey = (payload.dateKey || '').trim();
+  const reason = (payload.reason || '').trim();
+  if (!dateKey || !/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) {
+    return json({ ok: false, reason: 'Invalid date.' }, 400);
+  }
+  await addBloodTestOff(env.DB, dateKey, reason, nowIso(env.TIMEZONE));
+  await bumpVersion(env.DB);
+  await broadcast(env, dateKey);
+  return json({ ok: true });
+}
+
+export async function apiAdminDeleteBloodTestOff(req: Request, env: Env): Promise<Response> {
+  const denied = await requireAdmin(req, env);
+  if (denied) return denied;
+  const url = new URL(req.url);
+  const idStr = url.pathname.split('/').pop() || '';
+  const id = parseInt(idStr, 10);
+  if (isNaN(id)) return json({ ok: false, reason: 'Invalid id.' }, 400);
+  await deleteBloodTestOff(env.DB, id);
+  await bumpVersion(env.DB);
+  await broadcast(env, '');
+  return json({ ok: true });
+}
+
+// Admin: send a single blood-test booking to Spinola (clone the row to
+// clinic='spinola', drop calendar event, email the patient). Mirrors the
+// existing bulk redirect logic but operates on one appointment at a time —
+// blood tests never auto-redirect during doctor-off, but the admin can
+// move one manually if a patient prefers Spinola.
+export async function apiAdminBloodTestSendToSpinola(req: Request, env: Env): Promise<Response> {
+  const denied = await requireAdmin(req, env);
+  if (denied) return denied;
+
+  const payload: any = await req.json();
+  const appointmentId = (payload.appointmentId || '').trim();
+  if (!appointmentId) return json({ ok: false, reason: 'Missing appointmentId.' }, 400);
+
+  const appt = await getAppointmentById(env.DB, appointmentId);
+  if (!appt) return json({ ok: false, reason: 'Appointment not found.' }, 404);
+  if (appt.service_id !== 'blood-test') {
+    return json({ ok: false, reason: 'Not a blood-test booking.' }, 400);
+  }
+
+  const cfg = await getConfig(env.DB);
+  const tz = env.TIMEZONE;
+  const now = nowIso(tz);
+
+  // Mark the original Potter's blood-test as relocated and remove its
+  // calendar event so staff at Potter's don't expect the patient.
+  if (appt.calendar_event_id) {
+    try { await deleteCalendarEvent(env, appt.calendar_event_id, 'potters'); } catch {}
+  }
+  await updateAppointmentStatus(env.DB, appt.id, {
+    status: 'RELOCATED_SPINOLA',
+    location: cfg.spinolaLocation,
+    calendar_event_id: '',
+  }, now);
+
+  // Create a Spinola copy. Keep the same time slot since blood tests are
+  // 08:00–09:00 which doesn't conflict with Spinola's regular doctor
+  // schedule; if admin needs a different time they can use the regular
+  // reschedule flow on the new copy's token.
+  const spinolaCopyId = 'A-' + generateId();
+  const spinolaToken = generateId();
+  try {
+    await insertAppointment(env.DB, {
+      ...appt,
+      id: spinolaCopyId,
+      token: spinolaToken,
+      clinic: 'spinola',
+      status: 'RELOCATED_SPINOLA',
+      location: cfg.spinolaLocation,
+      updated_at: now,
+      calendar_event_id: '',
+    });
+  } catch (e) { console.error('Blood-test Spinola copy error:', e); }
+
+  try {
+    const spinolaCopy = { ...appt, id: spinolaCopyId, token: spinolaToken, clinic: 'spinola' as const, location: cfg.spinolaLocation };
+    const eventId = await createCalendarEvent(env, spinolaCopy);
+    if (eventId) {
+      await env.DB.prepare('UPDATE appointments SET calendar_event_id = ? WHERE id = ?').bind(eventId, spinolaCopyId).run();
+    }
+  } catch {}
+
+  const ctx = (globalThis as any).__ctx;
+  if (ctx?.waitUntil) {
+    ctx.waitUntil(sendRedirectToSpinolaEmail(env, { ...appt, token: spinolaToken }, cfg.spinolaLocation).catch(() => {}));
+  }
+  await bumpVersion(env.DB);
+  await broadcast(env, appt.date_key);
+  return json({ ok: true, message: 'Blood test moved to Spinola Clinic.', spinolaAppointmentId: spinolaCopyId });
 }

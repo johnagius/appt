@@ -406,6 +406,7 @@ export function adminPage(sig: string): string {
     <div class="tab" data-tab="referrals" onclick="switchTab('referrals')">Referrals</div>
     <div class="tab" data-tab="telemedicine" onclick="switchTab('telemedicine')" style="background:#fff7ed;color:#9a3412;">Telemedicine</div>
     <div class="tab" data-tab="linda" onclick="switchTab('linda')" style="background:#ecfdf5;color:#065f46;">Linda</div>
+    <div class="tab" data-tab="bloodtests" onclick="switchTab('bloodtests')" style="background:#fef2f2;color:#991b1b;">Blood Tests</div>
     <div class="tab" data-tab="settings" onclick="switchTab('settings')">Settings</div>
   </div>
 
@@ -467,6 +468,12 @@ export function adminPage(sig: string): string {
           Linda &middot; Physiotherapy
         </h4>
         <div id="schedTableLinda"></div>
+
+        <h4 style="margin:18px 0 6px 0;font-size:14px;color:#991b1b;font-weight:800;letter-spacing:.02em;">
+          <span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#dc2626;margin-right:6px;vertical-align:middle;"></span>
+          Blood Tests &middot; Potter&#39;s Pharmacy (08:00&ndash;09:00)
+        </h4>
+        <div id="schedTableBlood"></div>
       </div>
 
       <!-- Telemedicine — completely separate from Kevin/Spinola/Linda. Has no
@@ -955,6 +962,16 @@ export function adminPage(sig: string): string {
           <button class="btn btn-sm" style="background:#ea580c;color:#fff;" onclick="sendReviewEmails('telemedicine')">Send Review Request</button>
         </div>
       </div>
+      <div class="card rev-card">
+        <div class="rev-card-header">
+          <h3 class="rev-card-title" style="color:#991b1b;">Blood Tests</h3>
+          <label class="rev-check-label"><input type="checkbox" id="revSelectAllBloodTest" onchange="toggleRevAll('bloodtest',this.checked)"> Select all</label>
+        </div>
+        <div class="rev-list" id="revBloodTestList"><div class="empty">Loading...</div></div>
+        <div class="rev-card-footer">
+          <button class="btn btn-sm" style="background:#dc2626;color:#fff;" onclick="sendReviewEmails('bloodtest')">Send Review Request</button>
+        </div>
+      </div>
     </div>
     <div class="msg rev-msg" id="reviewsMsg"></div>
   </div>
@@ -1156,6 +1173,65 @@ export function adminPage(sig: string): string {
   <div class="card" style="padding:18px;">
     <h3 style="margin:0 0 10px 0;font-size:15px;font-weight:800;">Follow-ups</h3>
     <div id="lindaFollowUps"><div class="empty">Loading...</div></div>
+  </div>
+</div>
+
+<!-- BLOOD TESTS TAB -->
+<div class="tab-content" id="tab-bloodtests" style="display:none;">
+  <div class="card" style="padding:18px;background:#fef2f2;border-left:4px solid #dc2626;margin-bottom:14px;">
+    <h3 style="margin:0 0 6px 0;color:#991b1b;font-size:16px;">Blood Tests &middot; Potter&#39;s Pharmacy</h3>
+    <p style="margin:0;color:#7f1d1d;font-size:13px;line-height:1.5;">Pharmacy-staff blood-test bookings, 08:00&ndash;09:00. Independent of Dr Kevin's availability &mdash; a doctor-off event does not affect these.</p>
+  </div>
+
+  <div class="card" style="padding:18px;margin-bottom:14px;">
+    <h3 style="margin:0 0 10px 0;font-size:15px;font-weight:800;">Configuration</h3>
+    <div class="settings-grid">
+      <div class="form-group">
+        <label>Enabled</label>
+        <select id="btEnabled"><option value="1">Yes &mdash; accept bookings</option><option value="0">No &mdash; hide button</option></select>
+      </div>
+      <div class="form-group">
+        <label>Slot duration (minutes)</label>
+        <input type="number" id="btSlotMin" min="5" max="60">
+      </div>
+      <div class="form-group">
+        <label>Price (euros, 0 = TBD)</label>
+        <input type="number" id="btPriceEuros" min="0" step="0.5">
+      </div>
+      <div class="form-group" style="grid-column:1/-1;">
+        <label>Test types (one per line, optional)</label>
+        <textarea id="btTypes" rows="3" placeholder="Full blood count&#10;Glucose&#10;Cholesterol"></textarea>
+      </div>
+      <div class="form-group" style="grid-column:1/-1;">
+        <label>Hours (JSON per weekday, [{"start":"08:00","end":"09:00"}])</label>
+        <textarea id="btHours" rows="4" style="font-family:monospace;font-size:12px;"></textarea>
+      </div>
+    </div>
+    <div style="margin-top:10px;">
+      <button class="btn btn-dark" onclick="saveBloodTestConfig()">Save Configuration</button>
+    </div>
+    <div class="msg" id="btConfigMsg"></div>
+  </div>
+
+  <div class="card" style="padding:18px;margin-bottom:14px;">
+    <h3 style="margin:0 0 10px 0;font-size:15px;font-weight:800;">Day Off</h3>
+    <p style="margin:0 0 10px 0;color:#6b7280;font-size:13px;">Mark a date as closed for blood tests (existing bookings on that date stay; admin should manually reschedule or send to Spinola).</p>
+    <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;">
+      <div class="form-group" style="margin:0;"><label>Date</label><input type="date" id="btOffDate"></div>
+      <div class="form-group" style="margin:0;flex:1;min-width:200px;"><label>Reason (optional)</label><input type="text" id="btOffReason"></div>
+      <button class="btn btn-dark" onclick="addBloodTestOff()">Add Day Off</button>
+    </div>
+    <div id="btOffList" style="margin-top:10px;"><div class="empty">Loading...</div></div>
+  </div>
+
+  <div class="card" style="padding:18px;">
+    <h3 style="margin:0 0 10px 0;font-size:15px;font-weight:800;">Upcoming Bookings</h3>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;">
+      <label style="font-size:13px;color:#374151;">Date:</label>
+      <input type="date" id="btApptsDate" onchange="loadBloodTestAppts()">
+      <button class="btn" onclick="loadBloodTestAppts()">Refresh</button>
+    </div>
+    <div id="btApptsList"><div class="empty">Pick a date.</div></div>
   </div>
 </div>
 
@@ -1581,6 +1657,7 @@ function switchTab(name) {
   if (name === 'referrals') loadReferrals();
   if (name === 'telemedicine') loadTelemedicineData();
   if (name === 'linda') loadLindaData();
+  if (name === 'bloodtests') loadBloodTestData();
 }
 
 // ─── Telemedicine (admin) ─────────────────────────────────
@@ -2571,6 +2648,19 @@ function loadSchedAppts() {
   loadOne('linda', 'schedTableLinda');
   // Telemedicine — separate from Linda. Same date as the rest of the schedule.
   try { loadSchedTelemed(_schedDate); } catch(e) {}
+  // Blood tests — pharmacy service at Potter's, listed as its own subsection.
+  try { loadSchedBlood(_schedDate); } catch(e) {}
+}
+
+function loadSchedBlood(dateKey) {
+  var el = document.getElementById('schedTableBlood');
+  if (!el) return;
+  el.innerHTML = '<div class="empty">Loading...</div>';
+  apiCall('blood-test-appointments?date=' + encodeURIComponent(dateKey)).then(function(res) {
+    if (!res || !res.ok) { el.innerHTML = '<div class="empty">Failed to load.</div>'; return; }
+    var appts = (res.appointments || []).map(transformAppt);
+    renderApptTable(appts, 'schedTableBlood', false);
+  }).catch(function() { el.innerHTML = '<div class="empty">Error loading.</div>'; });
 }
 
 function loadSchedTelemed(dateKey) {
@@ -4705,6 +4795,7 @@ var _reviewPotters = [];
 var _reviewSpinola = [];
 var _reviewLinda = [];
 var _reviewTelemedicine = [];
+var _reviewBloodTest = [];
 var _reviewDateKey = '';
 
 // ── Reminders Tab ──
@@ -4801,11 +4892,13 @@ function loadReviewPatients() {
       _reviewSpinola = res.spinola || [];
       _reviewLinda = res.linda || [];
       _reviewTelemedicine = res.telemedicine || [];
+      _reviewBloodTest = res.bloodTest || [];
       _reviewDateKey = dateKey;
       renderReviewList('potters', _reviewPotters);
       renderReviewList('spinola', _reviewSpinola);
       renderReviewList('linda', _reviewLinda);
       renderReviewList('telemedicine', _reviewTelemedicine);
+      renderReviewList('bloodtest', _reviewBloodTest);
     })
     .catch(function(err) {
       showMsg('reviewsMsg', 'bad', 'Error: ' + (err && err.message ? err.message : String(err)));
@@ -4816,12 +4909,15 @@ function renderReviewList(loc, patients) {
   var elId = loc === 'potters' ? 'revPottersList'
     : loc === 'linda' ? 'revLindaList'
     : loc === 'telemedicine' ? 'revTelemedicineList'
+    : loc === 'bloodtest' ? 'revBloodTestList'
     : 'revSpinolaList';
   var el = document.getElementById(elId);
   if (!el) return;
   var emptyMsg = loc === 'telemedicine'
     ? 'No telemedicine calls with email today.'
-    : 'No patients with email today.';
+    : loc === 'bloodtest'
+      ? 'No blood-test bookings with email today.'
+      : 'No patients with email today.';
   if (!patients.length) { el.innerHTML = '<div class="empty">' + emptyMsg + '</div>'; return; }
 
   var html = '';
@@ -4877,6 +4973,9 @@ function sendReviewEmails(loc) {
   var teamNames = getSelectedTeamNames();
   if (!teamNames.length) { showMsg('reviewsMsg', 'bad', 'Please select at least one team member.'); return; }
 
+  // Blood tests route through the standard 'potters' send path — they live in
+  // the appointments table with clinic='potters' so the existing email helper
+  // (and Potter's Google Place ID) is the right one.
   var clinicLoc = loc === 'linda' ? 'linda'
     : loc === 'spinola' ? 'spinola'
     : loc === 'telemedicine' ? 'telemedicine'
@@ -4901,6 +5000,7 @@ function sendReviewEmails(loc) {
       var selAllId = loc === 'potters' ? 'revSelectAllPotters'
         : loc === 'linda' ? 'revSelectAllLinda'
         : loc === 'telemedicine' ? 'revSelectAllTelemedicine'
+        : loc === 'bloodtest' ? 'revSelectAllBloodTest'
         : 'revSelectAllSpinola';
       var selAll = document.getElementById(selAllId);
       if (selAll) selAll.checked = false;
@@ -4908,6 +5008,131 @@ function sendReviewEmails(loc) {
     .catch(function(err) {
       showMsg('reviewsMsg', 'bad', 'Error: ' + (err && err.message ? err.message : String(err)));
     });
+}
+
+
+// ─── Blood Tests (admin) ────────────────────────────────────
+var _btConfig = null;
+
+async function loadBloodTestData() {
+  loadBloodTestConfig();
+  loadBloodTestOff();
+  // Default the upcoming-appts date to today on first open.
+  var di = document.getElementById('btApptsDate');
+  if (di && !di.value) di.value = todayStr();
+  loadBloodTestAppts();
+}
+
+async function loadBloodTestConfig() {
+  try {
+    var res = await apiCall('blood-test-config');
+    if (!res || !res.ok || !res.config) return;
+    var c = res.config;
+    _btConfig = c;
+    document.getElementById('btEnabled').value = c.enabled ? '1' : '0';
+    document.getElementById('btSlotMin').value = String(c.slotMin || 10);
+    document.getElementById('btPriceEuros').value = ((c.priceCents || 0) / 100).toFixed(2);
+    document.getElementById('btTypes').value = (c.types || []).join('\\n');
+    document.getElementById('btHours').value = JSON.stringify(c.hours || {}, null, 2);
+  } catch (e) { console.error('Blood-test config load error:', e); }
+}
+
+async function saveBloodTestConfig() {
+  var enabled = document.getElementById('btEnabled').value === '1';
+  var slotMin = parseInt(document.getElementById('btSlotMin').value, 10);
+  var euros = parseFloat(document.getElementById('btPriceEuros').value);
+  if (!isFinite(euros) || euros < 0) euros = 0;
+  var priceCents = Math.round(euros * 100);
+  var types = document.getElementById('btTypes').value.split(/\\r?\\n/).map(function(s){ return s.trim(); }).filter(Boolean);
+  var hours;
+  try { hours = JSON.parse(document.getElementById('btHours').value); }
+  catch(e) { showMsg('btConfigMsg', 'bad', 'Invalid hours JSON.'); return; }
+
+  showMsg('btConfigMsg', '', 'Saving...');
+  try {
+    var res = await apiCall('blood-test-config', { body: { enabled: enabled, slotMin: slotMin, priceCents: priceCents, types: types, hours: hours } });
+    if (!res || !res.ok) { showMsg('btConfigMsg', 'bad', (res && res.reason) || 'Failed.'); return; }
+    showMsg('btConfigMsg', 'good', 'Saved.');
+    _btConfig = res.config;
+  } catch (e) { showMsg('btConfigMsg', 'bad', 'Error: ' + e.message); }
+}
+
+async function loadBloodTestOff() {
+  var el = document.getElementById('btOffList');
+  el.innerHTML = '<div class="empty">Loading...</div>';
+  try {
+    var res = await apiCall('blood-test-off');
+    if (!res || !res.ok) { el.innerHTML = '<div class="empty">Failed to load.</div>'; return; }
+    var rows = res.rows || [];
+    if (!rows.length) { el.innerHTML = '<div class="empty">No off-days set.</div>'; return; }
+    var html = '<table style="width:100%;border-collapse:collapse;font-size:13px;"><thead><tr style="text-align:left;color:#6b7280;"><th style="padding:6px;">Date</th><th style="padding:6px;">Reason</th><th style="padding:6px;text-align:right;">&nbsp;</th></tr></thead><tbody>';
+    for (var i = 0; i < rows.length; i++) {
+      var r = rows[i];
+      html += '<tr><td style="padding:6px;border-top:1px solid #f3f4f6;"><b>' + esc(r.date_key) + '</b></td>' +
+              '<td style="padding:6px;border-top:1px solid #f3f4f6;color:#374151;">' + esc(r.reason || '') + '</td>' +
+              '<td style="padding:6px;border-top:1px solid #f3f4f6;text-align:right;"><button class="btn btn-ghost btn-sm" onclick="removeBloodTestOff(' + r.id + ')">Remove</button></td></tr>';
+    }
+    html += '</tbody></table>';
+    el.innerHTML = html;
+  } catch (e) { el.innerHTML = '<div class="empty">Error: ' + esc(e.message) + '</div>'; }
+}
+
+async function addBloodTestOff() {
+  var d = document.getElementById('btOffDate').value;
+  var r = document.getElementById('btOffReason').value.trim();
+  if (!d) return;
+  await apiCall('blood-test-off', { body: { dateKey: d, reason: r } });
+  document.getElementById('btOffReason').value = '';
+  loadBloodTestOff();
+}
+
+async function removeBloodTestOff(id) {
+  if (!confirm('Remove this off-day?')) return;
+  await fetch('/api/admin/blood-test-off/' + id + '?sig=' + encodeURIComponent(SIG), { method: 'DELETE', credentials: 'same-origin' });
+  loadBloodTestOff();
+}
+
+async function loadBloodTestAppts() {
+  var di = document.getElementById('btApptsDate');
+  if (!di.value) return;
+  var el = document.getElementById('btApptsList');
+  el.innerHTML = '<div class="empty">Loading...</div>';
+  try {
+    var res = await apiCall('blood-test-appointments?date=' + encodeURIComponent(di.value));
+    if (!res || !res.ok) { el.innerHTML = '<div class="empty">Failed.</div>'; return; }
+    var appts = res.appointments || [];
+    if (!appts.length) { el.innerHTML = '<div class="empty">No blood-test bookings on this date.</div>'; return; }
+    var html = '<table style="width:100%;border-collapse:collapse;font-size:13px;"><thead><tr style="text-align:left;color:#6b7280;"><th style="padding:6px;">Time</th><th style="padding:6px;">Patient</th><th style="padding:6px;">Phone</th><th style="padding:6px;">Email</th><th style="padding:6px;">Service</th><th style="padding:6px;">Status</th><th style="padding:6px;text-align:right;">Actions</th></tr></thead><tbody>';
+    for (var i = 0; i < appts.length; i++) {
+      var a = appts[i];
+      var rowStyle = a.status === 'RELOCATED_SPINOLA' ? 'opacity:0.6;' : '';
+      html += '<tr style="' + rowStyle + '">';
+      html += '<td style="padding:6px;border-top:1px solid #f3f4f6;"><b>' + esc(a.start_time) + '</b></td>';
+      html += '<td style="padding:6px;border-top:1px solid #f3f4f6;">' + esc(a.full_name) + '</td>';
+      html += '<td style="padding:6px;border-top:1px solid #f3f4f6;"><a href="tel:' + esc(a.phone) + '">' + esc(a.phone) + '</a></td>';
+      html += '<td style="padding:6px;border-top:1px solid #f3f4f6;">' + esc(a.email) + '</td>';
+      html += '<td style="padding:6px;border-top:1px solid #f3f4f6;">' + esc(a.service_name) + '</td>';
+      html += '<td style="padding:6px;border-top:1px solid #f3f4f6;">' + esc(a.status) + '</td>';
+      html += '<td style="padding:6px;border-top:1px solid #f3f4f6;text-align:right;white-space:nowrap;">';
+      if (a.status === 'BOOKED') {
+        html += '<button class="btn btn-sm btn-ghost" onclick="bloodTestSendSpinola(\\'' + a.id + '\\')">Send to Spinola</button> ';
+        html += '<a class="btn btn-sm btn-ghost" target="_blank" rel="noopener" href="' + esc(a.rescheduleUrl) + '">Reschedule</a> ';
+        html += '<a class="btn btn-sm btn-ghost" style="color:#991b1b;" target="_blank" rel="noopener" href="' + esc(a.cancelUrl) + '">Cancel</a>';
+      }
+      html += '</td></tr>';
+    }
+    html += '</tbody></table>';
+    el.innerHTML = html;
+  } catch (e) { el.innerHTML = '<div class="empty">Error: ' + esc(e.message) + '</div>'; }
+}
+
+async function bloodTestSendSpinola(appointmentId) {
+  if (!confirm('Move this blood test to Spinola Clinic? Patient will be emailed the new location.')) return;
+  try {
+    var res = await apiCall('blood-test-send-spinola', { body: { appointmentId: appointmentId } });
+    if (res && res.ok) { alert(res.message || 'Moved to Spinola.'); loadBloodTestAppts(); }
+    else alert((res && res.reason) || 'Failed.');
+  } catch (e) { alert('Error: ' + e.message); }
 }
 
 

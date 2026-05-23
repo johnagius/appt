@@ -30,11 +30,14 @@ CREATE INDEX IF NOT EXISTS idx_appt_token ON appointments(token);
 CREATE INDEX IF NOT EXISTS idx_appt_date_status ON appointments(date_key, status);
 CREATE INDEX IF NOT EXISTS idx_appt_clinic_date ON appointments(clinic, date_key);
 CREATE INDEX IF NOT EXISTS idx_appt_email ON appointments(email);
--- Partial unique index: only one BOOKED row per (clinic, date_key, start_time).
+-- Partial unique index: only one BOOKED row per (clinic, service_id, date_key, start_time).
 -- Cancelled / attended / no-show rows are unconstrained so history is preserved.
 -- Backstops the application-level isSlotTaken check against simultaneous books.
+-- service_id is in the key so a doctor visit at 08:30 and a blood-test at 08:30
+-- (both clinic='potters') can coexist without violating the constraint.
+DROP INDEX IF EXISTS idx_appt_unique_booked_slot;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_appt_unique_booked_slot
-  ON appointments(clinic, date_key, start_time) WHERE status = 'BOOKED';
+  ON appointments(clinic, service_id, date_key, start_time) WHERE status = 'BOOKED';
 
 CREATE TABLE IF NOT EXISTS clients (
   id TEXT PRIMARY KEY,
@@ -226,3 +229,25 @@ INSERT OR IGNORE INTO config (key, value) VALUES ('LINDA_WINDOW_START', '2026-04
 INSERT OR IGNORE INTO config (key, value) VALUES ('LINDA_WINDOW_END', '2026-05-07');
 INSERT OR IGNORE INTO config (key, value) VALUES ('LINDA_SLOT_MIN', '30');
 INSERT OR IGNORE INTO config (key, value) VALUES ('LINDA_HOURS', '{"MON":[{"start":"09:30","end":"13:00"},{"start":"16:00","end":"18:30"}],"TUE":[{"start":"09:30","end":"13:00"},{"start":"16:00","end":"18:30"}],"WED":[{"start":"09:30","end":"13:00"},{"start":"16:00","end":"18:30"}],"THU":[{"start":"09:30","end":"13:00"},{"start":"16:00","end":"18:30"}],"FRI":[{"start":"09:30","end":"13:00"},{"start":"16:00","end":"18:30"}],"SAT":[],"SUN":[]}');
+
+-- Blood Tests (pharmacy-staff service, 8-9am at Potter's). Independent of
+-- Dr Kevin's availability — pharmacy staff take blood, doctor not needed.
+-- Slots live in the main `appointments` table with clinic='potters' and
+-- service_id='blood-test' so cancel/reschedule/review flows are reused;
+-- the doctor-off filter explicitly excludes blood-test rows so a doctor-off
+-- event never cancels a blood test. Hours, slot duration, price and test
+-- types are admin-editable via config.
+INSERT OR IGNORE INTO config (key, value) VALUES ('BLOOD_TEST_ENABLED', '1');
+INSERT OR IGNORE INTO config (key, value) VALUES ('BLOOD_TEST_SLOT_MIN', '10');
+INSERT OR IGNORE INTO config (key, value) VALUES ('BLOOD_TEST_PRICE_CENTS', '0');
+INSERT OR IGNORE INTO config (key, value) VALUES ('BLOOD_TEST_TYPES', '[]');
+INSERT OR IGNORE INTO config (key, value) VALUES ('BLOOD_TEST_HOURS', '{"MON":[{"start":"08:00","end":"09:00"}],"TUE":[{"start":"08:00","end":"09:00"}],"WED":[{"start":"08:00","end":"09:00"}],"THU":[{"start":"08:00","end":"09:00"}],"FRI":[{"start":"08:00","end":"09:00"}],"SAT":[{"start":"08:00","end":"09:00"}],"SUN":[]}');
+
+-- Blood-test day-off: dates pharmacy isn't taking blood. Overrides BLOOD_TEST_HOURS.
+CREATE TABLE IF NOT EXISTS blood_test_off (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  date_key TEXT NOT NULL UNIQUE,
+  reason TEXT DEFAULT '',
+  created_at TEXT DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS idx_blood_test_off_date ON blood_test_off(date_key);

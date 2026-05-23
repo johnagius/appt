@@ -168,21 +168,20 @@ export function indexPage(env: Env, bookingSource?: string): string {
        physiotherapy patients only. Outline style + smaller text keeps it
        visible without drawing accidental clicks. */
     .physioCta{
-      margin: 14px 0 6px 0;
       text-align:center;
     }
     .physioCta a{
-      display:inline-block;
-      background:#fff;
+      display:block;
+      background:#ecfdf5;
       color:#047857;
       text-decoration:none;
-      padding:9px 16px;
-      border-radius:8px;
-      border:1px solid #a7f3d0;
-      font-weight:700;
-      font-size:13px;
+      padding:12px 14px;
+      border-radius:12px;
+      border:1.5px solid #a7f3d0;
+      font-weight:800;
+      font-size:14px;
     }
-    .physioCta a:hover{ background:#ecfdf5; }
+    .physioCta a:hover{ background:#d1fae5; }
     .physioCta .sub{
       color: var(--muted);
       font-size:12px;
@@ -858,9 +857,15 @@ export function indexPage(env: Env, bookingSource?: string): string {
           <div>
             <div class="sectionTitle" data-i18n="services">Services</div>
             <div id="services"></div>
-            <!-- Physiotherapy CTA — shown only when Linda is enabled + has available dates -->
-            <div id="physioLinkWrap" class="physioCta" style="display:none;margin-top:10px;">
-              <a href="/physio" id="physioLinkBtn">Physiotherapy Bookings Here</a>
+            <!-- Other-service CTAs. Blood Tests + Telemedicine are always
+                 visible (independent of Dr Kevin). Physiotherapy shows only
+                 when Linda is enabled + has available dates. -->
+            <div id="extraServicesWrap" style="margin-top:10px;display:flex;flex-direction:column;gap:8px;">
+              <a href="/blood-tests" id="bloodTestLinkBtn" style="display:block;text-align:center;background:#fef2f2;color:#991b1b;border:1.5px solid #fecaca;text-decoration:none;padding:12px 14px;border-radius:12px;font-weight:800;font-size:14px;">Book Blood Tests &mdash; Potter&#39;s 8am</a>
+              <button type="button" id="telemedAlwaysBtn" onclick="openTelemedicineModal()" style="display:block;text-align:center;background:#fff7ed;color:#9a3412;border:1.5px solid #fdba74;padding:12px 14px;border-radius:12px;font-weight:800;font-size:14px;cursor:pointer;width:100%;">Book Telemedicine Call &mdash; &euro;25</button>
+              <div id="physioLinkWrap" class="physioCta" style="display:none;">
+                <a href="/physio" id="physioLinkBtn">Physiotherapy Bookings Here</a>
+              </div>
             </div>
           </div>
 
@@ -1021,7 +1026,7 @@ export function indexPage(env: Env, bookingSource?: string): string {
   <div class="overlay" id="telemedicineOverlay" role="dialog" aria-modal="true">
     <div class="modal" style="max-width:460px;">
       <h3 style="font-size:18px;margin-bottom:6px;color:#9a3412;">Book Telemedicine Call</h3>
-      <p style="font-size:14px;color:#374151;margin-bottom:8px;line-height:1.45;">The doctor will phone you on the number you enter, between 8pm and midnight tonight.</p>
+      <p style="font-size:14px;color:#374151;margin-bottom:8px;line-height:1.45;">The doctor will call you back as soon as possible on the number you enter.</p>
       <div style="background:#fff7ed;border:1px solid #fdba74;border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:14px;color:#9a3412;font-weight:700;">Doctor's fee: €25 (paid to the doctor on the call)</div>
       <div style="display:flex;flex-direction:column;gap:10px;">
         <div>
