@@ -859,11 +859,12 @@ export function indexPage(env: Env, bookingSource?: string): string {
             <div id="services"></div>
             <!-- Other-service CTAs. Blood Tests + Telemedicine are always
                  visible (independent of Dr Kevin). Physiotherapy shows only
-                 when Linda is enabled + has available dates. -->
-            <div id="extraServicesWrap" style="margin-top:10px;display:flex;flex-direction:column;gap:8px;">
-              <a href="/blood-tests" id="bloodTestLinkBtn" style="display:block;text-align:center;background:#fef2f2;color:#991b1b;border:1.5px solid #fecaca;text-decoration:none;padding:12px 14px;border-radius:12px;font-weight:800;font-size:14px;">Book Blood Tests &mdash; Potter&#39;s 8am</a>
-              <button type="button" id="telemedAlwaysBtn" onclick="openTelemedicineModal()" style="display:block;text-align:center;background:#fff7ed;color:#9a3412;border:1.5px solid #fdba74;padding:12px 14px;border-radius:12px;font-weight:800;font-size:14px;cursor:pointer;width:100%;">Book Telemedicine Call &mdash; &euro;25</button>
-              <div id="physioLinkWrap" class="physioCta" style="display:none;">
+                 when Linda is enabled + has available dates. Row layout
+                 on wider screens; wraps to a column on narrow ones. -->
+            <div id="extraServicesWrap" style="margin-top:10px;display:flex;flex-direction:row;flex-wrap:wrap;gap:8px;">
+              <a href="/blood-tests" id="bloodTestLinkBtn" style="flex:1 1 180px;display:block;text-align:center;background:#fef2f2;color:#991b1b;border:1.5px solid #fecaca;text-decoration:none;padding:12px 14px;border-radius:12px;font-weight:800;font-size:14px;">Book Blood Tests &mdash; Potter&#39;s 8am</a>
+              <button type="button" id="telemedAlwaysBtn" onclick="openTelemedicineModal()" style="flex:1 1 180px;display:block;text-align:center;background:#fff7ed;color:#9a3412;border:1.5px solid #fdba74;padding:12px 14px;border-radius:12px;font-weight:800;font-size:14px;cursor:pointer;">Book Telemedicine Call &mdash; &euro;25</button>
+              <div id="physioLinkWrap" class="physioCta" style="display:none;flex:1 1 180px;">
                 <a href="/physio" id="physioLinkBtn">Physiotherapy Bookings Here</a>
               </div>
             </div>
