@@ -1,4 +1,5 @@
 import type { Env } from '../types';
+import { qrWidget } from './qr';
 
 export function indexPage(env: Env, bookingSource?: string): string {
   const bakedSource = bookingSource ? bookingSource.replace(/[^a-zA-Z0-9_-]/g, '') : '';
@@ -4207,6 +4208,7 @@ export function indexPage(env: Env, bookingSource?: string): string {
     window.submitTelemedicineCall = submitTelemedicineCall;
 
   </script>
+${qrWidget()}
 </body>
 </html>
 `;

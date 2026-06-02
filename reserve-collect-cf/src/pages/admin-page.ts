@@ -35,6 +35,28 @@ export function adminPage(sig: string): string {
   </div>
 
   <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+      <h2 style="margin:0;">Promotional bundles</h2>
+      <button class="btn btn-dark" onclick="toggleNewBundle()">+ New bundle</button>
+    </div>
+    <div id="newBundle" style="display:none;margin-top:14px;border:1px solid var(--line);border-radius:12px;padding:14px;">
+      <div class="row">
+        <div style="flex:2;"><label>Title</label><input type="text" id="bTitle" placeholder="e.g. Cold &amp; Flu Bundle"></div>
+        <div style="flex:0 0 120px;"><label>Discount %</label><input type="number" id="bDiscount" min="0" max="100" value="10"></div>
+      </div>
+      <label>Description (optional)</label>
+      <input type="text" id="bDesc" placeholder="Short description shown to customers">
+      <label style="margin-top:8px;">Items (name &amp; normal price €)</label>
+      <div id="bItems"></div>
+      <button type="button" class="btn btn-outline" onclick="addBundleItem()" style="margin-top:6px;">+ Add item</button>
+      <div class="err" id="bErr"></div>
+      <button type="button" class="btn btn-primary" onclick="createBundle()" style="margin-top:10px;">Create bundle</button>
+      <p class="muted" style="margin-top:6px;">Add a photo after creating it (button appears on the bundle below).</p>
+    </div>
+    <div id="bundleList" style="margin-top:12px;"></div>
+  </div>
+
+  <div class="card">
     <div class="row" style="align-items:center;">
       <div style="flex:2;"><input type="text" id="q" placeholder="Search reference, name or email…" oninput="debouncedLoad()"></div>
       <div style="flex:0 0 auto;"><button class="btn btn-outline" onclick="load()">Search</button></div>
@@ -245,7 +267,74 @@ async function syncVersion(){ try{ var d=await api('/api/poll'); if(d&&d.v!==und
 async function poll(){
   try{ var d = await api('/api/poll'); if(d.v!==undefined && d.v!==lastV){ if(lastV!==-1) load(); lastV=d.v; } }catch(e){}
 }
-renderTabs(); load(); connectWS(); setInterval(poll, 15000);
+// ── Promotional bundles management ──
+function escA(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;'); }
+function eurC(c){ return '€'+(c/100).toFixed(2); }
+function bItemRowInto(c, name, price){
+  var d=document.createElement('div'); d.className='row'; d.style.marginBottom='6px';
+  d.innerHTML='<div style="flex:3;"><input type="text" class="biName" placeholder="Item" value="'+escA(name||'')+'"></div>'
+    +'<div style="flex:0 0 110px;"><input type="number" class="biPrice" step="0.01" min="0" placeholder="€" value="'+(price!=null?price:'')+'"></div>'
+    +'<button type="button" class="btn btn-outline" style="flex:0 0 auto;" onclick="this.parentNode.remove()">✕</button>';
+  c.appendChild(d);
+}
+function addBundleItem(){ bItemRowInto(document.getElementById('bItems')); }
+function addBdItem(btn){ bItemRowInto(btn.previousElementSibling); }
+function toggleNewBundle(){ var n=document.getElementById('newBundle'); var show=n.style.display==='none'; n.style.display=show?'block':'none'; if(show && !document.querySelectorAll('#bItems .biName').length){ addBundleItem(); addBundleItem(); } }
+function gatherBItems(scope){ var names=scope.querySelectorAll('.biName'), prices=scope.querySelectorAll('.biPrice'), items=[]; for(var i=0;i<names.length;i++){ var n=names[i].value.trim(); if(n) items.push({name:n, price: parseFloat(prices[i].value)||0}); } return items; }
+async function createBundle(){
+  var err=document.getElementById('bErr'); err.textContent='';
+  var title=document.getElementById('bTitle').value.trim();
+  var items=gatherBItems(document.getElementById('bItems'));
+  if(!title||!items.length){ err.textContent='Title and at least one item required.'; return; }
+  var d=await api('/api/admin/bundles','POST',{title:title,description:document.getElementById('bDesc').value.trim(),discountPct:parseInt(document.getElementById('bDiscount').value,10)||0,items:items});
+  if(d.ok){ document.getElementById('newBundle').style.display='none'; document.getElementById('bItems').innerHTML=''; document.getElementById('bTitle').value=''; document.getElementById('bDesc').value=''; loadBundles(); }
+  else err.textContent=d.reason||'Failed';
+}
+async function loadBundles(){
+  var box=document.getElementById('bundleList'); if(!box) return;
+  var d=await api('/api/admin/bundles');
+  if(!d.ok){ box.innerHTML=''; return; }
+  if(!d.bundles.length){ box.innerHTML='<p class="muted">No bundles yet.</p>'; return; }
+  box.innerHTML=d.bundles.map(function(b){
+    var items=b.items.map(function(it){ return '<div class="row" style="margin-bottom:6px;"><div style="flex:3;"><input type="text" class="biName" value="'+escA(it.name)+'"></div><div style="flex:0 0 110px;"><input type="number" class="biPrice" step="0.01" min="0" value="'+(it.price_cents/100).toFixed(2)+'"></div><button type="button" class="btn btn-outline" style="flex:0 0 auto;" onclick="this.parentNode.remove()">✕</button></div>'; }).join('');
+    return '<div class="card" data-bundle="'+b.id+'" style="border:1px solid var(--line);">'
+      +'<div class="row"><div style="flex:2;"><label>Title</label><input type="text" class="bdTitle" value="'+escA(b.title)+'"></div>'
+      +'<div style="flex:0 0 110px;"><label>Discount %</label><input type="number" class="bdDiscount" min="0" max="100" value="'+b.discount_pct+'"></div></div>'
+      +'<label>Description</label><input type="text" class="bdDesc" value="'+escA(b.description)+'">'
+      +'<label>Items</label><div class="bdItems">'+items+'</div>'
+      +'<button type="button" class="btn btn-outline" onclick="addBdItem(this)" style="margin-top:6px;">+ Add item</button>'
+      +'<p style="margin:10px 0 0;"><span style="text-decoration:line-through;color:#9ca3af;">'+eurC(b.originalCents)+'</span> &rarr; <b style="color:var(--good);">'+eurC(b.finalCents)+'</b> '+(b.saveCents>0?'<span class="badge" style="background:#dcfce7;color:#15803d;">Save '+eurC(b.saveCents)+'</span>':'')+'</p>'
+      +(b.hasImage?'<img src="/api/bundles/'+b.id+'/image?cb='+Date.now()+'" style="max-height:120px;border-radius:10px;margin-top:8px;">':'')
+      +'<div style="margin-top:10px;"><label style="display:inline-flex;gap:6px;align-items:center;font-weight:600;"><input type="checkbox" class="bdActive" style="width:auto;" '+(b.active?'checked':'')+'> Active (shown to customers)</label></div>'
+      +'<div class="row" style="margin-top:10px;">'
+      +'<button type="button" class="btn btn-primary" onclick="saveBundle(this)">Save</button>'
+      +'<label class="btn btn-outline" style="flex:0 0 auto;cursor:pointer;">Upload photo<input type="file" accept="image/*" style="display:none;" onchange="uploadBundleImage(this)"></label>'
+      +'<button type="button" class="btn btn-danger" onclick="deleteBundle(this)">Delete</button>'
+      +'</div></div>';
+  }).join('');
+}
+async function saveBundle(btn){
+  var card=btn.closest('[data-bundle]'); var id=card.getAttribute('data-bundle');
+  var body={title:card.querySelector('.bdTitle').value.trim(),description:card.querySelector('.bdDesc').value.trim(),discountPct:parseInt(card.querySelector('.bdDiscount').value,10)||0,active:card.querySelector('.bdActive').checked,items:gatherBItems(card.querySelector('.bdItems'))};
+  var d=await api('/api/admin/bundles/'+id,'POST',body);
+  if(d.ok) loadBundles(); else alert(d.reason||'Failed');
+}
+async function deleteBundle(btn){
+  if(!confirm('Delete this bundle?')) return;
+  var id=btn.closest('[data-bundle]').getAttribute('data-bundle');
+  var d=await api('/api/admin/bundles/'+id+'/delete','POST',{});
+  if(d.ok) loadBundles(); else alert(d.reason||'Failed');
+}
+async function uploadBundleImage(input){
+  if(!input.files||!input.files[0]) return;
+  var id=input.closest('[data-bundle]').getAttribute('data-bundle');
+  var fd=new FormData(); fd.append('file',input.files[0]);
+  var res=await fetch('/api/admin/bundles/'+id+'/image?sig='+encodeURIComponent(SIG),{method:'POST',body:fd});
+  var d=await res.json();
+  if(d.ok) loadBundles(); else alert(d.reason||'Upload failed');
+}
+
+renderTabs(); load(); loadBundles(); connectWS(); setInterval(poll, 15000);
 </script>`;
   return htmlDoc('Staff dashboard — Reserve & Collect', body);
 }

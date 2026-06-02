@@ -147,3 +147,36 @@ INSERT OR IGNORE INTO config (key, value) VALUES ('OTP_TTL_MIN', '10');
 INSERT OR IGNORE INTO config (key, value) VALUES ('MAX_PHOTO_MB', '8');
 INSERT OR IGNORE INTO config (key, value) VALUES ('CATALOGUE_MODE', 'freetext');
 INSERT OR IGNORE INTO config (key, value) VALUES ('PHOTO_RETENTION_DAYS', '90');
+
+-- ── Saved favourites (quick re-order) ───────────────────────
+CREATE TABLE IF NOT EXISTS favourites (
+  id         TEXT PRIMARY KEY,
+  user_id    TEXT NOT NULL,
+  item_name  TEXT NOT NULL,
+  quantity   INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_fav_user_item ON favourites(user_id, item_name);
+
+-- ── Promotional bundles ─────────────────────────────────────
+CREATE TABLE IF NOT EXISTS bundles (
+  id           TEXT PRIMARY KEY,             -- 'B-' + uuid
+  title        TEXT NOT NULL,
+  description  TEXT DEFAULT '',
+  image_key    TEXT DEFAULT '',              -- R2 key (bundles/<id>.<ext>), public
+  discount_pct INTEGER NOT NULL DEFAULT 0,   -- whole-number percent off the item total
+  active       INTEGER NOT NULL DEFAULT 1,
+  sort_order   INTEGER NOT NULL DEFAULT 0,
+  created_at   TEXT NOT NULL,
+  updated_at   TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_bundles_active ON bundles(active, sort_order);
+
+CREATE TABLE IF NOT EXISTS bundle_items (
+  id          TEXT PRIMARY KEY,
+  bundle_id   TEXT NOT NULL,
+  item_name   TEXT NOT NULL,
+  price_cents INTEGER NOT NULL DEFAULT 0,    -- normal price per item, in cents (EUR)
+  sort_order  INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_bundle_items_bundle ON bundle_items(bundle_id);

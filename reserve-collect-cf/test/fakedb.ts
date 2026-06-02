@@ -21,7 +21,7 @@ export class FakeDB {
 
   _run(sql: string, binds: any[]) {
     const low = this._norm(sql);
-    if (low.startsWith('insert into')) {
+    if (low.startsWith('insert ')) {
       const tbl = low.match(/insert(?: or \w+)? into (\w+)/)![1];
       const colsM = sql.match(/\(([^)]+)\)\s*values/i);
       this.tables[tbl] = this.tables[tbl] || [];

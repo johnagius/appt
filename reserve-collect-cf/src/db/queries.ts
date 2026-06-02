@@ -338,3 +338,62 @@ export async function getReservationStats(db: D1Database, todayKey: string): Pro
     collectedToday: collected?.c || 0,
   };
 }
+
+// ── Favourites (saved usual items) ─────────────────────────
+import type { Favourite, Bundle, BundleItem } from '../types';
+
+export async function addFavourite(db: D1Database, opts: { userId: string; itemName: string; quantity: number; now: string }): Promise<void> {
+  await db.prepare(
+    'INSERT OR IGNORE INTO favourites (id, user_id, item_name, quantity, created_at) VALUES (?, ?, ?, ?, ?)'
+  ).bind('FAV-' + generateId(), opts.userId, opts.itemName, opts.quantity, opts.now).run();
+}
+export async function listFavourites(db: D1Database, userId: string): Promise<Favourite[]> {
+  const res = await db.prepare('SELECT * FROM favourites WHERE user_id = ? ORDER BY created_at DESC').bind(userId).all<Favourite>();
+  return res.results;
+}
+export async function deleteFavourite(db: D1Database, id: string, userId: string): Promise<void> {
+  await db.prepare('DELETE FROM favourites WHERE id = ? AND user_id = ?').bind(id, userId).run();
+}
+
+// ── Promotional bundles ────────────────────────────────────
+export async function insertBundle(db: D1Database, b: Bundle): Promise<void> {
+  await db.prepare(
+    'INSERT INTO bundles (id, title, description, image_key, discount_pct, active, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+  ).bind(b.id, b.title, b.description, b.image_key, b.discount_pct, b.active, b.sort_order, b.created_at, b.updated_at).run();
+}
+export async function getBundle(db: D1Database, id: string): Promise<Bundle | null> {
+  return await db.prepare('SELECT * FROM bundles WHERE id = ?').bind(id).first<Bundle>();
+}
+export async function getBundleItems(db: D1Database, bundleId: string): Promise<BundleItem[]> {
+  const res = await db.prepare('SELECT * FROM bundle_items WHERE bundle_id = ? ORDER BY sort_order, rowid').bind(bundleId).all<BundleItem>();
+  return res.results;
+}
+export async function listActiveBundles(db: D1Database): Promise<Bundle[]> {
+  const res = await db.prepare('SELECT * FROM bundles WHERE active = 1 ORDER BY sort_order, created_at DESC').all<Bundle>();
+  return res.results;
+}
+export async function listAllBundles(db: D1Database): Promise<Bundle[]> {
+  const res = await db.prepare('SELECT * FROM bundles ORDER BY active DESC, sort_order, created_at DESC').all<Bundle>();
+  return res.results;
+}
+export async function updateBundle(db: D1Database, id: string, fields: { title: string; description: string; discount_pct: number; active: number; sort_order: number; now: string }): Promise<void> {
+  await db.prepare(
+    'UPDATE bundles SET title = ?, description = ?, discount_pct = ?, active = ?, sort_order = ?, updated_at = ? WHERE id = ?'
+  ).bind(fields.title, fields.description, fields.discount_pct, fields.active, fields.sort_order, fields.now, id).run();
+}
+export async function setBundleImage(db: D1Database, id: string, key: string, now: string): Promise<void> {
+  await db.prepare('UPDATE bundles SET image_key = ?, updated_at = ? WHERE id = ?').bind(key, now, id).run();
+}
+export async function deleteBundle(db: D1Database, id: string): Promise<void> {
+  await db.prepare('DELETE FROM bundle_items WHERE bundle_id = ?').bind(id).run();
+  await db.prepare('DELETE FROM bundles WHERE id = ?').bind(id).run();
+}
+export async function replaceBundleItems(db: D1Database, bundleId: string, items: { name: string; priceCents: number }[]): Promise<void> {
+  await db.prepare('DELETE FROM bundle_items WHERE bundle_id = ?').bind(bundleId).run();
+  let i = 0;
+  for (const it of items) {
+    await db.prepare(
+      'INSERT INTO bundle_items (id, bundle_id, item_name, price_cents, sort_order) VALUES (?, ?, ?, ?, ?)'
+    ).bind('BI-' + generateId(), bundleId, it.name, it.priceCents, i++).run();
+  }
+}

@@ -14,6 +14,12 @@ ${topBar(env, user)}
       <p class="lead" style="margin:0;">List your item(s) below. Add a photo of the product or your prescription if it helps us find the exact thing. We'll check stock and email you when it's ready to collect.</p>
     </div>
 
+    <div class="card" id="favCard" style="display:none;">
+      <h2>${icon('star', 18)} Your usual items</h2>
+      <p class="muted" style="margin:0 0 8px;">Tap one to add it to this order.</p>
+      <div id="favList"></div>
+    </div>
+
     <div class="card">
       <h2>${icon('box', 18)} Your items</h2>
       <div id="items"></div>
@@ -73,14 +79,55 @@ ${topBar(env, user)}
 ${footer(env)}
 <script>
 var photos=[];
-function addItem(){
+function escHtml(s){ var d=document.createElement('div'); d.textContent=s==null?'':String(s); return d.innerHTML; }
+function escAttr(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;'); }
+function addItem(name, qty){
   var wrap=document.getElementById('items');
   var div=document.createElement('div');
   div.className='row'; div.style.marginBottom='8px';
-  div.innerHTML='<div style="flex:3;"><input type="text" class="itemName" placeholder="Item name or description"></div>'
-    +'<div style="flex:0 0 90px;min-width:80px;"><input type="number" class="itemQty" min="1" max="99" value="1"></div>'
+  div.innerHTML='<div style="flex:3;"><input type="text" class="itemName" placeholder="Item name or description" value="'+escAttr(name||'')+'"></div>'
+    +'<div style="flex:0 0 80px;min-width:70px;"><input type="number" class="itemQty" min="1" max="99" value="'+(qty||1)+'"></div>'
+    +'<button type="button" class="btn btn-outline" title="Save to favourites" style="flex:0 0 auto;" onclick="saveFav(this)">☆</button>'
     +'<button type="button" class="btn btn-outline" style="flex:0 0 auto;" onclick="this.parentNode.remove()">✕</button>';
   wrap.appendChild(div);
+}
+async function saveFav(btn){
+  var row=btn.parentNode;
+  var nm=row.querySelector('.itemName').value.trim();
+  var q=parseInt(row.querySelector('.itemQty').value,10)||1;
+  if(!nm){ alert('Type the item first, then save it.'); return; }
+  try{ var r=await (await fetch('/api/favourites',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:nm,quantity:q})})).json();
+    if(r.ok){ btn.textContent='★'; loadFavourites(); } }catch(e){}
+}
+async function loadFavourites(){
+  try{
+    var data=await (await fetch('/api/favourites')).json();
+    var card=document.getElementById('favCard'), list=document.getElementById('favList');
+    if(!data.ok || !data.favourites.length){ card.style.display='none'; return; }
+    card.style.display='block';
+    list.innerHTML=data.favourites.map(function(f){
+      return '<span class="chip" style="margin:4px 6px 0 0;">'
+        +'<button type="button" class="favadd" data-name="'+escAttr(f.item_name)+'" data-qty="'+f.quantity+'" style="border:0;background:none;cursor:pointer;font:inherit;color:inherit;padding:0;">+ '+escHtml(f.item_name)+(f.quantity>1?' ×'+f.quantity:'')+'</button>'
+        +' <button type="button" class="favdel" data-id="'+escAttr(f.id)+'" title="Remove favourite" style="border:0;background:none;cursor:pointer;color:#9ca3af;padding:0;">✕</button></span>';
+    }).join('');
+    list.querySelectorAll('.favadd').forEach(function(b){ b.onclick=function(){ addItem(b.getAttribute('data-name'), parseInt(b.getAttribute('data-qty'),10)||1); }; });
+    list.querySelectorAll('.favdel').forEach(function(b){ b.onclick=async function(){ try{ await fetch('/api/favourites/'+b.getAttribute('data-id')+'/delete',{method:'POST'}); }catch(e){} loadFavourites(); }; });
+  }catch(e){}
+}
+function applyPrefill(){
+  var added=false;
+  try{
+    var p=new URLSearchParams(location.search);
+    var single=p.get('item');
+    if(single){ addItem(single,1); added=true; }
+    var multi=localStorage.getItem('rc_prefill_items');
+    if(multi){ var arr=JSON.parse(multi); (arr||[]).forEach(function(it){ addItem(it.name, it.quantity||1); }); if((arr||[]).length) added=true; localStorage.removeItem('rc_prefill_items'); }
+    var singleLS=localStorage.getItem('rc_prefill_item');
+    if(singleLS){ addItem(singleLS,1); added=true; localStorage.removeItem('rc_prefill_item'); }
+    var note=localStorage.getItem('rc_prefill_note');
+    if(note){ document.getElementById('notes').value=note; localStorage.removeItem('rc_prefill_note'); }
+  }catch(e){}
+  if(!added) addItem();
 }
 async function uploadPhoto(){
   var input=document.getElementById('file'), err=document.getElementById('photoErr'); err.textContent='';
@@ -126,7 +173,8 @@ async function submitReservation(){
     else{err.textContent=data.reason||'Could not submit.';btn.disabled=false;btn.innerHTML='Submit reservation';}
   }catch(e){err.textContent='Network error. Please try again.';btn.disabled=false;btn.innerHTML='Submit reservation';}
 }
-addItem();
+loadFavourites();
+applyPrefill();
 </script>`;
   return htmlDoc('Reserve — ' + env.PHARMACY_NAME, body);
 }

@@ -1,6 +1,7 @@
 import type { Env, User } from '../types';
 import { escapeHtml } from '../services/utils';
 import { htmlDoc, topBar, footer, icon } from './shared';
+import { qrWidget } from './qr';
 
 export function indexPage(env: Env, user?: User | null): string {
   const appts = escapeHtml(env.APPOINTMENTS_URL);
@@ -42,6 +43,8 @@ ${topBar(env, user)}
     </div>
   </div>
 
+  <div id="bundlesSection"></div>
+
   <div class="card hero" style="text-align:center;border-color:#fde68a;">
     <div class="eyebrow" style="justify-content:center;">${icon('star', 16)} Love ${escapeHtml(env.PHARMACY_NAME)}?</div>
     <h2 style="margin:4px 0 8px;">Leave us a quick Google review</h2>
@@ -62,10 +65,52 @@ ${topBar(env, user)}
 
 </div>
 ${footer(env)}
+${qrWidget()}
 <script>
   // Capture a referral code from ?ref= so we can credit it at sign-up.
   (function(){try{var p=new URLSearchParams(location.search);var ref=p.get('ref');
     if(ref){document.cookie='rc_ref='+encodeURIComponent(ref.replace(/[^a-zA-Z0-9]/g,''))+'; path=/; max-age=2592000; SameSite=Lax';}}catch(e){}})();
+
+  // Promotional bundles — fetched live; signed-out visitors are nudged to sign up to claim.
+  function eur(c){ return '€' + (c/100).toFixed(2); }
+  function bEsc(s){ var d=document.createElement('div'); d.textContent=s==null?'':String(s); return d.innerHTML; }
+  function reserveBundle(items, title){
+    try{
+      localStorage.setItem('rc_prefill_items', JSON.stringify(items));
+      localStorage.setItem('rc_prefill_note', 'Bundle: ' + title);
+    }catch(e){}
+    location.href = '/reserve';
+  }
+  window._bundles = [];
+  (async function(){
+    try{
+      var data = await (await fetch('/api/bundles')).json();
+      if(!data.ok || !data.bundles.length) return;
+      window._bundles = data.bundles;
+      var html = '<div class="card"><div class="eyebrow">⭐ Special bundles</div>'
+        + '<h2 style="margin-bottom:4px;">This week\\'s bundle offers</h2>'
+        + '<p class="muted" style="margin:0 0 14px;">Sign up free to Reserve &amp; Collect to claim these — reserve online, pay in store.</p>';
+      html += data.bundles.map(function(b, idx){
+        var items = b.items.map(function(it){ return '<li>'+bEsc(it.name)+' <span class="muted">— '+eur(it.price_cents)+'</span></li>'; }).join('');
+        var img = b.hasImage ? '<img src="/api/bundles/'+b.id+'/image" alt="" style="width:100%;max-height:200px;object-fit:cover;border-radius:12px;margin-bottom:12px;">' : '';
+        return '<div style="border:1.5px solid var(--line);border-radius:14px;padding:16px;margin-top:12px;">'
+          + img
+          + '<h2 style="margin:0 0 4px;font-size:19px;">'+bEsc(b.title)+'</h2>'
+          + (b.description?'<p class="muted" style="margin:0 0 10px;">'+bEsc(b.description)+'</p>':'')
+          + '<ul style="margin:0 0 10px;padding-left:18px;line-height:1.6;">'+items+'</ul>'
+          + '<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;">'
+          + '<span style="text-decoration:line-through;color:#9ca3af;">'+eur(b.originalCents)+'</span>'
+          + '<span style="font-size:24px;font-weight:900;color:var(--good);">'+eur(b.finalCents)+'</span>'
+          + (b.saveCents>0?'<span class="badge" style="background:#dcfce7;color:#15803d;">Save '+eur(b.saveCents)+' ('+b.discount_pct+'%)</span>':'')
+          + '</div>'
+          + '<button type="button" class="btn btn-primary block" style="margin-top:12px;" onclick="reserveBundle(window._bundles['+idx+'].items.map(function(i){return {name:i.name,quantity:1};}), window._bundles['+idx+'].title)">'
+          + 'Reserve this bundle</button>'
+          + '</div>';
+      }).join('');
+      html += '</div>';
+      document.getElementById('bundlesSection').innerHTML = html;
+    }catch(e){}
+  })();
 </script>`;
   return htmlDoc(env.PHARMACY_NAME + ' — Reserve & Collect', body);
 }

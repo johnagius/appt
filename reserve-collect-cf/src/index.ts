@@ -22,6 +22,11 @@ import {
   apiCancelMyReservation, apiReorderReservation,
 } from './api/reservations';
 import { apiUploadPhoto, apiServePhoto } from './api/photos';
+import { apiListFavourites, apiAddFavourite, apiDeleteFavourite } from './api/favourites';
+import {
+  apiListBundles, apiServeBundleImage, apiAdminListBundles, apiAdminCreateBundle,
+  apiAdminUpdateBundle, apiAdminDeleteBundle, apiAdminUploadBundleImage,
+} from './api/bundles';
 import {
   apiPoll, apiAdminListReservations, apiAdminGetReservation, apiAdminSetItems,
   apiAdminMarkReady, apiAdminMarkCollected, apiAdminNotify, apiAdminCancel, apiAdminStats,
@@ -102,6 +107,18 @@ export default {
         }
       }
 
+      // ─── Bundles (public) + favourites (customer) ─
+      if (path === '/api/bundles' && method === 'GET') return apiListBundles(request, env);
+      if (path.startsWith('/api/bundles/') && path.endsWith('/image') && method === 'GET') {
+        return apiServeBundleImage(request, env, decodeURIComponent(path.slice('/api/bundles/'.length, -'/image'.length)));
+      }
+      if (path === '/api/favourites' && method === 'GET') return apiListFavourites(request, env);
+      if (path === '/api/favourites' && method === 'POST') return apiAddFavourite(request, env);
+      {
+        const mf = path.match(/^\/api\/favourites\/([^\/]+)\/delete$/);
+        if (mf && method === 'POST') return apiDeleteFavourite(request, env, decodeURIComponent(mf[1]));
+      }
+
       // ─── Admin login ──────────────────────────────
       if (path === '/admin/login' && method === 'POST') {
         const form = await request.formData();
@@ -132,6 +149,17 @@ export default {
         if (path === '/api/admin/wipe' && method === 'POST') return apiAdminWipe(request, env);
         if (path === '/api/admin/reservations' && method === 'GET') return apiAdminListReservations(request, env);
         if (path === '/api/admin/reservations' && method === 'POST') return apiAdminCreateReservation(request, env);
+        if (path === '/api/admin/bundles' && method === 'GET') return apiAdminListBundles(request, env);
+        if (path === '/api/admin/bundles' && method === 'POST') return apiAdminCreateBundle(request, env);
+        {
+          const mb = path.match(/^\/api\/admin\/bundles\/([^\/]+)(?:\/(delete|image))?$/);
+          if (mb && method === 'POST') {
+            const bid = decodeURIComponent(mb[1]);
+            if (!mb[2]) return apiAdminUpdateBundle(request, env, bid);
+            if (mb[2] === 'delete') return apiAdminDeleteBundle(request, env, bid);
+            if (mb[2] === 'image') return apiAdminUploadBundleImage(request, env, bid);
+          }
+        }
         const m = path.match(/^\/api\/admin\/reservations\/([^\/]+)(?:\/(items|ready|collected|notify|cancel))?$/);
         if (m) {
           const id = decodeURIComponent(m[1]);

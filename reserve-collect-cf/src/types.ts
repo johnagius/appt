@@ -121,6 +121,34 @@ export interface ReservationEvent {
   created_at: string;
 }
 
+export interface Favourite {
+  id: string;
+  user_id: string;
+  item_name: string;
+  quantity: number;
+  created_at: string;
+}
+
+export interface Bundle {
+  id: string;
+  title: string;
+  description: string;
+  image_key: string;
+  discount_pct: number;
+  active: number;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BundleItem {
+  id: string;
+  bundle_id: string;
+  item_name: string;
+  price_cents: number;
+  sort_order: number;
+}
+
 // A reservation with its items + photo metadata, as returned to the UI.
 export interface ReservationDetail extends Reservation {
   items: ReservationItem[];
