@@ -25,7 +25,7 @@ import { apiUploadPhoto, apiServePhoto } from './api/photos';
 import {
   apiPoll, apiAdminListReservations, apiAdminGetReservation, apiAdminSetItems,
   apiAdminMarkReady, apiAdminMarkCollected, apiAdminNotify, apiAdminCancel, apiAdminStats,
-  apiAdminCreateReservation, apiAdminWipe,
+  apiAdminCreateReservation, apiAdminWipe, apiAdminActivity,
 } from './api/admin';
 import { purgeExpiredVerifications, getPhotosToPurge, deletePhotoRow, getConfigValue, revokeSession } from './db/queries';
 import { indexPage } from './pages/index-page';
@@ -128,6 +128,7 @@ export default {
       // ─── Admin API ────────────────────────────────
       if (path.startsWith('/api/admin/')) {
         if (path === '/api/admin/stats' && method === 'GET') return apiAdminStats(request, env);
+        if (path === '/api/admin/activity' && method === 'GET') return apiAdminActivity(request, env);
         if (path === '/api/admin/wipe' && method === 'POST') return apiAdminWipe(request, env);
         if (path === '/api/admin/reservations' && method === 'GET') return apiAdminListReservations(request, env);
         if (path === '/api/admin/reservations' && method === 'POST') return apiAdminCreateReservation(request, env);

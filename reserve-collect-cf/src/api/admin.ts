@@ -11,6 +11,7 @@ import {
   bumpVersion, getReservationStats, getDataVersion,
   getOrCreateUserByEmail, insertReservation, insertReservationItem, reservationHasEvent,
   promotePendingItemsToAvailable, getAllPhotoKeys, wipeAllOrders, wipeAllAccounts,
+  getRecentActivity,
 } from '../db/queries';
 import { broadcast } from '../services/realtime-client';
 import { deriveOrderStatus, hasCollectable, VALID_ITEM_STATUSES } from '../services/status';
@@ -228,6 +229,11 @@ export async function apiAdminStats(request: Request, env: Env): Promise<Respons
   const deny = await requireAdmin(request, env); if (deny) return deny;
   const stats = await getReservationStats(env.DB, todayKey(env));
   return json({ ok: true, stats });
+}
+
+export async function apiAdminActivity(request: Request, env: Env): Promise<Response> {
+  const deny = await requireAdmin(request, env); if (deny) return deny;
+  return json({ ok: true, events: await getRecentActivity(env.DB, 60) });
 }
 
 /** Testing reset. mode='orders' wipes all reservations/photos (keeps accounts);

@@ -258,6 +258,20 @@ export async function getPhotosToPurge(db: D1Database, cutoff: string): Promise<
 }
 
 // ─── Events (staff audit trail) ────────────────────────────
+// ── Activity feed (recent events across all reservations) ──
+export interface ActivityRow {
+  created_at: string; event: string; actor: string; detail: string;
+  reference: string; customer_name: string;
+}
+export async function getRecentActivity(db: D1Database, limit = 60): Promise<ActivityRow[]> {
+  const res = await db.prepare(
+    'SELECT e.created_at, e.event, e.actor, e.detail, r.reference, r.customer_name ' +
+    'FROM reservation_events e JOIN reservations r ON r.id = e.reservation_id ' +
+    'ORDER BY e.created_at DESC LIMIT ?'
+  ).bind(limit).all<ActivityRow>();
+  return res.results;
+}
+
 // ── Test / maintenance wipes ──
 export async function getAllPhotoKeys(db: D1Database): Promise<{ id: string; r2_key: string }[]> {
   const res = await db.prepare('SELECT id, r2_key FROM photos').all<{ id: string; r2_key: string }>();
