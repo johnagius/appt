@@ -377,6 +377,7 @@ export function adminPage(sig: string): string {
 <div class="wrap">
   <h1>Admin Panel</h1>
   <p class="subtitle">Dr Kevin Navarro Gera - Appointment Management</p>
+  <a href="/admin/reserve" style="display:inline-flex;align-items:center;gap:8px;background:#f5b301;color:#111827;text-decoration:none;font-weight:800;font-size:14px;padding:11px 18px;border-radius:999px;margin-bottom:14px;box-shadow:0 6px 16px rgba(245,179,1,.3);">🛍️ Reserve &amp; Collect orders &rarr;</a>
 
   <div class="stats" id="statsBar">
     <div class="stat"><div class="num" id="statBooked">-</div><div class="label">Booked this week</div></div>

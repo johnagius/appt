@@ -354,6 +354,26 @@ export default {
         if (path === '/reschedule') return html(reschedulePage());
         if (path === '/followup') return html(followupPage());
         if (path === '/action') return html(docActionPage());
+        // Embedded Reserve & Collect dashboard (staff convenience).
+        if (path === '/admin/reserve') {
+          let rsig = url.searchParams.get('sig') || '';
+          if (!rsig) {
+            const cookie = request.headers.get('Cookie') || '';
+            const m = cookie.match(/(?:^|;\s*)admin_sig=([^\s;]+)/);
+            if (m) rsig = m[1];
+          }
+          if (rsig && await verifyAdminSig(rsig, env.ADMIN_SECRET)) {
+            return new Response(reserveEmbedPage(env), {
+              headers: {
+                'Content-Type': 'text/html;charset=UTF-8',
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Set-Cookie': `admin_sig=${rsig}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=31536000`,
+              },
+            });
+          }
+          return html(loginPage('/admin/reserve'));
+        }
+
         if (path === '/admin' || path === '/doctor' || path === '/test') {
           // Check sig from query string or cookie
           let sig = url.searchParams.get('sig') || '';
@@ -626,6 +646,22 @@ export default {
     } catch (e) { console.error('Auto-review cron error:', e); }
   },
 };
+
+function reserveEmbedPage(env: Env): string {
+  const src = env.RESERVE_COLLECT_URL.replace(/\/$/, '') + '/admin?sig=' + encodeURIComponent(env.RESERVE_ADMIN_SIG || '');
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Reserve & Collect — Orders</title>
+<style>
+  html,body{margin:0;height:100%;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial;background:#f6f7fb;}
+  .bar{display:flex;align-items:center;gap:14px;padding:10px 16px;background:#111827;color:#fff;}
+  .bar a{color:#f5b301;text-decoration:none;font-weight:800;font-size:14px;}
+  .bar b{font-weight:800;font-size:15px;}
+  iframe{border:0;width:100%;height:calc(100vh - 46px);display:block;}
+</style></head><body>
+  <div class="bar"><a href="/admin">&larr; Back to admin</a><b>🛍️ Reserve &amp; Collect — Orders</b></div>
+  <iframe src="${src}" title="Reserve & Collect"></iframe>
+</body></html>`;
+}
 
 function loginPage(redirect: string, error?: string): string {
   const errHtml = error ? '<div class="err">' + error + '</div>' : '';

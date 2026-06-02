@@ -23,6 +23,7 @@ export interface Env {
   LINDA_LOCATION: string;
   LINDA_PASSWORD: string;
   RESERVE_COLLECT_URL: string;
+  RESERVE_ADMIN_SIG: string;
 }
 
 export interface Appointment {
