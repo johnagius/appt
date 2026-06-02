@@ -200,9 +200,10 @@ async function notify(id, type){
 
 // ── Testing: wipe data ──
 async function wipe(mode){
-  var msg = mode==='all' ? 'Delete ALL orders AND all customer accounts? This cannot be undone.' : 'Delete ALL orders (accounts kept)? This cannot be undone.';
-  if(!confirm(msg)) return;
-  if(!confirm('Final confirmation — really wipe now?')) return;
+  var what = mode==='all' ? 'ALL orders AND all customer accounts' : 'ALL orders (customer accounts kept)';
+  var typed = prompt('This permanently deletes ' + what + '. This CANNOT be undone.\\n\\nType DELETE (in capitals) to confirm:');
+  if(typed===null) return;
+  if(typed.trim()!=='DELETE'){ alert('Cancelled — you must type DELETE exactly to wipe.'); return; }
   var d = await api('/api/admin/wipe','POST',{mode:mode});
   if(d.ok){ alert('Done — '+(mode==='all'?'orders + accounts wiped.':'orders wiped.')+' Photos removed: '+d.photosDeleted); load(); }
   else alert(d.reason||'Failed');
