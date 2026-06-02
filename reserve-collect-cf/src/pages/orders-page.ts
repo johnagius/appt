@@ -3,17 +3,28 @@ import { escapeHtml } from '../services/utils';
 import { htmlDoc, topBar, footer, icon } from './shared';
 
 export function ordersPage(env: Env, user: User): string {
-  const refLink = user.referral_code ? escapeHtml(env.PUBLIC_BASE_URL.replace(/\/$/, '') + '/?ref=' + user.referral_code) : '';
-  const referralCard = refLink ? `
+  const base = env.PUBLIC_BASE_URL.replace(/\/$/, '');
+  const shareUrl = user.referral_code ? base + '/?ref=' + user.referral_code : base;
+  const shareText = "Reserve & collect your pharmacy items at " + env.PHARMACY_NAME + ": " + shareUrl;
+  const waHref = 'https://wa.me/?text=' + encodeURIComponent(shareText);
+  const mailHref = 'mailto:?subject=' + encodeURIComponent(env.PHARMACY_NAME + ' — Reserve & Collect') + '&body=' + encodeURIComponent(shareText);
+  const reviewUrl = (env.REVIEW_URL && env.REVIEW_URL.trim())
+    || ('https://www.google.com/search?q=' + encodeURIComponent(env.PHARMACY_NAME + ' reviews'));
+  const shareCard = `
   <div class="card hero">
-    <div class="eyebrow">${icon('star', 15)} Share with a friend</div>
-    <h2 style="margin-bottom:6px;">Tell friends they can reserve here too</h2>
+    <div class="eyebrow">${icon('star', 15)} Enjoying ${escapeHtml(env.PHARMACY_NAME)}?</div>
+    <h2 style="margin-bottom:8px;">Leave a review &amp; share with friends</h2>
     <div class="row">
-      <input type="text" id="refLink" value="${refLink}" readonly>
-      <button type="button" class="btn btn-outline" style="flex:0 0 auto;" onclick="copyRef()">Copy</button>
-      <a class="btn btn-good" style="flex:0 0 auto;" target="_blank" href="https://wa.me/?text=${encodeURIComponent('Reserve & collect your pharmacy items here: ' + (env.PUBLIC_BASE_URL.replace(/\/$/, '') + '/?ref=' + user.referral_code))}">${icon('phone', 16)} WhatsApp</a>
+      <a class="btn btn-primary block" target="_blank" rel="noopener" href="${escapeHtml(reviewUrl)}">${icon('star', 18)} Leave a Google review</a>
     </div>
-  </div>` : '';
+    <p class="muted" style="margin:14px 0 6px;">Tell a friend they can reserve &amp; collect here too:</p>
+    <div class="row">
+      <a class="btn btn-good" target="_blank" rel="noopener" href="${escapeHtml(waHref)}">${icon('phone', 16)} WhatsApp</a>
+      <a class="btn btn-outline" href="${escapeHtml(mailHref)}">${icon('mail', 16)} Email</a>
+      <button type="button" class="btn btn-outline" onclick="copyRef()">Copy link</button>
+    </div>
+    <input type="text" id="refLink" value="${escapeHtml(shareUrl)}" readonly style="margin-top:8px;">
+  </div>`;
 
   const body = `
 ${topBar(env, user)}
@@ -24,7 +35,7 @@ ${topBar(env, user)}
     <p class="lead" style="margin:0;">Track your reservations and re-order in one tap. We always email you when something's ready to collect.</p>
     <a class="btn btn-primary" href="/reserve" style="margin-top:14px;">${icon('plus', 18)} New reservation</a>
   </div>
-  ${referralCard}
+  ${shareCard}
   <div id="list"><div class="card"><p class="muted">Loading…</p></div></div>
 </div>
 ${footer(env)}
