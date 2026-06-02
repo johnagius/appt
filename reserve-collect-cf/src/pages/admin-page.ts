@@ -42,7 +42,7 @@ export function adminPage(sig: string): string {
     <div id="newBundle" style="display:none;margin-top:14px;border:1px solid var(--line);border-radius:12px;padding:14px;">
       <div class="row">
         <div style="flex:2;"><label>Title</label><input type="text" id="bTitle" placeholder="e.g. Cold &amp; Flu Bundle"></div>
-        <div style="flex:0 0 120px;"><label>Discount %</label><input type="number" id="bDiscount" min="0" max="100" value="10"></div>
+        <div style="flex:0 0 120px;"><label>Discount %</label><input type="number" id="bDiscount" min="0" max="100" value="3"></div>
       </div>
       <label>Description (optional)</label>
       <input type="text" id="bDesc" placeholder="Short description shown to customers">
