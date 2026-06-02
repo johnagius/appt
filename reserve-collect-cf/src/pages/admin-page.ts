@@ -145,7 +145,6 @@ async function openDetail(id){
     return '<div style="padding:10px 0;border-bottom:1px solid var(--line);">'
       + '<div style="font-weight:700;">'+esc(it.item_name)+(it.quantity>1?' ×'+it.quantity:'')+'</div>'
       + '<div style="margin:6px 0;display:flex;gap:6px;flex-wrap:wrap;" data-itemrow="'+it.id+'" data-current="'+it.item_status+'">'+chips+'</div>'
-      + '<input type="text" class="itemNote" data-note="'+it.id+'" placeholder="Note (optional)" value="'+esc(it.staff_note)+'">'
       + '</div>';
   }).join('');
   var photos = (r.photos||[]).map(function(p){
@@ -164,16 +163,15 @@ async function openDetail(id){
     + (r.notes?'<p class="muted">Customer note: '+esc(r.notes)+'</p>':'')
     + (photos?'<div class="row" style="margin:10px 0;gap:10px;">'+photos+'</div>':'')
     + '<h2 style="margin-top:14px;">Items</h2>'+items
-    + '<label style="margin-top:10px;">Staff note (internal)</label><input type="text" id="staffNote" value="'+esc(r.staff_note)+'">'
+    + '<div class="hint" style="margin-top:14px;">Items count as available when you mark the order ready — only tap an item above if you need to flag it Unavailable or Reserved.</div>'
     + '<div class="row" style="margin-top:12px;">'
-    + '<button class="btn btn-primary" onclick="saveItems(\\''+r.id+'\\')">Save item statuses</button>'
-    + '<button class="btn btn-good" onclick="action(\\''+r.id+'\\',\\'ready\\')">Mark ready + email</button>'
-    + '<button class="btn btn-dark" onclick="action(\\''+r.id+'\\',\\'collected\\')">Mark collected</button>'
+    + '<button class="btn btn-good" style="flex:2;" onclick="action(\\''+r.id+'\\',\\'ready\\')">✓ Ready to collect — email customer</button>'
+    + '<button class="btn btn-dark" onclick="action(\\''+r.id+'\\',\\'collected\\')">Collected</button>'
     + '</div>'
     + '<div class="row" style="margin-top:8px;">'
     + '<button class="btn btn-outline" onclick="notify(\\''+r.id+'\\',\\'ready\\')">Re-send ready email</button>'
-    + '<button class="btn btn-outline" onclick="notify(\\''+r.id+'\\',\\'unavailable\\')">Email: unavailable</button>'
-    + '<button class="btn btn-outline" onclick="notify(\\''+r.id+'\\',\\'custom\\')">Email: custom message</button>'
+    + '<button class="btn btn-outline" onclick="notify(\\''+r.id+'\\',\\'unavailable\\')">Tell customer unavailable</button>'
+    + '<button class="btn btn-outline" onclick="notify(\\''+r.id+'\\',\\'custom\\')">Custom message</button>'
     + '<button class="btn btn-danger" onclick="action(\\''+r.id+'\\',\\'cancel\\')">Cancel</button>'
     + '</div>'
     + (events?'<details style="margin-top:12px;"><summary class="muted">History</summary><ul class="muted" style="line-height:1.6;">'+events+'</ul></details>':'')
@@ -198,41 +196,8 @@ async function pickStatus(el){
   load();
 }
 
-// Persist whatever the chips currently show (used before marking ready).
-async function persistItems(id){
-  var rows = document.querySelectorAll('[data-itemrow]');
-  var items = [];
-  rows.forEach(function(row){
-    var itemId = row.getAttribute('data-itemrow');
-    var noteEl = document.querySelector('[data-note="'+itemId+'"]');
-    items.push({ id:itemId, status:row.getAttribute('data-current'), staffNote: noteEl?noteEl.value:'' });
-  });
-  if(items.length) await api('/api/admin/reservations/'+id+'/items','POST',{items:items});
-  return items;
-}
-
-async function saveItems(id){
-  var rows = document.querySelectorAll('[data-itemrow]');
-  var items = [];
-  rows.forEach(function(row){
-    var itemId = row.getAttribute('data-itemrow');
-    var status = row.getAttribute('data-current');
-    var noteEl = document.querySelector('[data-note="'+itemId+'"]');
-    items.push({id:itemId, status:status, staffNote: noteEl?noteEl.value:''});
-  });
-  var staffNote = document.getElementById('staffNote').value;
-  var d = await api('/api/admin/reservations/'+id+'/items','POST',{items:items, staffNote:staffNote});
-  if(d.ok){ openDetail(id); load(); } else alert(d.reason||'Failed');
-}
-
 async function action(id, kind){
-  if(kind==='cancel'){ if(!confirm('Cancel this reservation?')) return; }
-  if(kind==='ready'){
-    // Save current item selections first, then warn if nothing is available.
-    var items = await persistItems(id);
-    var anyAvail = items.some(function(it){ return it.status==='AVAILABLE'; });
-    if(!anyAvail && !confirm('No items are marked Available — the customer will be told nothing is ready. Send anyway?')) return;
-  }
+  if(kind==='cancel' && !confirm('Cancel this reservation?')) return;
   var path = kind==='ready'?'/ready':kind==='collected'?'/collected':'/cancel';
   var d = await api('/api/admin/reservations/'+id+path,'POST',{});
   if(d.ok){ openDetail(id); load(); } else alert(d.reason||'Failed');

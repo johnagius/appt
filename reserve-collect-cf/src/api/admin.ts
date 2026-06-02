@@ -10,6 +10,7 @@ import {
   markNotifiedReady, markNotifiedUnavailable, setStaffNote, insertEvent,
   bumpVersion, getReservationStats, getDataVersion,
   getOrCreateUserByEmail, insertReservation, insertReservationItem, reservationHasEvent,
+  promotePendingItemsToAvailable,
 } from '../db/queries';
 import { deriveOrderStatus, hasCollectable, VALID_ITEM_STATUSES } from '../services/status';
 import {
@@ -142,6 +143,8 @@ export async function apiAdminMarkReady(request: Request, env: Env, id: string):
   const r = await getReservationById(env.DB, id);
   if (!r) return json({ ok: false, reason: 'Not found' }, 404);
   const now = nowIso(env.TIMEZONE);
+  // Any item not explicitly flagged is treated as available on "ready".
+  await promotePendingItemsToAvailable(env.DB, id, now);
   await markReservationReady(env.DB, id, now);
   await insertEvent(env.DB, { reservationId: id, event: 'READY', actor: 'staff', detail: '', now });
   // Send the ready email once.
@@ -184,7 +187,8 @@ export async function apiAdminNotify(request: Request, env: Env, id: string): Pr
   const now = nowIso(env.TIMEZONE);
   try {
     if (type === 'ready') {
-      await sendReadyForCollectionEmail(env, r, items);
+      await promotePendingItemsToAvailable(env.DB, id, now);
+      await sendReadyForCollectionEmail(env, r, await getItemsByReservation(env.DB, id));
       await markNotifiedReady(env.DB, id, now);
     } else if (type === 'unavailable') {
       await sendUnavailableEmail(env, r, items);

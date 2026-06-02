@@ -216,6 +216,12 @@ export async function updateItemStatus(
   await db.prepare('UPDATE reservation_items SET item_status = ?, staff_note = ?, updated_at = ? WHERE id = ?')
     .bind(status, staffNote, now, id).run();
 }
+/** When an order is marked ready, any item the staff didn't explicitly flag is
+ *  treated as available — so the "ready" email never says "being checked". */
+export async function promotePendingItemsToAvailable(db: D1Database, reservationId: string, now: string): Promise<void> {
+  await db.prepare("UPDATE reservation_items SET item_status = 'AVAILABLE', updated_at = ? WHERE reservation_id = ? AND item_status = 'PENDING'")
+    .bind(now, reservationId).run();
+}
 
 // ─── Photos ────────────────────────────────────────────────
 export async function insertPhoto(db: D1Database, p: Photo): Promise<void> {
