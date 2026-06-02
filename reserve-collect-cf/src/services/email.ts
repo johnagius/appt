@@ -114,6 +114,31 @@ export async function sendCustomNotificationEmail(env: Env, r: Reservation, mess
   await sendEmail(env, r.customer_email, `A message about your reservation (${r.reference})`, layout(env, 'Message from ' + env.PHARMACY_NAME, body));
 }
 
+export async function sendReviewRequestEmail(env: Env, r: Reservation): Promise<void> {
+  const reviewUrl = (env.REVIEW_URL && env.REVIEW_URL.trim())
+    || 'https://www.google.com/search?q=' + encodeURIComponent(env.PHARMACY_NAME + ' St Julians reviews');
+  const body = `
+    <p style="margin:0 0 6px;color:#374151;">Thanks for collecting your order from ${escapeHtml(env.PHARMACY_NAME)}, ${escapeHtml(r.customer_name || '')}! We hope everything was perfect.</p>
+    <p style="margin:0 0 16px;color:#374151;">If you have a moment, a quick review really helps our small pharmacy — it only takes a few seconds.</p>
+    <div style="text-align:center;margin:18px 0;">
+      <a href="${reviewUrl}" style="display:inline-block;background:#f5b301;color:#111827;text-decoration:none;padding:12px 22px;border-radius:999px;font-weight:800;font-size:15px;">★ Leave a review</a>
+    </div>
+    <p style="margin:0;color:#6b7280;font-size:13px;">Reference ${escapeHtml(r.reference)}. Thank you for supporting ${escapeHtml(env.PHARMACY_NAME)}.</p>`;
+  await sendEmail(env, r.customer_email, `How did we do? (${r.reference})`, layout(env, 'Thanks for collecting!', body));
+}
+
+export async function sendStaffCreatedReservationEmail(env: Env, r: Reservation, items: ReservationItem[]): Promise<void> {
+  const body = `
+    <p style="margin:0 0 6px;color:#374151;">Hi ${escapeHtml(r.customer_name || 'there')}, we've started a reservation for you at ${escapeHtml(env.PHARMACY_NAME)} following your request.</p>
+    <p style="margin:10px 0 0;color:#111827;">Collection reference: <b style="font-size:16px;">${escapeHtml(r.reference)}</b></p>
+    ${itemsTable(items)}
+    <div style="text-align:center;margin:16px 0;">
+      <a href="${env.PUBLIC_BASE_URL}/signin" style="display:inline-block;background:#111827;color:#fff;text-decoration:none;padding:11px 20px;border-radius:999px;font-weight:800;font-size:14px;">Sign in to track it</a>
+    </div>
+    <p style="margin:0;color:#6b7280;font-size:13px;">Sign in any time with <b>${escapeHtml(r.customer_email)}</b> to follow your order. We'll also email you when it's ready to collect.</p>`;
+  await sendEmail(env, r.customer_email, `We've started your reservation (${r.reference})`, layout(env, 'Reservation started for you', body));
+}
+
 export async function sendStaffNewReservationEmail(env: Env, r: Reservation, items: ReservationItem[]): Promise<void> {
   if (!env.STAFF_EMAIL) return;
   const body = `

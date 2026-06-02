@@ -1,18 +1,23 @@
 /** Staff dashboard API. All routes are HMAC-sig gated (same scheme as kevappts). */
-import type { Env } from '../types';
+import type { Env, Reservation, ReservationItem } from '../types';
 import { json, requireAdmin } from '../services/http';
-import { nowIso } from '../services/utils';
+import { nowIso, sanitizeName, sanitizeEmail, sanitizePhone, isValidEmail } from '../services/utils';
+import { generateId, generateReference, generateReferralCode } from '../services/crypto';
 import {
   listReservationsForAdmin, getReservationById, getItemsByReservation,
   getPhotosByReservation, getEventsByReservation, getItemById, updateItemStatus,
   updateReservationStatus, markReservationReady, markReservationCollected,
   markNotifiedReady, markNotifiedUnavailable, setStaffNote, insertEvent,
   bumpVersion, getReservationStats, getDataVersion,
+  getOrCreateUserByEmail, insertReservation, insertReservationItem, reservationHasEvent,
 } from '../db/queries';
 import { deriveOrderStatus, hasCollectable, VALID_ITEM_STATUSES } from '../services/status';
 import {
   sendReadyForCollectionEmail, sendUnavailableEmail, sendCustomNotificationEmail,
+  sendReviewRequestEmail, sendStaffCreatedReservationEmail,
 } from '../services/email';
+
+const MAX_ITEMS = 30;
 
 function todayKey(env: Env): string { return nowIso(env.TIMEZONE).slice(0, 10); }
 const TERMINAL = new Set(['READY_FOR_COLLECTION', 'COLLECTED', 'CANCELLED']);
@@ -34,6 +39,58 @@ export async function apiAdminListReservations(request: Request, env: Env): Prom
     out.push({ ...r, items, photoCount: photos.length });
   }
   return json({ ok: true, reservations: out });
+}
+
+/** Staff-create a reservation on behalf of a customer (e.g. a phone order).
+ *  Links it to the customer's email account (created unverified if new) so they
+ *  see it once they sign in with that email. Emails them the reference + a
+ *  sign-in link. */
+export async function apiAdminCreateReservation(request: Request, env: Env): Promise<Response> {
+  const deny = await requireAdmin(request, env); if (deny) return deny;
+  const body: any = await request.json().catch(() => ({}));
+
+  const email = sanitizeEmail(body.email || '');
+  if (!isValidEmail(email)) return json({ ok: false, reason: 'Enter a valid customer email.' }, 400);
+  const name = sanitizeName(body.name || '');
+  if (!name) return json({ ok: false, reason: 'Enter the customer name.' }, 400);
+  const phone = sanitizePhone(body.phone || '');
+
+  const rawItems: any[] = Array.isArray(body.items) ? body.items : [];
+  const items = rawItems
+    .map(it => ({ name: sanitizeName(String(it.name || '')), quantity: Math.max(1, Math.min(99, parseInt(it.quantity, 10) || 1)) }))
+    .filter(it => it.name.length > 0)
+    .slice(0, MAX_ITEMS);
+  if (items.length === 0) return json({ ok: false, reason: 'Add at least one item.' }, 400);
+
+  const now = nowIso(env.TIMEZONE);
+  const refCode = await generateReferralCode(email, env.SIGNING_SECRET);
+  const user = await getOrCreateUserByEmail(env.DB, { email, fullName: name, phone, referralCode: refCode, now });
+
+  const reservationId = 'R-' + generateId();
+  const reference = generateReference();
+  const reservation: Reservation = {
+    id: reservationId, reference, user_id: user.id,
+    customer_name: name, customer_email: email, customer_phone: phone,
+    status: 'SUBMITTED', notes: sanitizeName(body.notes || '').slice(0, 1000),
+    staff_note: 'Created by staff (phone order)', preferred_day: '', preferred_time: '',
+    created_at: now, updated_at: now, ready_at: '', collected_at: '',
+    notified_ready_at: '', notified_unavailable_at: '',
+  };
+  await insertReservation(env.DB, reservation);
+  const itemRows: ReservationItem[] = [];
+  for (const it of items) {
+    const row: ReservationItem = {
+      id: 'RI-' + generateId(), reservation_id: reservationId, product_id: '',
+      item_name: it.name, quantity: it.quantity, item_status: 'PENDING', staff_note: '',
+      created_at: now, updated_at: now,
+    };
+    await insertReservationItem(env.DB, row);
+    itemRows.push(row);
+  }
+  await insertEvent(env.DB, { reservationId, event: 'SUBMITTED', actor: 'staff', detail: 'phone order', now });
+  await bumpVersion(env.DB);
+  try { await sendStaffCreatedReservationEmail(env, reservation, itemRows); } catch (e) { console.error('staff-created email', e); }
+  return json({ ok: true, reference, id: reservationId });
 }
 
 export async function apiAdminGetReservation(request: Request, env: Env, id: string): Promise<Response> {
@@ -106,6 +163,13 @@ export async function apiAdminMarkCollected(request: Request, env: Env, id: stri
   const now = nowIso(env.TIMEZONE);
   await markReservationCollected(env.DB, id, now);
   await insertEvent(env.DB, { reservationId: id, event: 'COLLECTED', actor: 'staff', detail: '', now });
+  // Send a review request once, after the order is completed.
+  if (r.customer_email && !(await reservationHasEvent(env.DB, id, 'REVIEW_SENT'))) {
+    try {
+      await sendReviewRequestEmail(env, { ...r, status: 'COLLECTED', collected_at: now });
+      await insertEvent(env.DB, { reservationId: id, event: 'REVIEW_SENT', actor: 'system', detail: '', now });
+    } catch (e) { console.error('review email', e); }
+  }
   await bumpVersion(env.DB);
   return json({ ok: true });
 }

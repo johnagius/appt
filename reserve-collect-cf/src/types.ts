@@ -16,6 +16,7 @@ export interface Env {
   PHARMACY_NAME: string;
   APPOINTMENTS_URL: string;
   PUBLIC_BASE_URL: string;
+  REVIEW_URL: string;
 }
 
 export interface User {

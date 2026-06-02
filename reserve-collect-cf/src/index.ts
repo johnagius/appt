@@ -11,7 +11,7 @@
 import type { Env } from './types';
 import { html, json } from './services/http';
 import { computeAdminSig, verifyAdminSig } from './services/crypto';
-import { getSessionUser } from './services/session';
+import { getSessionUser, parseSessionToken, clearSessionCookie, readCookie } from './services/session';
 import { nowIso, isoOffset } from './services/utils';
 import {
   apiGoogleStart, apiGoogleCallback, apiEmailRequest, apiEmailVerify, apiLogout, apiMe,
@@ -24,8 +24,9 @@ import { apiUploadPhoto, apiServePhoto } from './api/photos';
 import {
   apiPoll, apiAdminListReservations, apiAdminGetReservation, apiAdminSetItems,
   apiAdminMarkReady, apiAdminMarkCollected, apiAdminNotify, apiAdminCancel, apiAdminStats,
+  apiAdminCreateReservation,
 } from './api/admin';
-import { purgeExpiredVerifications, getPhotosToPurge, deletePhotoRow, getConfigValue } from './db/queries';
+import { purgeExpiredVerifications, getPhotosToPurge, deletePhotoRow, getConfigValue, revokeSession } from './db/queries';
 import { indexPage } from './pages/index-page';
 import { signinPage } from './pages/signin-page';
 import { verifyPage } from './pages/verify-page';
@@ -59,6 +60,14 @@ export default {
       if (path === '/api/auth/email/verify' && method === 'POST') return apiEmailVerify(request, env);
       if (path === '/api/auth/logout' && method === 'POST') return apiLogout(request, env);
       if (path === '/api/auth/me' && method === 'GET') return apiMe(request, env);
+
+      // Convenience GET logout for the header link.
+      if (path === '/logout' && method === 'GET') {
+        const token = readCookie(request, 'rc_session');
+        const sid = await parseSessionToken(token, env.SIGNING_SECRET);
+        if (sid) { try { await revokeSession(env.DB, sid, nowIso(env.TIMEZONE)); } catch {} }
+        return new Response(null, { status: 302, headers: { 'Location': '/', 'Set-Cookie': clearSessionCookie() } });
+      }
 
       // ─── Poll ─────────────────────────────────────
       if (path === '/api/poll' && method === 'GET') return apiPoll(env);
@@ -110,6 +119,7 @@ export default {
       if (path.startsWith('/api/admin/')) {
         if (path === '/api/admin/stats' && method === 'GET') return apiAdminStats(request, env);
         if (path === '/api/admin/reservations' && method === 'GET') return apiAdminListReservations(request, env);
+        if (path === '/api/admin/reservations' && method === 'POST') return apiAdminCreateReservation(request, env);
         const m = path.match(/^\/api\/admin\/reservations\/([^\/]+)(?:\/(items|ready|collected|notify|cancel))?$/);
         if (m) {
           const id = decodeURIComponent(m[1]);
@@ -125,16 +135,14 @@ export default {
 
       // ─── Pages ────────────────────────────────────
       if (method === 'GET') {
-        if (path === '/') return html(indexPage(env));
-        if (path === '/signin') return html(signinPage(env));
-        if (path === '/verify') return html(verifyPage(env));
-
-        if (path === '/reserve' || path === '/orders') {
-          const user = await getSessionUser(request, env);
-          if (!user) {
-            return new Response(null, { status: 302, headers: { 'Location': '/signin' } });
-          }
-          return html(path === '/reserve' ? reservePage(env) : ordersPage(env));
+        if (path === '/' || path === '/signin' || path === '/verify' || path === '/reserve' || path === '/orders') {
+          const sUser = await getSessionUser(request, env);
+          if (path === '/') return html(indexPage(env, sUser));
+          if (path === '/signin') return sUser ? redirectTo('/reserve') : html(signinPage(env));
+          if (path === '/verify') return sUser ? redirectTo('/reserve') : html(verifyPage(env));
+          // /reserve and /orders require a signed-in, verified user.
+          if (!sUser) return redirectTo('/signin');
+          return html(path === '/reserve' ? reservePage(env, sUser) : ordersPage(env, sUser));
         }
 
         if (path === '/admin') {
@@ -184,6 +192,10 @@ export default {
     } catch (e) { console.error('Photo purge cron error:', e); }
   },
 };
+
+function redirectTo(location: string): Response {
+  return new Response(null, { status: 302, headers: { 'Location': location } });
+}
 
 function loginPage(redirect: string, error?: string): string {
   const errHtml = error ? '<div class="err">' + error + '</div>' : '';

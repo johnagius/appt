@@ -10,6 +10,9 @@ PHARMACY_NAME = "Potter's Pharmacy"
 APPOINTMENTS_URL = "https://kevappts.labrint.workers.dev"
 # This app's own public URL (used for OAuth redirect + email links).
 PUBLIC_BASE_URL = "https://reserve-collect.labrint.workers.dev"
+# Where the "leave a review" button in the post-collection email points.
+# Set to your Google review link; falls back to a Google search if blank.
+REVIEW_URL = ""
 
 # Secrets (set via `wrangler secret put`):
 # SIGNING_SECRET        — HMAC key for session cookies, OTP hashing, signed links

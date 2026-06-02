@@ -2,14 +2,36 @@ import { htmlDoc } from './shared';
 
 export function adminPage(sig: string): string {
   const body = `
-<div class="topbar">
-  <span class="brand">Reserve &amp; Collect<small>Staff dashboard</small></span>
-  <div><a href="/" target="_blank">Public site ↗</a></div>
-</div>
-<div class="wrap" style="max-width:1000px;">
+<header class="nav">
+  <a class="brand" href="/" target="_blank"><b>Reserve &amp; Collect</b><small>Staff dashboard</small></a>
+  <nav class="navright"><a class="navlink" href="/" target="_blank">Public site ↗</a></nav>
+</header>
+<div class="wrap wide">
 
   <div class="card">
     <div id="stats" class="row" style="text-align:center;"></div>
+  </div>
+
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+      <h2 style="margin:0;">Phone &amp; counter orders</h2>
+      <button class="btn btn-dark" onclick="toggleNew()">+ New order for a customer</button>
+    </div>
+    <div id="newOrder" style="display:none;margin-top:14px;">
+      <p class="muted" style="margin:0 0 8px;">Create a reservation on a customer's behalf. They'll get an email with the reference and a sign-in link, and it appears in their account when they sign in with this email.</p>
+      <div class="row">
+        <div><label>Customer name</label><input type="text" id="nName"></div>
+        <div><label>Customer email</label><input type="email" id="nEmail"></div>
+        <div><label>Phone (optional)</label><input type="tel" id="nPhone"></div>
+      </div>
+      <label>Items</label>
+      <div id="nItems"></div>
+      <button class="btn btn-outline" onclick="addNewItem()" style="margin-top:6px;">+ Add item</button>
+      <label style="margin-top:10px;">Notes (optional)</label>
+      <input type="text" id="nNotes" placeholder="e.g. requested by phone, blue box">
+      <div class="err" id="nErr"></div>
+      <button class="btn btn-primary" onclick="createOrder()" style="margin-top:12px;">Create reservation &amp; email customer</button>
+    </div>
   </div>
 
   <div id="detail"></div>
@@ -42,6 +64,27 @@ function api(path, method, bodyObj){
   }).then(function(r){return r.json();});
 }
 function esc(s){ var d=document.createElement('div'); d.textContent=s==null?'':String(s); return d.innerHTML; }
+
+// ── New phone/counter order ──
+function toggleNew(){ var n=document.getElementById('newOrder'); var show=n.style.display==='none'; n.style.display=show?'block':'none'; if(show && !document.querySelectorAll('.nItem').length) addNewItem(); }
+function addNewItem(){ var w=document.getElementById('nItems'); var d=document.createElement('div'); d.className='row'; d.style.marginBottom='6px';
+  d.innerHTML='<div style="flex:3;"><input type="text" class="nItem" placeholder="Item name or description"></div>'
+    +'<div style="flex:0 0 80px;min-width:70px;"><input type="number" class="nQty" min="1" max="99" value="1"></div>'
+    +'<button class="btn btn-outline" style="flex:0 0 auto;" onclick="this.parentNode.remove()">✕</button>';
+  w.appendChild(d); }
+async function createOrder(){
+  var err=document.getElementById('nErr'); err.textContent='';
+  var names=document.querySelectorAll('.nItem'), qtys=document.querySelectorAll('.nQty'), items=[];
+  for(var i=0;i<names.length;i++){ var v=names[i].value.trim(); if(v) items.push({name:v, quantity:parseInt(qtys[i].value,10)||1}); }
+  var body={ name:document.getElementById('nName').value.trim(), email:document.getElementById('nEmail').value.trim(),
+    phone:document.getElementById('nPhone').value.trim(), notes:document.getElementById('nNotes').value.trim(), items:items };
+  if(!body.name||!body.email||items.length===0){ err.textContent='Name, email and at least one item are required.'; return; }
+  var d=await api('/api/admin/reservations','POST',body);
+  if(d.ok){ alert('Created '+d.reference+' — the customer has been emailed.');
+    document.getElementById('newOrder').style.display='none'; document.getElementById('nItems').innerHTML='';
+    ['nName','nEmail','nPhone','nNotes'].forEach(function(id){ document.getElementById(id).value=''; }); load(); }
+  else err.textContent=d.reason||'Failed to create.';
+}
 function badge(s){ return '<span class="badge b-'+s+'">'+(LABELS[s]||s)+'</span>'; }
 
 function renderTabs(){

@@ -71,6 +71,24 @@ export async function upsertUserEmail(
   return (await getUserById(db, id))!;
 }
 
+/** For staff-created (phone) orders: return the existing user for an email, or
+ *  create an UNVERIFIED placeholder user. When the customer later signs in with
+ *  the same email (OTP), upsertUserEmail flips email_verified=1 on this same row,
+ *  so their phone orders appear under their account automatically. */
+export async function getOrCreateUserByEmail(
+  db: D1Database,
+  opts: { email: string; fullName: string; phone: string; referralCode: string; now: string }
+): Promise<User> {
+  const existing = await getUserByEmail(db, opts.email);
+  if (existing) return existing;
+  const id = 'U-' + generateId();
+  await db.prepare(
+    'INSERT INTO users (id, email, email_verified, auth_provider, google_sub, full_name, phone, referral_code, created_at, updated_at, last_login_at) ' +
+    "VALUES (?, ?, 0, 'email', '', ?, ?, ?, ?, ?, '')"
+  ).bind(id, opts.email.toLowerCase(), opts.fullName, opts.phone, opts.referralCode, opts.now, opts.now).run();
+  return (await getUserById(db, id))!;
+}
+
 export async function updateUserProfile(
   db: D1Database, id: string, fullName: string, phone: string, now: string
 ): Promise<void> {
@@ -244,6 +262,11 @@ export async function insertEvent(
 export async function getEventsByReservation(db: D1Database, reservationId: string): Promise<ReservationEvent[]> {
   const res = await db.prepare('SELECT * FROM reservation_events WHERE reservation_id = ? ORDER BY created_at').bind(reservationId).all<ReservationEvent>();
   return res.results;
+}
+/** True if an event of this type was already recorded (e.g. dedup the review email). */
+export async function reservationHasEvent(db: D1Database, reservationId: string, event: string): Promise<boolean> {
+  const row = await db.prepare('SELECT 1 AS x FROM reservation_events WHERE reservation_id = ? AND event = ? LIMIT 1').bind(reservationId, event).first<{ x: number }>();
+  return !!row;
 }
 
 // ─── Referrals ─────────────────────────────────────────────
