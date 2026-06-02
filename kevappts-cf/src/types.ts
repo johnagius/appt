@@ -21,6 +21,7 @@ export interface Env {
   LINDA_DOCTOR_NAME: string;
   LINDA_LOCATION: string;
   LINDA_PASSWORD: string;
+  RESERVE_COLLECT_URL: string;
 }
 
 export interface Appointment {

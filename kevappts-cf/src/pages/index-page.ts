@@ -867,6 +867,7 @@ export function indexPage(env: Env, bookingSource?: string): string {
               <div id="physioLinkWrap" class="physioCta" style="display:none;flex:1 1 180px;">
                 <a href="/physio" id="physioLinkBtn">Physiotherapy Bookings Here</a>
               </div>
+              <a href="${env.RESERVE_COLLECT_URL}" id="reserveCollectLinkBtn" style="flex:1 1 180px;display:block;text-align:center;background:#fffbeb;color:#92400e;border:1.5px solid #fcd34d;text-decoration:none;padding:12px 14px;border-radius:12px;font-weight:800;font-size:14px;">Reserve &amp; Collect Pharmacy Items</a>
             </div>
           </div>
 

@@ -12,6 +12,8 @@ SPINOLA_DOCTOR_NAME = "Dr James"
 SPINOLA_LOCATION_DETAILS = "Near McDonald's, Love Statue, near bus stop, in Spinola"
 LINDA_DOCTOR_NAME = "Linda"
 LINDA_LOCATION = "Potter's Clinic"
+# Link to the sibling Reserve & Collect app (shown as a CTA on the home page).
+RESERVE_COLLECT_URL = "https://reserve-collect.labrint.workers.dev"
 
 # Secrets (set via `wrangler secret put`):
 # SIGNING_SECRET          — HMAC key for cancel/action links (reuse from GAS)

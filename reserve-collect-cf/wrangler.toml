@@ -1,0 +1,35 @@
+name = "reserve-collect"
+main = "src/index.ts"
+compatibility_date = "2024-12-01"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+TIMEZONE = "Europe/Malta"
+PHARMACY_NAME = "Potter's Pharmacy"
+# The "one-stop shop" link shown big on the landing page.
+APPOINTMENTS_URL = "https://kevappts.labrint.workers.dev"
+# This app's own public URL (used for OAuth redirect + email links).
+PUBLIC_BASE_URL = "https://reserve-collect.labrint.workers.dev"
+
+# Secrets (set via `wrangler secret put`):
+# SIGNING_SECRET        — HMAC key for session cookies, OTP hashing, signed links
+# ADMIN_SECRET          — HMAC key for staff dashboard (REUSE kevappts value)
+# ADMIN_PASSWORD        — plaintext compared at /admin/login (REUSE kevappts value)
+# RESEND_API_KEY        — Resend email API key (same Resend account)
+# STAFF_EMAIL           — pharmacy inbox for "new reservation" notifications
+# GOOGLE_CLIENT_ID      — OAuth2 / OIDC client id for Google Sign-In (new Web client)
+# GOOGLE_CLIENT_SECRET  — OAuth2 client secret for the auth-code exchange
+
+[[d1_databases]]
+binding = "DB"
+database_name = "reserve-collect-db"
+# Fill this in after `wrangler d1 create reserve-collect-db`:
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+
+[[r2_buckets]]
+binding = "PHOTOS"
+bucket_name = "reserve-collect-photos"
+
+# Cron (hourly): expire stale OTPs + purge photos 90 days past collected/cancelled.
+[triggers]
+crons = ["0 * * * *"]

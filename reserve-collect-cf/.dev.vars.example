@@ -1,0 +1,21 @@
+# Copy this to .dev.vars and fill in your values for `wrangler dev`.
+# In production these are set with `wrangler secret put <NAME>`.
+
+# HMAC key for session cookies, OTP hashing and signed links.
+SIGNING_SECRET=change-me-long-random-string
+
+# Staff dashboard auth. Reuse the SAME values as the appointment app (kevappts)
+# so the existing admin password works on this dashboard too.
+ADMIN_SECRET=same-as-kevappts-admin-secret
+ADMIN_PASSWORD=same-as-kevappts-admin-password
+
+# Resend email API key (same Resend account as the appointment app).
+RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxx
+
+# Pharmacy inbox that receives a "new reservation" notification.
+STAFF_EMAIL=pharmacy@example.com
+
+# Google Sign-In (OAuth 2.0 / OIDC) — a NEW Web client, separate from the
+# Calendar client in the appointment app. The email-OTP path works without these.
+GOOGLE_CLIENT_ID=xxxx.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=GOCSPX-xxxx
