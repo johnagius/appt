@@ -188,6 +188,24 @@ export function indexPage(env: Env, bookingSource?: string): string {
       margin:6px 0 0 0;
     }
 
+    /* Service CTA buttons (blood tests / telemedicine / physio / reserve & collect)
+       — icons + subtle, professional motion. Honors prefers-reduced-motion. */
+    .svcBtn{
+      display:flex; align-items:center; justify-content:center; gap:9px;
+      transition: transform .18s ease, box-shadow .18s ease, filter .18s ease;
+      animation: svcRise .5s ease both;
+    }
+    .svcBtn svg{ width:19px; height:19px; display:block; }
+    .svcBtn .svcIco{ display:inline-flex; vertical-align:middle; animation: svcFloat 3.4s ease-in-out infinite; }
+    .svcBtn:hover{ transform: translateY(-3px); box-shadow: 0 10px 22px rgba(17,24,39,0.14); filter: brightness(1.02); }
+    .svcBtn:active{ transform: translateY(-1px); }
+    @keyframes svcRise{ from{ opacity:0; transform: translateY(8px); } to{ opacity:1; transform: translateY(0); } }
+    @keyframes svcFloat{ 0%,100%{ transform: translateY(0); } 50%{ transform: translateY(-2px); } }
+    @media (prefers-reduced-motion: reduce){
+      .svcBtn{ animation:none; transition:none; }
+      .svcBtn .svcIco{ animation:none; }
+    }
+
     .topCard{
       padding:12px;
     }
@@ -862,12 +880,12 @@ export function indexPage(env: Env, bookingSource?: string): string {
                  when Linda is enabled + has available dates. Row layout
                  on wider screens; wraps to a column on narrow ones. -->
             <div id="extraServicesWrap" style="margin-top:10px;display:flex;flex-direction:row;flex-wrap:wrap;gap:8px;">
-              <a href="/blood-tests" id="bloodTestLinkBtn" style="flex:1 1 180px;display:block;text-align:center;background:#fef2f2;color:#991b1b;border:1.5px solid #fecaca;text-decoration:none;padding:12px 14px;border-radius:12px;font-weight:800;font-size:14px;">Book Blood Tests &mdash; Potter&#39;s 8am</a>
-              <button type="button" id="telemedAlwaysBtn" onclick="openTelemedicineModal()" style="flex:1 1 180px;display:block;text-align:center;background:#fff7ed;color:#9a3412;border:1.5px solid #fdba74;padding:12px 14px;border-radius:12px;font-weight:800;font-size:14px;cursor:pointer;">Book Telemedicine Call &mdash; &euro;25</button>
+              <a href="/blood-tests" id="bloodTestLinkBtn" class="svcBtn" style="flex:1 1 180px;background:#fef2f2;color:#991b1b;border:1.5px solid #fecaca;text-decoration:none;padding:12px 14px;border-radius:12px;font-weight:800;font-size:14px;"><span class="svcIco"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.6S5.5 9.7 5.5 14.4a6.5 6.5 0 0 0 13 0C18.5 9.7 12 2.6 12 2.6z"/></svg></span>Book Blood Tests &mdash; Potter&#39;s 8am</a>
+              <button type="button" id="telemedAlwaysBtn" class="svcBtn" onclick="openTelemedicineModal()" style="flex:1 1 180px;background:#fff7ed;color:#9a3412;border:1.5px solid #fdba74;padding:12px 14px;border-radius:12px;font-weight:800;font-size:14px;cursor:pointer;"><span class="svcIco" style="animation-delay:.5s"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6.6 10.8a15 15 0 0 0 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.5.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1A17 17 0 0 1 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.2.2 2.4.6 3.5.1.4 0 .8-.3 1l-2.2 2.3z"/></svg></span>Book Telemedicine Call &mdash; &euro;25</button>
               <div id="physioLinkWrap" class="physioCta" style="display:none;flex:1 1 180px;">
-                <a href="/physio" id="physioLinkBtn">Physiotherapy Bookings Here</a>
+                <a href="/physio" id="physioLinkBtn" class="svcBtn"><span class="svcIco" style="animation-delay:.9s"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="4.4" r="2.2"/><path d="M11 8c-1.6 0-3 1-3.6 2.5L6 14l1.9.7 1.1-2.8V22h2v-5h.4v5h2v-7.2L15.9 17l1.8-1-1.7-4.3A3.9 3.9 0 0 0 12 8h-1z"/></svg></span>Physiotherapy Bookings Here</a>
               </div>
-              <a href="${env.RESERVE_COLLECT_URL}" id="reserveCollectLinkBtn" style="flex:1 1 180px;display:block;text-align:center;background:#fffbeb;color:#92400e;border:1.5px solid #fcd34d;text-decoration:none;padding:12px 14px;border-radius:12px;font-weight:800;font-size:14px;">Reserve &amp; Collect Pharmacy Items</a>
+              <a href="${env.RESERVE_COLLECT_URL}" id="reserveCollectLinkBtn" class="svcBtn" style="flex:1 1 180px;background:#fffbeb;color:#92400e;border:1.5px solid #fcd34d;text-decoration:none;padding:12px 14px;border-radius:12px;font-weight:800;font-size:14px;"><span class="svcIco" style="animation-delay:1.3s"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 7V6a5 5 0 0 1 10 0v1h3v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7h3zm2 0h6V6a3 3 0 0 0-6 0v1z"/></svg></span>Reserve &amp; Collect Pharmacy Items</a>
             </div>
           </div>
 
