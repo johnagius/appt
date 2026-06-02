@@ -3,24 +3,62 @@
 import type { Env, Reservation, ReservationItem } from '../types';
 import { escapeHtml } from './utils';
 
+const FROM = "Potter's Pharmacy <noreply@swiftdataautomation.com>";
+const FROM_EMAIL = 'noreply@swiftdataautomation.com';
+const FROM_NAME = "Potter's Pharmacy";
+
+async function sendViaResend(env: Env, to: string, subject: string, html: string): Promise<boolean> {
+  if (!env.RESEND_API_KEY) return false;
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from: FROM, to: [to], subject, html }),
+    });
+    if (res.ok) return true;
+    console.error('Resend error:', res.status, await res.text());
+    return false;
+  } catch (e) { console.error('Resend exception:', e); return false; }
+}
+
+async function sendViaBrevo(env: Env, to: string, subject: string, html: string): Promise<boolean> {
+  if (!env.BREVO_API_KEY) return false;
+  try {
+    const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: { 'api-key': env.BREVO_API_KEY, 'Content-Type': 'application/json', 'accept': 'application/json' },
+      body: JSON.stringify({ sender: { name: FROM_NAME, email: FROM_EMAIL }, to: [{ email: to }], subject, htmlContent: html }),
+    });
+    if (res.ok) return true;
+    console.error('Brevo error:', res.status, await res.text());
+    return false;
+  } catch (e) { console.error('Brevo exception:', e); return false; }
+}
+
+async function sendViaSmtp2go(env: Env, to: string, subject: string, html: string): Promise<boolean> {
+  if (!env.SMTP2GO_API_KEY) return false;
+  try {
+    const res = await fetch('https://api.smtp2go.com/v3/email/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ api_key: env.SMTP2GO_API_KEY, sender: FROM, to: [to], subject, html_body: html }),
+    });
+    if (!res.ok) { console.error('SMTP2GO error:', res.status, await res.text()); return false; }
+    const j: any = await res.json();
+    if (j && j.data && (j.data.succeeded >= 1 || j.data.email_id)) return true;
+    console.error('SMTP2GO not sent:', JSON.stringify(j));
+    return false;
+  } catch (e) { console.error('SMTP2GO exception:', e); return false; }
+}
+
+/** Send via Resend; if it errors or is over quota, automatically fall back to
+ *  Brevo and then SMTP2GO (whichever is configured). */
 async function sendEmail(env: Env, to: string, subject: string, html: string): Promise<void> {
-  const res = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${env.RESEND_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      from: "Potter's Pharmacy <noreply@swiftdataautomation.com>",
-      to: [to],
-      subject,
-      html,
-    }),
-  });
-  if (!res.ok) {
-    const text = await res.text();
-    console.error('Resend error:', res.status, text);
-  }
+  if (await sendViaResend(env, to, subject, html)) return;
+  console.warn('Primary (Resend) failed — trying fallback providers for', to);
+  if (await sendViaBrevo(env, to, subject, html)) return;
+  if (await sendViaSmtp2go(env, to, subject, html)) return;
+  console.error('All email providers failed for', to, '—', subject);
 }
 
 function layout(env: Env, title: string, body: string): string {

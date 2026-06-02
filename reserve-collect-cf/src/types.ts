@@ -7,6 +7,9 @@ export interface Env {
   ADMIN_SECRET: string;
   ADMIN_PASSWORD: string;
   RESEND_API_KEY: string;
+  // Optional backup email providers — used automatically if Resend fails/quota.
+  BREVO_API_KEY: string;
+  SMTP2GO_API_KEY: string;
   STAFF_EMAIL: string;
   GOOGLE_CLIENT_ID: string;
   GOOGLE_CLIENT_SECRET: string;

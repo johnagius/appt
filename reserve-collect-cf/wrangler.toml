@@ -19,6 +19,8 @@ REVIEW_URL = ""
 # ADMIN_SECRET          — HMAC key for staff dashboard (REUSE kevappts value)
 # ADMIN_PASSWORD        — plaintext compared at /admin/login (REUSE kevappts value)
 # RESEND_API_KEY        — Resend email API key (same Resend account)
+# BREVO_API_KEY         — (optional) backup email provider, used if Resend fails/quota
+# SMTP2GO_API_KEY       — (optional) backup email provider, used if Resend fails/quota
 # STAFF_EMAIL           — pharmacy inbox for "new reservation" notifications
 # GOOGLE_CLIENT_ID      — OAuth2 / OIDC client id for Google Sign-In (new Web client)
 # GOOGLE_CLIENT_SECRET  — OAuth2 client secret for the auth-code exchange
