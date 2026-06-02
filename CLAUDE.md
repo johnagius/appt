@@ -46,6 +46,31 @@ Notes for the user:
   skip it if no schema/config changes are included in the update.
 - Note: `wrangler deploy` does NOT accept `--yes` (it deploys without asking
   by default). Only `d1 execute` needs the `--yes` flag.
+- Self-serve deploy: deploys can also be run from the Claude Code environment
+  (no local machine) when `CLOUDFLARE_API_TOKEN` (Workers Scripts + D1 + R2
+  edit) and `CLOUDFLARE_ACCOUNT_ID` are set as environment secrets. With those,
+  `npx wrangler deploy` / `d1 execute` run non-interactively — no `wrangler
+  login`. The network policy must allow `api.cloudflare.com`.
+
+### Reserve & Collect app (`reserve-collect-cf`)
+
+The repo also contains a second Worker — the Reserve & Collect system — with its
+own D1 database (`reserve-collect-db`) and R2 bucket (`reserve-collect-photos`).
+When an update touches it, deploy it too (and redeploy `kevappts-cf` as well when
+the change affects the shared/reciprocal home-page link):
+
+```cmd
+cd /d "C:\Users\Potte\Downloads\appt-main\appt-main\reserve-collect-cf" && npm install && npm install -D wrangler@latest && npx wrangler d1 execute reserve-collect-db --remote --file=schema.sql --yes && npx wrangler deploy
+```
+
+First-time-only setup (can't be chained — prompts / browser):
+- `npx wrangler login` (once), `npx wrangler d1 create reserve-collect-db` (paste
+  the id into `reserve-collect-cf/wrangler.toml`), `npx wrangler r2 bucket create
+  reserve-collect-photos`.
+- Secrets: `SIGNING_SECRET`, `ADMIN_SECRET` + `ADMIN_PASSWORD` (reuse the kevappts
+  values so the same staff password works), `RESEND_API_KEY`, `STAFF_EMAIL`,
+  `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` (Google OAuth Web client; authorized
+  redirect `https://reserve-collect.labrint.workers.dev/api/auth/google/callback`).
 
 ## 3. Include a short "What changed" summary
 
