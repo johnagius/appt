@@ -912,6 +912,20 @@ export interface TelemedicineStats {
   weekMedicineCents: number;
 }
 
+export async function getRecentAppointmentActivity(db: D1Database, limit = 60): Promise<any[]> {
+  const res = await db.prepare(
+    "SELECT id, full_name, service_name, date_key, start_time, status, clinic, created_at, updated_at, cancelled_at, booking_source " +
+    "FROM appointments ORDER BY updated_at DESC LIMIT ?"
+  ).bind(limit).all<any>();
+  return res.results;
+}
+export async function getRecentTelemedicineActivity(db: D1Database, limit = 30): Promise<any[]> {
+  const res = await db.prepare(
+    "SELECT id, patient_name, status, created_at, updated_at FROM telemedicine_calls ORDER BY updated_at DESC LIMIT ?"
+  ).bind(limit).all<any>();
+  return res.results;
+}
+
 export async function getTelemedicineStats(db: D1Database, todayKey: string, weekStartKey: string): Promise<TelemedicineStats> {
   const [today, week, all] = await Promise.all([
     safePeriod(db, todayKey, todayKey),

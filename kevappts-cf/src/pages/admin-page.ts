@@ -1,8 +1,10 @@
+import type { Env } from '../types';
+
 /**
  * Admin dashboard — full-featured management panel.
  * Ported from GAS Admin.html to Cloudflare Workers.
  */
-export function adminPage(sig: string): string {
+export function adminPage(sig: string, env: Env): string {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -377,7 +379,6 @@ export function adminPage(sig: string): string {
 <div class="wrap">
   <h1>Admin Panel</h1>
   <p class="subtitle">Dr Kevin Navarro Gera - Appointment Management</p>
-  <a href="/admin/reserve" style="display:inline-flex;align-items:center;gap:8px;background:#f5b301;color:#111827;text-decoration:none;font-weight:800;font-size:14px;padding:11px 18px;border-radius:999px;margin-bottom:14px;box-shadow:0 6px 16px rgba(245,179,1,.3);">🛍️ Reserve &amp; Collect orders &rarr;</a>
 
   <div class="stats" id="statsBar">
     <div class="stat"><div class="num" id="statBooked">-</div><div class="label">Booked this week</div></div>
@@ -398,6 +399,8 @@ export function adminPage(sig: string): string {
 
   <div class="tabs">
     <div class="tab active" data-tab="schedule" onclick="switchTab('schedule')">Schedule</div>
+    <div class="tab" data-tab="activity" onclick="switchTab('activity')" style="background:#eef2ff;color:#4338ca;">🔔 Activity</div>
+    <div class="tab" data-tab="reserve" onclick="switchTab('reserve')" style="background:#fffbeb;color:#92400e;">🛍️ Reserve &amp; Collect</div>
     <div class="tab" data-tab="availability" onclick="switchTab('availability')">Availability</div>
     <div class="tab" data-tab="actions" onclick="switchTab('actions')">Quick Actions</div>
     <div class="tab" data-tab="statistics" onclick="switchTab('statistics')">Statistics</div>
@@ -414,6 +417,20 @@ export function adminPage(sig: string): string {
   <div class="msg" id="globalMsg"></div>
 
   <!-- SCHEDULE TAB -->
+  <div class="tab-content" id="tab-activity" style="display:none;">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+        <h2 style="margin:0;">Recent activity</h2>
+        <button class="btn btn-dark btn-sm" onclick="loadActivity()">Refresh</button>
+      </div>
+      <p class="subtitle" style="margin:6px 0 0;">Everything that's happened — new appointments, cancellations, telemedicine, and Reserve &amp; Collect orders. Newest first. So when you hear a beep, you'll know exactly what it was.</p>
+      <div id="activityFeed" style="margin-top:12px;">Loading…</div>
+    </div>
+  </div>
+  <div class="tab-content" id="tab-reserve" style="display:none;">
+    <iframe id="reserveFrame" src="" data-loaded="0" title="Reserve & Collect" style="width:100%;height:80vh;border:0;border-radius:14px;box-shadow:var(--shadow);"></iframe>
+  </div>
+
   <div class="tab-content" id="tab-schedule">
     <!-- Search -->
     <div class="search-wrap">
@@ -1340,6 +1357,8 @@ export function adminPage(sig: string): string {
 
 <script>
 var SIG = ${JSON.stringify(sig)};
+var RESERVE_URL = ${JSON.stringify((env.RESERVE_COLLECT_URL || '').replace(/\/$/, ''))};
+var RESERVE_SIG = ${JSON.stringify(env.RESERVE_ADMIN_SIG || '')};
 var _silentRefresh = false;
 var _audioCtx = null;
 var _userInteracted = false;
@@ -1659,7 +1678,60 @@ function switchTab(name) {
   if (name === 'telemedicine') loadTelemedicineData();
   if (name === 'linda') loadLindaData();
   if (name === 'bloodtests') loadBloodTestData();
+  if (name === 'activity') loadActivity();
+  if (name === 'reserve') loadReserveTab();
 }
+
+function loadReserveTab() {
+  var f = document.getElementById('reserveFrame');
+  if (f && f.getAttribute('data-loaded') !== '1' && RESERVE_URL) {
+    f.src = RESERVE_URL + '/admin?sig=' + encodeURIComponent(RESERVE_SIG);
+    f.setAttribute('data-loaded', '1');
+  }
+}
+
+// ─── Activity feed (appointments + telemedicine + reserve orders) ───
+function actEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function actClinic(c){ return c==='spinola'?'Spinola':c==='linda'?'Physio':"Potter's"; }
+function actWhen(ts){ if(!ts) return ''; var d=ts.slice(0,10), t=ts.slice(11,16); var today=new Date().toLocaleDateString('en-CA',{timeZone:'Europe/Malta'}); return (d===today?'Today':d)+' '+t; }
+function actAppt(a){
+  var who=actEsc(a.full_name||'Someone'), svc=actEsc(a.service_name||'appointment');
+  var when=a.date_key?(' — '+a.date_key+' '+(a.start_time||'')):''; var cl=actClinic(a.clinic);
+  var s=a.status, icon='📅', label='New appointment';
+  if(s==='CANCELLED_CLIENT'){icon='❌';label='Cancelled by patient';}
+  else if(s==='CANCELLED_DOCTOR'){icon='❌';label='Cancelled by clinic';}
+  else if(s==='RELOCATED_SPINOLA'){icon='↗️';label='Moved to Spinola';}
+  else if(s==='ATTENDED'){icon='✅';label='Attended';}
+  else if(s==='NO_SHOW'){icon='⚠️';label='No-show';}
+  else if(s==='BOOKED'&&a.created_at!==a.updated_at){icon='✏️';label='Appointment updated';}
+  var time=((s==='CANCELLED_CLIENT'||s==='CANCELLED_DOCTOR')&&a.cancelled_at)?a.cancelled_at:a.updated_at;
+  return {time:time, icon:icon, text:label+': '+who+' — '+svc+when+' ('+cl+')'};
+}
+function actTel(t){ return {time:t.updated_at||t.created_at, icon:'📞', text:'Telemedicine call: '+actEsc(t.patient_name||'')+' ('+actEsc(t.status||'')+')'}; }
+function actResv(e){
+  var who=actEsc(e.customer_name||''), ref=actEsc(e.reference||'');
+  var map={SUBMITTED:['🛍️','New Reserve & Collect order'],READY:['📦','Order marked ready'],COLLECTED:['✅','Order collected'],CANCELLED:['❌','Order cancelled'],ITEMS_REVIEWED:['🔎','Order items reviewed'],NOTIFIED:['✉️','Customer notified'],REVIEW_SENT:['⭐','Review request sent']};
+  var m=map[e.event]||['•',e.event];
+  return {time:e.created_at, icon:m[0], text:m[1]+': '+who+(ref?' ('+ref+')':'')};
+}
+async function loadActivity(){
+  var box=document.getElementById('activityFeed'); if(!box) return;
+  var events=[];
+  try{ var a=await apiCall('activity'); if(a&&a.ok){ (a.appts||[]).forEach(function(x){events.push(actAppt(x));}); (a.telemed||[]).forEach(function(x){events.push(actTel(x));}); } }catch(e){}
+  if(RESERVE_URL&&RESERVE_SIG){
+    try{ var r=await (await fetch(RESERVE_URL+'/api/admin/activity?sig='+encodeURIComponent(RESERVE_SIG))).json();
+      if(r&&r.ok){ (r.events||[]).forEach(function(x){events.push(actResv(x));}); } }catch(e){}
+  }
+  events=events.filter(function(e){return e.time;}).sort(function(x,y){return (y.time||'').localeCompare(x.time||'');}).slice(0,80);
+  if(!events.length){ box.innerHTML='<p class="subtitle">No recent activity yet.</p>'; return; }
+  box.innerHTML=events.map(function(e){
+    return '<div style="display:flex;gap:10px;padding:9px 4px;border-bottom:1px solid var(--line);align-items:baseline;">'
+      +'<span style="font-size:16px;">'+e.icon+'</span>'
+      +'<span style="flex:1;">'+e.text+'</span>'
+      +'<span class="subtitle" style="margin:0;white-space:nowrap;font-size:12px;">'+actWhen(e.time)+'</span></div>';
+  }).join('');
+}
+setInterval(function(){ var el=document.getElementById('tab-activity'); if(el && el.style.display!=='none') loadActivity(); }, 15000);
 
 // ─── Telemedicine (admin) ─────────────────────────────────
 function telTodayKey() {

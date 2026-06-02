@@ -17,6 +17,7 @@ import {
   setConfigValue, getTakenSlots, isReviewSent, getReviewSent, markReviewSent,
   insertFollowUp, getFollowUps, isFollowUpSent, getReferrals,
   getBloodTestOffRows, addBloodTestOff, deleteBloodTestOff,
+  getRecentAppointmentActivity, getRecentTelemedicineActivity,
 } from '../db/queries';
 import { verifyAdminSig, generateId } from '../services/crypto';
 import {
@@ -1541,6 +1542,18 @@ export async function apiAdminGetFollowUps(req: Request, env: Env): Promise<Resp
   // Kevin's follow-ups tab should not see Linda's physio follow-ups.
   const followUps = all.filter((f: any) => f.clinic !== 'linda');
   return json({ ok: true, followUps });
+}
+
+export async function apiAdminGetActivity(req: Request, env: Env): Promise<Response> {
+  const deny = await requireAdmin(req, env);
+  if (deny) return deny;
+  try {
+    const appts = await getRecentAppointmentActivity(env.DB, 60);
+    const telemed = await getRecentTelemedicineActivity(env.DB, 30);
+    return json({ ok: true, appts, telemed });
+  } catch (e: any) {
+    return json({ ok: false, reason: e.message }, 500);
+  }
 }
 
 export async function apiAdminGetReferrals(req: Request, env: Env): Promise<Response> {

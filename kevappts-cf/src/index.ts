@@ -22,7 +22,7 @@ import {
   apiAdminSendReviewRequests, apiAdminGetWeekOverview, apiAdminSearchAppointments,
   apiAdminGetSettings, apiAdminSaveSettings, apiAdminGetStatistics,
   apiAdminMarkAttendance, apiAdminGetPatientHistory, apiAdminDoctorOffDates,
-  apiAdminCreateTestBooking, apiAdminPurgeTestData, apiAdminTestFollowUp, apiAdminTestReview, apiAdminGetFollowUps, apiAdminToggleFollowUpHandled, apiAdminGetReferrals,
+  apiAdminCreateTestBooking, apiAdminPurgeTestData, apiAdminTestFollowUp, apiAdminTestReview, apiAdminGetFollowUps, apiAdminToggleFollowUpHandled, apiAdminGetReferrals, apiAdminGetActivity,
   apiAdminGetLindaStats, apiAdminGetLindaReviewPatients, apiAdminSendLindaReviewRequests, apiAdminGetLindaFollowUps, apiAdminGetLindaAppointments,
   apiAdminGetLindaConfig, apiAdminSaveLindaConfig,
 } from './api/admin';
@@ -225,6 +225,7 @@ export default {
         if (adminPath === 'follow-ups' && method === 'GET') return apiAdminGetFollowUps(request, env);
         if (adminPath === 'follow-up-handled' && method === 'POST') return apiAdminToggleFollowUpHandled(request, env);
         if (adminPath === 'referrals' && method === 'GET') return apiAdminGetReferrals(request, env);
+        if (adminPath === 'activity' && method === 'GET') return apiAdminGetActivity(request, env);
 
         // ─── Linda (Physiotherapy) admin ────────────
         if (adminPath === 'linda-stats' && method === 'GET') return apiAdminGetLindaStats(request, env);
@@ -389,7 +390,7 @@ export default {
               'Cache-Control': 'no-cache, no-store, must-revalidate',
               'Set-Cookie': `admin_sig=${sig}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=31536000`,
             };
-            const page = path === '/admin' ? adminPage(sig) : path === '/doctor' ? doctorPage(sig) : testPage(sig);
+            const page = path === '/admin' ? adminPage(sig, env) : path === '/doctor' ? doctorPage(sig) : testPage(sig);
             return new Response(page, { headers });
           }
           // No valid auth — show login form
