@@ -258,6 +258,26 @@ export async function getPhotosToPurge(db: D1Database, cutoff: string): Promise<
 }
 
 // ─── Events (staff audit trail) ────────────────────────────
+// ── Test / maintenance wipes ──
+export async function getAllPhotoKeys(db: D1Database): Promise<{ id: string; r2_key: string }[]> {
+  const res = await db.prepare('SELECT id, r2_key FROM photos').all<{ id: string; r2_key: string }>();
+  return res.results;
+}
+/** Delete all reservations, items, photo rows and events. Keeps user accounts. */
+export async function wipeAllOrders(db: D1Database): Promise<void> {
+  await db.prepare('DELETE FROM reservation_events').run();
+  await db.prepare('DELETE FROM photos').run();
+  await db.prepare('DELETE FROM reservation_items').run();
+  await db.prepare('DELETE FROM reservations').run();
+}
+/** Delete all customer accounts, sessions, OTPs and referrals (for onboarding tests). */
+export async function wipeAllAccounts(db: D1Database): Promise<void> {
+  await db.prepare('DELETE FROM users').run();
+  await db.prepare('DELETE FROM sessions').run();
+  await db.prepare('DELETE FROM email_verifications').run();
+  await db.prepare('DELETE FROM referrals').run();
+}
+
 export async function insertEvent(
   db: D1Database, opts: { reservationId: string; event: string; actor: string; detail: string; now: string }
 ): Promise<void> {

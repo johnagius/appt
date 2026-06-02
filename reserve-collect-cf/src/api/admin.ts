@@ -10,8 +10,9 @@ import {
   markNotifiedReady, markNotifiedUnavailable, setStaffNote, insertEvent,
   bumpVersion, getReservationStats, getDataVersion,
   getOrCreateUserByEmail, insertReservation, insertReservationItem, reservationHasEvent,
-  promotePendingItemsToAvailable,
+  promotePendingItemsToAvailable, getAllPhotoKeys, wipeAllOrders, wipeAllAccounts,
 } from '../db/queries';
+import { broadcast } from '../services/realtime-client';
 import { deriveOrderStatus, hasCollectable, VALID_ITEM_STATUSES } from '../services/status';
 import {
   sendReadyForCollectionEmail, sendUnavailableEmail, sendCustomNotificationEmail,
@@ -19,6 +20,12 @@ import {
 } from '../services/email';
 
 const MAX_ITEMS = 30;
+
+/** Bump the data version and push a live update to all open dashboards. */
+async function touched(env: Env): Promise<void> {
+  await env.DB.prepare('UPDATE data_version SET version = version + 1 WHERE id = 1').run();
+  await broadcast(env, { type: 'changed' });
+}
 
 function todayKey(env: Env): string { return nowIso(env.TIMEZONE).slice(0, 10); }
 const TERMINAL = new Set(['READY_FOR_COLLECTION', 'COLLECTED', 'CANCELLED']);
@@ -89,7 +96,7 @@ export async function apiAdminCreateReservation(request: Request, env: Env): Pro
     itemRows.push(row);
   }
   await insertEvent(env.DB, { reservationId, event: 'SUBMITTED', actor: 'staff', detail: 'phone order', now });
-  await bumpVersion(env.DB);
+  await touched(env);
   try { await sendStaffCreatedReservationEmail(env, reservation, itemRows); } catch (e) { console.error('staff-created email', e); }
   return json({ ok: true, reference, id: reservationId });
 }
@@ -134,7 +141,7 @@ export async function apiAdminSetItems(request: Request, env: Env, id: string): 
     await updateReservationStatus(env.DB, id, newStatus, now);
   }
   await insertEvent(env.DB, { reservationId: id, event: 'ITEMS_REVIEWED', actor: 'staff', detail: newStatus, now });
-  await bumpVersion(env.DB);
+  await touched(env);
   return json({ ok: true, status: newStatus, collectable: hasCollectable(items) });
 }
 
@@ -155,7 +162,7 @@ export async function apiAdminMarkReady(request: Request, env: Env, id: string):
       await markNotifiedReady(env.DB, id, now);
     } catch (e) { console.error('ready email', e); }
   }
-  await bumpVersion(env.DB);
+  await touched(env);
   return json({ ok: true });
 }
 
@@ -173,7 +180,7 @@ export async function apiAdminMarkCollected(request: Request, env: Env, id: stri
       await insertEvent(env.DB, { reservationId: id, event: 'REVIEW_SENT', actor: 'system', detail: '', now });
     } catch (e) { console.error('review email', e); }
   }
-  await bumpVersion(env.DB);
+  await touched(env);
   return json({ ok: true });
 }
 
@@ -213,7 +220,7 @@ export async function apiAdminCancel(request: Request, env: Env, id: string): Pr
   const now = nowIso(env.TIMEZONE);
   await updateReservationStatus(env.DB, id, 'CANCELLED', now);
   await insertEvent(env.DB, { reservationId: id, event: 'CANCELLED', actor: 'staff', detail: '', now });
-  await bumpVersion(env.DB);
+  await touched(env);
   return json({ ok: true });
 }
 
@@ -221,4 +228,18 @@ export async function apiAdminStats(request: Request, env: Env): Promise<Respons
   const deny = await requireAdmin(request, env); if (deny) return deny;
   const stats = await getReservationStats(env.DB, todayKey(env));
   return json({ ok: true, stats });
+}
+
+/** Testing reset. mode='orders' wipes all reservations/photos (keeps accounts);
+ *  mode='all' also wipes customer accounts so onboarding can be re-tested. */
+export async function apiAdminWipe(request: Request, env: Env): Promise<Response> {
+  const deny = await requireAdmin(request, env); if (deny) return deny;
+  const body: any = await request.json().catch(() => ({}));
+  const mode = body.mode === 'all' ? 'all' : 'orders';
+  const photos = await getAllPhotoKeys(env.DB);
+  for (const p of photos) { try { await env.PHOTOS.delete(p.r2_key); } catch (e) { console.error('R2 delete', e); } }
+  await wipeAllOrders(env.DB);
+  if (mode === 'all') await wipeAllAccounts(env.DB);
+  await touched(env);
+  return json({ ok: true, mode, photosDeleted: photos.length });
 }

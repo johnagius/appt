@@ -9,6 +9,7 @@
  * Cron:   hourly — expire OTPs + purge old photos
  */
 import type { Env } from './types';
+import { RealtimeHub } from './realtime';
 import { html, json } from './services/http';
 import { computeAdminSig, verifyAdminSig } from './services/crypto';
 import { getSessionUser, parseSessionToken, clearSessionCookie, readCookie } from './services/session';
@@ -24,7 +25,7 @@ import { apiUploadPhoto, apiServePhoto } from './api/photos';
 import {
   apiPoll, apiAdminListReservations, apiAdminGetReservation, apiAdminSetItems,
   apiAdminMarkReady, apiAdminMarkCollected, apiAdminNotify, apiAdminCancel, apiAdminStats,
-  apiAdminCreateReservation,
+  apiAdminCreateReservation, apiAdminWipe,
 } from './api/admin';
 import { purgeExpiredVerifications, getPhotosToPurge, deletePhotoRow, getConfigValue, revokeSession } from './db/queries';
 import { indexPage } from './pages/index-page';
@@ -33,6 +34,8 @@ import { verifyPage } from './pages/verify-page';
 import { reservePage } from './pages/reserve-page';
 import { ordersPage } from './pages/orders-page';
 import { adminPage } from './pages/admin-page';
+
+export { RealtimeHub };
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
@@ -53,6 +56,13 @@ export default {
     }
 
     try {
+      // ─── WebSocket (realtime dashboard updates) ───
+      if (path === '/api/ws') {
+        const id = env.REALTIME.idFromName('global');
+        const stub = env.REALTIME.get(id);
+        return stub.fetch(new Request('http://internal/ws', { headers: request.headers }));
+      }
+
       // ─── Auth API ─────────────────────────────────
       if (path === '/api/auth/google/start' && method === 'GET') return apiGoogleStart(request, env);
       if (path === '/api/auth/google/callback' && method === 'GET') return apiGoogleCallback(request, env);
@@ -118,6 +128,7 @@ export default {
       // ─── Admin API ────────────────────────────────
       if (path.startsWith('/api/admin/')) {
         if (path === '/api/admin/stats' && method === 'GET') return apiAdminStats(request, env);
+        if (path === '/api/admin/wipe' && method === 'POST') return apiAdminWipe(request, env);
         if (path === '/api/admin/reservations' && method === 'GET') return apiAdminListReservations(request, env);
         if (path === '/api/admin/reservations' && method === 'POST') return apiAdminCreateReservation(request, env);
         const m = path.match(/^\/api\/admin\/reservations\/([^\/]+)(?:\/(items|ready|collected|notify|cancel))?$/);

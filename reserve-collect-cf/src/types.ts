@@ -1,6 +1,7 @@
 export interface Env {
   DB: D1Database;
   PHOTOS: R2Bucket;
+  REALTIME: DurableObjectNamespace;
 
   // Secrets
   SIGNING_SECRET: string;

@@ -35,6 +35,16 @@ database_id = "558fa64b-cc60-4d9d-aadb-4f8479061197"
 binding = "PHOTOS"
 bucket_name = "reserve-collect-photos"
 
+# Durable Object for real-time WebSocket updates (instant dashboard + beep).
+[durable_objects]
+bindings = [
+  { name = "REALTIME", class_name = "RealtimeHub" }
+]
+
+[[migrations]]
+tag = "v1"
+new_classes = ["RealtimeHub"]
+
 # Cron (hourly): expire stale OTPs + purge photos 90 days past collected/cancelled.
 [triggers]
 crons = ["0 * * * *"]

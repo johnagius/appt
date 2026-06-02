@@ -10,6 +10,7 @@ import {
   insertEvent, updateUserProfile, bumpVersion,
 } from '../db/queries';
 import { sendReservationReceivedEmail, sendStaffNewReservationEmail } from '../services/email';
+import { broadcast } from '../services/realtime-client';
 
 const MAX_ITEMS = 30;
 
@@ -88,6 +89,7 @@ export async function apiCreateReservation(request: Request, env: Env): Promise<
   // Notifications (best-effort; don't block the response on email).
   try { await sendReservationReceivedEmail(env, reservation, itemRows); } catch (e) { console.error('received email', e); }
   try { await sendStaffNewReservationEmail(env, reservation, itemRows); } catch (e) { console.error('staff email', e); }
+  await broadcast(env, { type: 'new_order', reference, name });
 
   return json({ ok: true, reference, id: reservationId });
 }
@@ -127,6 +129,7 @@ export async function apiCancelMyReservation(request: Request, env: Env, id: str
   await updateReservationStatus(env.DB, id, 'CANCELLED', now);
   await insertEvent(env.DB, { reservationId: id, event: 'CANCELLED', actor: 'customer', detail: '', now });
   await bumpVersion(env.DB);
+  await broadcast(env, { type: 'changed' });
   return json({ ok: true });
 }
 
@@ -166,5 +169,6 @@ export async function apiReorderReservation(request: Request, env: Env, id: stri
   await bumpVersion(env.DB);
   try { await sendReservationReceivedEmail(env, reservation, itemRows); } catch {}
   try { await sendStaffNewReservationEmail(env, reservation, itemRows); } catch {}
+  await broadcast(env, { type: 'new_order', reference });
   return json({ ok: true, reference, id: reservationId });
 }

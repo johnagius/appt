@@ -43,6 +43,17 @@ export function adminPage(sig: string): string {
   </div>
 
   <div id="list"></div>
+
+  <div class="card" style="border:1px solid #fecaca;">
+    <details>
+      <summary style="cursor:pointer;font-weight:800;color:#b91c1c;">⚠️ Testing tools (wipe data)</summary>
+      <p class="muted" style="margin:10px 0;">Permanently delete data for testing — cannot be undone.</p>
+      <div class="row">
+        <button class="btn btn-outline" style="border-color:#fca5a5;color:#b91c1c;" onclick="wipe('orders')">Wipe all orders (keep accounts)</button>
+        <button class="btn btn-danger" onclick="wipe('all')">Wipe everything (orders + accounts)</button>
+      </div>
+    </details>
+  </div>
 </div>
 <script>
 var SIG = ${JSON.stringify(sig)};
@@ -187,13 +198,53 @@ async function notify(id, type){
   if(d.ok){ alert('Email sent.'); } else alert(d.reason||'Failed');
 }
 
-// Keep lastV in sync after our own writes so the poll doesn't reload on us.
+// ── Testing: wipe data ──
+async function wipe(mode){
+  var msg = mode==='all' ? 'Delete ALL orders AND all customer accounts? This cannot be undone.' : 'Delete ALL orders (accounts kept)? This cannot be undone.';
+  if(!confirm(msg)) return;
+  if(!confirm('Final confirmation — really wipe now?')) return;
+  var d = await api('/api/admin/wipe','POST',{mode:mode});
+  if(d.ok){ alert('Done — '+(mode==='all'?'orders + accounts wiped.':'orders wiped.')+' Photos removed: '+d.photosDeleted); load(); }
+  else alert(d.reason||'Failed');
+}
+
+// ── Realtime: instant updates + beep on new orders ──
+function beep(){
+  try{
+    var ctx = beep._c || (beep._c = new (window.AudioContext||window.webkitAudioContext)());
+    if(ctx.state==='suspended') ctx.resume();
+    var o=ctx.createOscillator(), g=ctx.createGain(); o.connect(g); g.connect(ctx.destination);
+    o.type='sine'; o.frequency.value=880; g.gain.value=0.07;
+    o.frequency.setValueAtTime(1320, ctx.currentTime+0.12);
+    o.start(); o.stop(ctx.currentTime+0.26);
+  }catch(e){}
+}
+function flashTitle(txt){
+  var orig='Staff dashboard'; var n=0; clearInterval(flashTitle._t);
+  flashTitle._t=setInterval(function(){ document.title=(n%2?txt:orig); if(++n>7){clearInterval(flashTitle._t); document.title=orig;} },600);
+}
+function connectWS(){
+  try{
+    var proto = location.protocol==='https:'?'wss:':'ws:';
+    var ws = new WebSocket(proto+'//'+location.host+'/api/ws');
+    ws.onmessage = function(ev){ var m={}; try{ m=JSON.parse(ev.data); }catch(e){}
+      if(m.type==='new_order'){ beep(); flashTitle('🔔 New order!'); load(); }
+      else if(m.type==='changed'){ load(); } };
+    ws.onclose = function(){ clearInterval(connectWS._p); setTimeout(connectWS, 3000); };
+    ws.onerror = function(){ try{ ws.close(); }catch(e){} };
+    clearInterval(connectWS._p);
+    connectWS._p = setInterval(function(){ try{ if(ws.readyState===1) ws.send('ping'); }catch(e){} }, 25000);
+  }catch(e){ setTimeout(connectWS, 5000); }
+}
+// Resume audio on first interaction (browsers gate autoplay).
+document.addEventListener('click', function(){ try{ if(beep._c && beep._c.state==='suspended') beep._c.resume(); }catch(e){} });
+
+// Poll only as a fallback if the socket drops.
 async function syncVersion(){ try{ var d=await api('/api/poll'); if(d&&d.v!==undefined) lastV=d.v; }catch(e){} }
-// Auto-refresh only when someone else changes data.
 async function poll(){
   try{ var d = await api('/api/poll'); if(d.v!==undefined && d.v!==lastV){ if(lastV!==-1) load(); lastV=d.v; } }catch(e){}
 }
-renderTabs(); load(); setInterval(poll, 8000);
+renderTabs(); load(); connectWS(); setInterval(poll, 15000);
 </script>`;
   return htmlDoc('Staff dashboard — Reserve & Collect', body);
 }
