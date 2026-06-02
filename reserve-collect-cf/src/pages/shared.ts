@@ -116,10 +116,11 @@ export const BASE_CSS = `
   @keyframes floaty{0%,100%{transform:translateY(0);}50%{transform:translateY(-2px);}}
   .floaty{animation:floaty 3.4s ease-in-out infinite;}
   @keyframes reviewPulse{
-    0%,100%{ box-shadow:0 0 0 0 rgba(245,179,1,.55), 0 6px 16px rgba(245,179,1,.30); filter:brightness(1); }
-    50%{ box-shadow:0 0 0 10px rgba(245,179,1,0), 0 14px 34px rgba(245,179,1,.65); filter:brightness(1.10); }
+    0%,100%{ box-shadow:0 0 0 0 rgba(245,179,1,.65), 0 8px 20px rgba(245,179,1,.45); filter:brightness(1); transform:scale(1); }
+    50%{ box-shadow:0 0 0 14px rgba(245,179,1,0), 0 0 28px 7px rgba(245,179,1,.95); filter:brightness(1.28); transform:scale(1.03); }
   }
-  .review-cta{ animation:reviewPulse 1.8s ease-in-out infinite; }
+  /* !important so it still runs even under prefers-reduced-motion (requested). */
+  .review-cta{ animation:reviewPulse 1.5s ease-in-out infinite !important; }
   @media(prefers-reduced-motion:reduce){
     *{animation:none !important;}
     .btn,.signin-btn{transition:none;}
