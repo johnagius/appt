@@ -5,6 +5,7 @@ export interface Env {
   ADMIN_SECRET: string;
   ADMIN_PASSWORD: string;
   RESEND_API_KEY: string;
+  BREVO_API_KEY: string;
   DOCTOR_EMAIL: string;
   GOOGLE_CLIENT_ID: string;
   GOOGLE_CLIENT_SECRET: string;

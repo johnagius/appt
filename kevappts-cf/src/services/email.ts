@@ -6,24 +6,44 @@ import type { Env, Appointment } from '../types';
 import { escapeHtml } from './utils';
 import { computeSig, computeAdminSig } from './crypto';
 
+const EMAIL_FROM = "Potter's Pharmacy <noreply@swiftdataautomation.com>";
+const EMAIL_FROM_NAME = "Potter's Pharmacy";
+const EMAIL_FROM_ADDR = 'noreply@swiftdataautomation.com';
+
+async function sendViaResend(env: Env, to: string, subject: string, html: string): Promise<boolean> {
+  if (!env.RESEND_API_KEY) return false;
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from: EMAIL_FROM, to: [to], subject, html }),
+    });
+    if (res.ok) return true;
+    console.error('Resend error:', res.status, await res.text());
+    return false;
+  } catch (e) { console.error('Resend exception:', e); return false; }
+}
+
+async function sendViaBrevo(env: Env, to: string, subject: string, html: string): Promise<boolean> {
+  if (!env.BREVO_API_KEY) return false;
+  try {
+    const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: { 'api-key': env.BREVO_API_KEY, 'Content-Type': 'application/json', 'accept': 'application/json' },
+      body: JSON.stringify({ sender: { name: EMAIL_FROM_NAME, email: EMAIL_FROM_ADDR }, to: [{ email: to }], subject, htmlContent: html }),
+    });
+    if (res.ok) return true;
+    console.error('Brevo error:', res.status, await res.text());
+    return false;
+  } catch (e) { console.error('Brevo exception:', e); return false; }
+}
+
+/** Send via Resend; if it errors or is over quota, fall back to Brevo. */
 async function sendEmail(env: Env, to: string, subject: string, html: string): Promise<void> {
-  const res = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${env.RESEND_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      from: "Potter's Pharmacy <noreply@swiftdataautomation.com>",
-      to: [to],
-      subject,
-      html,
-    }),
-  });
-  if (!res.ok) {
-    const text = await res.text();
-    console.error('Resend error:', res.status, text);
-  }
+  if (await sendViaResend(env, to, subject, html)) return;
+  console.warn('Primary (Resend) failed — trying Brevo fallback for', to);
+  if (await sendViaBrevo(env, to, subject, html)) return;
+  console.error('All email providers failed for', to, '—', subject);
 }
 
 function getMapUrl(location: string): string {
