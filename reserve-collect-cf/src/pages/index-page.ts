@@ -4,6 +4,8 @@ import { htmlDoc, topBar, footer, icon } from './shared';
 
 export function indexPage(env: Env, user?: User | null): string {
   const appts = escapeHtml(env.APPOINTMENTS_URL);
+  const reviewUrl = (env.REVIEW_URL && env.REVIEW_URL.trim())
+    || ('https://www.google.com/search?q=' + encodeURIComponent(env.PHARMACY_NAME + ' reviews'));
 
   // Primary CTA adapts to login state.
   const primary = user
@@ -38,6 +40,13 @@ ${topBar(env, user)}
       <span class="pill">${icon('box', 15)} Collection only</span>
       <span class="pill">${icon('mail', 15)} Email when ready</span>
     </div>
+  </div>
+
+  <div class="card hero" style="text-align:center;border-color:#fde68a;">
+    <div class="eyebrow" style="justify-content:center;">${icon('star', 16)} Love ${escapeHtml(env.PHARMACY_NAME)}?</div>
+    <h2 style="margin:4px 0 8px;">Leave us a quick Google review</h2>
+    <p class="muted" style="margin:0 auto 16px;max-width:460px;">⭐⭐⭐⭐⭐ It takes 10 seconds and genuinely helps our pharmacy. Thank you!</p>
+    <a class="btn btn-primary" target="_blank" rel="noopener" href="${escapeHtml(reviewUrl)}">${icon('star', 18)} Leave a Google review</a>
   </div>
 
   <div class="card">
