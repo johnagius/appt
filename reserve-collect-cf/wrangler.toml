@@ -24,7 +24,7 @@ PUBLIC_BASE_URL = "https://reserve-collect.labrint.workers.dev"
 binding = "DB"
 database_name = "reserve-collect-db"
 # Fill this in after `wrangler d1 create reserve-collect-db`:
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
+database_id = "558fa64b-cc60-4d9d-aadb-4f8479061197"
 
 [[r2_buckets]]
 binding = "PHOTOS"
