@@ -37,7 +37,7 @@ export async function apiAdminListReservations(request: Request, env: Env): Prom
   for (const r of rows) {
     const items = await getItemsByReservation(env.DB, r.id);
     const photos = await getPhotosByReservation(env.DB, r.id);
-    out.push({ ...r, items, photoCount: photos.length });
+    out.push({ ...r, items, photos: photos.map(p => ({ id: p.id, kind: p.kind })), photoCount: photos.length });
   }
   return json({ ok: true, reservations: out });
 }
