@@ -115,6 +115,8 @@ export const BASE_CSS = `
   @keyframes fadeUp{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
   @keyframes floaty{0%,100%{transform:translateY(0);}50%{transform:translateY(-2px);}}
   .floaty{animation:floaty 3.4s ease-in-out infinite;}
+  @keyframes reviewPulse{0%,100%{box-shadow:0 6px 16px rgba(245,179,1,.30);}50%{box-shadow:0 12px 36px rgba(245,179,1,.80);}}
+  .review-cta{animation:reviewPulse 2.6s ease-in-out infinite;}
   @media(prefers-reduced-motion:reduce){
     *{animation:none !important;}
     .btn,.signin-btn{transition:none;}

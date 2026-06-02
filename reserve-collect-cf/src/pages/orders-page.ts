@@ -15,7 +15,7 @@ export function ordersPage(env: Env, user: User): string {
     <div class="eyebrow">${icon('star', 15)} Enjoying ${escapeHtml(env.PHARMACY_NAME)}?</div>
     <h2 style="margin-bottom:8px;">Leave a review &amp; share with friends</h2>
     <div class="row">
-      <a class="btn btn-primary block" target="_blank" rel="noopener" href="${escapeHtml(reviewUrl)}">${icon('star', 18)} Leave a Google review</a>
+      <a class="btn btn-primary block review-cta" target="_blank" rel="noopener" href="${escapeHtml(reviewUrl)}">${icon('star', 18)} Leave a Google review</a>
     </div>
     <p class="muted" style="margin:14px 0 6px;">Tell a friend they can reserve &amp; collect here too:</p>
     <div class="row">

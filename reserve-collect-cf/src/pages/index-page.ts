@@ -46,7 +46,7 @@ ${topBar(env, user)}
     <div class="eyebrow" style="justify-content:center;">${icon('star', 16)} Love ${escapeHtml(env.PHARMACY_NAME)}?</div>
     <h2 style="margin:4px 0 8px;">Leave us a quick Google review</h2>
     <p class="muted" style="margin:0 auto 16px;max-width:460px;">⭐⭐⭐⭐⭐ It takes 10 seconds and genuinely helps our pharmacy. Thank you!</p>
-    <a class="btn btn-primary" target="_blank" rel="noopener" href="${escapeHtml(reviewUrl)}">${icon('star', 18)} Leave a Google review</a>
+    <a class="btn btn-primary review-cta" target="_blank" rel="noopener" href="${escapeHtml(reviewUrl)}">${icon('star', 18)} Leave a Google review</a>
   </div>
 
   <div class="card">
