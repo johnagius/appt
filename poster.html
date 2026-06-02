@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Potter's Pharmacy — Poster (A4)</title>
+<style>
+  :root{ --ink:#0f172a; --gold:#f5b301; --blue:#2563eb; --muted:#475569; --line:#e5e7eb; }
+  *{ box-sizing:border-box; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  html,body{ margin:0; padding:0; background:#e2e8f0; font-family:"Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif; color:var(--ink); }
+  .page{
+    width:210mm; height:297mm; margin:0 auto; background:#fff; position:relative; overflow:hidden;
+    display:flex; flex-direction:column;
+  }
+  /* Header */
+  .head{ background:var(--ink); color:#fff; padding:13mm 14mm 11mm; text-align:center; position:relative; }
+  .head:after{ content:""; position:absolute; left:0; right:0; bottom:0; height:3mm; background:var(--gold); }
+  .brand{ font-size:30pt; font-weight:900; letter-spacing:.3px; }
+  .brand .g{ color:var(--gold); }
+  .tag{ margin-top:2mm; font-size:13pt; color:#cbd5e1; font-weight:600; }
+  .lead{ text-align:center; font-size:13.5pt; color:var(--muted); font-weight:700; margin:7mm 14mm 4mm; }
+  /* Cards */
+  .cards{ flex:1; display:flex; flex-direction:column; gap:7mm; padding:2mm 14mm 6mm; }
+  .card{ flex:1; border:1.2mm solid; border-radius:7mm; padding:8mm 9mm; display:flex; gap:8mm; align-items:center; }
+  .card.appt{ border-color:#bfdbfe; background:linear-gradient(135deg,#eff6ff,#fff); }
+  .card.resv{ border-color:#fde68a; background:linear-gradient(135deg,#fffbeb,#fff); }
+  .c-main{ flex:1; }
+  .pill{ display:inline-block; font-size:10.5pt; font-weight:800; padding:1.5mm 4mm; border-radius:999px; color:#fff; letter-spacing:.4px; }
+  .appt .pill{ background:var(--blue); }
+  .resv .pill{ background:var(--gold); color:var(--ink); }
+  .c-title{ font-size:24pt; font-weight:900; margin:3mm 0 2mm; line-height:1.05; }
+  .c-sub{ font-size:12pt; color:var(--muted); font-weight:600; margin-bottom:4mm; }
+  ul{ margin:0; padding:0; list-style:none; }
+  li{ font-size:12.5pt; font-weight:700; margin:2.4mm 0; padding-left:8mm; position:relative; }
+  li:before{ content:"✓"; position:absolute; left:0; font-weight:900; }
+  .appt li:before{ color:var(--blue); }
+  .resv li:before{ color:#b45309; }
+  .price{ color:#9a3412; font-weight:900; }
+  /* QR block */
+  .qr-wrap{ width:52mm; text-align:center; flex:0 0 auto; }
+  .qr{ width:46mm; height:46mm; padding:3mm; background:#fff; border:0.6mm solid var(--line); border-radius:4mm; margin:0 auto; }
+  .qr svg{ width:100%; height:100%; display:block; }
+  .scan{ font-size:11pt; font-weight:900; margin-top:2.5mm; }
+  .url{ font-size:8.6pt; font-weight:700; color:var(--muted); margin-top:1mm; word-break:break-all; }
+  /* Footer */
+  .foot{ background:#f8fafc; border-top:1px solid var(--line); padding:5mm 14mm; text-align:center; font-size:10pt; color:var(--muted); font-weight:600; }
+  .foot b{ color:var(--ink); }
+  @media print{ html,body{ background:#fff; } .page{ margin:0; } }
+  @page{ size:A4; margin:0; }
+</style>
+</head>
+<body>
+  <div class="page">
+    <div class="head">
+      <div class="brand">Potter's <span class="g">Pharmacy</span></div>
+      <div class="tag">Your health &amp; pharmacy — now online</div>
+    </div>
+
+    <div class="lead">Two easy ways to use us from your phone — scan, tap, done.</div>
+
+    <div class="cards">
+      <div class="card appt">
+        <div class="c-main">
+          <span class="pill">SEE THE DOCTOR</span>
+          <div class="c-title">Book an appointment online</div>
+          <div class="c-sub">No phone calls, no waiting on hold.</div>
+          <ul>
+            <li>Doctor consultations</li>
+            <li>Physiotherapy sessions</li>
+            <li>Blood tests at Potter's — from 8am</li>
+            <li>Telemedicine phone consult — <span class="price">€25</span></li>
+          </ul>
+        </div>
+        <div class="qr-wrap">
+          <div class="qr"><svg preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 29 29" shape-rendering="crispEdges"><path fill="#ffffff" d="M0 0h29v29H0z"/><path stroke="#000000" d="M0 0.5h7m1 0h1m1 0h1m3 0h1m2 0h2m3 0h7M0 1.5h1m5 0h1m2 0h3m5 0h1m1 0h1m2 0h1m5 0h1M0 2.5h1m1 0h3m1 0h1m2 0h1m3 0h1m3 0h1m4 0h1m1 0h3m1 0h1M0 3.5h1m1 0h3m1 0h1m1 0h2m1 0h1m2 0h2m2 0h2m2 0h1m1 0h3m1 0h1M0 4.5h1m1 0h3m1 0h1m1 0h1m1 0h1m2 0h4m5 0h1m1 0h3m1 0h1M0 5.5h1m5 0h1m1 0h1m2 0h4m1 0h1m2 0h2m1 0h1m5 0h1M0 6.5h7m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h7M8 7.5h1m1 0h2m2 0h2m1 0h1m1 0h1M0 8.5h1m3 0h1m1 0h3m1 0h1m1 0h3m2 0h3m1 0h5m2 0h1M0 9.5h1m1 0h2m3 0h1m1 0h1m2 0h1m2 0h4m2 0h8M1 10.5h3m2 0h1m6 0h4m1 0h1m2 0h2m5 0h1M1 11.5h2m1 0h1m2 0h2m2 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h3m1 0h1m1 0h2M1 12.5h1m2 0h1m1 0h2m1 0h3m1 0h1m3 0h1m1 0h3m5 0h1M4 13.5h2m1 0h2m1 0h1m1 0h5m4 0h8M0 14.5h1m1 0h2m2 0h4m1 0h1m3 0h2m1 0h1m1 0h7m1 0h1M0 15.5h2m1 0h3m2 0h1m3 0h1m1 0h1m2 0h2m2 0h2m4 0h2M0 16.5h1m1 0h1m1 0h1m1 0h2m1 0h7m1 0h1m1 0h3m1 0h1m3 0h1M0 17.5h2m3 0h1m2 0h5m2 0h1m1 0h2m2 0h5m1 0h2M3 18.5h1m1 0h2m1 0h1m1 0h2m1 0h3m2 0h1m3 0h1m3 0h1m1 0h1M3 19.5h3m1 0h1m1 0h1m1 0h3m2 0h3m1 0h3m4 0h2M0 20.5h4m2 0h1m1 0h2m1 0h1m1 0h1m2 0h2m2 0h6m2 0h1M8 21.5h4m1 0h4m2 0h2m3 0h1m3 0h1M0 22.5h7m1 0h2m2 0h1m2 0h2m2 0h2m1 0h1m1 0h3m1 0h1M0 23.5h1m5 0h1m2 0h2m1 0h1m1 0h1m1 0h2m1 0h2m3 0h1m2 0h2M0 24.5h1m1 0h3m1 0h1m1 0h1m2 0h1m1 0h2m1 0h2m1 0h7m1 0h1M0 25.5h1m1 0h3m1 0h1m2 0h1m2 0h1m2 0h5m1 0h1m6 0h1M0 26.5h1m1 0h3m1 0h1m2 0h4m1 0h2m3 0h2m4 0h4M0 27.5h1m5 0h1m2 0h1m1 0h1m2 0h2m1 0h2m1 0h3m1 0h2m1 0h2M0 28.5h7m1 0h1m2 0h1m1 0h1m3 0h1m1 0h4m2 0h1m1 0h1"/></svg>
+</div>
+          <div class="scan">Scan to book</div>
+          <div class="url">kevappts.labrint.workers.dev</div>
+        </div>
+      </div>
+
+      <div class="card resv">
+        <div class="c-main">
+          <span class="pill">RESERVE &amp; COLLECT</span>
+          <div class="c-title">Reserve your pharmacy items</div>
+          <div class="c-sub">Collect in-store when it's ready — skip the queue.</div>
+          <ul>
+            <li>Reserve any item or medicine</li>
+            <li>Add a photo of the product or prescription</li>
+            <li>We email you the moment it's ready</li>
+            <li>Collection only — pay in store</li>
+          </ul>
+        </div>
+        <div class="qr-wrap">
+          <div class="qr"><svg preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 33 33" shape-rendering="crispEdges"><path fill="#ffffff" d="M0 0h33v33H0z"/><path stroke="#000000" d="M0 0.5h7m2 0h2m5 0h1m1 0h6m2 0h7M0 1.5h1m5 0h1m3 0h2m3 0h2m1 0h1m1 0h2m2 0h1m1 0h1m5 0h1M0 2.5h1m1 0h3m1 0h1m1 0h1m5 0h2m4 0h5m1 0h1m1 0h3m1 0h1M0 3.5h1m1 0h3m1 0h1m1 0h2m1 0h2m5 0h1m2 0h1m2 0h1m1 0h1m1 0h3m1 0h1M0 4.5h1m1 0h3m1 0h1m1 0h1m2 0h6m3 0h3m3 0h1m1 0h3m1 0h1M0 5.5h1m5 0h1m1 0h1m1 0h1m1 0h3m2 0h3m2 0h3m1 0h1m5 0h1M0 6.5h7m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h7M8 7.5h1m2 0h2m3 0h1m2 0h3m1 0h1M0 8.5h1m1 0h5m2 0h1m1 0h1m1 0h2m2 0h1m1 0h1m2 0h2m2 0h5M4 9.5h2m2 0h1m1 0h1m2 0h2m1 0h2m1 0h2m2 0h1m2 0h2m1 0h2m1 0h1M4 10.5h1m1 0h3m2 0h1m1 0h3m1 0h1m4 0h1m5 0h1m1 0h2M1 11.5h3m1 0h1m2 0h1m1 0h1m1 0h2m3 0h2m1 0h1m4 0h2m1 0h5M1 12.5h1m3 0h2m1 0h1m2 0h1m2 0h3m2 0h4m1 0h1m3 0h2m1 0h1M5 13.5h1m1 0h1m2 0h1m1 0h2m1 0h1m2 0h1m2 0h1m2 0h1m1 0h1m2 0h1m1 0h2M0 14.5h3m1 0h5m3 0h5m3 0h3m1 0h6m1 0h1M1 15.5h2m1 0h2m1 0h1m2 0h1m1 0h1m2 0h1m2 0h1m2 0h3m1 0h3m1 0h2M1 16.5h1m1 0h1m2 0h1m1 0h1m2 0h1m3 0h4m5 0h2m1 0h3m2 0h1M0 17.5h1m1 0h2m3 0h1m2 0h2m4 0h1m1 0h4m1 0h1m1 0h3m1 0h4M0 18.5h2m3 0h3m1 0h1m2 0h2m1 0h1m2 0h1m2 0h1m3 0h4m1 0h2M2 19.5h3m2 0h5m8 0h5m1 0h5m1 0h1M1 20.5h1m1 0h2m1 0h1m4 0h1m1 0h1m1 0h1m2 0h2m1 0h1m3 0h1m2 0h2m1 0h2M0 21.5h1m4 0h1m7 0h1m1 0h3m2 0h1m1 0h2m2 0h1m3 0h1m1 0h1M0 22.5h1m2 0h1m1 0h2m2 0h2m1 0h1m1 0h1m2 0h1m1 0h1m1 0h2m8 0h1M0 23.5h1m2 0h2m2 0h1m2 0h3m1 0h1m1 0h1m1 0h5m3 0h1m2 0h4M0 24.5h1m1 0h2m2 0h3m1 0h1m2 0h2m2 0h1m1 0h1m2 0h1m1 0h5m3 0h1M8 25.5h1m2 0h2m3 0h5m2 0h2m3 0h1m1 0h1m1 0h1M0 26.5h7m2 0h3m2 0h4m2 0h1m1 0h3m1 0h1m1 0h1m1 0h1M0 27.5h1m5 0h1m1 0h1m3 0h1m2 0h1m1 0h4m2 0h2m3 0h3M0 28.5h1m1 0h3m1 0h1m1 0h3m4 0h2m2 0h4m1 0h6m1 0h1M0 29.5h1m1 0h3m1 0h1m1 0h1m1 0h1m2 0h3m1 0h2m2 0h1m1 0h3m2 0h1m3 0h1M0 30.5h1m1 0h3m1 0h1m1 0h3m4 0h2m3 0h1m2 0h2m1 0h2m1 0h1M0 31.5h1m5 0h1m2 0h1m1 0h1m1 0h1m1 0h1m2 0h1m2 0h2m2 0h1m2 0h3M0 32.5h7m1 0h1m1 0h2m1 0h3m1 0h1m4 0h3m2 0h1m3 0h1"/></svg>
+</div>
+          <div class="scan">Scan to reserve</div>
+          <div class="url">reserve-collect.labrint.workers.dev</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="foot">
+      Point your phone camera at a QR code to start &nbsp;·&nbsp; <b>Potter's Pharmacy</b>, St Julian's
+    </div>
+  </div>
+</body>
+</html>
