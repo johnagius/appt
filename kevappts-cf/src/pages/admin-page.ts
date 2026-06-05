@@ -5560,7 +5560,9 @@ function rsOpen(i){
   document.getElementById('rsNewLoc').placeholder = 'Location address';
   document.getElementById('rsNotify').checked = true;
   rsMsgClear();
-  document.getElementById('rsOverlay').style.display = 'flex';
+  var ov = document.getElementById('rsOverlay');
+  ov.style.display = 'flex';
+  requestAnimationFrame(function(){ requestAnimationFrame(function(){ ov.classList.add('show'); }); });
 }
 function rsClinicChanged(){
   // Moving to a different clinic: clear the location so the server fills that
@@ -5583,7 +5585,11 @@ function rsMsg(type, text){
   m.textContent = text;
 }
 function rsMsgClear(){ var m = document.getElementById('rsMsg'); m.style.display = 'none'; m.textContent = ''; }
-function rsCloseForm(){ document.getElementById('rsOverlay').style.display = 'none'; }
+function rsCloseForm(){
+  var ov = document.getElementById('rsOverlay');
+  ov.classList.remove('show');
+  setTimeout(function(){ ov.style.display = 'none'; }, 200);
+}
 async function rsSubmit(){
   if (!rsCurrentAppt) return;
   var date = document.getElementById('rsNewDate').value;
