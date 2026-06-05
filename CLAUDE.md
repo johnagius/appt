@@ -31,7 +31,7 @@ includes `--yes` / `-y` so no interactive prompts can stall the chain**.
 Replace paths only if the project moves:
 
 ```cmd
-cd /d "C:\Users\Potte\Downloads\appt-main\appt-main\kevappts-cf" && npm install && npm install -D wrangler@latest && npx wrangler d1 execute kevappts-db --remote --file=schema.sql --yes && npx wrangler deploy
+cd /d "C:\Users\locumpharmacist\Downloads\appt-main\kevappts-cf" && npm install && npm install -D wrangler@latest && npx wrangler d1 execute kevappts-db --remote --file=schema.sql --yes && npx wrangler deploy
 ```
 
 Notes for the user:
@@ -60,7 +60,7 @@ When an update touches it, deploy it too (and redeploy `kevappts-cf` as well whe
 the change affects the shared/reciprocal home-page link):
 
 ```cmd
-cd /d "C:\Users\Potte\Downloads\appt-main\appt-main\reserve-collect-cf" && npm install && npm install -D wrangler@latest && npx wrangler d1 execute reserve-collect-db --remote --file=schema.sql --yes && npx wrangler deploy
+cd /d "C:\Users\locumpharmacist\Downloads\appt-main\reserve-collect-cf" && npm install && npm install -D wrangler@latest && npx wrangler d1 execute reserve-collect-db --remote --file=schema.sql --yes && npx wrangler deploy
 ```
 
 First-time-only setup (can't be chained — prompts / browser):
