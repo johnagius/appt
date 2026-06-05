@@ -18,12 +18,14 @@ import {
   insertFollowUp, getFollowUps, isFollowUpSent, getReferrals,
   getBloodTestOffRows, addBloodTestOff, deleteBloodTestOff,
   getRecentAppointmentActivity, getRecentTelemedicineActivity,
+  rescheduleAppointmentFull,
 } from '../db/queries';
 import { verifyAdminSig, generateId } from '../services/crypto';
 import {
   sendClientCancelledEmail, sendRedirectToSpinolaEmail,
   sendAppointmentPushedEmail, sendCustomNotificationEmail, sendReviewRequestEmail,
   sendFollowUpEmail,
+  sendClientConfirmationEmail, sendSpinolaConfirmationEmail, sendLindaConfirmationEmail,
 } from '../services/email';
 import { createCalendarEvent, deleteCalendarEvent } from '../services/calendar';
 import { loadLindaConfig } from '../services/linda';
@@ -897,6 +899,177 @@ export async function apiAdminSearchAppointments(req: Request, env: Env): Promis
 
   const results = await searchAppointments(env.DB, query, 50);
   return json({ ok: true, results });
+}
+
+// ─── Universal Reschedule (any clinic) ─────────────────────
+//
+// Powers the admin "Reschedule" tab. Unlike the bulk Quick-Actions flow
+// (Potter's only), this works on EVERY appointment in the system — Potter's,
+// Spinola, Linda physio and blood tests — and lets the admin move it to any
+// location, date and time with no slot/availability restrictions.
+
+function rescheduleApptOut(a: Appointment) {
+  return {
+    appointmentId: a.id,
+    dateKey: a.date_key,
+    startTime: a.start_time,
+    endTime: a.end_time,
+    serviceId: a.service_id,
+    serviceName: a.service_name,
+    fullName: a.full_name,
+    email: a.email,
+    phone: a.phone,
+    status: a.status,
+    location: a.location,
+    clinic: a.clinic || 'potters',
+  };
+}
+
+export async function apiAdminGetRescheduleList(req: Request, env: Env): Promise<Response> {
+  const denied = await requireAdmin(req, env);
+  if (denied) return denied;
+
+  const url = new URL(req.url);
+  const q = (url.searchParams.get('q') || '').trim();
+  const dateKey = (url.searchParams.get('date') || '').trim();
+
+  let appts: Appointment[] = [];
+  if (q && q.length >= 2) {
+    // Search spans every clinic + service (name / phone / email).
+    appts = await searchAppointments(env.DB, q, 80);
+  } else if (dateKey && /^\d{4}-\d{2}-\d{2}$/.test(dateKey)) {
+    // Browse a whole day across all clinics. Skip cancelled so the list is
+    // actionable, but keep everything else (BOOKED, ATTENDED, RELOCATED…).
+    const day = await getAppointmentsByDate(env.DB, dateKey);
+    appts = day.filter(a => !a.status.includes('CANCELLED'));
+  } else {
+    return json({ ok: true, appointments: [] });
+  }
+
+  return json({ ok: true, appointments: appts.map(rescheduleApptOut) });
+}
+
+export async function apiAdminRescheduleAppointment(req: Request, env: Env): Promise<Response> {
+  const denied = await requireAdmin(req, env);
+  if (denied) return denied;
+
+  const tz = env.TIMEZONE;
+  const cfg = await getConfig(env.DB);
+  const payload: any = await req.json();
+
+  const id = (payload.appointmentId || '').trim();
+  const newDateKey = (payload.dateKey || '').trim();
+  const newStartTime = (payload.startTime || '').trim();
+  let newEndTime = (payload.endTime || '').trim();
+  let newClinic = (payload.clinic || '').trim().toLowerCase();
+  let newLocation = (payload.location != null ? String(payload.location) : '').trim();
+  const notify = payload.notify !== false;
+
+  if (!id || !newDateKey || !newStartTime) {
+    return json({ ok: false, reason: 'Missing appointment, date or time.' }, 400);
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(newDateKey)) return json({ ok: false, reason: 'Invalid date format.' }, 400);
+  if (!/^\d{2}:\d{2}$/.test(newStartTime)) return json({ ok: false, reason: 'Invalid time format.' }, 400);
+
+  const appt = await getAppointmentById(env.DB, id);
+  if (!appt) return json({ ok: false, reason: 'Appointment not found.' }, 404);
+
+  const oldClinic = (appt.clinic || 'potters').toLowerCase();
+  if (!newClinic) newClinic = oldClinic;
+  if (!['potters', 'spinola', 'linda'].includes(newClinic)) newClinic = oldClinic;
+
+  // Work out the new end time. Honour an explicit endTime; otherwise preserve
+  // the original appointment's duration; failing that fall back to the clinic
+  // default slot length.
+  const startMin = parseTimeToMinutes(newStartTime);
+  if (!newEndTime) {
+    let dur = parseTimeToMinutes(appt.end_time) - parseTimeToMinutes(appt.start_time);
+    if (!(dur > 0)) dur = cfg.apptDurationMin;
+    newEndTime = minutesToTime(startMin + dur);
+  }
+  if (!/^\d{2}:\d{2}$/.test(newEndTime) || parseTimeToMinutes(newEndTime) <= startMin) {
+    return json({ ok: false, reason: 'End time must be after the start time.' }, 400);
+  }
+
+  // Default the location when not supplied: keep the current one if the clinic
+  // is unchanged, else use the destination clinic's configured location.
+  if (!newLocation) {
+    if (newClinic === oldClinic) {
+      newLocation = appt.location;
+    } else if (newClinic === 'spinola') {
+      newLocation = cfg.spinolaLocation;
+    } else if (newClinic === 'linda') {
+      newLocation = env.LINDA_LOCATION || appt.location;
+    } else {
+      newLocation = cfg.pottersLocation;
+    }
+  }
+
+  const now = nowIso(tz);
+
+  // Remove the old calendar event (it may live on a different clinic calendar).
+  if (appt.calendar_event_id) {
+    try { await deleteCalendarEvent(env, appt.calendar_event_id, oldClinic as any); } catch {}
+  }
+
+  await rescheduleAppointmentFull(env.DB, id, {
+    date_key: newDateKey,
+    start_time: newStartTime,
+    end_time: newEndTime,
+    clinic: newClinic,
+    location: newLocation,
+    status: 'BOOKED',
+    calendar_event_id: '',
+  }, now);
+
+  await bumpVersion(env.DB);
+  await broadcast(env, newDateKey);
+  if (appt.date_key !== newDateKey) await broadcast(env, appt.date_key);
+
+  // Recreate the calendar event on the destination clinic's calendar and
+  // notify the patient — both best-effort so a hiccup never blocks the move.
+  const updated: Appointment = {
+    ...appt,
+    date_key: newDateKey,
+    start_time: newStartTime,
+    end_time: newEndTime,
+    clinic: newClinic,
+    location: newLocation,
+    status: 'BOOKED',
+    calendar_event_id: '',
+    cancelled_at: '',
+    cancel_reason: '',
+    updated_at: now,
+  };
+  const ctx = (globalThis as any).__ctx;
+  if (ctx?.waitUntil) {
+    ctx.waitUntil((async () => {
+      try {
+        const eventId = await createCalendarEvent(env, updated);
+        if (eventId) {
+          await env.DB.prepare('UPDATE appointments SET calendar_event_id = ? WHERE id = ?').bind(eventId, id).run();
+        }
+      } catch {}
+      if (notify && updated.email) {
+        try {
+          if (newClinic === 'spinola') await sendSpinolaConfirmationEmail(env, updated);
+          else if (newClinic === 'linda') await sendLindaConfirmationEmail(env, updated);
+          else await sendClientConfirmationEmail(env, updated);
+        } catch {}
+      }
+    })());
+  }
+
+  return json({
+    ok: true,
+    message: 'Appointment rescheduled.',
+    appointmentId: id,
+    dateKey: newDateKey,
+    startTime: newStartTime,
+    endTime: newEndTime,
+    clinic: newClinic,
+    location: newLocation,
+  });
 }
 
 // ─── Settings ──────────────────────────────────────────────

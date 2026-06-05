@@ -411,6 +411,7 @@ export function adminPage(sig: string, env: Env): string {
     <div class="tab" data-tab="telemedicine" onclick="switchTab('telemedicine')" style="background:#fff7ed;color:#9a3412;">Telemedicine</div>
     <div class="tab" data-tab="linda" onclick="switchTab('linda')" style="background:#ecfdf5;color:#065f46;">Linda</div>
     <div class="tab" data-tab="bloodtests" onclick="switchTab('bloodtests')" style="background:#fef2f2;color:#991b1b;">Blood Tests</div>
+    <div class="tab" data-tab="reschedule" onclick="switchTab('reschedule')" style="background:#eef2ff;color:#3730a3;">&#x1F504; Reschedule</div>
     <div class="tab" data-tab="settings" onclick="switchTab('settings')">Settings</div>
   </div>
 
@@ -1253,6 +1254,63 @@ export function adminPage(sig: string, env: Env): string {
   </div>
 </div>
 
+<!-- RESCHEDULE TAB -->
+<div class="tab-content" id="tab-reschedule" style="display:none;">
+  <div class="card" style="background:#eef2ff;border-left:4px solid #4f46e5;margin-bottom:14px;">
+    <h3 style="margin:0 0 6px 0;color:#3730a3;font-size:16px;">Reschedule any appointment</h3>
+    <p style="margin:0;color:#4338ca;font-size:13px;line-height:1.5;">Move <b>any</b> appointment &mdash; Dr Kevin (Potter&#39;s &amp; Spinola), Linda physiotherapy and blood tests &mdash; to any location, date and time. No slot restrictions. Search by name, phone or email, or browse a whole day. The patient is emailed their new details (you can switch that off per move).</p>
+  </div>
+
+  <div class="card">
+    <div class="form-row">
+      <div class="form-group">
+        <label>Search patient (name / phone / email)</label>
+        <input type="text" id="rsSearch" placeholder="Type at least 2 characters..." oninput="rsOnSearch()" autocomplete="off">
+      </div>
+      <div class="form-group" style="max-width:220px;">
+        <label>Or browse by date</label>
+        <input type="date" id="rsDate" onchange="rsLoadDate()">
+      </div>
+    </div>
+    <div id="rsList"><div class="empty">Search for a patient or pick a date to see appointments.</div></div>
+  </div>
+</div>
+
+<!-- Reschedule modal -->
+<div class="overlay" id="rsOverlay" role="dialog" aria-modal="true">
+  <div class="patient-modal" style="max-width:520px;">
+    <div class="patient-modal-header">
+      <h3 style="margin:0;">Reschedule appointment</h3>
+      <button class="btn btn-ghost btn-sm" onclick="rsCloseForm()">&#x2715;</button>
+    </div>
+    <div id="rsCurrent" style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:12px;font-size:13px;line-height:1.55;"></div>
+    <div class="form-row">
+      <div class="form-group"><label>New date</label><input type="date" id="rsNewDate"></div>
+      <div class="form-group"><label>New time</label><input type="time" id="rsNewTime" step="300"></div>
+      <div class="form-group" style="max-width:120px;"><label>Duration (min)</label><input type="number" id="rsNewDur" min="5" max="480" step="5"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Clinic</label>
+        <select id="rsNewClinic" onchange="rsClinicChanged()">
+          <option value="potters">Dr Kevin &middot; Potter&#39;s</option>
+          <option value="spinola">Dr Kevin &middot; Spinola</option>
+          <option value="linda">Linda &middot; Physiotherapy</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Location</label><input type="text" id="rsNewLoc" placeholder="Location address"></div>
+    </div>
+    <label style="display:flex;align-items:center;gap:8px;font-size:13px;margin:8px 0 2px;cursor:pointer;">
+      <input type="checkbox" id="rsNotify" checked style="width:auto;margin:0;"> Email the patient their new appointment details
+    </label>
+    <div class="msg" id="rsMsg"></div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px;flex-wrap:wrap;">
+      <button class="btn btn-ghost" onclick="rsCloseForm()">Cancel</button>
+      <button class="btn btn-dark" id="rsSaveBtn" onclick="rsSubmit()">Reschedule</button>
+    </div>
+  </div>
+</div>
+
 <!-- Telemedicine Prescription modal -->
 <div class="overlay" id="telPrescriptionOverlay" role="dialog" aria-modal="true">
   <div class="patient-modal" style="max-width:560px;">
@@ -1678,6 +1736,7 @@ function switchTab(name) {
   if (name === 'telemedicine') loadTelemedicineData();
   if (name === 'linda') loadLindaData();
   if (name === 'bloodtests') loadBloodTestData();
+  if (name === 'reschedule') loadRescheduleTab();
   if (name === 'activity') loadActivity();
   if (name === 'reserve') loadReserveTab();
 }
@@ -5389,6 +5448,181 @@ function loadReferrals() {
   }).catch(function() {
     el.innerHTML = '<div class="empty">Error loading referrals.</div>';
   });
+}
+
+// ─── Reschedule (universal — any clinic) ──────────────────
+var rsListData = [];
+var rsCurrentAppt = null;
+var rsSearchTimer = null;
+
+function rsEsc(s){ return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+function rsClinicLabel(a){
+  if (a.clinic === 'spinola') return 'Spinola';
+  if (a.clinic === 'linda') return 'Physio (Linda)';
+  if (a.serviceId === 'blood-test') return 'Blood Test';
+  return "Potter's";
+}
+function rsClinicBadge(a){
+  var l = rsClinicLabel(a);
+  var bg = '#111827';
+  if (l === 'Spinola') bg = '#6d28d9';
+  else if (l === 'Physio (Linda)') bg = '#047857';
+  else if (l === 'Blood Test') bg = '#b91c1c';
+  else bg = '#1d4ed8';
+  return '<span class="badge" style="background:' + bg + ';color:#fff;">' + l + '</span>';
+}
+function rsFmt12(hhmm){
+  if (!hhmm) return '';
+  var p = hhmm.split(':');
+  var h = parseInt(p[0], 10), m = p[1] || '00';
+  var ap = h >= 12 ? 'PM' : 'AM';
+  var h12 = (h % 12) === 0 ? 12 : (h % 12);
+  return h12 + ':' + m + ' ' + ap;
+}
+function rsDuration(s, e){
+  if (!s || !e) return 0;
+  var ps = s.split(':'), pe = e.split(':');
+  return (parseInt(pe[0],10)*60 + parseInt(pe[1],10)) - (parseInt(ps[0],10)*60 + parseInt(ps[1],10));
+}
+function rsNormClinic(c){ return (c === 'spinola' || c === 'linda') ? c : 'potters'; }
+
+function loadRescheduleTab(){
+  // Default the browse-date to today the first time the tab opens.
+  var dEl = document.getElementById('rsDate');
+  if (dEl && !dEl.value && !document.getElementById('rsSearch').value) {
+    dEl.value = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Malta' });
+    rsLoadDate();
+  }
+}
+function rsOnSearch(){
+  clearTimeout(rsSearchTimer);
+  rsSearchTimer = setTimeout(rsDoSearch, 300);
+}
+async function rsDoSearch(){
+  var q = document.getElementById('rsSearch').value.trim();
+  var box = document.getElementById('rsList');
+  if (q.length < 2) { box.innerHTML = '<div class="empty">Type at least 2 characters, or pick a date.</div>'; return; }
+  document.getElementById('rsDate').value = '';
+  box.innerHTML = '<div class="empty">Searching\\u2026</div>';
+  try {
+    var res = await apiCall('reschedule-list?q=' + encodeURIComponent(q));
+    rsRender((res && res.appointments) || []);
+  } catch(e) { box.innerHTML = '<div class="empty">Error searching.</div>'; }
+}
+async function rsLoadDate(){
+  var d = document.getElementById('rsDate').value;
+  if (!d) return;
+  document.getElementById('rsSearch').value = '';
+  var box = document.getElementById('rsList');
+  box.innerHTML = '<div class="empty">Loading\\u2026</div>';
+  try {
+    var res = await apiCall('reschedule-list?date=' + encodeURIComponent(d));
+    rsRender((res && res.appointments) || []);
+  } catch(e) { box.innerHTML = '<div class="empty">Error loading.</div>'; }
+}
+function rsRender(list){
+  rsListData = list || [];
+  var box = document.getElementById('rsList');
+  if (!rsListData.length) { box.innerHTML = '<div class="empty">No appointments found.</div>'; return; }
+  var html = '<div class="table-wrap"><table><thead><tr>' +
+    '<th>Date</th><th>Time</th><th>Patient</th><th>Service</th><th>Clinic</th><th>Status</th><th></th>' +
+    '</tr></thead><tbody>';
+  for (var i = 0; i < rsListData.length; i++) {
+    var a = rsListData[i];
+    html += '<tr>' +
+      '<td>' + rsEsc(a.dateKey) + '</td>' +
+      '<td>' + rsEsc(rsFmt12(a.startTime)) + '</td>' +
+      '<td>' + rsEsc(a.fullName || '') + '<div class="subtitle" style="margin:0;font-size:11px;">' + rsEsc(a.phone || '') + '</div></td>' +
+      '<td>' + rsEsc(a.serviceName || '') + '</td>' +
+      '<td>' + rsClinicBadge(a) + '</td>' +
+      '<td>' + rsEsc(a.status || '') + '</td>' +
+      '<td><button class="btn btn-blue btn-sm" onclick="rsOpen(' + i + ')">Reschedule</button></td>' +
+      '</tr>';
+  }
+  html += '</tbody></table></div>';
+  box.innerHTML = html;
+}
+function rsOpen(i){
+  var a = rsListData[i];
+  if (!a) return;
+  rsCurrentAppt = a;
+  document.getElementById('rsCurrent').innerHTML =
+    '<b>' + rsEsc(a.fullName || '') + '</b> &mdash; ' + rsEsc(a.serviceName || '') + ' ' + rsClinicBadge(a) + '<br>' +
+    '<span style="color:#6b7280;">Currently:</span> ' + rsEsc(a.dateKey) + ' &middot; ' + rsEsc(rsFmt12(a.startTime)) +
+      (a.endTime ? ('\\u2013' + rsEsc(rsFmt12(a.endTime))) : '') + '<br>' +
+    '<span style="color:#6b7280;">Location:</span> ' + rsEsc(a.location || '\\u2014');
+  document.getElementById('rsNewDate').value = a.dateKey || '';
+  document.getElementById('rsNewTime').value = a.startTime || '';
+  var dur = rsDuration(a.startTime, a.endTime);
+  document.getElementById('rsNewDur').value = dur > 0 ? dur : 30;
+  document.getElementById('rsNewClinic').value = rsNormClinic(a.clinic);
+  document.getElementById('rsNewLoc').value = a.location || '';
+  document.getElementById('rsNewLoc').placeholder = 'Location address';
+  document.getElementById('rsNotify').checked = true;
+  rsMsgClear();
+  document.getElementById('rsOverlay').style.display = 'flex';
+}
+function rsClinicChanged(){
+  // Moving to a different clinic: clear the location so the server fills that
+  // clinic's default. Moving back to the original: restore the original.
+  var c = document.getElementById('rsNewClinic').value;
+  var loc = document.getElementById('rsNewLoc');
+  var orig = rsCurrentAppt ? rsNormClinic(rsCurrentAppt.clinic) : 'potters';
+  if (c === orig) {
+    loc.value = rsCurrentAppt ? (rsCurrentAppt.location || '') : '';
+    loc.placeholder = 'Location address';
+  } else {
+    loc.value = '';
+    loc.placeholder = 'Leave blank to use the ' + c + ' default';
+  }
+}
+function rsMsg(type, text){
+  var m = document.getElementById('rsMsg');
+  m.style.display = 'block';
+  m.className = 'msg' + (type ? (' ' + type) : '');
+  m.textContent = text;
+}
+function rsMsgClear(){ var m = document.getElementById('rsMsg'); m.style.display = 'none'; m.textContent = ''; }
+function rsCloseForm(){ document.getElementById('rsOverlay').style.display = 'none'; }
+async function rsSubmit(){
+  if (!rsCurrentAppt) return;
+  var date = document.getElementById('rsNewDate').value;
+  var time = document.getElementById('rsNewTime').value;
+  var dur = parseInt(document.getElementById('rsNewDur').value, 10);
+  var clinic = document.getElementById('rsNewClinic').value;
+  var loc = document.getElementById('rsNewLoc').value.trim();
+  var notify = document.getElementById('rsNotify').checked;
+  if (!date || !time) { rsMsg('bad', 'Please choose a new date and time.'); return; }
+  var endTime = '';
+  if (dur && dur > 0) {
+    var p = time.split(':');
+    var mins = parseInt(p[0],10)*60 + parseInt(p[1],10) + dur;
+    endTime = String(Math.floor(mins/60)).padStart(2,'0') + ':' + String(mins%60).padStart(2,'0');
+  }
+  var btn = document.getElementById('rsSaveBtn');
+  btn.disabled = true;
+  rsMsg('', 'Rescheduling\\u2026');
+  try {
+    var res = await apiCall('reschedule-appointment', { body: {
+      appointmentId: rsCurrentAppt.appointmentId,
+      dateKey: date, startTime: time, endTime: endTime,
+      clinic: clinic, location: loc, notify: notify
+    }});
+    if (res && res.ok) {
+      rsMsg('good', 'Moved to ' + res.dateKey + ' at ' + rsFmt12(res.startTime) + '.');
+      setTimeout(function(){
+        rsCloseForm();
+        if (document.getElementById('rsDate').value) rsLoadDate();
+        else if (document.getElementById('rsSearch').value) rsDoSearch();
+      }, 900);
+    } else {
+      rsMsg('bad', (res && res.reason) || 'Could not reschedule.');
+      btn.disabled = false;
+    }
+  } catch(e) {
+    rsMsg('bad', 'Error: ' + e.message);
+    btn.disabled = false;
+  }
 }
 </script>
 </body>

@@ -25,6 +25,7 @@ import {
   apiAdminCreateTestBooking, apiAdminPurgeTestData, apiAdminTestFollowUp, apiAdminTestReview, apiAdminGetFollowUps, apiAdminToggleFollowUpHandled, apiAdminGetReferrals, apiAdminGetActivity,
   apiAdminGetLindaStats, apiAdminGetLindaReviewPatients, apiAdminSendLindaReviewRequests, apiAdminGetLindaFollowUps, apiAdminGetLindaAppointments,
   apiAdminGetLindaConfig, apiAdminSaveLindaConfig,
+  apiAdminGetRescheduleList, apiAdminRescheduleAppointment,
 } from './api/admin';
 import { verifyAdminSig, computeAdminSig } from './services/crypto';
 import { todayKeyLocal, nowIso, parseTimeToMinutes, toDateKey, todayLocal, addDays, nowMinutesLocal } from './services/utils';
@@ -212,6 +213,8 @@ export default {
         if (adminPath === 'reviews/send' && method === 'POST') return apiAdminSendReviewRequests(request, env);
         if (adminPath === 'week-overview' && method === 'GET') return apiAdminGetWeekOverview(request, env);
         if (adminPath === 'search' && method === 'GET') return apiAdminSearchAppointments(request, env);
+        if (adminPath === 'reschedule-list' && method === 'GET') return apiAdminGetRescheduleList(request, env);
+        if (adminPath === 'reschedule-appointment' && method === 'POST') return apiAdminRescheduleAppointment(request, env);
         if (adminPath === 'settings' && method === 'GET') return apiAdminGetSettings(request, env);
         if (adminPath === 'settings' && method === 'POST') return apiAdminSaveSettings(request, env);
         if (adminPath === 'stats' && method === 'GET') return apiAdminGetStatistics(request, env);

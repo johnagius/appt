@@ -115,6 +115,32 @@ export async function updateAppointmentStatus(
   await db.prepare(`UPDATE appointments SET ${sets.join(', ')} WHERE id = ?`).bind(...vals).run();
 }
 
+// Admin free-form reschedule: move an appointment in place to any date, time,
+// clinic and location. Keeps the same id/token (so history, reviews and the
+// patient's cancel/reschedule links stay valid) and re-activates the booking
+// (clears any prior cancellation). service_id is intentionally untouched so a
+// blood-test stays a blood-test wherever it's moved.
+export async function rescheduleAppointmentFull(
+  db: D1Database,
+  id: string,
+  fields: {
+    date_key: string; start_time: string; end_time: string;
+    clinic: string; location: string; status: string; calendar_event_id: string;
+  },
+  nowStr: string
+): Promise<void> {
+  await db.prepare(
+    `UPDATE appointments
+     SET date_key = ?, start_time = ?, end_time = ?, clinic = ?, location = ?,
+         status = ?, calendar_event_id = ?, cancelled_at = '', cancel_reason = '',
+         updated_at = ?
+     WHERE id = ?`
+  ).bind(
+    fields.date_key, fields.start_time, fields.end_time, fields.clinic, fields.location,
+    fields.status, fields.calendar_event_id, nowStr, id
+  ).run();
+}
+
 export async function countActiveAppointmentsInWindow(
   db: D1Database,
   email: string,
