@@ -1285,9 +1285,9 @@ export function adminPage(sig: string, env: Env): string {
     </div>
     <div id="rsCurrent" style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:12px;font-size:13px;line-height:1.55;"></div>
     <div class="form-row">
-      <div class="form-group"><label>New date</label><input type="date" id="rsNewDate"></div>
-      <div class="form-group"><label>New time</label><input type="time" id="rsNewTime" step="300"></div>
-      <div class="form-group" style="max-width:120px;"><label>Duration (min)</label><input type="number" id="rsNewDur" min="5" max="480" step="5"></div>
+      <div class="form-group"><label>New date</label><input type="date" id="rsNewDate" onchange="rsResetForce()"></div>
+      <div class="form-group"><label>New time</label><input type="time" id="rsNewTime" step="300" onchange="rsResetForce()"></div>
+      <div class="form-group" style="max-width:120px;"><label>Duration (min)</label><input type="number" id="rsNewDur" min="5" max="480" step="5" onchange="rsResetForce()"></div>
     </div>
     <div class="form-row">
       <div class="form-group">
@@ -2790,7 +2790,12 @@ function loadSchedBlood(dateKey) {
   el.innerHTML = '<div class="empty">Loading...</div>';
   apiCall('blood-test-appointments?date=' + encodeURIComponent(dateKey)).then(function(res) {
     if (!res || !res.ok) { el.innerHTML = '<div class="empty">Failed to load.</div>'; return; }
-    var appts = (res.appointments || []).map(transformAppt);
+    // Only blood tests still at Potter's belong in this section. A blood test
+    // rescheduled to another clinic (e.g. Spinola) shows under that clinic's
+    // table instead, so exclude anything that has been moved off Potter's.
+    var appts = (res.appointments || []).filter(function(a) {
+      return !a.clinic || a.clinic === 'potters';
+    }).map(transformAppt);
     renderApptTable(appts, 'schedTableBlood', false);
   }).catch(function() { el.innerHTML = '<div class="empty">Error loading.</div>'; });
 }
@@ -5454,6 +5459,7 @@ function loadReferrals() {
 var rsListData = [];
 var rsCurrentAppt = null;
 var rsSearchTimer = null;
+var rsForce = false;
 
 function rsEsc(s){ return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 function rsClinicLabel(a){
@@ -5559,12 +5565,19 @@ function rsOpen(i){
   document.getElementById('rsNewLoc').value = a.location || '';
   document.getElementById('rsNewLoc').placeholder = 'Location address';
   document.getElementById('rsNotify').checked = true;
+  // Reset the action button every time the modal opens — otherwise the
+  // disabled state left over from a previous reschedule would carry over.
+  rsForce = false;
+  var sb = document.getElementById('rsSaveBtn');
+  sb.disabled = false;
+  sb.textContent = 'Reschedule';
   rsMsgClear();
   var ov = document.getElementById('rsOverlay');
   ov.style.display = 'flex';
   requestAnimationFrame(function(){ requestAnimationFrame(function(){ ov.classList.add('show'); }); });
 }
 function rsClinicChanged(){
+  rsResetForce();
   // Moving to a different clinic: clear the location so the server fills that
   // clinic's default. Moving back to the original: restore the original.
   var c = document.getElementById('rsNewClinic').value;
@@ -5577,6 +5590,15 @@ function rsClinicChanged(){
     loc.value = '';
     loc.placeholder = 'Leave blank to use the ' + c + ' default';
   }
+}
+// Editing the slot clears any pending "book anyway" override so a changed
+// time can never be force-booked over a fresh clash without a new warning.
+function rsResetForce(){
+  if (!rsForce) return;
+  rsForce = false;
+  var sb = document.getElementById('rsSaveBtn');
+  sb.textContent = 'Reschedule';
+  rsMsgClear();
 }
 function rsMsg(type, text){
   var m = document.getElementById('rsMsg');
@@ -5612,16 +5634,25 @@ async function rsSubmit(){
     var res = await apiCall('reschedule-appointment', { body: {
       appointmentId: rsCurrentAppt.appointmentId,
       dateKey: date, startTime: time, endTime: endTime,
-      clinic: clinic, location: loc, notify: notify
+      clinic: clinic, location: loc, notify: notify, force: rsForce
     }});
     if (res && res.ok) {
+      rsForce = false;
       rsMsg('good', 'Moved to ' + res.dateKey + ' at ' + rsFmt12(res.startTime) + '.');
       setTimeout(function(){
         rsCloseForm();
         if (document.getElementById('rsDate').value) rsLoadDate();
         else if (document.getElementById('rsSearch').value) rsDoSearch();
       }, 900);
+    } else if (res && res.conflict) {
+      // Double-booking detected. Let the admin override deliberately — the
+      // next click sends force:true and goes through.
+      rsForce = true;
+      rsMsg('bad', (res.reason || 'That time is already booked.') + ' Click again to book it anyway.');
+      btn.textContent = 'Reschedule anyway';
+      btn.disabled = false;
     } else {
+      rsForce = false;
       rsMsg('bad', (res && res.reason) || 'Could not reschedule.');
       btn.disabled = false;
     }

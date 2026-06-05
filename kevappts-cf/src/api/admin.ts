@@ -1007,6 +1007,42 @@ export async function apiAdminRescheduleAppointment(req: Request, env: Env): Pro
 
   const now = nowIso(tz);
 
+  // ── Double-booking guard ──────────────────────────────────
+  // Warn (and block, unless the admin confirms with force) when the new
+  // slot clashes with another active appointment in the SAME clinic that
+  // overlaps in time. Blood tests and doctor consultations at Potter's run
+  // on separate tracks (pharmacy staff vs the doctor) so they never clash
+  // with each other — only same-track overlaps count.
+  const force = payload.force === true;
+  const isBlood = appt.service_id === 'blood-test';
+  const newStartMin = startMin;
+  const newEndMin = parseTimeToMinutes(newEndTime);
+  const dayActive = await getActiveAppointmentsByDate(env.DB, newDateKey);
+  const clash = dayActive.find(o => {
+    if (o.id === id) return false;
+    if ((o.clinic || 'potters').toLowerCase() !== newClinic) return false;
+    if ((o.service_id === 'blood-test') !== isBlood) return false;
+    const os = parseTimeToMinutes(o.start_time);
+    const oe = parseTimeToMinutes(o.end_time);
+    return newStartMin < oe && newEndMin > os;
+  });
+  if (clash && !force) {
+    const clinicLabel = newClinic === 'spinola' ? 'Spinola'
+      : newClinic === 'linda' ? 'Linda (physio)'
+      : isBlood ? "Potter's blood tests" : "Potter's";
+    return json({
+      ok: false,
+      conflict: true,
+      reason: `That time clashes with ${clash.full_name} (${clash.start_time}–${clash.end_time}) already booked at ${clinicLabel}.`,
+      conflictWith: {
+        fullName: clash.full_name,
+        startTime: clash.start_time,
+        endTime: clash.end_time,
+        serviceName: clash.service_name,
+      },
+    });
+  }
+
   // Remove the old calendar event (it may live on a different clinic calendar).
   if (appt.calendar_event_id) {
     try { await deleteCalendarEvent(env, appt.calendar_event_id, oldClinic as any); } catch {}
