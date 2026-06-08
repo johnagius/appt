@@ -22,7 +22,15 @@ CREATE TABLE IF NOT EXISTS appointments (
   cancel_reason TEXT DEFAULT '',
   reminder_sent TEXT DEFAULT '',
   confirmed TEXT DEFAULT '',
-  booking_source TEXT DEFAULT ''
+  booking_source TEXT DEFAULT '',
+  -- Optional free-text accommodation/hotel the patient is staying at (tourists).
+  -- Powers the "Where patients are staying" admin statistics so we can see which
+  -- hotels send us the most visitors. Existing DBs created before this column:
+  -- run once to migrate (CREATE TABLE IF NOT EXISTS is a no-op on existing tables
+  -- so it never adds the column on its own):
+  --   npx wrangler d1 execute kevappts-db --remote \
+  --     --command "ALTER TABLE appointments ADD COLUMN hotel TEXT DEFAULT '';"
+  hotel TEXT DEFAULT ''
 );
 
 CREATE INDEX IF NOT EXISTS idx_appt_date ON appointments(date_key);

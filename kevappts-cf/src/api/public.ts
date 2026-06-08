@@ -151,6 +151,7 @@ async function doBook(req: Request, env: Env, clinic: 'potters' | 'spinola'): Pr
   const email = sanitizeEmail(payload.email);
   const phone = sanitizePhone(payload.phone);
   const comments = (payload.comments || '').trim();
+  const hotel = (payload.hotel || '').trim().slice(0, 120);
   const referralCode = ((payload as any).referralCode || '').trim();
   const bookingSource = ((payload as any).bookingSource || '').trim();
 
@@ -264,6 +265,7 @@ async function doBook(req: Request, env: Env, clinic: 'potters' | 'spinola'): Pr
     reminder_sent: '',
     confirmed: '',
     booking_source: bookingSource,
+    hotel,
   };
 
   try {

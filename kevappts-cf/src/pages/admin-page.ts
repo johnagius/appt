@@ -812,6 +812,13 @@ export function adminPage(sig: string, env: Env): string {
     </div>
   </div>
 
+  <div class="card" style="margin-top:12px;">
+    <h3>&#127976; Where Patients Are Staying &mdash; Hotels</h3>
+    <p style="margin:0 0 10px;font-size:12px;color:var(--muted);">Which hotels &amp; accommodation send us the most visitors (from the optional field on the booking page). Shows who's referring guests to us &mdash; and how many tourists tell us where they're staying.</p>
+    <div id="hotelCoverage"></div>
+    <div id="hotelChart"></div>
+  </div>
+
   <div class="stats-grid" style="margin-top:12px;">
     <div class="card">
       <h3>Top Cancellers</h3>
@@ -1527,6 +1534,7 @@ function transformAppt(a) {
     email: a.email,
     phone: a.phone,
     comments: a.comments,
+    hotel: a.hotel || '',
     status: a.status,
     location: a.location,
     createdAt: a.created_at || a.createdAt,
@@ -1603,6 +1611,8 @@ function transformResponse(method, res) {
     res.upcomingLoad = st.upcomingLoad || [];
     res.countryBreakdown = st.countryBreakdown || [];
     res.sourceBreakdown = st.sourceBreakdown || [];
+    res.hotelBreakdown = st.hotelBreakdown || [];
+    res.hotelStats = st.hotelStats || { withHotel: 0, withoutHotel: 0, uniqueHotels: 0 };
     res.cancelBreakdown = st.cancelBreakdown || { byDoctor: st.cancelledDoctor || 0, byPatient: st.cancelledClient || 0 };
     res.period = st.period || { from: '', to: '' };
     res.generated = st.generated || '';
@@ -2547,7 +2557,7 @@ function renderApptTable(appts, containerId, withCheckboxes, showDate) {
     if (withCheckboxes) html += '<td><input type="checkbox" class="appt-cb" value="' + esc(a.appointmentId) + '"></td>';
     if (showDate) html += '<td><b>' + esc(a.dateKey) + '</b></td>';
     html += '<td><b>' + esc(a.startTime) + ' - ' + esc(a.endTime) + '</b></td>';
-    html += '<td><a class="patient-link" href="#" onclick="event.stopPropagation();event.preventDefault();showPatientHistory(\\'' + esc(a.email) + '\\',\\'' + esc(a.phone) + '\\')">' + esc(a.fullName) + '</a></td>';
+    html += '<td><a class="patient-link" href="#" onclick="event.stopPropagation();event.preventDefault();showPatientHistory(\\'' + esc(a.email) + '\\',\\'' + esc(a.phone) + '\\')">' + esc(a.fullName) + '</a>' + (a.hotel ? '<div style="font-size:11px;color:var(--muted);margin-top:2px;">&#127976; ' + esc(a.hotel) + '</div>' : '') + '</td>';
     html += '<td>' + esc(a.phone) + '</td>';
     html += '<td>' + esc(a.serviceName) + '</td>';
     html += '<td>' + esc(a.location) + '</td>';
@@ -4322,7 +4332,7 @@ function showPatientHistory(email, phone) {
       // Appointment table
       if (res.appointments && res.appointments.length > 0) {
         html += '<div class="table-wrap" style="margin-top:10px;"><table><thead><tr>';
-        html += '<th>Date</th><th>Time</th><th>Status</th><th>Source</th><th>Location</th><th>Notes</th>';
+        html += '<th>Date</th><th>Time</th><th>Status</th><th>Source</th><th>Location</th><th>Hotel</th><th>Notes</th>';
         html += '</tr></thead><tbody>';
         for (var i = 0; i < res.appointments.length; i++) {
           var a = res.appointments[i];
@@ -4333,6 +4343,7 @@ function showPatientHistory(email, phone) {
           html += '<td><span class="badge ' + badge.cls + '">' + badge.text + '</span>' + (a.confirmed ? ' <span class="badge" style="background:#d1fae5;color:#065f46;">Confirmed</span>' : '') + '</td>';
           html += '<td>' + (a.bookingSource ? '<span class="badge" style="background:#eff6ff;color:#1e40af;">' + esc(a.bookingSource) + '</span>' : '<span style="color:#d1d5db;">\u2014</span>') + '</td>';
           html += '<td>' + esc(a.location) + '</td>';
+          html += '<td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + (a.hotel ? esc(a.hotel) : '<span style="color:#d1d5db;">—</span>') + '</td>';
           html += '<td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(a.comments || '') + '</td>';
           html += '</tr>';
         }
@@ -4438,6 +4449,7 @@ function renderAllStats(s) {
   renderDoctorActions(s);
   renderSourceBreakdown(s.sourceBreakdown);
   renderCountryBreakdown(s.countryBreakdown);
+  renderHotelBreakdown(s.hotelBreakdown, s.hotelStats);
   renderTopCancellers(s.topCancellers);
   renderSpinolaStats(s.spinola);
 
@@ -4737,6 +4749,49 @@ function renderCountryBreakdown(countries) {
     html += '<div class="h-bar-label" style="width:90px;font-size:12px;">' + esc(c.country) + '</div>';
     html += '<div class="h-bar-track"><div class="h-bar-fill" style="width:' + pct + '%;background:' + color + ';"></div></div>';
     html += '<div class="h-bar-pct">' + c.count + '</div>';
+    html += '</div>';
+  }
+  el.innerHTML = html;
+}
+
+function renderHotelBreakdown(hotels, hstats) {
+  var cov = document.getElementById('hotelCoverage');
+  if (cov) {
+    var total = hstats ? ((hstats.withHotel || 0) + (hstats.withoutHotel || 0)) : 0;
+    if (hstats && total > 0 && hstats.withHotel > 0) {
+      var pct = Math.round((hstats.withHotel || 0) / total * 100);
+      var pill = function(v, l, c) {
+        return '<div style="flex:1 1 120px;min-width:110px;background:#f8fafc;border:1px solid #e5e7eb;border-radius:12px;padding:12px 14px;text-align:center;">' +
+          '<div style="font-size:26px;font-weight:900;color:' + c + ';line-height:1;">' + v + '</div>' +
+          '<div style="font-size:11px;color:var(--muted);margin-top:5px;font-weight:600;">' + l + '</div>' +
+        '</div>';
+      }
+      cov.innerHTML = '<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px;">' +
+        pill(hstats.withHotel || 0, 'told us their hotel', '#0ea5e9') +
+        pill(hstats.uniqueHotels || 0, 'different hotels', '#8b5cf6') +
+        pill(pct + '%', 'of bookings shared it', '#10b981') +
+      '</div>';
+    } else {
+      cov.innerHTML = '';
+    }
+  }
+  var el = document.getElementById('hotelChart');
+  if (!el) return;
+  if (!hotels || !hotels.length) {
+    el.innerHTML = '<div class="empty">No hotel data yet. Guests can add where they are staying on the booking page (optional).</div>';
+    return;
+  }
+  var maxCount = hotels[0].count || 1;
+  var colors = ['#0ea5e9','#10b981','#f59e0b','#8b5cf6','#ef4444','#06b6d4','#ec4899','#6366f1','#14b8a6','#f97316','#2563eb','#84cc16','#e11d48','#7c3aed','#0891b2'];
+  var html = '';
+  for (var i = 0; i < hotels.length; i++) {
+    var h = hotels[i];
+    var pct2 = Math.round(h.count / maxCount * 100);
+    var color = colors[i % colors.length];
+    html += '<div class="h-bar-row">';
+    html += '<div class="h-bar-label" style="width:160px;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + esc(h.hotel) + '">' + esc(h.hotel) + '</div>';
+    html += '<div class="h-bar-track"><div class="h-bar-fill" style="width:' + pct2 + '%;background:' + color + ';"></div></div>';
+    html += '<div class="h-bar-count">' + h.count + '</div>';
     html += '</div>';
   }
   el.innerHTML = html;

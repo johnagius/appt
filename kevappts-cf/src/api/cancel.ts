@@ -196,6 +196,7 @@ export async function apiDoctorAction(req: Request, env: Env): Promise<Response>
       cancelled_at: '',
       cancel_reason: '',
       booking_source: appt.booking_source || '',
+      hotel: appt.hotel || '',
     };
 
     // Use a new ID for the spinola copy to avoid primary key conflict
@@ -433,6 +434,7 @@ export async function apiRescheduleAppointment(req: Request, env: Env): Promise<
     reminder_sent: '',
     confirmed: '',
     booking_source: appt.booking_source || '',
+    hotel: appt.hotel || '',
   };
 
   await insertAppointment(env.DB, newAppt);

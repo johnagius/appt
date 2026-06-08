@@ -552,7 +552,7 @@ export async function sendReviewRequestEmail(env: Env, appt: Appointment, locati
 
   const reviewUrl = 'https://search.google.com/local/writereview?placeid=ChIJ3dCu7mtFDhMRYBPbRR0pgtE';
 
-  const subject = 'A small favour, big impact';
+  const subject = "Potter's Pharmacy — your review helps a traveller find a doctor";
 
   const html = `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
@@ -576,15 +576,15 @@ export async function sendReviewRequestEmail(env: Env, appt: Appointment, locati
     </h1>
 
     <p style="margin:0 0 18px;font-size:16px;line-height:1.65;color:#374151;">
-      Thank you for trusting us with your care today.
+      Thank you for trusting ${escapeHtml(placeName)} with your care today — we hope you're already feeling better.
     </p>
 
     <p style="margin:0 0 18px;font-size:16px;line-height:1.65;color:#374151;">
-      Your review on Google could be the reason another family finds us when they need care most.
+      Being unwell far from home is frightening, and the hardest part is often not knowing which doctor or pharmacy to trust. <b>Your review is how the next traveller finds us.</b>
     </p>
 
     <p style="margin:0 0 32px;font-size:16px;line-height:1.65;color:#374151;">
-      It only takes <b>20 seconds</b> — but it means the world to us. It encourages us to keep improving and helps us reach more people who need care.
+      When the next visitor is searching for medical help in Malta — anxious, far from home and unsure where to turn — honest words from someone like you are what guide them to real care. Just a minute of your time could be the reason another family finds the help they need, exactly when they need it most.
     </p>
 
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 32px;">
@@ -592,12 +592,12 @@ export async function sendReviewRequestEmail(env: Env, appt: Appointment, locati
         <a href="${reviewUrl}" class="cta-btn"
            style="display:inline-block;text-align:center;background:linear-gradient(135deg,#10b981 0%,#059669 100%);color:#ffffff;text-decoration:none;padding:20px 42px;border-radius:999px;font-size:17px;font-weight:800;letter-spacing:0.3px;box-shadow:0 8px 24px rgba(16,185,129,0.42);min-width:240px;">
           <span style="display:block;font-size:22px;letter-spacing:8px;margin-bottom:6px;color:#FBBF24;line-height:1;">&#9733;&#9733;&#9733;&#9733;&#9733;</span>
-          <span style="display:block;font-size:17px;line-height:1;">Leave a Google review</span>
+          <span style="display:block;font-size:17px;line-height:1;">Leave a review &middot; help a traveller</span>
         </a>
       </td></tr>
     </table>
 
-    <p style="margin:0;font-size:15px;line-height:1.6;color:#374151;">Thank you,</p>
+    <p style="margin:0;font-size:15px;line-height:1.6;color:#374151;">Thank you for looking out for the travellers who come after you,</p>
     <p style="margin:4px 0 0;font-size:15px;font-weight:700;color:#111827;">${escapeHtml(signOff)}</p>
 
   </td></tr>

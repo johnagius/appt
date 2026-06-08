@@ -519,6 +519,7 @@ export async function apiAdminProcessAppointments(req: Request, env: Env): Promi
         cancelled_at: '',
         cancel_reason: '',
         booking_source: appt.booking_source || '',
+        hotel: appt.hotel || '',
       };
 
       await insertAppointment(env.DB, newAppt);
@@ -620,6 +621,7 @@ export async function apiAdminProcessAppointments(req: Request, env: Env): Promi
         cancelled_at: '',
         cancel_reason: '',
         booking_source: appt.booking_source || '',
+        hotel: appt.hotel || '',
       };
 
       await insertAppointment(env.DB, newAppt);
@@ -1257,6 +1259,28 @@ export async function apiAdminGetStatistics(req: Request, env: Env): Promise<Res
       _sourceCounts[src] = (_sourceCounts[src] || 0) + 1;
     }
 
+    // Hotel / accommodation — which hotels are sending us the most visitors.
+    // Patients type this freely so we normalise (case + whitespace + trailing
+    // punctuation) to merge "Hilton", "hilton " and "Hilton." into one bucket,
+    // while keeping the first nicely-cased spelling we saw for display.
+    const _hotelCounts: Record<string, number> = {};
+    const _hotelDisplay: Record<string, string> = {};
+    let _withHotel = 0, _withoutHotel = 0;
+    for (const a of appts) {
+      if (a.status.includes('CANCELLED')) continue;
+      const raw = String((a as any).hotel || '').replace(/\s+/g, ' ').trim();
+      if (!raw) { _withoutHotel++; continue; }
+      _withHotel++;
+      const key = raw.toLowerCase().replace(/[.,;:'"`!?\-\s]+$/g, '');
+      if (!key) { continue; }
+      _hotelCounts[key] = (_hotelCounts[key] || 0) + 1;
+      if (!_hotelDisplay[key]) _hotelDisplay[key] = raw;
+    }
+    const _hotelBreakdown = Object.entries(_hotelCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 15)
+      .map(([k, c]) => ({ hotel: _hotelDisplay[k] || k, count: c }));
+
     // Busiest day
     const _dayApptCounts: Record<string, number> = {};
     for (const a of appts) {
@@ -1312,6 +1336,8 @@ export async function apiAdminGetStatistics(req: Request, env: Env): Promise<Res
       sameDayCancels: _sameDayCancels,
       countryBreakdown: Object.entries(_countryCounts).sort((a, b) => b[1] - a[1]).map(([country, count]) => ({ country, count })),
       sourceBreakdown: Object.entries(_sourceCounts).sort((a, b) => b[1] - a[1]).map(([source, count]) => ({ source, count })),
+      hotelBreakdown: _hotelBreakdown,
+      hotelStats: { withHotel: _withHotel, withoutHotel: _withoutHotel, uniqueHotels: Object.keys(_hotelCounts).length },
       relocatedSpinola: _spRedirected,
       busiestDay: _busiestDay,
       spinola: {

@@ -49,6 +49,7 @@ export interface Appointment {
   reminder_sent: string;
   confirmed: string;
   booking_source: string;
+  hotel: string;
 }
 
 export type AppointmentStatus =
@@ -139,6 +140,7 @@ export interface BookingPayload {
   email: string;
   phone: string;
   comments?: string;
+  hotel?: string;
 }
 
 export interface AppConfig {

@@ -257,6 +257,12 @@ export function indexPage(env: Env, bookingSource?: string): string {
       line-height:1.3;
     }
     .field-error:empty{ display:none; }
+    .hotel-hint{
+      font-size:12px;
+      color: var(--muted);
+      margin-top:5px;
+      line-height:1.4;
+    }
     .has-error{ border-color: var(--bad) !important; }
     .has-error:focus{ box-shadow: 0 0 0 3px rgba(239,68,68,0.15) !important; }
     .phoneWrap.has-error{ border-color: var(--bad) !important; }
@@ -993,6 +999,12 @@ export function indexPage(env: Env, bookingSource?: string): string {
       </div>
 
       <div style="margin-top:10px;">
+        <label class="label" for="hotel" data-i18n="hotelLabel">Where are you staying? (optional)</label>
+        <input id="hotel" type="text" autocomplete="off" placeholder="Hotel or apartment name" data-i18n-ph="hotelPh">
+        <div class="hotel-hint" data-i18n="hotelHint">Visiting Malta? Telling us your hotel helps us serve guests faster — it's optional.</div>
+      </div>
+
+      <div style="margin-top:10px;">
         <label class="label" for="comments" data-i18n="commentsLabel">Comments</label>
         <textarea id="comments" placeholder="Optional notes…" data-i18n-ph="commentsPh"></textarea>
       </div>
@@ -1185,6 +1197,7 @@ export function indexPage(env: Env, bookingSource?: string): string {
       clinicMF:'Mon–Fri:',clinicSat:'Sat:',clinicSun:'Sun:',closed:'Closed',
       slotInfo:'Slots are {duration} minutes each.',ready:'Ready',
       fullNamePh:'Full name',emailPh:'you@example.com',commentsPh:'Optional notes…',searchCountryPh:'Search country…',
+      hotelLabel:'Where are you staying? (optional)',hotelPh:'Hotel or apartment name',hotelHint:"Visiting Malta? Telling us your hotel helps us serve guests faster — it's optional.",
       serviceTemplate:'Service: {0} ({1} mins)',dateTemplate:'Date: {0}',timeTemplate:'Time: {0} - {1}',
       locationTemplate:'Location: {0}',mins:'mins',
       loadingTitle:'Loading…',loadingDesc:'Please wait.',
@@ -1222,6 +1235,7 @@ export function indexPage(env: Env, bookingSource?: string): string {
       confirmBtn:'Confirmer',clearBtn:'Effacer',appointmentConfirmed:'Rendez-vous confirmé',okBtn:'OK',
       clinicMF:'Lun–Ven :',clinicSat:'Sam :',clinicSun:'Dim :',closed:'Fermé',
       slotInfo:'Les créneaux sont de {duration} minutes chacun.',ready:'Prêt',
+      hotelLabel:"Où logez-vous ? (facultatif)",hotelPh:"Nom de l'hôtel ou de l'appartement",hotelHint:"En visite à Malte ? Nous indiquer votre hôtel nous aide à mieux vous servir — c'est facultatif.",
       fullNamePh:'Nom complet',emailPh:'vous@exemple.com',commentsPh:'Notes facultatives…',searchCountryPh:'Rechercher un pays…',
       serviceTemplate:'Service : {0} ({1} min)',dateTemplate:'Date : {0}',timeTemplate:'Heure : {0} - {1}',
       locationTemplate:'Lieu : {0}',mins:'min',
@@ -1260,6 +1274,7 @@ export function indexPage(env: Env, bookingSource?: string): string {
       confirmBtn:'Confirmar',clearBtn:'Borrar',appointmentConfirmed:'Cita confirmada',okBtn:'OK',
       clinicMF:'Lun–Vie:',clinicSat:'Sáb:',clinicSun:'Dom:',closed:'Cerrado',
       slotInfo:'Los turnos son de {duration} minutos cada uno.',ready:'Listo',
+      hotelLabel:'¿Dónde se aloja? (opcional)',hotelPh:'Nombre del hotel o apartamento',hotelHint:'¿De visita en Malta? Indicarnos su hotel nos ayuda a atenderle más rápido — es opcional.',
       fullNamePh:'Nombre completo',emailPh:'tu@ejemplo.com',commentsPh:'Notas opcionales…',searchCountryPh:'Buscar país…',
       serviceTemplate:'Servicio: {0} ({1} min)',dateTemplate:'Fecha: {0}',timeTemplate:'Hora: {0} - {1}',
       locationTemplate:'Ubicación: {0}',mins:'min',
@@ -1298,6 +1313,7 @@ export function indexPage(env: Env, bookingSource?: string): string {
       confirmBtn:'Conferma',clearBtn:'Cancella',appointmentConfirmed:'Appuntamento confermato',okBtn:'OK',
       clinicMF:'Lun–Ven:',clinicSat:'Sab:',clinicSun:'Dom:',closed:'Chiuso',
       slotInfo:'Gli slot sono di {duration} minuti ciascuno.',ready:'Pronto',
+      hotelLabel:'Dove alloggi? (facoltativo)',hotelPh:"Nome dell'hotel o dell'appartamento",hotelHint:'In visita a Malta? Dirci il tuo hotel ci aiuta a servirti più velocemente — è facoltativo.',
       fullNamePh:'Nome completo',emailPh:'tu@esempio.com',commentsPh:'Note facoltative…',searchCountryPh:'Cerca paese…',
       serviceTemplate:'Servizio: {0} ({1} min)',dateTemplate:'Data: {0}',timeTemplate:'Orario: {0} - {1}',
       locationTemplate:'Luogo: {0}',mins:'min',
@@ -1336,6 +1352,7 @@ export function indexPage(env: Env, bookingSource?: string): string {
       confirmBtn:'确认',clearBtn:'清除',appointmentConfirmed:'预约已确认',okBtn:'确定',
       clinicMF:'周一至周五：',clinicSat:'周六：',clinicSun:'周日：',closed:'休息',
       slotInfo:'每个时段为{duration}分钟。',ready:'就绪',
+      hotelLabel:'您住在哪里？（可选）',hotelPh:'酒店或公寓名称',hotelHint:'来马耳他旅游？告诉我们您入住的酒店，有助于我们更快地为您服务——此项可选。',
       fullNamePh:'全名',emailPh:'you@example.com',commentsPh:'可选备注…',searchCountryPh:'搜索国家…',
       serviceTemplate:'服务：{0}（{1}分钟）',dateTemplate:'日期：{0}',timeTemplate:'时间：{0} - {1}',
       locationTemplate:'地点：{0}',mins:'分钟',
@@ -1412,6 +1429,7 @@ export function indexPage(env: Env, bookingSource?: string): string {
       confirmBtn:'Confirmar',clearBtn:'Limpar',appointmentConfirmed:'Consulta confirmada',okBtn:'OK',
       clinicMF:'Seg–Sex:',clinicSat:'Sáb:',clinicSun:'Dom:',closed:'Fechado',
       slotInfo:'Os horários são de {duration} minutos cada.',ready:'Pronto',
+      hotelLabel:'Onde está hospedado? (opcional)',hotelPh:'Nome do hotel ou apartamento',hotelHint:'De visita a Malta? Dizer-nos o seu hotel ajuda-nos a atendê-lo mais rápido — é opcional.',
       fullNamePh:'Nome completo',emailPh:'voce@exemplo.com',commentsPh:'Notas opcionais…',searchCountryPh:'Pesquisar país…',
       serviceTemplate:'Serviço: {0} ({1} min)',dateTemplate:'Data: {0}',timeTemplate:'Horário: {0} - {1}',
       locationTemplate:'Local: {0}',mins:'min',
@@ -1450,6 +1468,7 @@ export function indexPage(env: Env, bookingSource?: string): string {
       confirmBtn:'Подтвердить',clearBtn:'Очистить',appointmentConfirmed:'Запись подтверждена',okBtn:'ОК',
       clinicMF:'Пн–Пт:',clinicSat:'Сб:',clinicSun:'Вс:',closed:'Закрыто',
       slotInfo:'Каждый слот — {duration} минут.',ready:'Готово',
+      hotelLabel:'Где вы остановились? (необязательно)',hotelPh:'Название отеля или апартаментов',hotelHint:'Приехали на Мальту? Сообщив нам свой отель, вы поможете нам обслужить вас быстрее — это необязательно.',
       fullNamePh:'ФИО',emailPh:'you@example.com',commentsPh:'Необязательные заметки…',searchCountryPh:'Поиск страны…',
       serviceTemplate:'Услуга: {0} ({1} мин)',dateTemplate:'Дата: {0}',timeTemplate:'Время: {0} - {1}',
       locationTemplate:'Место: {0}',mins:'мин',
@@ -1489,6 +1508,7 @@ export function indexPage(env: Env, bookingSource?: string): string {
       confirmBtn:'確認',clearBtn:'クリア',appointmentConfirmed:'予約が確定しました',okBtn:'OK',
       clinicMF:'月〜金：',clinicSat:'土：',clinicSun:'日：',closed:'休診',
       slotInfo:'各スロットは{duration}分間です。',ready:'準備完了',
+      hotelLabel:'ご滞在先はどちらですか？（任意）',hotelPh:'ホテルまたはアパートメント名',hotelHint:'マルタにご旅行ですか？滞在先のホテルをお知らせいただくと、より迅速に対応できます（任意）。',
       fullNamePh:'氏名',emailPh:'you@example.com',commentsPh:'メモ（任意）…',searchCountryPh:'国を検索…',
       serviceTemplate:'サービス：{0}（{1}分）',dateTemplate:'日付：{0}',timeTemplate:'時間：{0} - {1}',
       locationTemplate:'場所：{0}',mins:'分',
@@ -2198,6 +2218,7 @@ export function indexPage(env: Env, bookingSource?: string): string {
       ccList: document.getElementById('ccList'),
       dialCode: document.getElementById('dialCode'),
       comments: document.getElementById('comments'),
+      hotel: document.getElementById('hotel'),
 
       spinolaInline: document.getElementById('spinolaInline'),
       kevinNextSection: document.getElementById('kevinNextSection'),
@@ -2506,6 +2527,7 @@ export function indexPage(env: Env, bookingSource?: string): string {
       els.email.value = '';
       els.phone.value = '';
       els.comments.value = '';
+      if (els.hotel) els.hotel.value = '';
       _hasScrolledToForm = false;
       els.sumTime.textContent = t('timeTemplate', t('timeDash'), '').replace(' - ', '');
       els.timeGrid.innerHTML = '';
@@ -3608,6 +3630,7 @@ export function indexPage(env: Env, bookingSource?: string): string {
           email: els.email.value.trim(),
           phone: getFullPhone(),
           comments: els.comments.value.trim(),
+          hotel: els.hotel ? els.hotel.value.trim() : '',
           referralCode: _referralCode || undefined,
           bookingSource: _bookingSource || undefined
         };
@@ -3643,6 +3666,7 @@ export function indexPage(env: Env, bookingSource?: string): string {
         email: els.email.value.trim(),
         phone: getFullPhone(),
         comments: els.comments.value.trim(),
+        hotel: els.hotel ? els.hotel.value.trim() : '',
         referralCode: _referralCode || undefined,
         bookingSource: _bookingSource || undefined
       };

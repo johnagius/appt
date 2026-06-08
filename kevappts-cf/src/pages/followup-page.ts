@@ -41,9 +41,9 @@ export function followupPage(): string {
         <p>We're glad you're feeling well. Thank you for visiting us.</p>
         <div class="msg good">Your response has been recorded. Thank you!</div>
         <div id="reviewBox" class="review-box">
-          <h3>One small favour?</h3>
-          <p>If you have a moment, a quick Google review would mean the world to the team.</p>
-          <a id="reviewLink" href="#" class="review-btn" target="_blank">Leave a Review</a>
+          <h3>Help the next traveller find us</h3>
+          <p>Somewhere, someone will arrive in Malta unwell and unsure who to trust. Your quick Google review is how they'll find real care when they need it — it only takes a minute.</p>
+          <a id="reviewLink" href="#" class="review-btn" target="_blank">Leave a review &middot; help a traveller</a>
         </div>
       </div>
 
