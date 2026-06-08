@@ -43,7 +43,7 @@ export function followupPage(): string {
         <div id="reviewBox" class="review-box">
           <h3>Help the next traveller find us</h3>
           <p>Somewhere, someone will arrive in Malta unwell and unsure who to trust. Your quick Google review is how they'll find real care when they need it — it only takes a minute.</p>
-          <a id="reviewLink" href="#" class="review-btn" target="_blank">Leave a review &middot; help a traveller</a>
+          <a id="reviewLink" href="#" class="review-btn" target="_blank">Leave a review &middot; Help the next traveller</a>
         </div>
       </div>
 
