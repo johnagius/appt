@@ -580,11 +580,11 @@ export async function sendReviewRequestEmail(env: Env, appt: Appointment, locati
     </p>
 
     <p style="margin:0 0 18px;font-size:16px;line-height:1.65;color:#374151;">
-      Being unwell far from home is frightening, and the hardest part is often not knowing which doctor or pharmacy to trust. <b>Your review is how the next traveller finds us.</b>
+      Being unwell far from home is frightening — especially when you don't know which doctor or pharmacy to trust. <b>Your review is how the next traveller finds us.</b>
     </p>
 
     <p style="margin:0 0 32px;font-size:16px;line-height:1.65;color:#374151;">
-      When the next visitor is searching for medical help in Malta — anxious, far from home and unsure where to turn — honest words from someone like you are what guide them to real care. Just a minute of your time could be the reason another family finds the help they need, exactly when they need it most.
+      Just a minute of your time could help the next family find real care in Malta, exactly when they need it most.
     </p>
 
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 32px;">
