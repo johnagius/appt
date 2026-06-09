@@ -4018,7 +4018,23 @@ function cancelSingleAppt(appointmentId, containerId) {
 
 // ========== Notifications ==========
 
-function loadNotifyAppts() {
+// Fetch Dr Kevin's appointments for a date, split by clinic. The admin
+// dashboard payload only carries Potter's rows (and even includes the
+// RELOCATED_SPINOLA tombstone of redirected bookings), so any feature that
+// also needs Spinola pulls both clinics from the per-clinic endpoint, which
+// filters by clinic server-side. Returns the raw appointment rows.
+async function fetchKevinApptsByClinic(dateKey) {
+  var res = await Promise.all([
+    apiCall('appointments?clinic=potters&date=' + encodeURIComponent(dateKey)),
+    apiCall('appointments?clinic=spinola&date=' + encodeURIComponent(dateKey))
+  ]);
+  return {
+    potters: (res[0] && res[0].ok && res[0].appointments) || [],
+    spinola: (res[1] && res[1].ok && res[1].appointments) || []
+  };
+}
+
+async function loadNotifyAppts() {
   var dateKey = document.getElementById('notifyDate').value;
   if (!dateKey) return;
 
@@ -4027,23 +4043,22 @@ function loadNotifyAppts() {
   document.getElementById('notifyPresets').style.display = 'none';
   document.getElementById('notifyBtn').style.display = 'none';
 
-  google.script.run
-    .withSuccessHandler(function(res) {
-      if (!res || !res.ok) {
-        document.getElementById('notifyApptsList').innerHTML = '<div class="empty">' + esc(res.reason || 'Failed.') + '</div>';
-        return;
-      }
-      renderApptTable(res.appointments, 'notifyApptsList', true);
-      if (res.appointments && res.appointments.length > 0) {
-        document.getElementById('notifyMsgRow').style.display = 'flex';
-        document.getElementById('notifyPresets').style.display = 'block';
-        document.getElementById('notifyBtn').style.display = 'inline-flex';
-      }
-    })
-    .withFailureHandler(function(err) {
-      document.getElementById('notifyApptsList').innerHTML = '<div class="empty">Error loading.</div>';
-    })
-    .apiAdminGetDateAppointments(SIG, dateKey);
+  try {
+    var byClinic = await fetchKevinApptsByClinic(dateKey);
+    // Potter's bookings (minus the redirected RELOCATED_SPINOLA tombstone)
+    // plus Spinola, so a custom message can reach Dr Kevin's patients at
+    // either clinic. Sending still only goes to the rows the admin ticks.
+    var potters = byClinic.potters.filter(function(a) { return a.status !== 'RELOCATED_SPINOLA'; });
+    var appts = potters.concat(byClinic.spinola);
+    renderApptTable(appts, 'notifyApptsList', true);
+    if (appts.length > 0) {
+      document.getElementById('notifyMsgRow').style.display = 'flex';
+      document.getElementById('notifyPresets').style.display = 'block';
+      document.getElementById('notifyBtn').style.display = 'inline-flex';
+    }
+  } catch (err) {
+    document.getElementById('notifyApptsList').innerHTML = '<div class="empty">Error loading.</div>';
+  }
 }
 
 function prefillNotifyMsg(type) {
@@ -5190,29 +5205,45 @@ var _reviewBloodTest = [];
 var _reviewDateKey = '';
 
 // ── Reminders Tab ──
-function loadReminderPatients() {
+async function loadReminderPatients() {
   var pList = document.getElementById('pottersReminderList');
   var sList = document.getElementById('spinolaReminderList');
   pList.innerHTML = '<div class="empty">Loading...</div>';
   sList.innerHTML = '<div class="empty">Loading...</div>';
 
-  apiCall('dashboard').then(function(res) {
-    if (!res || !res.ok) return;
-    var appts = (res.todayAppointments || []).concat(res.tomorrowAppointments || []);
+  try {
+    // The dashboard only carries Potter's (and its tombstones), so its Spinola
+    // column was always empty. Pull both clinics for today + tomorrow from the
+    // per-clinic endpoint instead.
+    var dash = await apiCall('dashboard');
+    if (!dash || !dash.ok) throw new Error('load');
+    var days = [dash.todayKey, dash.tomorrowKey].filter(Boolean);
+    var byClinic = await Promise.all(days.map(fetchKevinApptsByClinic));
+    var pAppts = [], sAppts = [];
+    byClinic.forEach(function(d) { pAppts = pAppts.concat(d.potters); sAppts = sAppts.concat(d.spinola); });
+
     var potters = [], spinola = [];
-    appts.forEach(function(a) {
-      if (a.status !== 'BOOKED' && a.status !== 'RELOCATED_SPINOLA') return;
-      if (!a.email) return;
-      var item = transformAppt ? transformAppt(a) : a;
-      if (a.clinic === 'spinola') spinola.push(item);
-      else potters.push(item);
+    pAppts.forEach(function(a) {
+      // Potter's column: real Potter's bookings only. A booking that was
+      // redirected to Spinola leaves a RELOCATED_SPINOLA tombstone here — drop
+      // it so the patient isn't listed under the wrong clinic (their live copy
+      // shows under Spinola).
+      if (a.status !== 'BOOKED' || !a.email) return;
+      potters.push(transformAppt(a));
+    });
+    sAppts.forEach(function(a) {
+      // Spinola column: direct bookings (BOOKED) and appointments redirected
+      // here from Potter's (RELOCATED_SPINOLA).
+      if ((a.status !== 'BOOKED' && a.status !== 'RELOCATED_SPINOLA') || !a.email) return;
+      spinola.push(transformAppt(a));
     });
 
     renderReminderList(pList, potters);
     renderReminderList(sList, spinola);
-  }).catch(function() {
+  } catch (e) {
     pList.innerHTML = '<div class="empty">Error loading.</div>';
-  });
+    sList.innerHTML = '<div class="empty">Error loading.</div>';
+  }
 }
 
 function renderReminderList(el, appts) {
