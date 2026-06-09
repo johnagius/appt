@@ -300,17 +300,18 @@ export async function apiAdminProcessAppointments(req: Request, env: Env): Promi
   const validActions = ['cancel', 'redirect_spinola', 'push_next_day', 'push_same_day'];
   if (!validActions.includes(action)) return json({ ok: false, reason: 'Invalid action.' }, 400);
 
-  // This endpoint runs from Dr Kevin's admin page and operates on Potter's
-  // appointments only. Hard-exclude Spinola + Linda so a stale frontend list
-  // (or an empty appointmentIds with action='cancel') can never cancel /
-  // redirect Linda physio bookings or already-relocated Spinola bookings.
+  // Bulk actions cover Dr Kevin's consultations at BOTH Potter's and Spinola.
+  // Still hard-exclude: Linda (separate physio practice) and blood tests
+  // (pharmacy-staff service, unaffected by doctor availability), plus the
+  // RELOCATED_SPINOLA tombstone of an already-redirected booking — its live
+  // Spinola copy is the row that actually gets acted on. This guards against a
+  // stale frontend list touching something it shouldn't. Move a single
+  // blood-test manually via the Blood Tests tab.
   const allApptsRaw = await getActiveAppointmentsByDate(env.DB, dateKey);
-  // Bulk actions operate on Dr Kevin's Potter's consultations only.
-  // Spinola + Linda + blood tests are excluded — blood tests are pharmacy
-  // staff service, not affected by doctor availability. Admin can move a
-  // single blood-test manually via the Blood Tests tab.
   const allAppts = allApptsRaw.filter(a =>
-    a.clinic !== 'spinola' && a.clinic !== 'linda' && a.service_id !== 'blood-test'
+    a.clinic !== 'linda' &&
+    a.service_id !== 'blood-test' &&
+    !(a.status === 'RELOCATED_SPINOLA' && a.clinic !== 'spinola')
   );
   let appts = appointmentIds.length > 0
     ? allAppts.filter(a => appointmentIds.includes(a.id))
@@ -346,6 +347,12 @@ export async function apiAdminProcessAppointments(req: Request, env: Env): Promi
     const spinolaTaken = await getTakenSlots(env.DB, dateKey, 'spinola');
 
     for (const appt of appts) {
+      // Redirect only applies to Potter's bookings. The list now also carries
+      // Spinola appointments (for cancel/push), so skip anything already there.
+      if (appt.clinic === 'spinola') {
+        results.push({ appointmentId: appt.id, action: "skipped — already at Spinola", patient: appt.full_name });
+        continue;
+      }
       // Find available slot at Spinola — try same time first, then next available
       const spinolaDateObj = parseDateKey(dateKey);
       const spinolaSlots = buildSlotsForDate(spinolaDateObj, cfg.apptDurationMin, null, cfg.spinolaHours);
@@ -419,27 +426,39 @@ export async function apiAdminProcessAppointments(req: Request, env: Env): Promi
   if (action === 'push_next_day') {
     const offRows = await getDoctorOffRows(env.DB);
     const offMap = buildDoctorOffMap(offRows);
-    const nextDay = findNextAvailableDay(dateKey, offMap, cfg.apptDurationMin);
-
-    if (!nextDay) return json({ ok: false, reason: 'No available day in the next 30 days.' }, 400);
-
-    const nextDateObj = parseDateKey(nextDay);
     const extraRows = await getDoctorExtraRows(env.DB);
     const extraMap = buildExtraMap(extraRows);
-    const availableSlots = buildSlotsForDate(nextDateObj, cfg.apptDurationMin, extraMap[nextDay] || null, cfg.workingHours);
 
-    // Scope to doctor's own service so blood-test bookings can't block
-    // a doctor push to that slot.
-    const takenOnNextDay = await getTakenSlots(env.DB, nextDay, 'potters', 'clinic');
+    const nextDay = findNextAvailableDay(dateKey, offMap, cfg.apptDurationMin);
+    if (!nextDay) return json({ ok: false, reason: 'No available day in the next 30 days.' }, 400);
+
+    // Per-(clinic, day) booked-slot caches, mutated as each push is placed so
+    // two bookings in this batch can't claim the same slot. Spinola
+    // consultations are scheduled against Spinola's hours/slots, Potter's
+    // against Dr Kevin's. Doctor-off applies to both (it's the doctor's own
+    // unavailability); ad-hoc extra slots are a Potter's-only concept.
+    const takenCache: Record<string, Set<string>> = {};
+    const takenFor = async (clinicKey: string, day: string): Promise<Set<string>> => {
+      const k = clinicKey + '|' + day;
+      if (!takenCache[k]) takenCache[k] = await getTakenSlots(env.DB, day, clinicKey, 'clinic');
+      return takenCache[k];
+    };
 
     for (const appt of appts) {
-      // Try same time first
+      const isSpinola = appt.clinic === 'spinola';
+      const clinicKey = isSpinola ? 'spinola' : 'potters';
+      const clinicHours = isSpinola ? cfg.spinolaHours : cfg.workingHours;
+      const extrasFor = (day: string) => (isSpinola ? null : (extraMap[day] || null));
+
+      const nextDateObj = parseDateKey(nextDay);
+      const availableSlots = buildSlotsForDate(nextDateObj, cfg.apptDurationMin, extrasFor(nextDay), clinicHours);
+      const takenOnNextDay = await takenFor(clinicKey, nextDay);
+
+      // Try same time first, then any free slot on the next available day.
       let newSlot = availableSlots.find(s =>
         s.start === appt.start_time && !takenOnNextDay.has(s.start) &&
         !slotBlockedByDoctorOff(offMap[nextDay], s.start, s.end)
       );
-
-      // Fallback: any available
       if (!newSlot) {
         newSlot = availableSlots.find(s =>
           !takenOnNextDay.has(s.start) &&
@@ -447,20 +466,18 @@ export async function apiAdminProcessAppointments(req: Request, env: Env): Promi
         );
       }
 
-      // If no slot on the initial nextDay, cascade through future days
+      // If no slot on the initial day, cascade through future days.
       let pushDay: string = nextDay;
       if (!newSlot) {
         let searchDate = pushDay;
         for (let attempt = 0; attempt < 30 && !newSlot; attempt++) {
           searchDate = toDateKey(addDays(parseDateKey(searchDate), 1));
           const searchDateObj = parseDateKey(searchDate);
-          const holiday = isHolidayOrClosed(searchDateObj);
-          if (holiday.closed) continue;
-          const offEntry = offMap[searchDate];
-          if (offEntry?.allDay) continue;
+          if (isHolidayOrClosed(searchDateObj).closed) continue;
+          if (offMap[searchDate]?.allDay) continue;
 
-          const daySlots = buildSlotsForDate(searchDateObj, cfg.apptDurationMin, extraMap[searchDate] || null, cfg.workingHours);
-          const dayTaken = await getTakenSlots(env.DB, searchDate, 'potters', 'clinic');
+          const daySlots = buildSlotsForDate(searchDateObj, cfg.apptDurationMin, extrasFor(searchDate), clinicHours);
+          const dayTaken = await takenFor(clinicKey, searchDate);
           newSlot = daySlots.find(s =>
             !dayTaken.has(s.start) &&
             !slotBlockedByDoctorOff(offMap[searchDate], s.start, s.end)
@@ -524,7 +541,8 @@ export async function apiAdminProcessAppointments(req: Request, env: Env): Promi
       };
 
       await insertAppointment(env.DB, newAppt);
-      if (pushDay === nextDay) takenOnNextDay.add(newSlot.start);
+      // Reserve the slot in this batch's cache so a later push can't reuse it.
+      (await takenFor(clinicKey, pushDay)).add(newSlot.start);
 
       // Create new calendar event
       try {
@@ -542,6 +560,12 @@ export async function apiAdminProcessAppointments(req: Request, env: Env): Promi
   }
 
   if (action === 'push_same_day') {
+    // Same-day break reschedule extends Potter's hours via doctor-extra — a
+    // Potter's-only tool. The relaxed filter now lets Spinola rows through, so
+    // drop them here rather than scheduling them against Potter's hours.
+    appts = appts.filter(a => a.clinic !== 'spinola');
+    if (!appts.length) return json({ ok: true, message: "No Potter's appointments to reschedule.", processed: 0 });
+
     const breakEndTime = (payload.breakEndTime || '').trim();
     if (!breakEndTime) return json({ ok: false, reason: 'Missing breakEndTime.' }, 400);
     const breakEndMin = parseTimeToMinutes(breakEndTime);

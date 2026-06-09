@@ -3901,7 +3901,7 @@ function removeOverride(type, rowIndex) {
 
 // ========== Quick Actions ==========
 
-function loadActionAppts() {
+async function loadActionAppts() {
   var dateKey = document.getElementById('actionDate').value;
   if (!dateKey) return;
 
@@ -3909,28 +3909,23 @@ function loadActionAppts() {
   document.getElementById('actionBar').style.display = 'none';
   document.getElementById('customMsgRow').style.display = 'none';
 
-  google.script.run
-    .withSuccessHandler(function(res) {
-      if (!res || !res.ok) {
-        document.getElementById('actionApptsList').innerHTML = '<div class="empty">' + esc(res.reason || 'Failed.') + '</div>';
-        return;
-      }
-      // This is the Potter's redirect/cancel/push tool. Drop the
-      // RELOCATED_SPINOLA tombstone of any booking already redirected to
-      // Spinola: clinic stays 'potters' (so the endpoint still returns it) but
-      // it's no longer an actionable Potter's appointment — its live copy is
-      // under Spinola. Same filter the Schedule's Potter's table uses.
-      var actionable = (res.appointments || []).filter(function(a) { return a.status !== 'RELOCATED_SPINOLA'; });
-      renderApptTable(actionable, 'actionApptsList', true);
-      if (actionable.length > 0) {
-        document.getElementById('actionBar').style.display = 'flex';
-        document.getElementById('customMsgRow').style.display = 'flex';
-      }
-    })
-    .withFailureHandler(function(err) {
-      document.getElementById('actionApptsList').innerHTML = '<div class="empty">Error loading.</div>';
-    })
-    .apiAdminGetDateAppointments(SIG, dateKey);
+  try {
+    var byClinic = await fetchKevinApptsByClinic(dateKey);
+    // Both of Dr Kevin's clinics. Drop the Potter's RELOCATED_SPINOLA tombstone
+    // (its live Spinola copy is shown instead). Cancel + Push to Next Day act on
+    // any row; Redirect to Spinola applies to the Potter's rows only — the
+    // backend skips any already at Spinola.
+    var potters = byClinic.potters.filter(function(a) { return a.status !== 'RELOCATED_SPINOLA'; });
+    var appts = potters.concat(byClinic.spinola).map(transformAppt);
+    appts.sort(function(a, b) { return (a.startTime || '').localeCompare(b.startTime || ''); });
+    renderApptTable(appts, 'actionApptsList', true);
+    if (appts.length > 0) {
+      document.getElementById('actionBar').style.display = 'flex';
+      document.getElementById('customMsgRow').style.display = 'flex';
+    }
+  } catch (err) {
+    document.getElementById('actionApptsList').innerHTML = '<div class="empty">Error loading.</div>';
+  }
 }
 
 function processAction(action) {
