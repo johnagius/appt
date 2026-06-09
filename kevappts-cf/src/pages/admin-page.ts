@@ -3915,8 +3915,14 @@ function loadActionAppts() {
         document.getElementById('actionApptsList').innerHTML = '<div class="empty">' + esc(res.reason || 'Failed.') + '</div>';
         return;
       }
-      renderApptTable(res.appointments, 'actionApptsList', true);
-      if (res.appointments && res.appointments.length > 0) {
+      // This is the Potter's redirect/cancel/push tool. Drop the
+      // RELOCATED_SPINOLA tombstone of any booking already redirected to
+      // Spinola: clinic stays 'potters' (so the endpoint still returns it) but
+      // it's no longer an actionable Potter's appointment — its live copy is
+      // under Spinola. Same filter the Schedule's Potter's table uses.
+      var actionable = (res.appointments || []).filter(function(a) { return a.status !== 'RELOCATED_SPINOLA'; });
+      renderApptTable(actionable, 'actionApptsList', true);
+      if (actionable.length > 0) {
         document.getElementById('actionBar').style.display = 'flex';
         document.getElementById('customMsgRow').style.display = 'flex';
       }
