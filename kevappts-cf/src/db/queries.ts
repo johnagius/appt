@@ -970,3 +970,69 @@ export async function getTelemedicineStats(db: D1Database, todayKey: string, wee
     weekMedicineCents: week.medicineCents,
   };
 }
+
+// ─── DDA (controlled-drug) register ───────────────────────
+
+export interface DdaEntry {
+  id: number;
+  drug: string;          // e.g. "Zolpidem 10mg (Tablet)"
+  quantity: string;      // e.g. "7"
+  code: string;          // e.g. "C960953"
+  patient_name: string;  // e.g. "Jose Pedro Dinis Lopes"
+  pv: string;            // e.g. "PV"
+  year: string;          // e.g. "1985"
+  prescriber: string;    // e.g. "Kevin Navarro Gera"
+  doctor_code: string;   // e.g. "E67579"
+  rx_date: string;       // e.g. "04/06/2026 00:00:00" (raw, time stripped at print)
+  flag: string;          // e.g. "False"
+  raw: string;           // original pasted line, kept for reference
+  created_at: string;
+}
+
+// Older DBs may not have the table yet. Idempotent create on every call so a
+// new deploy picks it up without forcing a manual `wrangler d1 execute`.
+async function ensureDdaTable(db: D1Database): Promise<void> {
+  await db.prepare(
+    "CREATE TABLE IF NOT EXISTS dda_entries (" +
+    "id INTEGER PRIMARY KEY AUTOINCREMENT," +
+    "drug TEXT NOT NULL DEFAULT ''," +
+    "quantity TEXT NOT NULL DEFAULT ''," +
+    "code TEXT DEFAULT ''," +
+    "patient_name TEXT NOT NULL DEFAULT ''," +
+    "pv TEXT DEFAULT ''," +
+    "year TEXT DEFAULT ''," +
+    "prescriber TEXT DEFAULT ''," +
+    "doctor_code TEXT DEFAULT ''," +
+    "rx_date TEXT DEFAULT ''," +
+    "flag TEXT DEFAULT ''," +
+    "raw TEXT DEFAULT ''," +
+    "created_at TEXT NOT NULL" +
+    ")"
+  ).run();
+}
+
+export async function insertDdaEntry(db: D1Database, e: Omit<DdaEntry, 'id'>): Promise<number> {
+  await ensureDdaTable(db);
+  const res = await db.prepare(
+    'INSERT INTO dda_entries (drug, quantity, code, patient_name, pv, year, prescriber, doctor_code, rx_date, flag, raw, created_at) ' +
+    'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+  ).bind(
+    e.drug, e.quantity, e.code, e.patient_name, e.pv, e.year,
+    e.prescriber, e.doctor_code, e.rx_date, e.flag, e.raw, e.created_at
+  ).run();
+  return (res.meta?.last_row_id as number) || 0;
+}
+
+// Newest first — the admin table keeps building with the latest entry on top.
+export async function getDdaEntries(db: D1Database, limit = 500): Promise<DdaEntry[]> {
+  await ensureDdaTable(db);
+  const r = await db.prepare(
+    'SELECT * FROM dda_entries ORDER BY id DESC LIMIT ?'
+  ).bind(limit).all<DdaEntry>();
+  return r.results;
+}
+
+export async function deleteDdaEntry(db: D1Database, id: number): Promise<void> {
+  await ensureDdaTable(db);
+  await db.prepare('DELETE FROM dda_entries WHERE id = ?').bind(id).run();
+}

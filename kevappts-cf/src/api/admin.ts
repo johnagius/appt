@@ -19,6 +19,7 @@ import {
   getBloodTestOffRows, addBloodTestOff, deleteBloodTestOff,
   getRecentAppointmentActivity, getRecentTelemedicineActivity,
   rescheduleAppointmentFull,
+  insertDdaEntry, getDdaEntries, deleteDdaEntry, type DdaEntry,
 } from '../db/queries';
 import { verifyAdminSig, generateId } from '../services/crypto';
 import {
@@ -2235,4 +2236,85 @@ export async function apiAdminBloodTestSendToSpinola(req: Request, env: Env): Pr
   await bumpVersion(env.DB);
   await broadcast(env, appt.date_key);
   return json({ ok: true, message: 'Blood test moved to Spinola Clinic.', spinolaAppointmentId: spinolaCopyId });
+}
+
+// ─── DDA (controlled-drug) register ───────────────────────
+//
+// Admin pastes tab-separated rows exported from the dispensing system; each
+// row is parsed into columns and stored so it can be reprinted as a label.
+// The export column order is:
+//   0 drug · 1 quantity · 2 code · 3 patient · 4 pv · 5 year ·
+//   6 prescriber · 7 doctor code · 8 prescription date · 9 flag
+
+const DDA_MAX_FIELD = 200;
+
+function ddaField(parts: string[], i: number): string {
+  return ((parts[i] ?? '').toString()).trim().slice(0, DDA_MAX_FIELD);
+}
+
+// Parse a pasted block into one entry per non-empty line. Lenient: a line just
+// needs at least a drug (col 0) or a patient (col 3) to count. Returns parsed
+// entries ready to insert (sans id/created_at, which the caller supplies).
+function parseDdaPaste(text: string): Omit<DdaEntry, 'id' | 'created_at'>[] {
+  const out: Omit<DdaEntry, 'id' | 'created_at'>[] = [];
+  const lines = String(text || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+  for (const line of lines) {
+    if (!line.trim()) continue;
+    const parts = line.split('\t');
+    const drug = ddaField(parts, 0);
+    const patient = ddaField(parts, 3);
+    // Skip blank/garbage lines that carry neither a drug nor a patient.
+    if (!drug && !patient) continue;
+    out.push({
+      drug,
+      quantity: ddaField(parts, 1),
+      code: ddaField(parts, 2),
+      patient_name: patient,
+      pv: ddaField(parts, 4),
+      year: ddaField(parts, 5),
+      prescriber: ddaField(parts, 6),
+      doctor_code: ddaField(parts, 7),
+      rx_date: ddaField(parts, 8),
+      flag: ddaField(parts, 9),
+      raw: line.trim().slice(0, 2000),
+    });
+  }
+  return out;
+}
+
+export async function apiAdminListDda(req: Request, env: Env): Promise<Response> {
+  const denied = await requireAdmin(req, env);
+  if (denied) return denied;
+  const entries = await getDdaEntries(env.DB);
+  return json({ ok: true, entries });
+}
+
+export async function apiAdminAddDda(req: Request, env: Env): Promise<Response> {
+  const denied = await requireAdmin(req, env);
+  if (denied) return denied;
+
+  const body: any = await req.json().catch(() => ({}));
+  const raw = (body.raw ?? body.text ?? '').toString();
+  const parsed = parseDdaPaste(raw);
+  if (!parsed.length) {
+    return json({ ok: false, reason: 'Nothing to add — paste at least one tab-separated row.' }, 400);
+  }
+  const now = nowIso(env.TIMEZONE);
+  let added = 0;
+  for (const e of parsed) {
+    await insertDdaEntry(env.DB, { ...e, created_at: now });
+    added++;
+  }
+  const entries = await getDdaEntries(env.DB);
+  return json({ ok: true, added, entries });
+}
+
+export async function apiAdminDeleteDda(req: Request, env: Env): Promise<Response> {
+  const denied = await requireAdmin(req, env);
+  if (denied) return denied;
+  const url = new URL(req.url);
+  const id = parseInt(url.pathname.split('/').pop() || '', 10);
+  if (isNaN(id)) return json({ ok: false, reason: 'Invalid id.' }, 400);
+  await deleteDdaEntry(env.DB, id);
+  return json({ ok: true });
 }

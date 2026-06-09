@@ -411,6 +411,7 @@ export function adminPage(sig: string, env: Env): string {
     <div class="tab" data-tab="telemedicine" onclick="switchTab('telemedicine')" style="background:#fff7ed;color:#9a3412;">Telemedicine</div>
     <div class="tab" data-tab="linda" onclick="switchTab('linda')" style="background:#ecfdf5;color:#065f46;">Linda</div>
     <div class="tab" data-tab="bloodtests" onclick="switchTab('bloodtests')" style="background:#fef2f2;color:#991b1b;">Blood Tests</div>
+    <div class="tab" data-tab="dda" onclick="switchTab('dda')" style="background:#f5f3ff;color:#5b21b6;">&#x1F48A; DDAs</div>
     <div class="tab" data-tab="reschedule" onclick="switchTab('reschedule')" style="background:#eef2ff;color:#3730a3;">&#x1F504; Reschedule</div>
     <div class="tab" data-tab="settings" onclick="switchTab('settings')">Settings</div>
   </div>
@@ -1261,6 +1262,34 @@ export function adminPage(sig: string, env: Env): string {
   </div>
 </div>
 
+<!-- DDA (CONTROLLED DRUGS) TAB -->
+<div class="tab-content" id="tab-dda" style="display:none;">
+  <div class="card" style="padding:18px;margin-bottom:14px;background:#f5f3ff;border-left:4px solid #7c3aed;">
+    <h3 style="margin:0 0 4px 0;font-size:16px;font-weight:900;color:#5b21b6;">&#x1F48A; DDA Register</h3>
+    <p style="margin:0;color:#5b21b6;font-size:13px;line-height:1.5;">Paste one or more controlled-drug rows below (copied straight from the dispensing system, tab-separated). They&#39;re saved to the table &mdash; newest at the top &mdash; and any row can be reprinted as a <b>75&times;50&nbsp;mm</b> label.</p>
+  </div>
+
+  <div class="card" style="padding:18px;margin-bottom:14px;">
+    <h3 style="margin:0 0 8px 0;font-size:15px;font-weight:800;">Paste rows</h3>
+    <p style="margin:0 0 10px 0;color:#6b7280;font-size:12px;">Each line is one entry. Columns (tab-separated): Drug, Qty, Code, Patient, PV, Year, Prescriber, Doctor&nbsp;code, Date, Flag.</p>
+    <textarea id="ddaPaste" rows="3" placeholder="Zolpidem 10mg (Tablet)&#9;7&#9;C960953&#9;Jose Pedro Dinis Lopes&#9;PV&#9;1985&#9;Kevin Navarro Gera&#9;E67579&#9;04/06/2026 00:00:00&#9;False" style="width:100%;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;white-space:pre;overflow-x:auto;"></textarea>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px;">
+      <button class="btn btn-dark" onclick="addDdaEntries()">Add to table</button>
+      <span id="ddaAddMsg" style="font-size:13px;"></span>
+    </div>
+  </div>
+
+  <div class="card" style="padding:18px;">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+      <h3 style="margin:0;font-size:15px;font-weight:800;flex:1;">Saved entries</h3>
+      <button class="btn btn-sm" style="background:#7c3aed;color:#fff;" onclick="printSelectedDda()">&#x1F5A8;&#xFE0F; Print selected label</button>
+      <button class="btn btn-ghost btn-sm" onclick="loadDdaList()">Refresh</button>
+    </div>
+    <p style="margin:0 0 10px 0;font-size:12px;color:#6b7280;">Click a row to select it, then print &mdash; or use the print button on the row.</p>
+    <div id="ddaList"><div class="empty">Loading...</div></div>
+  </div>
+</div>
+
 <!-- RESCHEDULE TAB -->
 <div class="tab-content" id="tab-reschedule" style="display:none;">
   <div class="card" style="background:#eef2ff;border-left:4px solid #4f46e5;margin-bottom:14px;">
@@ -1746,6 +1775,7 @@ function switchTab(name) {
   if (name === 'telemedicine') loadTelemedicineData();
   if (name === 'linda') loadLindaData();
   if (name === 'bloodtests') loadBloodTestData();
+  if (name === 'dda') loadDdaList();
   if (name === 'reschedule') loadRescheduleTab();
   if (name === 'activity') loadActivity();
   if (name === 'reserve') loadReserveTab();
@@ -2638,6 +2668,168 @@ function formatDateFull(dateStr) {
   var d = new Date(dateStr + 'T00:00:00');
   var days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   return days[d.getDay()] + ', ' + formatDateNice(dateStr);
+}
+
+// ========== DDA (controlled-drug) register ==========
+var _ddaSelectedId = null;
+
+async function loadDdaList() {
+  var listEl = document.getElementById('ddaList');
+  if (!listEl) return;
+  listEl.innerHTML = '<div class="empty">Loading...</div>';
+  try {
+    var res = await apiCall('dda');
+    if (!res || !res.ok) { listEl.innerHTML = '<div class="empty">Failed to load.</div>'; return; }
+    renderDdaEntries(res.entries || []);
+  } catch (err) {
+    listEl.innerHTML = '<div class="empty">Failed to load entries.</div>';
+  }
+}
+
+function renderDdaEntries(entries) {
+  var listEl = document.getElementById('ddaList');
+  if (!listEl) return;
+  window._ddaEntries = {};
+  if (!entries.length) {
+    listEl.innerHTML = '<div class="empty">No DDA entries yet. Paste a row above to start the register.</div>';
+    return;
+  }
+  var html = '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;">' +
+    '<thead><tr style="background:#f9fafb;text-align:left;">' +
+    '<th style="padding:8px;border-bottom:1px solid #e5e7eb;">Patient</th>' +
+    '<th style="padding:8px;border-bottom:1px solid #e5e7eb;">Drug</th>' +
+    '<th style="padding:8px;border-bottom:1px solid #e5e7eb;">Qty</th>' +
+    '<th style="padding:8px;border-bottom:1px solid #e5e7eb;">Code</th>' +
+    '<th style="padding:8px;border-bottom:1px solid #e5e7eb;">PV</th>' +
+    '<th style="padding:8px;border-bottom:1px solid #e5e7eb;">Doctor</th>' +
+    '<th style="padding:8px;border-bottom:1px solid #e5e7eb;">Rx date</th>' +
+    '<th style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:right;">Actions</th>' +
+    '</tr></thead><tbody>';
+  for (var i = 0; i < entries.length; i++) {
+    var e = entries[i];
+    window._ddaEntries[e.id] = e;
+    var rxDate = String(e.rx_date || '').split(' ')[0];
+    var sel = (_ddaSelectedId != null && String(_ddaSelectedId) === String(e.id));
+    html += '<tr data-dda-id="' + esc(e.id) + '" onclick="selectDdaRow(' + esc(e.id) + ')" style="cursor:pointer;' + (sel ? 'background:#ede9fe;' : '') + '">' +
+      '<td style="padding:8px;border-bottom:1px solid #f3f4f6;"><b>' + esc(e.patient_name) + '</b></td>' +
+      '<td style="padding:8px;border-bottom:1px solid #f3f4f6;">' + esc(e.drug) + '</td>' +
+      '<td style="padding:8px;border-bottom:1px solid #f3f4f6;">' + esc(e.quantity) + '</td>' +
+      '<td style="padding:8px;border-bottom:1px solid #f3f4f6;">' + esc(e.code) + '</td>' +
+      '<td style="padding:8px;border-bottom:1px solid #f3f4f6;">' + esc(e.pv) + '</td>' +
+      '<td style="padding:8px;border-bottom:1px solid #f3f4f6;">' + esc(e.doctor_code) + '</td>' +
+      '<td style="padding:8px;border-bottom:1px solid #f3f4f6;white-space:nowrap;">' + esc(rxDate) + '</td>' +
+      '<td style="padding:8px;border-bottom:1px solid #f3f4f6;text-align:right;white-space:nowrap;">' +
+        '<button class="btn btn-sm" style="background:#7c3aed;color:#fff;margin-right:4px;" onclick="event.stopPropagation();printDdaEntry(' + esc(e.id) + ')">&#x1F5A8;&#xFE0F; Print</button>' +
+        '<button class="btn btn-sm" style="background:#ef4444;color:#fff;" onclick="event.stopPropagation();deleteDdaEntry(' + esc(e.id) + ')">Delete</button>' +
+      '</td></tr>';
+  }
+  html += '</tbody></table></div>';
+  listEl.innerHTML = html;
+}
+
+function selectDdaRow(id) {
+  _ddaSelectedId = id;
+  var rows = document.querySelectorAll('#ddaList tr[data-dda-id]');
+  for (var i = 0; i < rows.length; i++) {
+    rows[i].style.background = (rows[i].getAttribute('data-dda-id') === String(id)) ? '#ede9fe' : '';
+  }
+}
+
+async function addDdaEntries() {
+  var msg = document.getElementById('ddaAddMsg');
+  var ta = document.getElementById('ddaPaste');
+  var raw = ta.value;
+  if (!raw.trim()) { msg.style.color = '#b91c1c'; msg.textContent = 'Paste at least one row first.'; return; }
+  msg.style.color = '#6b7280';
+  msg.textContent = 'Saving...';
+  try {
+    var res = await apiCall('dda', { body: { raw: raw } });
+    if (res && res.ok) {
+      msg.style.color = '#059669';
+      msg.textContent = 'Added ' + (res.added || 0) + ' row' + (res.added === 1 ? '' : 's') + '.';
+      ta.value = '';
+      renderDdaEntries(res.entries || []);
+    } else {
+      msg.style.color = '#b91c1c';
+      msg.textContent = (res && res.reason) ? res.reason : 'Failed to add.';
+    }
+  } catch (err) {
+    msg.style.color = '#b91c1c';
+    msg.textContent = 'Failed to add.';
+  }
+}
+
+async function deleteDdaEntry(id) {
+  if (!confirm('Delete this DDA entry from the register?')) return;
+  try {
+    var res = await apiCall('dda/' + encodeURIComponent(id), { method: 'DELETE' });
+    if (res && res.ok) {
+      if (String(_ddaSelectedId) === String(id)) _ddaSelectedId = null;
+      loadDdaList();
+    } else {
+      alert((res && res.reason) ? res.reason : 'Failed to delete.');
+    }
+  } catch (err) { alert('Failed to delete.'); }
+}
+
+// Derive the "7 Tablets" line: quantity + unit pulled from the drug's last
+// parenthetical (e.g. "(Tablet)"), pluralised unless the quantity is 1.
+function ddaQtyLine(drug, qty) {
+  qty = (qty == null ? '' : String(qty)).trim();
+  var unit = '';
+  var matches = String(drug || '').match(/\\(([^)]*)\\)/g);
+  if (matches && matches.length) unit = matches[matches.length - 1].replace(/[()]/g, '').trim();
+  if (unit && qty) {
+    var plural = (qty !== '1' && !/s$/i.test(unit)) ? unit + 's' : unit;
+    return qty + ' ' + plural;
+  }
+  return qty || unit || '';
+}
+
+function ddaLabelLines(e) {
+  return [
+    e.patient_name || '',
+    e.code || '',
+    e.pv || '',
+    e.drug || '',
+    ddaQtyLine(e.drug, e.quantity),
+    e.doctor_code || '',
+    String(e.rx_date || '').split(' ')[0]
+  ];
+}
+
+// Build a self-contained 75x50mm label document. Times New Roman Bold 16pt,
+// a 3mm margin on every side, content clipped so a long entry can never spill
+// onto the next sticker on the roll.
+function ddaBuildLabelHtml(e) {
+  var lines = ddaLabelLines(e);
+  var body = '';
+  for (var i = 0; i < lines.length; i++) body += '<div class="ln">' + esc(lines[i]) + '</div>';
+  return '<!DOCTYPE html><html><head><meta charset="utf-8"><title>DDA Label</title><style>' +
+    '@page{size:75mm 50mm;margin:0;}' +
+    'html,body{margin:0;padding:0;}' +
+    'body{width:75mm;height:50mm;}' +
+    '.label{box-sizing:border-box;width:75mm;height:50mm;padding:3mm;overflow:hidden;' +
+    'font-family:\\'Times New Roman\\',Times,serif;font-weight:bold;font-size:16pt;line-height:1.1;}' +
+    '.label .ln{overflow:hidden;}' +
+    '</style></head><body><div class="label">' + body + '</div>' +
+    '<script>window.onload=function(){window.focus();window.print();};window.onafterprint=function(){window.close();};<\\/script>' +
+    '</body></html>';
+}
+
+function printDdaEntry(id) {
+  var e = (window._ddaEntries || {})[id];
+  if (!e) { alert('Entry not found — refresh the list and try again.'); return; }
+  var w = window.open('', '_blank', 'width=420,height=320');
+  if (!w) { alert('Pop-up blocked. Allow pop-ups for this site so the label can print.'); return; }
+  w.document.open();
+  w.document.write(ddaBuildLabelHtml(e));
+  w.document.close();
+}
+
+function printSelectedDda() {
+  if (_ddaSelectedId == null) { alert('Click a row in the table to select it first.'); return; }
+  printDdaEntry(_ddaSelectedId);
 }
 
 function esc(s) {

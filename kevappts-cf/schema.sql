@@ -259,3 +259,27 @@ CREATE TABLE IF NOT EXISTS blood_test_off (
   created_at TEXT DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS idx_blood_test_off_date ON blood_test_off(date_key);
+
+-- DDA (Dangerous Drugs Act / controlled-drug) register. Admin pastes
+-- tab-separated rows exported from the dispensing system; each row is stored
+-- here so it can be reprinted on demand as a 75×50mm controlled-drug label.
+-- Newest entries show at the top of the admin table (ORDER BY id DESC). The
+-- columns mirror the pasted export order:
+--   drug · quantity · code · patient · pv · year · prescriber · doctor code
+--   · prescription date · flag — plus `raw` (the original pasted line).
+CREATE TABLE IF NOT EXISTS dda_entries (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  drug TEXT NOT NULL DEFAULT '',
+  quantity TEXT NOT NULL DEFAULT '',
+  code TEXT DEFAULT '',
+  patient_name TEXT NOT NULL DEFAULT '',
+  pv TEXT DEFAULT '',
+  year TEXT DEFAULT '',
+  prescriber TEXT DEFAULT '',
+  doctor_code TEXT DEFAULT '',
+  rx_date TEXT DEFAULT '',
+  flag TEXT DEFAULT '',
+  raw TEXT DEFAULT '',
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_dda_created ON dda_entries(created_at);

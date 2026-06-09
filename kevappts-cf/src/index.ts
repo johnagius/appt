@@ -45,6 +45,7 @@ import {
   apiAdminGetBloodTestConfig, apiAdminSaveBloodTestConfig, apiAdminGetBloodTestAppointments,
   apiAdminListBloodTestOff, apiAdminAddBloodTestOff, apiAdminDeleteBloodTestOff,
   apiAdminBloodTestSendToSpinola,
+  apiAdminListDda, apiAdminAddDda, apiAdminDeleteDda,
 } from './api/admin';
 import { apiLindaGetDay, apiLindaNextDay, apiLindaSlots, apiLindaListExtras, apiLindaAddExtra, apiLindaDeleteExtra, apiLindaUpdateExtra, apiLindaListOff, apiLindaAddOff, apiLindaDeleteOff, apiLindaListBlocks, apiLindaAddBlock, apiLindaDeleteBlock, apiLindaReschedule, apiLindaRescheduleDay, apiLindaNewBooking, apiLindaSearch, apiLindaPatientHistory, apiLindaClientsAutocomplete, apiLindaWeek, apiLindaCopyDay, apiLindaCancel, apiLindaCancelDay, apiLindaMarkStatus, apiLindaBaseSchedule, apiLindaSaveBaseSchedule, apiLindaListWindows, apiLindaAddWindow, apiLindaUpdateWindow, apiLindaDeleteWindow, handleLindaLogin, handleLindaLogout, lindaRoute } from './api/linda-view';
 import {
@@ -247,6 +248,11 @@ export default {
         if (adminPath === 'blood-test-off' && method === 'POST') return apiAdminAddBloodTestOff(request, env);
         if (adminPath.startsWith('blood-test-off/') && method === 'DELETE') return apiAdminDeleteBloodTestOff(request, env);
         if (adminPath === 'blood-test-send-spinola' && method === 'POST') return apiAdminBloodTestSendToSpinola(request, env);
+
+        // ─── DDA (controlled-drug) register ────────────
+        if (adminPath === 'dda' && method === 'GET') return apiAdminListDda(request, env);
+        if (adminPath === 'dda' && method === 'POST') return apiAdminAddDda(request, env);
+        if (adminPath.startsWith('dda/') && method === 'DELETE') return apiAdminDeleteDda(request, env);
 
         // ─── Telemedicine admin ────────────────────────
         if (adminPath === 'telemedicine' && method === 'GET') return apiAdminListTelemedicineByDate(request, env);
