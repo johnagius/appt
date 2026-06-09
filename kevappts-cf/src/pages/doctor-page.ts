@@ -74,6 +74,7 @@ export function doctorPage(sig: string): string {
   .patient-badge{display:inline-block;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;padding:2px 8px;border-radius:8px;margin-top:4px;text-decoration:none;}
   .patient-badge.spinola{background:#fef3c7;color:#92400e;}
   .patient-comment{font-size:12px;color:#6b7280;margin-top:4px;padding:4px 8px;background:#f3f4f6;border-radius:8px;line-height:1.35;font-style:italic;}
+  .patient-hotel{font-size:12px;color:#92400e;margin-top:4px;padding:4px 8px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;line-height:1.35;display:inline-block;}
   .followup-card{border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:8px;background:#fff;}
   .followup-card.needs-reply{border-color:#3b82f6;background:#eff6ff;}
   .followup-name{font-weight:800;font-size:14px;}
@@ -753,6 +754,7 @@ function renderPatientList(session) {
     if (phoneText && emailText) html += ' \u2022 ';
     if (emailText) html += '<a class="contact-link" href="mailto:' + esc(emailText) + '">' + esc(emailText) + '</a>';
     html += '</div>';
+    if (a.hotel && String(a.hotel).trim()) html += '<div class="patient-hotel">&#127976; ' + esc(a.hotel) + '</div>';
     if (isSpinola) html += '<div class="patient-badge spinola">Sent to Spinola</div>';
     if (a.confirmed) html += '<div class="patient-badge" style="background:#d1fae5;color:#065f46;">Confirmed</div>';
     if (a.booking_source && a.booking_source !== 'test') html += '<div class="patient-badge" style="background:#eff6ff;color:#1e40af;">via ' + esc(a.booking_source) + '</div>';
