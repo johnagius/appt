@@ -2798,21 +2798,39 @@ function ddaLabelLines(e) {
   ];
 }
 
-// Build a self-contained 75x50mm label document. Times New Roman Bold 16pt,
-// a 3mm margin on every side, content clipped so a long entry can never spill
-// onto the next sticker on the roll.
+// Fixed pharmacy / pharmacist credentials printed as the second DDA label
+// (page 2 on the roll) — required on its own sticker alongside every entry.
+function ddaSecondLabelLines() {
+  return [
+    'Potters Pharmacy',
+    'DL191',
+    'John Agius',
+    'Pharmacist',
+    'Reg. 1269'
+  ];
+}
+
+// Build a self-contained label document of two 75x50mm stickers: page 1 is the
+// patient/drug entry, page 2 the fixed pharmacy credentials. Times New Roman
+// Bold 16pt, a 3mm margin on every side, content clipped so a long entry can
+// never spill onto the next sticker on the roll.
 function ddaBuildLabelHtml(e) {
-  var lines = ddaLabelLines(e);
-  var body = '';
-  for (var i = 0; i < lines.length; i++) body += '<div class="ln">' + esc(lines[i]) + '</div>';
+  function rows(lines) {
+    var out = '';
+    for (var i = 0; i < lines.length; i++) out += '<div class="ln">' + esc(lines[i]) + '</div>';
+    return out;
+  }
   return '<!DOCTYPE html><html><head><meta charset="utf-8"><title>DDA Label</title><style>' +
     '@page{size:75mm 50mm;margin:0;}' +
     'html,body{margin:0;padding:0;}' +
-    'body{width:75mm;height:50mm;}' +
+    'body{width:75mm;}' +
     '.label{box-sizing:border-box;width:75mm;height:50mm;padding:3mm;overflow:hidden;' +
     'font-family:\\'Times New Roman\\',Times,serif;font-weight:bold;font-size:16pt;line-height:1.1;}' +
+    '.label.page2{page-break-before:always;}' +
     '.label .ln{overflow:hidden;}' +
-    '</style></head><body><div class="label">' + body + '</div>' +
+    '</style></head><body>' +
+    '<div class="label">' + rows(ddaLabelLines(e)) + '</div>' +
+    '<div class="label page2">' + rows(ddaSecondLabelLines()) + '</div>' +
     '<script>window.onload=function(){window.focus();window.print();};window.onafterprint=function(){window.close();};<\\/script>' +
     '</body></html>';
 }
