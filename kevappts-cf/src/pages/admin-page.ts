@@ -4055,7 +4055,10 @@ async function loadNotifyAppts() {
     // plus Spinola, so a custom message can reach Dr Kevin's patients at
     // either clinic. Sending still only goes to the rows the admin ticks.
     var potters = byClinic.potters.filter(function(a) { return a.status !== 'RELOCATED_SPINOLA'; });
-    var appts = potters.concat(byClinic.spinola);
+    // renderApptTable expects camelCase (the legacy shim mapped these); the raw
+    // /appointments rows are snake_case, so transform them or the Patient/Time
+    // columns and the checkbox ids come out blank.
+    var appts = potters.concat(byClinic.spinola).map(transformAppt);
     renderApptTable(appts, 'notifyApptsList', true);
     if (appts.length > 0) {
       document.getElementById('notifyMsgRow').style.display = 'flex';
