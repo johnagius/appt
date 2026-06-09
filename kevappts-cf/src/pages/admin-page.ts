@@ -2780,6 +2780,13 @@ function loadSchedAppts() {
           return;
         }
         var appts = (res.appointments || []).map(transformAppt);
+        // An appointment redirected to Spinola (quick action) leaves a
+        // RELOCATED_SPINOLA tombstone on clinic='potters' while the live copy
+        // now sits in the Spinola table. Hide that tombstone from Potter's so
+        // a moved appointment no longer shows under both clinics.
+        if (clinic === 'potters') {
+          appts = appts.filter(function(a) { return a.status !== 'RELOCATED_SPINOLA'; });
+        }
         renderApptTable(appts, containerId, false);
       })
       .catch(function() { el.innerHTML = '<div class="empty">Error loading.</div>'; });
@@ -2804,7 +2811,7 @@ function loadSchedBlood(dateKey) {
     // rescheduled to another clinic (e.g. Spinola) shows under that clinic's
     // table instead, so exclude anything that has been moved off Potter's.
     var appts = (res.appointments || []).filter(function(a) {
-      return !a.clinic || a.clinic === 'potters';
+      return (!a.clinic || a.clinic === 'potters') && a.status !== 'RELOCATED_SPINOLA';
     }).map(transformAppt);
     renderApptTable(appts, 'schedTableBlood', false);
   }).catch(function() { el.innerHTML = '<div class="empty">Error loading.</div>'; });
