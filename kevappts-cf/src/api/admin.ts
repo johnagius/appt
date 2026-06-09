@@ -973,6 +973,12 @@ export async function apiAdminGetRescheduleList(req: Request, env: Env): Promise
     return json({ ok: true, appointments: [] });
   }
 
+  // When an appointment is redirected to Spinola the original Potter's row is
+  // kept as a RELOCATED_SPINOLA phantom and a real, bookable copy is created at
+  // Spinola (clinic='spinola'). Drop the phantom so the list shows only the
+  // latest copy instead of a duplicate pair (matches the dedupe at line ~1208).
+  appts = appts.filter(a => !(a.status === 'RELOCATED_SPINOLA' && a.clinic !== 'spinola'));
+
   return json({ ok: true, appointments: appts.map(rescheduleApptOut) });
 }
 
