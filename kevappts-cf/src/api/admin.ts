@@ -62,6 +62,20 @@ async function broadcast(env: Env, dateKey: string) {
   } catch (e) { console.error('Broadcast error:', e); }
 }
 
+// Generic broadcast for non-slot events (e.g. the DDA register) so every
+// connected admin/tablet refreshes instantly instead of waiting for a manual
+// reload or the slow polling fallback.
+async function broadcastEvent(env: Env, message: Record<string, unknown>) {
+  try {
+    const id = env.REALTIME.idFromName('global');
+    const stub = env.REALTIME.get(id);
+    await stub.fetch('http://internal/broadcast', {
+      method: 'POST',
+      body: JSON.stringify(message),
+    });
+  } catch (e) { console.error('Broadcast error:', e); }
+}
+
 // ─── Dashboard ─────────────────────────────────────────────
 
 export async function apiAdminGetDashboard(req: Request, env: Env): Promise<Response> {
@@ -1816,7 +1830,10 @@ export async function apiAdminGetActivity(req: Request, env: Env): Promise<Respo
   try {
     const appts = await getRecentAppointmentActivity(env.DB, 60);
     const telemed = await getRecentTelemedicineActivity(env.DB, 30);
-    return json({ ok: true, appts, telemed });
+    // Most recent DDA register entries (newest first) so controlled-drug
+    // additions show up in the activity feed alongside bookings.
+    const dda = await getDdaEntries(env.DB, 30);
+    return json({ ok: true, appts, telemed, dda });
   } catch (e: any) {
     return json({ ok: false, reason: e.message }, 500);
   }
@@ -2336,6 +2353,8 @@ export async function apiAdminAddDda(req: Request, env: Env): Promise<Response> 
     added++;
   }
   const entries = await getDdaEntries(env.DB);
+  // Tell every other connected admin/tablet to refresh the register instantly.
+  await broadcastEvent(env, { type: 'dda_updated' });
   return json({ ok: true, added, entries });
 }
 
@@ -2346,5 +2365,7 @@ export async function apiAdminDeleteDda(req: Request, env: Env): Promise<Respons
   const id = parseInt(url.pathname.split('/').pop() || '', 10);
   if (isNaN(id)) return json({ ok: false, reason: 'Invalid id.' }, 400);
   await deleteDdaEntry(env.DB, id);
+  // Tell every other connected admin/tablet to refresh the register instantly.
+  await broadcastEvent(env, { type: 'dda_updated' });
   return json({ ok: true });
 }

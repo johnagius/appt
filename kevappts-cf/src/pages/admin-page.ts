@@ -1807,6 +1807,7 @@ function actAppt(a){
   return {time:time, icon:icon, text:label+': '+who+' — '+svc+when+' ('+cl+')'};
 }
 function actTel(t){ return {time:t.updated_at||t.created_at, icon:'📞', text:'Telemedicine call: '+actEsc(t.patient_name||'')+' ('+actEsc(t.status||'')+')'}; }
+function actDda(d){ var qty=d.quantity?(' \\u00d7'+actEsc(d.quantity)):''; return {time:d.created_at, icon:'💊', text:'DDA register: '+actEsc(d.patient_name||'')+' \\u2014 '+actEsc(d.drug||'')+qty}; }
 function actResv(e){
   var who=actEsc(e.customer_name||''), ref=actEsc(e.reference||'');
   var map={SUBMITTED:['🛍️','New Reserve & Collect order'],READY:['📦','Order marked ready'],COLLECTED:['✅','Order collected'],CANCELLED:['❌','Order cancelled'],ITEMS_REVIEWED:['🔎','Order items reviewed'],NOTIFIED:['✉️','Customer notified'],REVIEW_SENT:['⭐','Review request sent']};
@@ -1816,7 +1817,7 @@ function actResv(e){
 async function loadActivity(){
   var box=document.getElementById('activityFeed'); if(!box) return;
   var events=[];
-  try{ var a=await apiCall('activity'); if(a&&a.ok){ (a.appts||[]).forEach(function(x){events.push(actAppt(x));}); (a.telemed||[]).forEach(function(x){events.push(actTel(x));}); } }catch(e){}
+  try{ var a=await apiCall('activity'); if(a&&a.ok){ (a.appts||[]).forEach(function(x){events.push(actAppt(x));}); (a.telemed||[]).forEach(function(x){events.push(actTel(x));}); (a.dda||[]).forEach(function(x){events.push(actDda(x));}); } }catch(e){}
   if(RESERVE_URL&&RESERVE_SIG){
     try{ var r=await (await fetch(RESERVE_URL+'/api/admin/activity?sig='+encodeURIComponent(RESERVE_SIG))).json();
       if(r&&r.ok){ (r.events||[]).forEach(function(x){events.push(actResv(x));}); } }catch(e){}
@@ -5603,6 +5604,19 @@ function connectWS() {
     try {
       if (ev.data === 'pong' || ev.data === 'ping') return;
       var msg = JSON.parse(ev.data);
+      // DDA register changed on another device — refresh the table (and the
+      // activity feed) live wherever they're open. No booking sound for this.
+      if (msg.type === 'dda_updated') {
+        var ddaTab = document.getElementById('tab-dda');
+        if (ddaTab && ddaTab.style.display !== 'none' && typeof loadDdaList === 'function') loadDdaList();
+        var actTabEl = document.getElementById('tab-activity');
+        if (actTabEl && actTabEl.style.display !== 'none' && typeof loadActivity === 'function') loadActivity();
+        showLiveToast('DDA register updated');
+        var ddaLastEl = document.getElementById('refreshLastText');
+        if (ddaLastEl) ddaLastEl.textContent = 'Live update received';
+        _lastRefreshTime = Date.now();
+        return;
+      }
       var isTelemed = msg.type === 'telemedicine_updated';
       if (isTelemed || msg.type === 'slots_updated' || msg.type === 'slots_data' || msg.type === 'dashboard_data' || msg.type === 'appointment_changed') {
         showLiveToast(isTelemed ? 'New telemedicine call' : 'New booking or schedule change detected');
