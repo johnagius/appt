@@ -180,30 +180,40 @@ export async function sendClientConfirmationEmail(env: Env, appt: Appointment): 
   const cancelUrl = await buildCancelLink(env, appt.token);
   const rescheduleUrl = await buildRescheduleLink(env, appt.token);
 
-  // Blood tests are a pharmacy-staff service — different subject + copy,
-  // no "Dr Kevin" row, plus a "what to expect" note. Reuses the same
+  // Lab tests (blood / STI / urinalysis) are a staff-run service — different
+  // subject + copy, no "Dr Kevin" row, a "Test details" box and a "what to
+  // expect" note. Location (Spinola or Potter's) is admin-toggleable, so the
+  // copy reads off appt.location rather than assuming Potter's. Reuses the same
   // confirmation function so cancel/reschedule links stay consistent.
-  const isBloodTest = appt.service_id === 'blood-test';
+  const isBloodTest = appt.service_id === 'blood-test'
+    || appt.booking_source === 'blood' || appt.booking_source === 'sti' || appt.booking_source === 'urinalysis';
 
   const subject = isBloodTest
-    ? `Blood Test Confirmed - ${appt.date_key} ${appt.start_time}`
+    ? `Test Appointment Confirmed - ${appt.date_key} ${appt.start_time}`
     : `Appointment Confirmed - ${appt.service_name} (${appt.date_key} ${appt.start_time})`;
 
   const headerLine = isBloodTest
-    ? 'Your blood test has been confirmed at <b>' + escapeHtml(appt.location) + '</b>.'
+    ? 'Your test appointment has been confirmed at <b>' + escapeHtml(appt.location) + '</b>.'
     : 'Your appointment with <b>Dr Kevin</b> has been confirmed.';
 
   const middleRowHtml = isBloodTest
-    ? `<tr><td style="padding:6px 0;color:#6b7280;">Window</td><td style="padding:6px 0;"><b>Blood-test slot, 08:00–09:00</b></td></tr>`
+    ? ''
     : `<tr><td style="padding:6px 0;color:#6b7280;">Doctor</td><td style="padding:6px 0;"><b>Dr Kevin</b></td></tr>`;
 
+  const testDetailsBox = isBloodTest && appt.comments
+    ? `<div style="margin-top:14px;padding:12px 14px;border:1px solid #fecaca;border-radius:12px;background:#fef2f2;">
+        <p style="margin:0 0 6px 0;font-weight:800;color:#991b1b;font-size:14px;">Test details</p>
+        <p style="margin:0;color:#7f1d1d;font-size:13.5px;line-height:1.55;white-space:pre-line;">${escapeHtml(appt.comments)}</p>
+      </div>`
+    : '';
+
   const bloodTestNote = isBloodTest
-    ? `<p style="margin:14px 0 0;padding:10px 12px;background:#fef2f2;border:1px solid #fecaca;border-radius:10px;color:#7f1d1d;font-size:13px;line-height:1.5;">Please arrive 5 minutes early. Pharmacy staff will take the sample. Pricing and any preparation (e.g. fasting) will be confirmed at the clinic.</p>`
+    ? `<p style="margin:14px 0 0;padding:10px 12px;background:#fffbeb;border:1px solid #fcd34d;border-radius:10px;color:#92400e;font-size:13px;line-height:1.5;">Please arrive 5 minutes early. A member of our staff will take the sample. Pricing and any preparation (e.g. fasting) will be confirmed at the clinic.</p>`
     : '';
 
   const html = `
 <div style="font-family:Arial,sans-serif;line-height:1.4;color:#111827;">
-  <h2 style="margin:0 0 10px 0;">${isBloodTest ? 'Blood Test Confirmed' : 'Appointment Confirmed'}</h2>
+  <h2 style="margin:0 0 10px 0;">${isBloodTest ? 'Test Appointment Confirmed' : 'Appointment Confirmed'}</h2>
   <p style="margin:0 0 10px 0;">${headerLine}</p>
   <table style="border-collapse:collapse;width:100%;max-width:520px;">
     <tr><td style="padding:6px 0;color:#6b7280;">Service</td><td style="padding:6px 0;"><b>${escapeHtml(appt.service_name)}</b></td></tr>
@@ -212,6 +222,7 @@ export async function sendClientConfirmationEmail(env: Env, appt: Appointment): 
     <tr><td style="padding:6px 0;color:#6b7280;">Time</td><td style="padding:6px 0;"><b>${escapeHtml(appt.start_time)} - ${escapeHtml(appt.end_time)}</b></td></tr>
     <tr><td style="padding:6px 0;color:#6b7280;">Location</td><td style="padding:6px 0;"><b>${escapeHtml(appt.location)}</b></td></tr>
   </table>
+  ${testDetailsBox}
   ${bloodTestNote}
   ${getMapHtml(appt.location)}
   ${buildManageSection(cancelUrl, rescheduleUrl)}

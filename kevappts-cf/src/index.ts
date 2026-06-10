@@ -22,7 +22,7 @@ import {
   apiAdminSendReviewRequests, apiAdminGetWeekOverview, apiAdminSearchAppointments,
   apiAdminGetSettings, apiAdminSaveSettings, apiAdminGetStatistics,
   apiAdminMarkAttendance, apiAdminGetPatientHistory, apiAdminDoctorOffDates,
-  apiAdminCreateTestBooking, apiAdminCreateTestVaccination, apiAdminPurgeTestData, apiAdminTestFollowUp, apiAdminTestReview, apiAdminGetFollowUps, apiAdminToggleFollowUpHandled, apiAdminGetReferrals, apiAdminGetActivity,
+  apiAdminCreateTestBooking, apiAdminCreateTestVaccination, apiAdminCreateTestLabTest, apiAdminPurgeTestData, apiAdminTestFollowUp, apiAdminTestReview, apiAdminGetFollowUps, apiAdminToggleFollowUpHandled, apiAdminGetReferrals, apiAdminGetActivity,
   apiAdminGetLindaStats, apiAdminGetLindaReviewPatients, apiAdminSendLindaReviewRequests, apiAdminGetLindaFollowUps, apiAdminGetLindaAppointments,
   apiAdminGetLindaConfig, apiAdminSaveLindaConfig,
   apiAdminGetRescheduleList, apiAdminRescheduleAppointment,
@@ -224,6 +224,7 @@ export default {
         if (adminPath === 'doctor-off-dates' && method === 'POST') return apiAdminDoctorOffDates(request, env);
         if (adminPath === 'test-booking' && method === 'POST') return apiAdminCreateTestBooking(request, env);
         if (adminPath === 'test-vaccination' && method === 'POST') return apiAdminCreateTestVaccination(request, env);
+        if (adminPath === 'test-lab' && method === 'POST') return apiAdminCreateTestLabTest(request, env);
         if (adminPath === 'purge-test-data' && method === 'POST') return apiAdminPurgeTestData(request, env);
         if (adminPath === 'test-followup' && method === 'POST') return apiAdminTestFollowUp(request, env);
         if (adminPath === 'test-review' && method === 'POST') return apiAdminTestReview(request, env);
@@ -780,6 +781,27 @@ function testPage(sig: string): string {
 </div>
 
 <div class="card">
+  <h2>Lab Test (Blood / STI / Urinalysis)</h2>
+  <p style="font-size:13px;color:#666;margin-bottom:12px">Books a test at the configured lab location (Spinola/Potter's per the admin toggle) and sends the real patient email so you can preview it. Uses a "Test …" name so Purge removes it. Does not touch real test slots.</p>
+  <div class="row">
+    <div><label>Patient Name</label><input type="text" id="ltName" value="Test John"></div>
+    <div><label>Email (receives the email)</label><input type="email" id="ltEmail" value="labrint@gmail.com"></div>
+  </div>
+  <div class="row">
+    <div><label>Category</label><select id="ltCategory"><option value="blood">Blood</option><option value="sti">STI</option><option value="urinalysis">Urinalysis</option></select></div>
+    <div><label>Full STI package?</label><select id="ltPackage"><option value="">No</option><option value="Full STI Check">Full STI Check</option></select></div>
+  </div>
+  <div><label>Tests (comma separated)</label><input type="text" id="ltTests" placeholder="e.g. Lipid Profile, HIV"></div>
+  <div><label>Add-ons (comma separated, optional)</label><input type="text" id="ltAddons" placeholder="e.g. Urine culture"></div>
+  <div class="row">
+    <div><label>Date</label><input type="date" id="ltDate"></div>
+    <div><label>Time</label><input type="time" id="ltTime" value="08:00"></div>
+  </div>
+  <button class="btn btn-book" onclick="createLabTest('confirmation')">Book + Send Confirmation Email</button>
+  <button class="btn btn-quick" style="margin-top:8px;background:#8b5cf6" onclick="createLabTest('reminder')">Book + Send Reminder Email</button>
+</div>
+
+<div class="card">
   <h2>Purge Test Data</h2>
   <p style="font-size:13px;color:#666;margin-bottom:12px">Deletes ALL appointments with TEST- prefix. Real bookings are never affected.</p>
   <button class="btn btn-purge" onclick="purgeAll()">Purge All Test Bookings</button>
@@ -809,6 +831,30 @@ var today = new Date().toISOString().split('T')[0];
 document.getElementById('tDate').value = today;
 var vDateEl = document.getElementById('vDate');
 if (vDateEl) vDateEl.value = today;
+var ltDateEl = document.getElementById('ltDate');
+if (ltDateEl) ltDateEl.value = today;
+
+async function createLabTest(kind) {
+  var tests = document.getElementById('ltTests').value.split(',').map(function(s){return s.trim();}).filter(Boolean);
+  var addons = document.getElementById('ltAddons').value.split(',').map(function(s){return s.trim();}).filter(Boolean);
+  var body = {
+    name: document.getElementById('ltName').value.trim(),
+    email: document.getElementById('ltEmail').value.trim(),
+    dateKey: document.getElementById('ltDate').value,
+    startTime: document.getElementById('ltTime').value,
+    kind: kind,
+    category: document.getElementById('ltCategory').value,
+    tests: tests,
+    addons: addons,
+    packageName: document.getElementById('ltPackage').value
+  };
+  log('Creating test lab booking (' + kind + ' email)...');
+  try {
+    var res = await api('test-lab', body);
+    if (res.ok) log('OK: ' + res.message);
+    else log('ERROR: ' + (res.reason || 'Unknown error'));
+  } catch(e) { log('FAILED: ' + e.message); }
+}
 
 function vToggle() {
   var cat = document.getElementById('vCategory').value;

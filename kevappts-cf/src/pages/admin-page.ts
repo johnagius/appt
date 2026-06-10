@@ -1206,8 +1206,8 @@ export function adminPage(sig: string, env: Env): string {
 <!-- BLOOD TESTS TAB -->
 <div class="tab-content" id="tab-bloodtests" style="display:none;">
   <div class="card" style="padding:18px;background:#fef2f2;border-left:4px solid #dc2626;margin-bottom:14px;">
-    <h3 style="margin:0 0 6px 0;color:#991b1b;font-size:16px;">Blood Tests &middot; Potter&#39;s Pharmacy</h3>
-    <p style="margin:0;color:#7f1d1d;font-size:13px;line-height:1.5;">Pharmacy-staff blood-test bookings, 08:00&ndash;09:00. Independent of Dr Kevin's availability &mdash; a doctor-off event does not affect these.</p>
+    <h3 style="margin:0 0 6px 0;color:#991b1b;font-size:16px;">Blood Tests, STI &amp; Urinalysis</h3>
+    <p style="margin:0;color:#7f1d1d;font-size:13px;line-height:1.5;">Staff-run test bookings on their own schedule. Independent of Dr Kevin's availability &mdash; a doctor-off event does not affect these. Use the <b>Location</b> toggle below to hold them at Spinola Clinic or Potter's Pharmacy.</p>
   </div>
 
   <div class="card" style="padding:18px;margin-bottom:14px;">
@@ -1216,6 +1216,12 @@ export function adminPage(sig: string, env: Env): string {
       <div class="form-group">
         <label>Enabled</label>
         <select id="btEnabled"><option value="1">Yes &mdash; accept bookings</option><option value="0">No &mdash; hide button</option></select>
+      </div>
+      <div class="form-group">
+        <label>Location</label>
+        <label style="display:flex;align-items:center;gap:8px;font-weight:400;cursor:pointer;font-size:14px;">
+          <input type="checkbox" id="btAtPotters" style="width:auto;"> Run at Potter&#39;s Pharmacy <span style="color:#6b7280;">(unchecked = Spinola Clinic)</span>
+        </label>
       </div>
       <div class="form-group">
         <label>Slot duration (minutes)</label>
@@ -5475,6 +5481,7 @@ async function loadBloodTestConfig() {
     var c = res.config;
     _btConfig = c;
     document.getElementById('btEnabled').value = c.enabled ? '1' : '0';
+    document.getElementById('btAtPotters').checked = (c.location === 'potters');
     document.getElementById('btSlotMin').value = String(c.slotMin || 10);
     document.getElementById('btPriceEuros').value = ((c.priceCents || 0) / 100).toFixed(2);
     document.getElementById('btTypes').value = (c.types || []).join('\\n');
@@ -5484,6 +5491,7 @@ async function loadBloodTestConfig() {
 
 async function saveBloodTestConfig() {
   var enabled = document.getElementById('btEnabled').value === '1';
+  var location = document.getElementById('btAtPotters').checked ? 'potters' : 'spinola';
   var slotMin = parseInt(document.getElementById('btSlotMin').value, 10);
   var euros = parseFloat(document.getElementById('btPriceEuros').value);
   if (!isFinite(euros) || euros < 0) euros = 0;
@@ -5495,7 +5503,7 @@ async function saveBloodTestConfig() {
 
   showMsg('btConfigMsg', '', 'Saving...');
   try {
-    var res = await apiCall('blood-test-config', { body: { enabled: enabled, slotMin: slotMin, priceCents: priceCents, types: types, hours: hours } });
+    var res = await apiCall('blood-test-config', { body: { enabled: enabled, location: location, slotMin: slotMin, priceCents: priceCents, types: types, hours: hours } });
     if (!res || !res.ok) { showMsg('btConfigMsg', 'bad', (res && res.reason) || 'Failed.'); return; }
     showMsg('btConfigMsg', 'good', 'Saved.');
     _btConfig = res.config;

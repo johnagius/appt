@@ -30,6 +30,7 @@ import {
 } from '../services/email';
 import { createCalendarEvent, deleteCalendarEvent } from '../services/calendar';
 import { buildVaccinationDescriptor } from '../services/vaccination';
+import { buildLabTestDescriptor } from '../services/lab-test';
 import { loadLindaConfig } from '../services/linda';
 import { loadBloodTestConfig } from '../services/blood-test';
 
@@ -1833,6 +1834,87 @@ export async function apiAdminCreateTestVaccination(req: Request, env: Env): Pro
   });
 }
 
+// ─── Test Mode: Lab test (Blood / STI / Urinalysis) booking + email ───
+// Same idea as the vaccination test: creates a TEST- booking at the configured
+// lab location and sends the real patient email. service_id='lab-test-test' so
+// it never collides with — or blocks — a real blood-test slot; the email's
+// lab branch keys on booking_source so it still renders correctly. Purge
+// removes it via the TEST- id and the "Test " name.
+export async function apiAdminCreateTestLabTest(req: Request, env: Env): Promise<Response> {
+  const deny = await requireAdmin(req, env);
+  if (deny) return deny;
+
+  const body: any = await req.json();
+  const tz = env.TIMEZONE;
+  const now = nowIso(tz);
+  const btCfg = await loadBloodTestConfig(env.DB);
+  const appCfg = await getConfig(env.DB);
+  const clinic: 'potters' | 'spinola' = btCfg.location === 'potters' ? 'potters' : 'spinola';
+  const location = clinic === 'potters'
+    ? (appCfg.pottersLocation || "Potter's Pharmacy Clinic")
+    : (appCfg.spinolaLocation || 'Spinola Clinic');
+
+  const dateKey = body.dateKey || toDateKey(todayLocal(tz));
+  const startTime = body.startTime || '08:00';
+  const endTime = minutesToTime(parseTimeToMinutes(startTime) + (btCfg.slotMin || 10));
+  const kind = body.kind === 'reminder' ? 'reminder' : 'confirmation';
+
+  const desc = buildLabTestDescriptor(body || {});
+  const serviceName = desc ? desc.serviceName : 'Blood Test';
+  const summary = desc ? desc.summary : 'Test appointment';
+  const category = desc ? desc.category : 'blood-test';
+
+  let name = String(body.name || 'Test John').trim() || 'Test John';
+  if (!/^test\b/i.test(name)) name = 'Test ' + name;
+  const email = String(body.email || 'labrint@gmail.com').trim();
+  const phone = String(body.phone || '+35699999999').trim();
+
+  const appt: Appointment = {
+    id: 'TEST-' + generateId(),
+    date_key: dateKey,
+    start_time: startTime,
+    end_time: endTime,
+    service_id: 'lab-test-test',
+    service_name: serviceName,
+    full_name: name,
+    email,
+    phone,
+    comments: summary + '\n\n[TEST lab booking — safe to delete]',
+    status: 'BOOKED',
+    location,
+    clinic,
+    created_at: now,
+    updated_at: now,
+    token: generateId(),
+    calendar_event_id: '',
+    cancelled_at: '',
+    cancel_reason: '',
+    reminder_sent: '',
+    confirmed: '',
+    booking_source: category,
+    hotel: '',
+  };
+
+  try {
+    await insertAppointment(env.DB, appt);
+  } catch (e: any) {
+    return json({ ok: false, reason: 'Could not create test booking: ' + (e?.message || e) });
+  }
+  await bumpVersion(env.DB);
+
+  try {
+    if (kind === 'reminder') await sendReminderEmail(env, appt);
+    else await sendClientConfirmationEmail(env, appt);
+  } catch (e: any) {
+    return json({ ok: false, reason: 'Booking created but email failed: ' + (e?.message || e) });
+  }
+
+  return json({
+    ok: true,
+    message: `Test "${serviceName}" booked as "${name}" at ${location} — ${kind} email sent to ${email}. Use Purge to remove it.`,
+  });
+}
+
 // ─── Test Follow-up ──────────────────────────────────────────
 
 export async function apiAdminTestFollowUp(req: Request, env: Env): Promise<Response> {
@@ -2212,6 +2294,9 @@ export async function apiAdminSaveBloodTestConfig(req: Request, env: Env): Promi
 
   if (payload.enabled !== undefined) {
     await setConfigValue(env.DB, 'BLOOD_TEST_ENABLED', payload.enabled ? '1' : '0');
+  }
+  if (payload.location === 'potters' || payload.location === 'spinola') {
+    await setConfigValue(env.DB, 'BLOOD_TEST_LOCATION', payload.location);
   }
   if (typeof payload.slotMin === 'number' && payload.slotMin > 0) {
     await setConfigValue(env.DB, 'BLOOD_TEST_SLOT_MIN', String(Math.round(payload.slotMin)));

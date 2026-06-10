@@ -43,13 +43,13 @@ export function bloodTestPage(env: Env): string {
 <body>
 <div class="wrap">
   <div class="top">
-    <h1 class="title">Blood Tests — ${location}</h1>
+    <h1 class="title" id="btPageTitle">Blood Tests — ${location}</h1>
     <a class="back" href="/">&larr; Back to Pharmacy Bookings</a>
   </div>
 
   <div class="card">
-    <p class="meta">Location: <b>${location}</b></p>
-    <p class="meta">Available: <b>Mon–Sat 08:00–09:00</b> &middot; 10-minute slots &middot; Walk in to the pharmacy at your booked time, staff will take the sample.</p>
+    <p class="meta">Location: <b id="btPageLoc">${location}</b></p>
+    <p class="meta">10-minute slots &middot; Walk in at your booked time, staff will take the sample.</p>
     <p class="meta" id="priceLine" style="display:none;">Price: <span id="priceTag" class="priceTag"></span></p>
     <p class="meta" id="priceTbd" style="display:none;">Pricing will be confirmed at the clinic.</p>
   </div>
@@ -149,6 +149,10 @@ export function bloodTestPage(env: Env): string {
   }
 
   function renderConfig(c){
+    if (c && c.location) {
+      var t = document.getElementById('btPageTitle'); if (t) t.textContent = 'Blood Tests — ' + c.location;
+      var l = document.getElementById('btPageLoc'); if (l) l.textContent = c.location;
+    }
     if (c && c.priceCents > 0) {
       $('priceLine').style.display = 'block';
       $('priceTag').textContent = c.priceLabel || ('€' + (c.priceCents/100).toFixed(2));

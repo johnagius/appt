@@ -250,6 +250,10 @@ INSERT OR IGNORE INTO config (key, value) VALUES ('BLOOD_TEST_SLOT_MIN', '10');
 INSERT OR IGNORE INTO config (key, value) VALUES ('BLOOD_TEST_PRICE_CENTS', '0');
 INSERT OR IGNORE INTO config (key, value) VALUES ('BLOOD_TEST_TYPES', '[]');
 INSERT OR IGNORE INTO config (key, value) VALUES ('BLOOD_TEST_HOURS', '{"MON":[{"start":"08:00","end":"09:00"}],"TUE":[{"start":"08:00","end":"09:00"}],"WED":[{"start":"08:00","end":"09:00"}],"THU":[{"start":"08:00","end":"09:00"}],"FRI":[{"start":"08:00","end":"09:00"}],"SAT":[{"start":"08:00","end":"09:00"}],"SUN":[]}');
+-- Where the lab tests (blood / STI / urinalysis) are physically held: 'spinola'
+-- or 'potters'. Admin-toggleable from the Blood Tests tab. Defaults to Spinola
+-- (existing DBs without this key fall back to 'spinola' in loadBloodTestConfig).
+INSERT OR IGNORE INTO config (key, value) VALUES ('BLOOD_TEST_LOCATION', 'spinola');
 
 -- Blood-test day-off: dates pharmacy isn't taking blood. Overrides BLOOD_TEST_HOURS.
 CREATE TABLE IF NOT EXISTS blood_test_off (

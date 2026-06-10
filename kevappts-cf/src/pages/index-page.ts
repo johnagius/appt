@@ -708,6 +708,24 @@ export function indexPage(env: Env, bookingSource?: string): string {
     .vax-slots-hint{ color:#6b7280; font-size:14px; }
     .vax-summary{ background:#eff6ff; border:1px solid #bfdbfe; border-radius:12px; padding:12px 14px; margin-bottom:14px; font-size:14px; color:#1e3a8a; line-height:1.5; white-space:pre-line; }
 
+    /* Lab-test wizard (Blood / STI / Urinalysis) — reuses the .vax-* modal
+       chrome but in a red theme, plus checklist rows that carry a description. */
+    .lt-modal .vax-progress-bar{ background:#dc2626; }
+    .lt-modal .vax-opt.sel{ border-color:#dc2626; background:#fef2f2; box-shadow:0 0 0 1px #dc2626 inset; }
+    .lt-modal .vax-slots .timeBtn.sel{ background:#dc2626; border-color:#dc2626; }
+    .lt-modal .vax-summary{ background:#fef2f2; border-color:#fecaca; color:#7f1d1d; }
+    .lt-group-title{ font-weight:800; font-size:12px; color:#6b7280; margin:16px 0 7px; text-transform:uppercase; letter-spacing:.03em; }
+    .lt-group-title:first-child{ margin-top:0; }
+    .lt-check{ display:flex; gap:10px; align-items:flex-start; border:1.5px solid var(--line); border-radius:10px; padding:10px 12px; cursor:pointer; margin-bottom:8px; }
+    .lt-check:hover{ border-color:#fca5a5; }
+    .lt-check.sel{ border-color:#dc2626; background:#fef2f2; }
+    .lt-check input{ width:auto; margin:2px 0 0; accent-color:#dc2626; flex:0 0 auto; }
+    .lt-check .lt-name{ font-weight:700; color:#111827; font-size:14px; }
+    .lt-check .lt-desc{ color:#6b7280; font-size:12.5px; line-height:1.4; margin-top:2px; }
+    .lt-info{ background:#f9fafb; border:1px solid var(--line); border-radius:10px; padding:10px 12px; margin-bottom:12px; }
+    .lt-info p{ margin:0 0 4px; font-size:13.5px; color:#374151; }
+    .lt-info ul{ margin:6px 0 0; padding-left:18px; color:#6b7280; font-size:12.5px; line-height:1.6; }
+
     /* Spinola inline offer (replaces time grid when no Potter's slots) */
     .spinola-inline{
       display:none;
@@ -927,7 +945,7 @@ export function indexPage(env: Env, bookingSource?: string): string {
                (labels fit on one line) and more columns on a desktop;
                min-width:0 lets labels wrap rather than forcing odd rows. -->
           <div id="extraServicesWrap" style="grid-column:1 / -1;margin-top:6px;display:flex;flex-wrap:wrap;gap:8px;align-items:stretch;">
-            <a href="/blood-tests" id="bloodTestLinkBtn" class="svcBtn" style="flex:1 1 260px;min-width:0;background:#fef2f2;color:#991b1b;border:1.5px solid #fecaca;text-decoration:none;padding:12px 14px;border-radius:12px;font-weight:800;font-size:14px;"><span class="svcIco"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.6S5.5 9.7 5.5 14.4a6.5 6.5 0 0 0 13 0C18.5 9.7 12 2.6 12 2.6z"/></svg></span>Book Blood Tests &mdash; Potter&#39;s 8am</a>
+            <button type="button" id="bloodTestLinkBtn" class="svcBtn" onclick="openLabWizard()" style="flex:1 1 260px;min-width:0;background:#fef2f2;color:#991b1b;border:1.5px solid #fecaca;padding:12px 14px;border-radius:12px;font-weight:800;font-size:14px;cursor:pointer;"><span class="svcIco"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.6S5.5 9.7 5.5 14.4a6.5 6.5 0 0 0 13 0C18.5 9.7 12 2.6 12 2.6z"/></svg></span>Blood Tests, STI &amp; Urinalysis</button>
             <button type="button" id="telemedAlwaysBtn" class="svcBtn" onclick="openTelemedicineModal()" style="flex:1 1 260px;min-width:0;background:#fff7ed;color:#9a3412;border:1.5px solid #fdba74;padding:12px 14px;border-radius:12px;font-weight:800;font-size:14px;cursor:pointer;"><span class="svcIco" style="animation-delay:.5s"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6.6 10.8a15 15 0 0 0 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.5.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1A17 17 0 0 1 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.2.2 2.4.6 3.5.1.4 0 .8-.3 1l-2.2 2.3z"/></svg></span>Book Telemedicine Call &mdash; &euro;25</button>
             <button type="button" id="vaccinationBtn" class="svcBtn" onclick="openVaccinationWizard()" style="flex:1 1 260px;min-width:0;background:#eff6ff;color:#1e3a8a;border:1.5px solid #bfdbfe;padding:12px 14px;border-radius:12px;font-weight:800;font-size:14px;cursor:pointer;"><span class="svcIco" style="animation-delay:.7s"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l8 3v6c0 5-3.4 8.4-8 10-4.6-1.6-8-5-8-10V5l8-3z"/></svg></span>Vaccinations &mdash; Spinola Clinic</button>
             <div id="physioLinkWrap" class="physioCta" style="display:none;flex:1 1 260px;min-width:0;">
@@ -1203,6 +1221,70 @@ export function indexPage(env: Env, bookingSource?: string): string {
         <button class="btn btnGhost" type="button" id="vaxBackBtn" onclick="vaxBack()" style="display:none;">Back</button>
         <button class="btn btnAccent" type="button" id="vaxNextBtn" onclick="vaxNext()">Next</button>
         <button class="btn btnAccent" type="button" id="vaxSubmitBtn" onclick="submitVaccination()" style="display:none;background:#2563eb;">Confirm booking</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Lab test booking wizard modal (Blood Tests / STI / Urinalysis) -->
+  <div class="overlay" id="labOverlay" role="dialog" aria-modal="true" aria-labelledby="labTitle">
+    <div class="modal vax-modal lt-modal">
+      <button type="button" class="vax-close" aria-label="Close" onclick="closeLabWizard()">&times;</button>
+      <h3 id="labTitle" style="padding-right:28px;">Book a Test</h3>
+      <div class="vax-progress"><div class="vax-progress-bar" id="labProgressBar"></div></div>
+      <div class="vax-step-label" id="labStepLabel">Step 1 of 4</div>
+
+      <!-- Step 1: category -->
+      <div class="vax-step" id="labStep1">
+        <p>What would you like to book?</p>
+        <div class="vax-options">
+          <div class="vax-opt" id="labCatBlood" onclick="labPickCategory('blood')">
+            <div class="vax-opt-title">🩸 Blood Tests</div>
+            <div class="vax-opt-desc">General health bloods (CBC, thyroid, lipids, liver, kidney, glucose/HbA1c, PSA) and recommended STI bloods.</div>
+          </div>
+          <div class="vax-opt" id="labCatSti" onclick="labPickCategory('sti')">
+            <div class="vax-opt-title">🧫 STI Tests</div>
+            <div class="vax-opt-desc">Urine/swab and blood STI tests, or a complete Full STI Check package.</div>
+          </div>
+          <div class="vax-opt" id="labCatUrine" onclick="labPickCategory('urinalysis')">
+            <div class="vax-opt-title">🧪 Urine Test / Urinalysis</div>
+            <div class="vax-opt-desc">A simple urine test for urinary, kidney, hydration or metabolic issues. Not the same as STI testing.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 2: selection (rendered by JS) -->
+      <div class="vax-step" id="labStep2" style="display:none;">
+        <p id="labSelectPrompt">Select your test(s):</p>
+        <div id="labSelect"></div>
+      </div>
+
+      <!-- Step 3: date & time -->
+      <div class="vax-step" id="labStep3" style="display:none;">
+        <p>Choose a date and time.</p>
+        <label class="label" for="labDate">Date</label>
+        <select id="labDate" onchange="labLoadSlots()"></select>
+        <div class="label" style="margin-top:10px;">Available times</div>
+        <div class="vax-slots" id="labSlots"><div class="vax-slots-hint">Select a date to see available times.</div></div>
+      </div>
+
+      <!-- Step 4: details -->
+      <div class="vax-step" id="labStep4" style="display:none;">
+        <div class="vax-summary" id="labSummary"></div>
+        <label class="label" for="labName">Full name *</label>
+        <input id="labName" type="text" autocomplete="name" placeholder="Full name">
+        <label class="label" for="labPhone" style="margin-top:8px;">Phone *</label>
+        <input id="labPhone" type="tel" autocomplete="tel" placeholder="+356 ...">
+        <label class="label" for="labEmail" style="margin-top:8px;">Email *</label>
+        <input id="labEmail" type="email" autocomplete="email" placeholder="you@example.com">
+        <label class="label" for="labNotes" style="margin-top:8px;">Anything else? (optional)</label>
+        <textarea id="labNotes" rows="2" placeholder="Fasting, medication, prior tests, symptoms…"></textarea>
+      </div>
+
+      <div id="labError" class="field-error" style="margin-top:10px;"></div>
+      <div class="modalActions" style="margin-top:14px;">
+        <button class="btn btnGhost" type="button" id="labBackBtn" onclick="labBack()" style="display:none;">Back</button>
+        <button class="btn btnAccent" type="button" id="labNextBtn" onclick="labNext()" style="background:#dc2626;">Next</button>
+        <button class="btn btnAccent" type="button" id="labSubmitBtn" onclick="submitLabTest()" style="display:none;background:#dc2626;">Confirm booking</button>
       </div>
     </div>
   </div>
@@ -4590,6 +4672,280 @@ export function indexPage(env: Env, bookingSource?: string): string {
     window.vaxBack = vaxBack;
     window.vaxLoadSlots = vaxLoadSlots;
     window.submitVaccination = submitVaccination;
+
+    // ─── Lab test booking wizard (Blood / STI / Urinalysis) ───
+    // Reuses the blood-test slot machinery; location (Spinola/Potter's) is set
+    // by admin. Catalogue mirrors services/lab-test.ts groupings.
+    var LAB_CAT = {
+      blood: { groups: [
+        { name:'General blood tests', tests:[
+          ['Full Blood Count / CBC','Checks for anaemia, infection markers and blood cell levels'],
+          ['Thyroid Function','TSH / thyroid hormone check'],
+          ['Lipid Profile','Cholesterol and cardiovascular risk'],
+          ['Liver Function','Liver enzymes and related markers'],
+          ['Kidney Function','Urea, creatinine, electrolytes / renal profile'],
+          ['Glucose / HbA1c','Diabetes / sugar control'],
+          ['PSA','Prostate check, mainly for men depending on age/symptoms']
+        ]},
+        { name:'Recommended blood tests for STIs', tests:[
+          ['HIV 1/2 Ag/Ab',''],['Syphilis screen',''],['Hepatitis B',''],['Hepatitis C','']
+        ]}
+      ]},
+      sti: { groups: [
+        { name:'Urine / swab STI tests', tests:[
+          ['Chlamydia','Urine or swab'],['Gonorrhoea','Urine or swab'],
+          ['Trichomonas','Urine or swab, depending on lab'],
+          ['Mycoplasma genitalium','Optional / usually recommended if symptoms are present']
+        ]},
+        { name:'STI blood tests', tests:[
+          ['HIV','Blood test'],['Syphilis','Blood test'],['Hepatitis B','Blood test'],['Hepatitis C','Blood test']
+        ]}
+      ]},
+      urinalysis: {
+        blurb:'A simple urine test to check for urinary, kidney, hydration or metabolic issues. This is not the same as STI testing.',
+        checks:['Leukocytes / nitrites — possible UTI','Blood — infection, stones or other urinary issues','Protein — possible kidney-related flag','Glucose / ketones — diabetes/metabolic flag','pH / specific gravity — hydration and urine concentration'],
+        addons:[
+          ['Urine culture','If UTI is suspected or recurring'],
+          ['STI Urine/Swab PCR','If burning, discharge or exposure risk'],
+          ['Kidney Function Blood Test','If protein/blood is found in urine or there is kidney concern'],
+          ['PSA','For male urinary symptoms or prostate concern']
+        ]
+      }
+    };
+
+    var labState = { step:1, category:null, tests:[], addons:[], stiFull:false, dateKey:null, slot:null, location:'', enabled:true, dateOptions:[] };
+
+    function labReset() {
+      labState = { step:1, category:null, tests:[], addons:[], stiFull:false, dateKey:null, slot:null, location:labState.location, enabled:true, dateOptions:labState.dateOptions };
+      ['labName','labPhone','labEmail','labNotes'].forEach(function(id){ var e=document.getElementById(id); if(e) e.value=''; });
+      ['labCatBlood','labCatSti','labCatUrine'].forEach(function(id){ var e=document.getElementById(id); if(e) e.classList.remove('sel'); });
+      var err=document.getElementById('labError'); if(err) err.textContent='';
+      var sel=document.getElementById('labSelect'); if(sel) sel.innerHTML='';
+      var slots=document.getElementById('labSlots'); if(slots) slots.innerHTML='<div class="vax-slots-hint">Select a date to see available times.</div>';
+    }
+
+    function labHasData() {
+      if (labState.category || labState.tests.length || labState.addons.length || labState.stiFull) return true;
+      var ids=['labName','labPhone','labEmail','labNotes'];
+      for (var i=0;i<ids.length;i++){ var e=document.getElementById(ids[i]); if(e && e.value.trim()) return true; }
+      return false;
+    }
+
+    function openLabWizard() {
+      labReset();
+      labShowStep(1);
+      hideOtherBookingBanners();
+      showOverlay(document.getElementById('labOverlay'));
+      fetch('/api/blood-test-init').then(function(r){ return r.json(); }).then(function(d){
+        if (!d) return;
+        labState.enabled = !(d.config && d.config.enabled === false);
+        labState.location = (d.config && d.config.location) || '';
+        labState.dateOptions = d.dateOptions || [];
+        if (!labState.enabled) document.getElementById('labError').textContent = 'Test bookings are not currently open. Please check back later.';
+      }).catch(function(){});
+    }
+
+    function closeLabWizard() {
+      if (labHasData() && !confirm('Close the test booking? Your information will be lost.')) return;
+      hideOverlay(document.getElementById('labOverlay'));
+      labReset();
+      restoreOtherBookingBanners();
+    }
+
+    function labShowStep(n) {
+      labState.step = n;
+      for (var i=1;i<=4;i++){ var el=document.getElementById('labStep'+i); if(el) el.style.display=(i===n)?'block':'none'; }
+      document.getElementById('labStepLabel').textContent='Step '+n+' of 4';
+      document.getElementById('labProgressBar').style.width=(n*25)+'%';
+      document.getElementById('labBackBtn').style.display=(n>1)?'inline-block':'none';
+      document.getElementById('labNextBtn').style.display=(n<4)?'inline-block':'none';
+      document.getElementById('labSubmitBtn').style.display=(n===4)?'inline-block':'none';
+      document.getElementById('labError').textContent='';
+      if (n===4) labRenderSummary();
+    }
+
+    function labPickCategory(cat) {
+      if (labState.category && labState.category!==cat){ labState.tests=[]; labState.addons=[]; labState.stiFull=false; }
+      labState.category=cat;
+      document.getElementById('labCatBlood').classList.toggle('sel', cat==='blood');
+      document.getElementById('labCatSti').classList.toggle('sel', cat==='sti');
+      document.getElementById('labCatUrine').classList.toggle('sel', cat==='urinalysis');
+    }
+
+    function labArrToggle(arr, name, on) { var i=arr.indexOf(name); if(on){ if(i<0) arr.push(name); } else if(i>=0) arr.splice(i,1); }
+
+    function labMakeCheck(name, desc, checked, onChange) {
+      var lbl=document.createElement('label'); lbl.className='lt-check'+(checked?' sel':'');
+      var cb=document.createElement('input'); cb.type='checkbox'; cb.checked=checked;
+      cb.addEventListener('change', function(){ lbl.classList.toggle('sel', cb.checked); onChange(cb.checked); });
+      var box=document.createElement('div');
+      var nm=document.createElement('div'); nm.className='lt-name'; nm.textContent=name; box.appendChild(nm);
+      if (desc){ var d=document.createElement('div'); d.className='lt-desc'; d.textContent=desc; box.appendChild(d); }
+      lbl.appendChild(cb); lbl.appendChild(box);
+      return lbl;
+    }
+
+    function labGroupTitle(text) { var h=document.createElement('div'); h.className='lt-group-title'; h.textContent=text; return h; }
+
+    function labRenderStep2() {
+      var c=document.getElementById('labSelect'); c.innerHTML='';
+      var prompt=document.getElementById('labSelectPrompt');
+      var cat=labState.category;
+      if (cat==='blood') {
+        prompt.textContent='Select the blood test(s) you would like:';
+        LAB_CAT.blood.groups.forEach(function(g){
+          c.appendChild(labGroupTitle(g.name));
+          g.tests.forEach(function(t){ c.appendChild(labMakeCheck(t[0], t[1], labState.tests.indexOf(t[0])>=0, function(on){ labArrToggle(labState.tests,t[0],on); })); });
+        });
+      } else if (cat==='urinalysis') {
+        prompt.textContent='Urinalysis';
+        var info=document.createElement('div'); info.className='lt-info';
+        var p=document.createElement('p'); p.textContent=LAB_CAT.urinalysis.blurb; info.appendChild(p);
+        var ul=document.createElement('ul');
+        LAB_CAT.urinalysis.checks.forEach(function(x){ var li=document.createElement('li'); li.textContent=x; ul.appendChild(li); });
+        info.appendChild(ul); c.appendChild(info);
+        c.appendChild(labGroupTitle('Recommended add-ons (optional)'));
+        LAB_CAT.urinalysis.addons.forEach(function(t){ c.appendChild(labMakeCheck(t[0], t[1], labState.addons.indexOf(t[0])>=0, function(on){ labArrToggle(labState.addons,t[0],on); })); });
+      } else if (cat==='sti') {
+        prompt.textContent='Choose your STI tests:';
+        var pkg=document.createElement('div'); pkg.className='vax-opt'+(labState.stiFull?' sel':'');
+        pkg.innerHTML='<div class="vax-opt-title">✅ Full STI Check (Blood + Urine/Swab)</div><div class="vax-opt-desc">Complete screening: HIV, Syphilis, Hepatitis B, Hepatitis C, Chlamydia, Gonorrhoea, Trichomonas.</div>';
+        pkg.addEventListener('click', function(){ labState.stiFull=!labState.stiFull; if(labState.stiFull){ labState.tests=[]; } else { labState.addons=[]; } labRenderStep2(); });
+        c.appendChild(pkg);
+        if (labState.stiFull) {
+          c.appendChild(labGroupTitle('Optional add-on'));
+          c.appendChild(labMakeCheck('Mycoplasma genitalium','Recommended if symptomatic or advised by the doctor/lab', labState.addons.indexOf('Mycoplasma genitalium')>=0, function(on){ labArrToggle(labState.addons,'Mycoplasma genitalium',on); }));
+        } else {
+          c.appendChild(labGroupTitle('— or choose individual tests —'));
+          LAB_CAT.sti.groups.forEach(function(g){
+            c.appendChild(labGroupTitle(g.name));
+            g.tests.forEach(function(t){ c.appendChild(labMakeCheck(t[0], t[1], labState.tests.indexOf(t[0])>=0, function(on){ labArrToggle(labState.tests,t[0],on); })); });
+          });
+        }
+      }
+    }
+
+    function labPopulateDates() {
+      var sel=document.getElementById('labDate'); sel.innerHTML='';
+      var opts=(labState.dateOptions||[]).filter(function(o){ return !o.disabled; });
+      if (!opts.length){ var o=document.createElement('option'); o.value=''; o.textContent='No dates available'; sel.appendChild(o); labState.dateKey=null; return; }
+      opts.forEach(function(o){ var op=document.createElement('option'); op.value=o.dateKey; op.textContent=localDate(o.dateKey); sel.appendChild(op); });
+      labState.dateKey=opts[0].dateKey; sel.value=labState.dateKey;
+    }
+
+    function labLoadSlots() {
+      var sel=document.getElementById('labDate');
+      labState.dateKey=sel.value||null; labState.slot=null;
+      var grid=document.getElementById('labSlots');
+      if (!labState.dateKey){ grid.innerHTML='<div class="vax-slots-hint">No date selected.</div>'; return; }
+      grid.innerHTML='<div class="vax-slots-hint">Loading…</div>';
+      fetch('/api/blood-test-availability?date='+encodeURIComponent(labState.dateKey))
+        .then(function(r){ return r.json(); })
+        .then(function(res){
+          grid.innerHTML='';
+          var avail=(res && res.slots ? res.slots : []).filter(function(s){ return s.available; });
+          if (!res || !res.ok || !avail.length){ grid.innerHTML='<div class="vax-slots-hint">No times available on this date. Please pick another date.</div>'; return; }
+          avail.forEach(function(s){
+            var b=document.createElement('button'); b.type='button'; b.className='timeBtn'; b.textContent=to12h(s.start);
+            b.addEventListener('click', function(){
+              labState.slot=s;
+              var prev=grid.querySelectorAll('.timeBtn'); for(var i=0;i<prev.length;i++) prev[i].classList.remove('sel');
+              b.classList.add('sel');
+            });
+            grid.appendChild(b);
+          });
+        })
+        .catch(function(){ grid.innerHTML='<div class="vax-slots-hint">Could not load times. Please try again.</div>'; });
+    }
+
+    function labRenderSummary() {
+      var parts=[];
+      if (labState.category==='blood'){ parts.push('Blood tests: '+(labState.tests.join(', ')||'(none selected)')); }
+      else if (labState.category==='urinalysis'){ parts.push('Urinalysis'+(labState.addons.length?' + add-ons: '+labState.addons.join(', '):'')); }
+      else if (labState.category==='sti'){
+        if (labState.stiFull){ parts.push('Full STI Check (Blood + Urine/Swab)'); if(labState.addons.length) parts.push('Add-on: '+labState.addons.join(', ')); }
+        else { parts.push('STI tests: '+(labState.tests.join(', ')||'(none selected)')); }
+      }
+      if (labState.dateKey && labState.slot) parts.push('When: '+localDate(labState.dateKey)+' at '+to12h(labState.slot.start));
+      parts.push('Where: '+(labState.location||'our clinic'));
+      document.getElementById('labSummary').textContent=parts.join('\\n');
+    }
+
+    function labNext() {
+      var err=document.getElementById('labError'); err.textContent='';
+      if (labState.step===1){
+        if (!labState.enabled){ err.textContent='Test bookings are not currently open.'; return; }
+        if (!labState.category){ err.textContent='Please choose what you would like to book.'; return; }
+        labShowStep(2);
+        labRenderStep2();
+        return;
+      }
+      if (labState.step===2){
+        if (labState.category==='blood' && !labState.tests.length){ err.textContent='Please select at least one blood test.'; return; }
+        if (labState.category==='sti' && !labState.stiFull && !labState.tests.length){ err.textContent='Please select a test or the Full STI Check.'; return; }
+        labShowStep(3);
+        labPopulateDates();
+        labLoadSlots();
+        return;
+      }
+      if (labState.step===3){
+        if (!labState.dateKey){ err.textContent='Please choose a date.'; return; }
+        if (!labState.slot){ err.textContent='Please choose a time.'; return; }
+        labShowStep(4);
+        return;
+      }
+    }
+
+    function labBack() {
+      if (labState.step===2){ labShowStep(1); }
+      else if (labState.step===3){ labShowStep(2); labRenderStep2(); }
+      else if (labState.step===4){ labShowStep(3); }
+    }
+
+    async function submitLabTest() {
+      var err=document.getElementById('labError'); err.textContent='';
+      var name=document.getElementById('labName').value.trim();
+      var phone=document.getElementById('labPhone').value.trim();
+      var email=document.getElementById('labEmail').value.trim();
+      var notes=document.getElementById('labNotes').value.trim();
+      if (!name){ err.textContent='Please enter your full name.'; return; }
+      if (!phone){ err.textContent='Please enter a phone number.'; return; }
+      if (!email){ err.textContent='Please enter your email.'; return; }
+      if (!labState.dateKey || !labState.slot){ err.textContent='Please choose a date and time.'; labShowStep(3); return; }
+      var btn=document.getElementById('labSubmitBtn'); btn.disabled=true; btn.textContent='Booking…';
+      var payload={
+        dateKey:labState.dateKey,
+        startTime:labState.slot.start,
+        fullName:name, email:email, phone:phone, comments:notes,
+        category:labState.category,
+        tests:(labState.stiFull?[]:labState.tests),
+        addons:labState.addons,
+        packageName:(labState.stiFull?'Full STI Check':'')
+      };
+      try {
+        var res=await fetch('/api/blood-test-book',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+        var data=await res.json();
+        if (data && data.ok){
+          var dk=labState.dateKey;
+          var msg=t('confirmMsg', data.serviceName, localDate(dk), to12h(data.startTime), to12h(data.endTime), data.location);
+          hideOverlay(document.getElementById('labOverlay'));
+          labReset();
+          _telemedHidden=[];
+          showConfirmModal(msg);
+        } else {
+          err.textContent=(data && data.reason) || 'Could not book. Please try again.';
+        }
+      } catch(e){ err.textContent='Network error — please try again.'; }
+      finally { btn.disabled=false; btn.textContent='Confirm booking'; }
+    }
+
+    window.openLabWizard = openLabWizard;
+    window.closeLabWizard = closeLabWizard;
+    window.labPickCategory = labPickCategory;
+    window.labNext = labNext;
+    window.labBack = labBack;
+    window.labLoadSlots = labLoadSlots;
+    window.submitLabTest = submitLabTest;
 
   </script>
 ${qrWidget()}

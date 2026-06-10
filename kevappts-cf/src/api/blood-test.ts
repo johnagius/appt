@@ -13,7 +13,7 @@ import {
   sanitizePhone, toDateKey, todayKeyLocal, todayLocal,
 } from '../services/utils';
 import {
-  bumpVersion, getActiveAppointmentsByDate, getOrCreateClient, getTakenSlots,
+  bumpVersion, getActiveAppointmentsByDate, getConfig, getOrCreateClient, getTakenSlots,
   insertAppointment, isSlotTaken, personAlreadyBookedSameSlot,
 } from '../db/queries';
 import { generateId } from '../services/crypto';
@@ -23,21 +23,32 @@ import {
   buildBloodTestDateOptions, buildBloodTestSlots, isBloodTestDayOff,
   loadBloodTestConfig, type BloodTestConfig,
 } from '../services/blood-test';
+import { buildLabTestDescriptor } from '../services/lab-test';
 
 const BLOOD_TEST_SERVICE_ID = 'blood-test';
 const BLOOD_TEST_SERVICE_NAME = 'Blood Test';
+
+/** Resolve the clinic + display location for lab tests from the toggle. */
+async function resolveLabLocation(env: Env, cfg: BloodTestConfig): Promise<{ clinic: 'potters' | 'spinola'; location: string }> {
+  const clinic = cfg.location === 'potters' ? 'potters' : 'spinola';
+  const appCfg = await getConfig(env.DB);
+  const location = clinic === 'potters'
+    ? (appCfg.pottersLocation || env.CLINIC_NAME || "Potter's Pharmacy Clinic")
+    : (appCfg.spinolaLocation || 'Spinola Clinic');
+  return { clinic, location };
+}
 
 // ─── Init ──────────────────────────────────────────────────
 
 export async function apiBloodTestInit(env: Env): Promise<Response> {
   const tz = env.TIMEZONE;
   const cfg = await loadBloodTestConfig(env.DB);
-  const location = env.CLINIC_NAME || "Potter's Pharmacy Clinic";
+  const { clinic, location } = await resolveLabLocation(env, cfg);
 
   if (!cfg.enabled) {
     return json({
       ok: true,
-      config: { enabled: false, location },
+      config: { enabled: false, location, clinic },
       dateOptions: [],
       initialSlots: null,
     });
@@ -52,6 +63,7 @@ export async function apiBloodTestInit(env: Env): Promise<Response> {
     config: {
       enabled: true,
       location,
+      clinic,
       apptMinutes: cfg.slotMin,
       priceCents: cfg.priceCents,
       priceLabel: cfg.priceCents > 0 ? '€' + (cfg.priceCents / 100).toFixed(2) : '',
@@ -87,8 +99,11 @@ async function buildAvailability(dateKey: string, env: Env, cfg: BloodTestConfig
   if (!baseSlots.length) return { ok: false, reason: off ? 'Closed for the day' : 'Closed', dateKey, slots: [] };
 
   // Taken-slot query is scoped to service_id='blood-test' so a doctor
-  // appointment at the same time does NOT block the blood-test slot.
-  const taken = await getTakenSlots(env.DB, dateKey, 'potters', BLOOD_TEST_SERVICE_ID);
+  // appointment at the same time does NOT block the lab-test slot. Use the
+  // configured host clinic (Spinola or Potter's) so the slot pool matches
+  // where the tests are actually held.
+  const clinic = cfg.location === 'potters' ? 'potters' : 'spinola';
+  const taken = await getTakenSlots(env.DB, dateKey, clinic, BLOOD_TEST_SERVICE_ID);
   const nowMin = nowMinutesLocal(tz);
 
   const outSlots = baseSlots.map(slot => {
@@ -110,13 +125,18 @@ export async function apiBloodTestBook(req: Request, env: Env): Promise<Response
   const cfg = await loadBloodTestConfig(env.DB);
   if (!cfg.enabled) return json({ ok: false, reason: 'Blood test bookings are not currently open.' }, 400);
 
+  const { clinic, location } = await resolveLabLocation(env, cfg);
+
   const dateKey = (payload.dateKey || '').trim();
   const startTime = (payload.startTime || '').trim();
   const fullName = sanitizeName(payload.fullName);
   const email = sanitizeEmail(payload.email);
   const phone = sanitizePhone(payload.phone);
-  const comments = (payload.comments || '').trim();
+  const userComments = (payload.comments || '').trim();
   const testType = (payload.testType || '').trim().slice(0, 120);
+  // The new wizard sends a structured selection (category + tests/addons/package);
+  // the legacy /blood-tests page sends only testType. Either is accepted.
+  const labInfo = buildLabTestDescriptor(payload as any);
 
   if (!dateKey || !startTime || !fullName || !email || !phone) {
     return json({ ok: false, reason: 'Missing required fields' }, 400);
@@ -142,20 +162,23 @@ export async function apiBloodTestBook(req: Request, env: Env): Promise<Response
   if (await personAlreadyBookedSameSlot(env.DB, dateKey, startTime, email, phone)) {
     return json({ ok: false, reason: 'You already booked this exact time slot.' }, 400);
   }
-  if (await isSlotTaken(env.DB, dateKey, startTime, 'potters', BLOOD_TEST_SERVICE_ID)) {
+  if (await isSlotTaken(env.DB, dateKey, startTime, clinic, BLOOD_TEST_SERVICE_ID)) {
     return json({ ok: false, reason: 'That slot was just taken. Please pick another.' }, 400);
   }
 
   const now = nowIso(tz);
   await getOrCreateClient(env.DB, fullName, email, phone, now);
 
-  const location = env.CLINIC_NAME || "Potter's Pharmacy Clinic";
-  // If admin configured test types and the patient picked one, append it to
-  // service_name so it appears on the confirmation/admin/calendar without
-  // needing a new column.
-  const serviceName = testType
-    ? `${BLOOD_TEST_SERVICE_NAME} — ${testType}`
-    : BLOOD_TEST_SERVICE_NAME;
+  // The wizard's structured selection wins; otherwise fall back to the legacy
+  // single test-type label. Details go into comments so they show on the
+  // confirmation / admin / calendar without a new column.
+  const serviceName = labInfo
+    ? labInfo.serviceName
+    : (testType ? `${BLOOD_TEST_SERVICE_NAME} — ${testType}` : BLOOD_TEST_SERVICE_NAME);
+  const bookingSource = labInfo ? labInfo.category : 'blood-test';
+  const comments = labInfo
+    ? (userComments ? labInfo.summary + '\n\n' + userComments : labInfo.summary)
+    : userComments;
 
   const appt: Appointment = {
     id: 'A-' + generateId(),
@@ -170,7 +193,7 @@ export async function apiBloodTestBook(req: Request, env: Env): Promise<Response
     comments,
     status: 'BOOKED',
     location,
-    clinic: 'potters',
+    clinic,
     created_at: now,
     updated_at: now,
     token: generateId(),
@@ -179,7 +202,8 @@ export async function apiBloodTestBook(req: Request, env: Env): Promise<Response
     cancel_reason: '',
     reminder_sent: '',
     confirmed: '',
-    booking_source: 'blood-test',
+    booking_source: bookingSource,
+    hotel: '',
   };
 
   try {

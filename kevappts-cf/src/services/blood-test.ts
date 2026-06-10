@@ -35,6 +35,8 @@ export interface BloodTestConfig {
   /** Newline- or comma-separated list of test types the patient can pick. Empty = single generic "Blood Test". */
   types: string[];
   hours: WorkingHours;
+  /** Which clinic physically hosts the lab tests. Admin-toggleable; defaults to 'spinola'. */
+  location: 'potters' | 'spinola';
 }
 
 export async function loadBloodTestConfig(db: D1Database): Promise<BloodTestConfig> {
@@ -62,6 +64,8 @@ export async function loadBloodTestConfig(db: D1Database): Promise<BloodTestConf
     priceCents: parseInt(map['BLOOD_TEST_PRICE_CENTS'] || '0', 10) || 0,
     types,
     hours,
+    // Default to Spinola so existing prod DBs (no key yet) relocate there.
+    location: map['BLOOD_TEST_LOCATION'] === 'potters' ? 'potters' : 'spinola',
   };
 }
 
