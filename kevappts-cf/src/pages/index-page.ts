@@ -909,25 +909,6 @@ export function indexPage(env: Env, bookingSource?: string): string {
           <div>
             <div class="sectionTitle" data-i18n="services">Services</div>
             <div id="services"></div>
-            <!-- Other-service CTAs. Blood Tests + Telemedicine are always
-                 visible (independent of Dr Kevin). Physiotherapy shows only
-                 when Linda is enabled + has available dates. Auto-fit grid
-                 with a low (150px) min so the buttons sit two-across in the
-                 narrow Services column (tablet) and fill the width evenly,
-                 instead of the old lopsided flex-wrap where short buttons
-                 paired up while long ones took a full row. align-items:stretch
-                 keeps paired buttons equal height; a lone last button (e.g.
-                 when Physio is shown, making 5) stretches full-width. Only
-                 stacks to one column on very narrow screens. -->
-            <div id="extraServicesWrap" style="margin-top:10px;display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;align-items:stretch;">
-              <a href="/blood-tests" id="bloodTestLinkBtn" class="svcBtn" style="flex:1 1 180px;background:#fef2f2;color:#991b1b;border:1.5px solid #fecaca;text-decoration:none;padding:12px 14px;border-radius:12px;font-weight:800;font-size:14px;"><span class="svcIco"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.6S5.5 9.7 5.5 14.4a6.5 6.5 0 0 0 13 0C18.5 9.7 12 2.6 12 2.6z"/></svg></span>Book Blood Tests &mdash; Potter&#39;s 8am</a>
-              <button type="button" id="telemedAlwaysBtn" class="svcBtn" onclick="openTelemedicineModal()" style="flex:1 1 180px;background:#fff7ed;color:#9a3412;border:1.5px solid #fdba74;padding:12px 14px;border-radius:12px;font-weight:800;font-size:14px;cursor:pointer;"><span class="svcIco" style="animation-delay:.5s"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6.6 10.8a15 15 0 0 0 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.5.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1A17 17 0 0 1 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.2.2 2.4.6 3.5.1.4 0 .8-.3 1l-2.2 2.3z"/></svg></span>Book Telemedicine Call &mdash; &euro;25</button>
-              <button type="button" id="vaccinationBtn" class="svcBtn" onclick="openVaccinationWizard()" style="flex:1 1 180px;background:#eff6ff;color:#1e3a8a;border:1.5px solid #bfdbfe;padding:12px 14px;border-radius:12px;font-weight:800;font-size:14px;cursor:pointer;"><span class="svcIco" style="animation-delay:.7s"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l8 3v6c0 5-3.4 8.4-8 10-4.6-1.6-8-5-8-10V5l8-3z"/></svg></span>Vaccinations &mdash; Spinola Clinic</button>
-              <div id="physioLinkWrap" class="physioCta" style="display:none;flex:1 1 180px;">
-                <a href="/physio" id="physioLinkBtn" class="svcBtn"><span class="svcIco" style="animation-delay:.9s"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="4.4" r="2.2"/><path d="M11 8c-1.6 0-3 1-3.6 2.5L6 14l1.9.7 1.1-2.8V22h2v-5h.4v5h2v-7.2L15.9 17l1.8-1-1.7-4.3A3.9 3.9 0 0 0 12 8h-1z"/></svg></span>Physiotherapy Bookings Here</a>
-              </div>
-              <a href="${env.RESERVE_COLLECT_URL}" id="reserveCollectLinkBtn" class="svcBtn" style="flex:1 1 180px;background:#fffbeb;color:#92400e;border:1.5px solid #fcd34d;text-decoration:none;padding:12px 14px;border-radius:12px;font-weight:800;font-size:14px;"><span class="svcIco" style="animation-delay:1.3s"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 7V6a5 5 0 0 1 10 0v1h3v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7h3zm2 0h6V6a3 3 0 0 0-6 0v1z"/></svg></span>Reserve &amp; Collect Pharmacy Items</a>
-            </div>
           </div>
 
           <div>
@@ -935,6 +916,24 @@ export function indexPage(env: Env, bookingSource?: string): string {
             <div class="label" data-i18n="availableDates">Available dates (next 7 days)</div>
             <select id="dateSelect"></select>
             <div id="dateHint" class="msg"></div>
+          </div>
+
+          <!-- Other-service CTAs span the FULL width of the pick card (below
+               both the Services and Date columns) so they use the space under
+               the date picker instead of being crammed into the narrow left
+               column. Flexbox + flex-grow: every row fills the full width and
+               the last row's buttons widen to fill — no stranded gaps. The
+               ~260px basis gives big two-across kiosk buttons on a tablet
+               (labels fit on one line) and more columns on a desktop;
+               min-width:0 lets labels wrap rather than forcing odd rows. -->
+          <div id="extraServicesWrap" style="grid-column:1 / -1;margin-top:6px;display:flex;flex-wrap:wrap;gap:8px;align-items:stretch;">
+            <a href="/blood-tests" id="bloodTestLinkBtn" class="svcBtn" style="flex:1 1 260px;min-width:0;background:#fef2f2;color:#991b1b;border:1.5px solid #fecaca;text-decoration:none;padding:12px 14px;border-radius:12px;font-weight:800;font-size:14px;"><span class="svcIco"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.6S5.5 9.7 5.5 14.4a6.5 6.5 0 0 0 13 0C18.5 9.7 12 2.6 12 2.6z"/></svg></span>Book Blood Tests &mdash; Potter&#39;s 8am</a>
+            <button type="button" id="telemedAlwaysBtn" class="svcBtn" onclick="openTelemedicineModal()" style="flex:1 1 260px;min-width:0;background:#fff7ed;color:#9a3412;border:1.5px solid #fdba74;padding:12px 14px;border-radius:12px;font-weight:800;font-size:14px;cursor:pointer;"><span class="svcIco" style="animation-delay:.5s"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6.6 10.8a15 15 0 0 0 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.5.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1A17 17 0 0 1 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.2.2 2.4.6 3.5.1.4 0 .8-.3 1l-2.2 2.3z"/></svg></span>Book Telemedicine Call &mdash; &euro;25</button>
+            <button type="button" id="vaccinationBtn" class="svcBtn" onclick="openVaccinationWizard()" style="flex:1 1 260px;min-width:0;background:#eff6ff;color:#1e3a8a;border:1.5px solid #bfdbfe;padding:12px 14px;border-radius:12px;font-weight:800;font-size:14px;cursor:pointer;"><span class="svcIco" style="animation-delay:.7s"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l8 3v6c0 5-3.4 8.4-8 10-4.6-1.6-8-5-8-10V5l8-3z"/></svg></span>Vaccinations &mdash; Spinola Clinic</button>
+            <div id="physioLinkWrap" class="physioCta" style="display:none;flex:1 1 260px;min-width:0;">
+              <a href="/physio" id="physioLinkBtn" class="svcBtn"><span class="svcIco" style="animation-delay:.9s"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="4.4" r="2.2"/><path d="M11 8c-1.6 0-3 1-3.6 2.5L6 14l1.9.7 1.1-2.8V22h2v-5h.4v5h2v-7.2L15.9 17l1.8-1-1.7-4.3A3.9 3.9 0 0 0 12 8h-1z"/></svg></span>Physiotherapy Bookings Here</a>
+            </div>
+            <a href="${env.RESERVE_COLLECT_URL}" id="reserveCollectLinkBtn" class="svcBtn" style="flex:1 1 260px;min-width:0;background:#fffbeb;color:#92400e;border:1.5px solid #fcd34d;text-decoration:none;padding:12px 14px;border-radius:12px;font-weight:800;font-size:14px;"><span class="svcIco" style="animation-delay:1.3s"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 7V6a5 5 0 0 1 10 0v1h3v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7h3zm2 0h6V6a3 3 0 0 0-6 0v1z"/></svg></span>Reserve &amp; Collect Pharmacy Items</a>
           </div>
         </div>
       </div>
