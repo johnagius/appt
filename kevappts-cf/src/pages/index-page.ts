@@ -911,9 +911,13 @@ export function indexPage(env: Env, bookingSource?: string): string {
             <div id="services"></div>
             <!-- Other-service CTAs. Blood Tests + Telemedicine are always
                  visible (independent of Dr Kevin). Physiotherapy shows only
-                 when Linda is enabled + has available dates. Row layout
-                 on wider screens; wraps to a column on narrow ones. -->
-            <div id="extraServicesWrap" style="margin-top:10px;display:flex;flex-direction:row;flex-wrap:wrap;gap:8px;">
+                 when Linda is enabled + has available dates. Auto-fit grid:
+                 even, equal-width columns that collapse to a clean single
+                 column in the narrow Services column (tablet) and on phones,
+                 and spread to 2+ columns when there's room (desktop). Avoids
+                 the lopsided flex-wrap where short buttons paired up while
+                 long ones took a full row. -->
+            <div id="extraServicesWrap" style="margin-top:10px;display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:8px;align-items:stretch;">
               <a href="/blood-tests" id="bloodTestLinkBtn" class="svcBtn" style="flex:1 1 180px;background:#fef2f2;color:#991b1b;border:1.5px solid #fecaca;text-decoration:none;padding:12px 14px;border-radius:12px;font-weight:800;font-size:14px;"><span class="svcIco"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.6S5.5 9.7 5.5 14.4a6.5 6.5 0 0 0 13 0C18.5 9.7 12 2.6 12 2.6z"/></svg></span>Book Blood Tests &mdash; Potter&#39;s 8am</a>
               <button type="button" id="telemedAlwaysBtn" class="svcBtn" onclick="openTelemedicineModal()" style="flex:1 1 180px;background:#fff7ed;color:#9a3412;border:1.5px solid #fdba74;padding:12px 14px;border-radius:12px;font-weight:800;font-size:14px;cursor:pointer;"><span class="svcIco" style="animation-delay:.5s"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6.6 10.8a15 15 0 0 0 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.5.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1A17 17 0 0 1 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.2.2 2.4.6 3.5.1.4 0 .8-.3 1l-2.2 2.3z"/></svg></span>Book Telemedicine Call &mdash; &euro;25</button>
               <button type="button" id="vaccinationBtn" class="svcBtn" onclick="openVaccinationWizard()" style="flex:1 1 180px;background:#eff6ff;color:#1e3a8a;border:1.5px solid #bfdbfe;padding:12px 14px;border-radius:12px;font-weight:800;font-size:14px;cursor:pointer;"><span class="svcIco" style="animation-delay:.7s"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l8 3v6c0 5-3.4 8.4-8 10-4.6-1.6-8-5-8-10V5l8-3z"/></svg></span>Vaccinations &mdash; Spinola Clinic</button>
