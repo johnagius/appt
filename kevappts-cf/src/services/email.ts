@@ -89,6 +89,25 @@ function buildFooter(appt: Appointment): string {
         <a href="${whatsappUrl}" target="_blank" style="display:block;text-align:center;background:#25D366;color:#fff;text-decoration:none;padding:12px 8px;border-radius:999px;font-weight:700;font-size:14px;">Share with a friend</a>
       </td>
     </tr></table>
+  </div>
+  ${buildOtherServicesHtml()}`;
+}
+
+// Promotes the clinic's other services on every patient-facing email
+// (confirmations, reminders, cancellations, etc. \u2014 anything that uses
+// buildFooter). Kept out of the internal doctor/telemedicine emails.
+function buildOtherServicesHtml(): string {
+  return `
+  <div style="margin-top:18px;padding:14px 16px;border:1px solid #e5e7eb;border-radius:12px;background:#f9fafb;">
+    <p style="margin:0 0 8px 0;font-weight:800;color:#111827;font-size:14px;">Other services we offer</p>
+    <ul style="margin:0;padding-left:20px;color:#374151;font-size:13.5px;line-height:1.7;">
+      <li>Blood Tests</li>
+      <li>STI testing (sexually transmitted infections)</li>
+      <li>Urinalysis tests</li>
+      <li>Vaccinations &mdash; at Spinola Clinic</li>
+      <li>Physiotherapy &mdash; subject to the availability of Linda, our physiotherapist</li>
+    </ul>
+    <p style="margin:10px 0 0 0;font-size:13px;"><a href="https://kevappts.labrint.workers.dev/" style="color:#2563eb;font-weight:700;text-decoration:none;">Book online &rarr;</a></p>
   </div>`;
 }
 
@@ -211,11 +230,21 @@ export async function sendSpinolaConfirmationEmail(env: Env, appt: Appointment):
   const rescheduleUrl = await buildRescheduleLink(env, appt.token);
   const spinolaLocation = appt.location || 'Spinola Clinic';
 
-  const subject = `Appointment Confirmed - Dr James at ${spinolaLocation} (${appt.date_key} ${appt.start_time})`;
+  const isVaccination = appt.booking_source === 'vaccination';
+  const vaccinationBox = isVaccination && appt.comments
+    ? `<div style="margin-top:14px;padding:12px 14px;border:1px solid #bfdbfe;border-radius:12px;background:#eff6ff;">
+        <p style="margin:0 0 6px 0;font-weight:800;color:#1e3a8a;font-size:14px;">Vaccination details</p>
+        <p style="margin:0;color:#1e3a8a;font-size:13.5px;line-height:1.55;white-space:pre-line;">${escapeHtml(appt.comments)}</p>
+      </div>`
+    : '';
+
+  const subject = isVaccination
+    ? `Vaccination Appointment Confirmed - ${spinolaLocation} (${appt.date_key} ${appt.start_time})`
+    : `Appointment Confirmed - Dr James at ${spinolaLocation} (${appt.date_key} ${appt.start_time})`;
   const html = `
 <div style="font-family:Arial,sans-serif;line-height:1.4;color:#111827;">
-  <h2 style="margin:0 0 10px 0;">Appointment Confirmed - Spinola Clinic</h2>
-  <p style="margin:0 0 10px 0;">Your appointment with <b>Dr James</b> at <b>${escapeHtml(spinolaLocation)}</b> has been confirmed.</p>
+  <h2 style="margin:0 0 10px 0;">${isVaccination ? 'Vaccination Appointment Confirmed' : 'Appointment Confirmed'} - Spinola Clinic</h2>
+  <p style="margin:0 0 10px 0;">Your ${isVaccination ? 'vaccination appointment' : 'appointment'} with <b>Dr James</b> at <b>${escapeHtml(spinolaLocation)}</b> has been confirmed.</p>
   <p style="margin:0 0 10px 0;color:#6b7280;font-size:13px;">Location: ${escapeHtml(env.SPINOLA_LOCATION_DETAILS)}</p>
   <table style="border-collapse:collapse;width:100%;max-width:520px;">
     <tr><td style="padding:6px 0;color:#6b7280;">Service</td><td style="padding:6px 0;"><b>${escapeHtml(appt.service_name)}</b></td></tr>
@@ -224,6 +253,7 @@ export async function sendSpinolaConfirmationEmail(env: Env, appt: Appointment):
     <tr><td style="padding:6px 0;color:#6b7280;">Time</td><td style="padding:6px 0;"><b>${escapeHtml(appt.start_time)} - ${escapeHtml(appt.end_time)}</b></td></tr>
     <tr><td style="padding:6px 0;color:#6b7280;">Location</td><td style="padding:6px 0;"><b>${escapeHtml(spinolaLocation)}</b></td></tr>
   </table>
+  ${vaccinationBox}
   ${getMapHtml(spinolaLocation)}
   ${buildManageSection(cancelUrl, rescheduleUrl)}
   ${buildCalendarLinks(appt)}
@@ -303,6 +333,7 @@ export async function sendDoctorBookingEmail(env: Env, appt: Appointment, dayLis
     <tr><td style="padding:6px 0;color:#6b7280;">Phone</td><td style="padding:6px 0;"><b>${escapeHtml(appt.phone)}</b></td></tr>
     <tr><td style="padding:6px 0;color:#6b7280;">Email</td><td style="padding:6px 0;"><b>${escapeHtml(appt.email)}</b></td></tr>
     <tr><td style="padding:6px 0;color:#6b7280;">Location</td><td style="padding:6px 0;"><b>${escapeHtml(appt.location)}</b></td></tr>
+    ${appt.comments ? `<tr><td style="padding:6px 0;color:#6b7280;vertical-align:top;">Notes</td><td style="padding:6px 0;white-space:pre-line;">${escapeHtml(appt.comments)}</td></tr>` : ''}
   </table>
   <h3 style="margin:16px 0 8px 0;">Appointments for the day</h3>
   <table style="border-collapse:collapse;width:100%;max-width:800px;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;">

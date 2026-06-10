@@ -681,6 +681,33 @@ export function indexPage(env: Env, bookingSource?: string): string {
       gap:10px;
     }
 
+    /* Vaccination wizard */
+    .vax-modal{ position:relative; width:min(560px,100%); max-height:90vh; overflow-y:auto; }
+    .vax-close{ position:absolute; top:12px; right:14px; background:none; border:none; font-size:26px; line-height:1; color:#9ca3af; cursor:pointer; padding:0; }
+    .vax-close:hover{ color:#374151; }
+    .vax-progress{ height:6px; background:#e5e7eb; border-radius:999px; overflow:hidden; margin:4px 0 6px; }
+    .vax-progress-bar{ height:100%; width:25%; background:#2563eb; border-radius:999px; transition:width .25s ease; }
+    .vax-step-label{ font-size:12px; font-weight:700; color:#6b7280; margin-bottom:12px; }
+    .vax-step > p{ font-size:15px; color:var(--text); margin:0 0 12px; font-weight:600; }
+    .vax-options{ display:flex; flex-direction:column; gap:10px; }
+    .vax-opt{ border:1.5px solid var(--line); border-radius:12px; padding:14px 16px; cursor:pointer; transition:border-color .15s, background .15s; }
+    .vax-opt:hover{ border-color:#93c5fd; background:#f8fafc; }
+    .vax-opt.sel{ border-color:#2563eb; background:#eff6ff; box-shadow:0 0 0 1px #2563eb inset; }
+    .vax-opt-title{ font-weight:800; font-size:15px; color:#111827; }
+    .vax-opt-desc{ font-size:13px; color:#6b7280; margin-top:4px; line-height:1.4; }
+    .vax-checks{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    @media (max-width:460px){ .vax-checks{ grid-template-columns:1fr; } }
+    .vax-check{ display:flex; align-items:center; gap:8px; border:1.5px solid var(--line); border-radius:10px; padding:10px 12px; cursor:pointer; font-size:14px; font-weight:600; color:#111827; }
+    .vax-check:hover{ border-color:#93c5fd; }
+    .vax-check.sel{ border-color:#2563eb; background:#eff6ff; }
+    .vax-check input{ width:auto; margin:0; accent-color:#2563eb; }
+    .vax-slots{ display:flex; flex-wrap:wrap; gap:8px; }
+    .vax-slots .timeBtn{ flex:0 0 auto; padding:10px 14px; border:1.5px solid var(--line); border-radius:10px; background:#fff; font-weight:700; font-size:14px; cursor:pointer; color:#111827; }
+    .vax-slots .timeBtn:hover{ border-color:#2563eb; }
+    .vax-slots .timeBtn.sel{ background:#2563eb; color:#fff; border-color:#2563eb; }
+    .vax-slots-hint{ color:#6b7280; font-size:14px; }
+    .vax-summary{ background:#eff6ff; border:1px solid #bfdbfe; border-radius:12px; padding:12px 14px; margin-bottom:14px; font-size:14px; color:#1e3a8a; line-height:1.5; white-space:pre-line; }
+
     /* Spinola inline offer (replaces time grid when no Potter's slots) */
     .spinola-inline{
       display:none;
@@ -889,6 +916,7 @@ export function indexPage(env: Env, bookingSource?: string): string {
             <div id="extraServicesWrap" style="margin-top:10px;display:flex;flex-direction:row;flex-wrap:wrap;gap:8px;">
               <a href="/blood-tests" id="bloodTestLinkBtn" class="svcBtn" style="flex:1 1 180px;background:#fef2f2;color:#991b1b;border:1.5px solid #fecaca;text-decoration:none;padding:12px 14px;border-radius:12px;font-weight:800;font-size:14px;"><span class="svcIco"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.6S5.5 9.7 5.5 14.4a6.5 6.5 0 0 0 13 0C18.5 9.7 12 2.6 12 2.6z"/></svg></span>Book Blood Tests &mdash; Potter&#39;s 8am</a>
               <button type="button" id="telemedAlwaysBtn" class="svcBtn" onclick="openTelemedicineModal()" style="flex:1 1 180px;background:#fff7ed;color:#9a3412;border:1.5px solid #fdba74;padding:12px 14px;border-radius:12px;font-weight:800;font-size:14px;cursor:pointer;"><span class="svcIco" style="animation-delay:.5s"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6.6 10.8a15 15 0 0 0 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.5.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1A17 17 0 0 1 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.2.2 2.4.6 3.5.1.4 0 .8-.3 1l-2.2 2.3z"/></svg></span>Book Telemedicine Call &mdash; &euro;25</button>
+              <button type="button" id="vaccinationBtn" class="svcBtn" onclick="openVaccinationWizard()" style="flex:1 1 180px;background:#eff6ff;color:#1e3a8a;border:1.5px solid #bfdbfe;padding:12px 14px;border-radius:12px;font-weight:800;font-size:14px;cursor:pointer;"><span class="svcIco" style="animation-delay:.7s"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l8 3v6c0 5-3.4 8.4-8 10-4.6-1.6-8-5-8-10V5l8-3z"/></svg></span>Vaccinations &mdash; Spinola Clinic</button>
               <div id="physioLinkWrap" class="physioCta" style="display:none;flex:1 1 180px;">
                 <a href="/physio" id="physioLinkBtn" class="svcBtn"><span class="svcIco" style="animation-delay:.9s"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="4.4" r="2.2"/><path d="M11 8c-1.6 0-3 1-3.6 2.5L6 14l1.9.7 1.1-2.8V22h2v-5h.4v5h2v-7.2L15.9 17l1.8-1-1.7-4.3A3.9 3.9 0 0 0 12 8h-1z"/></svg></span>Physiotherapy Bookings Here</a>
               </div>
@@ -1083,6 +1111,93 @@ export function indexPage(env: Env, bookingSource?: string): string {
       <div class="modalActions">
         <button class="btn btnGhost" type="button" onclick="closeTelemedicineModal()">Cancel</button>
         <button class="btn btnAccent" type="button" id="telemedSubmitBtn" onclick="submitTelemedicineCall()" style="background:#ea580c;">Book Call — €25</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Vaccination booking wizard modal (Spinola Clinic) -->
+  <div class="overlay" id="vaxOverlay" role="dialog" aria-modal="true" aria-labelledby="vaxTitle">
+    <div class="modal vax-modal">
+      <button type="button" class="vax-close" aria-label="Close" onclick="closeVaccinationWizard()">&times;</button>
+      <h3 id="vaxTitle" style="padding-right:28px;">Book a Vaccination &mdash; Spinola Clinic</h3>
+      <div class="vax-progress"><div class="vax-progress-bar" id="vaxProgressBar"></div></div>
+      <div class="vax-step-label" id="vaxStepLabel">Step 1 of 4</div>
+
+      <!-- Step 1: category -->
+      <div class="vax-step" id="vaxStep1">
+        <p>What kind of vaccination do you need?</p>
+        <div class="vax-options">
+          <div class="vax-opt" id="vaxCatTravel" onclick="vaxPickCategory('travel')">
+            <div class="vax-opt-title">✈️ Travel vaccines</div>
+            <div class="vax-opt-desc">For an upcoming trip. Choose your vaccines, or just tell us where you're going and the doctor will advise.</div>
+          </div>
+          <div class="vax-opt" id="vaxCatRoutine" onclick="vaxPickCategory('routine')">
+            <div class="vax-opt-title">🛡️ Routine vaccines</div>
+            <div class="vax-opt-desc">Standard immunisations (e.g. Influenza, HPV, Shingles, Pneumococcal).</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 2: selection -->
+      <div class="vax-step" id="vaxStep2" style="display:none;">
+        <!-- Travel sub-mode toggle (hidden for routine) -->
+        <div id="vaxTravelModeWrap" style="display:none;">
+          <p>How would you like to proceed?</p>
+          <div class="vax-options">
+            <div class="vax-opt" id="vaxModeVaccine" onclick="vaxPickMode('vaccine')">
+              <div class="vax-opt-title">I know which vaccine(s) I need</div>
+              <div class="vax-opt-desc">Pick from the list of travel vaccines.</div>
+            </div>
+            <div class="vax-opt" id="vaxModeDestination" onclick="vaxPickMode('destination')">
+              <div class="vax-opt-title">I'm travelling &mdash; let the doctor advise</div>
+              <div class="vax-opt-desc">Just tell us your destination country; the doctor will recommend the right vaccines.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Vaccine checklist (travel or routine) -->
+        <div id="vaxVaccineWrap" style="display:none;">
+          <p id="vaxVaccinePrompt">Select the vaccine(s) you'd like:</p>
+          <div class="vax-checks" id="vaxVaccineList"></div>
+        </div>
+
+        <!-- Destination input (travel only) -->
+        <div id="vaxDestinationWrap" style="display:none;">
+          <p>Where are you travelling to?</p>
+          <label class="label" for="vaxDestination">Destination country *</label>
+          <input id="vaxDestination" type="text" placeholder="e.g. Thailand, Kenya, Brazil">
+          <label class="label" for="vaxTravelDate" style="margin-top:10px;">Approximate travel date (optional)</label>
+          <input id="vaxTravelDate" type="text" placeholder="e.g. 15 August 2026">
+        </div>
+      </div>
+
+      <!-- Step 3: date & time -->
+      <div class="vax-step" id="vaxStep3" style="display:none;">
+        <p>Choose a date and time at Spinola Clinic.</p>
+        <label class="label" for="vaxDate">Date</label>
+        <select id="vaxDate" onchange="vaxLoadSlots()"></select>
+        <div class="label" style="margin-top:10px;">Available times</div>
+        <div class="vax-slots" id="vaxSlots"><div class="vax-slots-hint">Select a date to see available times.</div></div>
+      </div>
+
+      <!-- Step 4: details -->
+      <div class="vax-step" id="vaxStep4" style="display:none;">
+        <div class="vax-summary" id="vaxSummary"></div>
+        <label class="label" for="vaxName">Full name *</label>
+        <input id="vaxName" type="text" autocomplete="name" placeholder="Full name">
+        <label class="label" for="vaxPhone" style="margin-top:8px;">Phone *</label>
+        <input id="vaxPhone" type="tel" autocomplete="tel" placeholder="+356 ...">
+        <label class="label" for="vaxEmail" style="margin-top:8px;">Email *</label>
+        <input id="vaxEmail" type="email" autocomplete="email" placeholder="you@example.com">
+        <label class="label" for="vaxNotes" style="margin-top:8px;">Anything else? (optional)</label>
+        <textarea id="vaxNotes" rows="2" placeholder="Notes for the doctor"></textarea>
+      </div>
+
+      <div id="vaxError" class="field-error" style="margin-top:10px;"></div>
+      <div class="modalActions" style="margin-top:14px;">
+        <button class="btn btnGhost" type="button" id="vaxBackBtn" onclick="vaxBack()" style="display:none;">Back</button>
+        <button class="btn btnAccent" type="button" id="vaxNextBtn" onclick="vaxNext()">Next</button>
+        <button class="btn btnAccent" type="button" id="vaxSubmitBtn" onclick="submitVaccination()" style="display:none;background:#2563eb;">Confirm booking</button>
       </div>
     </div>
   </div>
@@ -4230,6 +4345,240 @@ export function indexPage(env: Env, bookingSource?: string): string {
     window.openTelemedicineModal = openTelemedicineModal;
     window.closeTelemedicineModal = closeTelemedicineModal;
     window.submitTelemedicineCall = submitTelemedicineCall;
+
+    // ─── Vaccination booking wizard (Spinola Clinic) ───
+    // Multi-step modal. Keep lists in sync with services/vaccination.ts.
+    var VAX_TRAVEL = ['Hepatitis A','Hepatitis B','Japanese Encephalitis','Rabies','Yellow Fever','Tick-borne Encephalitis','Typhoid'];
+    var VAX_ROUTINE = ['Meningitis','DTaP','DTP','HPV','Pneumococcal','MenACWY','Rotavirus','Shingles','Varicella','Influenza','MMRV'];
+    var vaxState = { step:1, category:null, mode:'vaccine', vaccines:[], destination:'', travelDate:'', dateKey:null, slot:null };
+
+    function vaxReset() {
+      vaxState = { step:1, category:null, mode:'vaccine', vaccines:[], destination:'', travelDate:'', dateKey:null, slot:null };
+      ['vaxDestination','vaxTravelDate','vaxName','vaxPhone','vaxEmail','vaxNotes'].forEach(function(id){ var e=document.getElementById(id); if(e) e.value=''; });
+      ['vaxCatTravel','vaxCatRoutine','vaxModeVaccine','vaxModeDestination'].forEach(function(id){ var e=document.getElementById(id); if(e) e.classList.remove('sel'); });
+      var err=document.getElementById('vaxError'); if(err) err.textContent='';
+      var list=document.getElementById('vaxVaccineList'); if(list) list.innerHTML='';
+      var slots=document.getElementById('vaxSlots'); if(slots) slots.innerHTML='<div class="vax-slots-hint">Select a date to see available times.</div>';
+    }
+
+    function vaxHasData() {
+      if (vaxState.category || vaxState.vaccines.length || vaxState.destination) return true;
+      var ids=['vaxDestination','vaxName','vaxPhone','vaxEmail','vaxNotes'];
+      for (var i=0;i<ids.length;i++){ var e=document.getElementById(ids[i]); if(e && e.value.trim()) return true; }
+      return false;
+    }
+
+    function openVaccinationWizard() {
+      vaxReset();
+      vaxShowStep(1);
+      hideOtherBookingBanners();
+      showOverlay(document.getElementById('vaxOverlay'));
+    }
+
+    function closeVaccinationWizard() {
+      if (vaxHasData() && !confirm('Close the vaccination booking? Your information will be lost.')) return;
+      hideOverlay(document.getElementById('vaxOverlay'));
+      vaxReset();
+      restoreOtherBookingBanners();
+    }
+
+    function vaxShowStep(n) {
+      vaxState.step = n;
+      for (var i=1;i<=4;i++){ var el=document.getElementById('vaxStep'+i); if(el) el.style.display=(i===n)?'block':'none'; }
+      document.getElementById('vaxStepLabel').textContent='Step '+n+' of 4';
+      document.getElementById('vaxProgressBar').style.width=(n*25)+'%';
+      document.getElementById('vaxBackBtn').style.display=(n>1)?'inline-block':'none';
+      document.getElementById('vaxNextBtn').style.display=(n<4)?'inline-block':'none';
+      document.getElementById('vaxSubmitBtn').style.display=(n===4)?'inline-block':'none';
+      document.getElementById('vaxError').textContent='';
+      if (n===4) vaxRenderSummary();
+    }
+
+    function vaxPickCategory(cat) {
+      if (vaxState.category && vaxState.category!==cat){ vaxState.vaccines=[]; vaxState.destination=''; vaxState.travelDate=''; vaxState.mode='vaccine'; }
+      vaxState.category=cat;
+      document.getElementById('vaxCatTravel').classList.toggle('sel', cat==='travel');
+      document.getElementById('vaxCatRoutine').classList.toggle('sel', cat==='routine');
+    }
+
+    function vaxPickMode(mode) {
+      vaxState.mode=mode;
+      document.getElementById('vaxModeVaccine').classList.toggle('sel', mode==='vaccine');
+      document.getElementById('vaxModeDestination').classList.toggle('sel', mode==='destination');
+      vaxRenderStep2Body();
+    }
+
+    function vaxRenderStep2Body() {
+      var isTravel = vaxState.category==='travel';
+      document.getElementById('vaxTravelModeWrap').style.display = isTravel?'block':'none';
+      var showDest = isTravel && vaxState.mode==='destination';
+      document.getElementById('vaxDestinationWrap').style.display = showDest?'block':'none';
+      document.getElementById('vaxVaccineWrap').style.display = showDest?'none':'block';
+      if (!showDest) vaxRenderVaccineList();
+    }
+
+    function vaxRenderVaccineList() {
+      var list = vaxState.category==='travel' ? VAX_TRAVEL : VAX_ROUTINE;
+      document.getElementById('vaxVaccinePrompt').textContent = vaxState.category==='travel'
+        ? 'Select the travel vaccine(s) you would like:' : 'Select the vaccine(s) you would like:';
+      var c = document.getElementById('vaxVaccineList');
+      c.innerHTML='';
+      list.forEach(function(name){
+        var sel = vaxState.vaccines.indexOf(name)>=0;
+        var lbl = document.createElement('label');
+        lbl.className = 'vax-check' + (sel?' sel':'');
+        var cb = document.createElement('input'); cb.type='checkbox'; cb.value=name; cb.checked=sel;
+        cb.addEventListener('change', function(){
+          if (cb.checked){ if (vaxState.vaccines.indexOf(name)<0) vaxState.vaccines.push(name); }
+          else { vaxState.vaccines = vaxState.vaccines.filter(function(v){ return v!==name; }); }
+          lbl.classList.toggle('sel', cb.checked);
+        });
+        var span = document.createElement('span'); span.textContent = name;
+        lbl.appendChild(cb); lbl.appendChild(span);
+        c.appendChild(lbl);
+      });
+    }
+
+    function vaxPopulateDates() {
+      var sel = document.getElementById('vaxDate');
+      sel.innerHTML='';
+      var opts = (state.dateOptions||[]).filter(function(o){ return !o.disabled; });
+      if (!opts.length){ var o=document.createElement('option'); o.value=''; o.textContent='No dates available'; sel.appendChild(o); vaxState.dateKey=null; return; }
+      opts.forEach(function(o){ var op=document.createElement('option'); op.value=o.dateKey; op.textContent=localDate(o.dateKey); sel.appendChild(op); });
+      vaxState.dateKey = opts[0].dateKey;
+      sel.value = vaxState.dateKey;
+    }
+
+    function vaxLoadSlots() {
+      var sel=document.getElementById('vaxDate');
+      vaxState.dateKey = sel.value || null;
+      vaxState.slot = null;
+      var grid=document.getElementById('vaxSlots');
+      if (!vaxState.dateKey){ grid.innerHTML='<div class="vax-slots-hint">No date selected.</div>'; return; }
+      grid.innerHTML='<div class="vax-slots-hint">Loading…</div>';
+      fetch('/api/spinola?date='+encodeURIComponent(vaxState.dateKey))
+        .then(function(r){ return r.json(); })
+        .then(function(res){
+          grid.innerHTML='';
+          var avail = (res && res.slots ? res.slots : []).filter(function(s){ return s.available; });
+          if (!res || !res.ok || !avail.length){ grid.innerHTML='<div class="vax-slots-hint">No times available on this date. Please pick another date.</div>'; return; }
+          avail.forEach(function(s){
+            var b=document.createElement('button'); b.type='button'; b.className='timeBtn'; b.textContent=to12h(s.start);
+            b.addEventListener('click', function(){
+              vaxState.slot=s;
+              var prev=grid.querySelectorAll('.timeBtn'); for(var i=0;i<prev.length;i++) prev[i].classList.remove('sel');
+              b.classList.add('sel');
+            });
+            grid.appendChild(b);
+          });
+        })
+        .catch(function(){ grid.innerHTML='<div class="vax-slots-hint">Could not load times. Please try again.</div>'; });
+    }
+
+    function vaxRenderSummary() {
+      var parts=[];
+      if (vaxState.category==='travel' && vaxState.mode==='destination'){
+        parts.push('Travel vaccines for ' + (vaxState.destination||'(destination)'));
+        parts.push('The doctor will advise which vaccines you need.');
+        if (vaxState.travelDate) parts.push('Travel date: ' + vaxState.travelDate);
+      } else {
+        var label = vaxState.category==='travel' ? 'Travel vaccination' : 'Routine vaccination';
+        parts.push(label + ': ' + (vaxState.vaccines.join(', ') || '(none selected)'));
+      }
+      if (vaxState.dateKey && vaxState.slot) parts.push('When: ' + localDate(vaxState.dateKey) + ' at ' + to12h(vaxState.slot.start));
+      parts.push('Where: Spinola Clinic');
+      document.getElementById('vaxSummary').textContent = parts.join('\\n');
+    }
+
+    function vaxNext() {
+      var err=document.getElementById('vaxError'); err.textContent='';
+      if (vaxState.step===1){
+        if (!vaxState.category){ err.textContent='Please choose a category.'; return; }
+        if (vaxState.category==='routine'){ vaxState.mode='vaccine'; }
+        else if (!document.getElementById('vaxModeVaccine').classList.contains('sel') && !document.getElementById('vaxModeDestination').classList.contains('sel')){ vaxPickMode('vaccine'); }
+        vaxShowStep(2);
+        vaxRenderStep2Body();
+        return;
+      }
+      if (vaxState.step===2){
+        if (vaxState.category==='travel' && vaxState.mode==='destination'){
+          var dest=document.getElementById('vaxDestination').value.trim();
+          if (!dest){ err.textContent='Please enter your destination country.'; return; }
+          vaxState.destination=dest;
+          vaxState.travelDate=document.getElementById('vaxTravelDate').value.trim();
+        } else {
+          if (!vaxState.vaccines.length){ err.textContent='Please select at least one vaccine.'; return; }
+        }
+        vaxShowStep(3);
+        vaxPopulateDates();
+        vaxLoadSlots();
+        return;
+      }
+      if (vaxState.step===3){
+        if (!vaxState.dateKey){ err.textContent='Please choose a date.'; return; }
+        if (!vaxState.slot){ err.textContent='Please choose a time.'; return; }
+        vaxShowStep(4);
+        return;
+      }
+    }
+
+    function vaxBack() {
+      if (vaxState.step===2){ vaxShowStep(1); }
+      else if (vaxState.step===3){ vaxShowStep(2); vaxRenderStep2Body(); }
+      else if (vaxState.step===4){ vaxShowStep(3); }
+    }
+
+    async function submitVaccination() {
+      var err=document.getElementById('vaxError'); err.textContent='';
+      var name=document.getElementById('vaxName').value.trim();
+      var phone=document.getElementById('vaxPhone').value.trim();
+      var email=document.getElementById('vaxEmail').value.trim();
+      var notes=document.getElementById('vaxNotes').value.trim();
+      if (!name){ err.textContent='Please enter your full name.'; return; }
+      if (!phone){ err.textContent='Please enter a phone number.'; return; }
+      if (!email){ err.textContent='Please enter your email.'; return; }
+      if (!vaxState.dateKey || !vaxState.slot){ err.textContent='Please choose a date and time.'; vaxShowStep(3); return; }
+      var btn=document.getElementById('vaxSubmitBtn'); btn.disabled=true; btn.textContent='Booking…';
+      var payload={
+        serviceId:'clinic',
+        dateKey:vaxState.dateKey,
+        startTime:vaxState.slot.start,
+        fullName:name, email:email, phone:phone, comments:notes,
+        bookingSource:'vaccination',
+        referralCode:_referralCode||undefined,
+        vaccination:{
+          category:vaxState.category,
+          mode:(vaxState.category==='travel'?vaxState.mode:'vaccine'),
+          vaccines:vaxState.vaccines,
+          destination:vaxState.destination,
+          travelDate:vaxState.travelDate
+        }
+      };
+      try {
+        var res=await fetch('/api/book-spinola',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+        var data=await res.json();
+        if (data && data.ok){
+          var dk=vaxState.dateKey;
+          var msg=t('confirmMsg', data.serviceName, localDate(dk), to12h(data.startTime), to12h(data.endTime), data.location);
+          hideOverlay(document.getElementById('vaxOverlay'));
+          vaxReset();
+          _telemedHidden=[]; // init() will redraw the banners; don't restore stale ones
+          showConfirmModal(msg);
+        } else {
+          err.textContent=(data && data.reason) || 'Could not book. Please try again.';
+        }
+      } catch(e){ err.textContent='Network error — please try again.'; }
+      finally { btn.disabled=false; btn.textContent='Confirm booking'; }
+    }
+
+    window.openVaccinationWizard = openVaccinationWizard;
+    window.closeVaccinationWizard = closeVaccinationWizard;
+    window.vaxPickCategory = vaxPickCategory;
+    window.vaxPickMode = vaxPickMode;
+    window.vaxNext = vaxNext;
+    window.vaxBack = vaxBack;
+    window.vaxLoadSlots = vaxLoadSlots;
+    window.submitVaccination = submitVaccination;
 
   </script>
 ${qrWidget()}

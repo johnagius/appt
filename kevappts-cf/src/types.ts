@@ -141,6 +141,19 @@ export interface BookingPayload {
   phone: string;
   comments?: string;
   hotel?: string;
+  /**
+   * Optional vaccination metadata (Spinola only). When present the Spinola
+   * booking is tagged as a vaccination: the vaccine(s) or travel destination
+   * are folded into service_name + comments. See services/vaccination.ts.
+   */
+  vaccination?: {
+    category?: string;
+    mode?: string;
+    vaccines?: string[];
+    vaccine?: string;
+    destination?: string;
+    travelDate?: string;
+  };
 }
 
 export interface AppConfig {

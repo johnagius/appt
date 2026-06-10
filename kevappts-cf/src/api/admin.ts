@@ -25,10 +25,11 @@ import { verifyAdminSig, generateId } from '../services/crypto';
 import {
   sendClientCancelledEmail, sendRedirectToSpinolaEmail,
   sendAppointmentPushedEmail, sendCustomNotificationEmail, sendReviewRequestEmail,
-  sendFollowUpEmail,
+  sendFollowUpEmail, sendReminderEmail,
   sendClientConfirmationEmail, sendSpinolaConfirmationEmail, sendLindaConfirmationEmail,
 } from '../services/email';
 import { createCalendarEvent, deleteCalendarEvent } from '../services/calendar';
+import { buildVaccinationDescriptor } from '../services/vaccination';
 import { loadLindaConfig } from '../services/linda';
 import { loadBloodTestConfig } from '../services/blood-test';
 
@@ -1753,6 +1754,83 @@ export async function apiAdminPurgeTestData(req: Request, env: Env): Promise<Res
   } catch {}
 
   return json({ ok: true, deleted: result.meta?.changes || 0, message: 'All test data purged.' });
+}
+
+// ─── Test Mode: Vaccination booking + email ───────────────────
+//
+// Creates a TEST- Spinola vaccination appointment and sends the real patient
+// email so the whole flow can be previewed from /test. The booking uses
+// service_id='vaccination-test' so it can NEVER collide with — or block — a
+// real Spinola consultation slot (service_id='clinic'); only the email content
+// matters here. Purge removes it by the TEST- id prefix AND the "Test " name.
+export async function apiAdminCreateTestVaccination(req: Request, env: Env): Promise<Response> {
+  const deny = await requireAdmin(req, env);
+  if (deny) return deny;
+
+  const body: any = await req.json();
+  const cfg = await getConfig(env.DB);
+  const tz = env.TIMEZONE;
+  const now = nowIso(tz);
+  const dateKey = body.dateKey || toDateKey(todayLocal(tz));
+  const startTime = body.startTime || '10:30';
+  const endTime = minutesToTime(parseTimeToMinutes(startTime) + cfg.apptDurationMin);
+  const kind = body.kind === 'reminder' ? 'reminder' : 'confirmation';
+
+  const vax = buildVaccinationDescriptor(body.vaccination || {});
+  const serviceName = vax ? vax.serviceName : 'Vaccination';
+  const summary = vax ? vax.summary : 'Vaccination appointment';
+
+  // Force a "Test …" name so the existing name-based purge always catches it,
+  // even if the user typed just "John".
+  let name = String(body.name || 'Test John').trim() || 'Test John';
+  if (!/^test\b/i.test(name)) name = 'Test ' + name;
+  const email = String(body.email || 'labrint@gmail.com').trim();
+  const phone = String(body.phone || '+35699999999').trim();
+
+  const appt: Appointment = {
+    id: 'TEST-' + generateId(),
+    date_key: dateKey,
+    start_time: startTime,
+    end_time: endTime,
+    service_id: 'vaccination-test',
+    service_name: serviceName,
+    full_name: name,
+    email,
+    phone,
+    comments: summary + '\n\n[TEST vaccination — safe to delete]',
+    status: 'BOOKED',
+    location: cfg.spinolaLocation || 'Spinola Clinic',
+    clinic: 'spinola',
+    created_at: now,
+    updated_at: now,
+    token: generateId(),
+    calendar_event_id: '',
+    cancelled_at: '',
+    cancel_reason: '',
+    reminder_sent: '',
+    confirmed: '',
+    booking_source: 'vaccination',
+    hotel: '',
+  };
+
+  try {
+    await insertAppointment(env.DB, appt);
+  } catch (e: any) {
+    return json({ ok: false, reason: 'Could not create test booking: ' + (e?.message || e) });
+  }
+  await bumpVersion(env.DB);
+
+  try {
+    if (kind === 'reminder') await sendReminderEmail(env, appt);
+    else await sendSpinolaConfirmationEmail(env, appt);
+  } catch (e: any) {
+    return json({ ok: false, reason: 'Booking created but email failed: ' + (e?.message || e) });
+  }
+
+  return json({
+    ok: true,
+    message: `Test vaccination "${serviceName}" booked as "${name}" — ${kind} email sent to ${email}. Use Purge to remove it.`,
+  });
 }
 
 // ─── Test Follow-up ──────────────────────────────────────────

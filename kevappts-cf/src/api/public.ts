@@ -18,6 +18,7 @@ import {
   lookupReferrerByCode, insertReferral,
 } from '../db/queries';
 import { generateId } from '../services/crypto';
+import { buildVaccinationDescriptor } from '../services/vaccination';
 import { sendClientConfirmationEmail, sendDoctorBookingEmail } from '../services/email';
 import { sendSpinolaConfirmationEmail, sendReferralThankYouEmail } from '../services/email';
 import { createCalendarEvent } from '../services/calendar';
@@ -230,6 +231,16 @@ async function doBook(req: Request, env: Env, clinic: 'potters' | 'spinola'): Pr
   const service = { id: 'clinic', name: 'Clinic Consultation', minutes: cfg.apptDurationMin };
   if (serviceId !== service.id) return json({ ok: false, reason: 'Unknown service' }, 400);
 
+  // Vaccinations (Spinola only) ride on the normal Spinola consultation slot
+  // (same service_id so one patient = one slot) but carry the vaccine / travel
+  // destination in the service name + comments. Ignored for Potter's.
+  const vaxInfo = clinic === 'spinola' ? buildVaccinationDescriptor((payload as any).vaccination) : null;
+  const serviceName = vaxInfo ? vaxInfo.serviceName : service.name;
+  const effectiveSource = vaxInfo ? 'vaccination' : bookingSource;
+  const effectiveComments = vaxInfo
+    ? (comments ? vaxInfo.summary + '\n\n' + comments : vaxInfo.summary)
+    : comments;
+
   const endTime = (() => {
     const m = parseTimeToMinutes(startTime) + service.minutes;
     const h = Math.floor(m / 60);
@@ -248,11 +259,11 @@ async function doBook(req: Request, env: Env, clinic: 'potters' | 'spinola'): Pr
     start_time: startTime,
     end_time: endTime,
     service_id: service.id,
-    service_name: service.name,
+    service_name: serviceName,
     full_name: fullName,
     email,
     phone,
-    comments,
+    comments: effectiveComments,
     status: 'BOOKED',
     location,
     clinic,
@@ -264,7 +275,7 @@ async function doBook(req: Request, env: Env, clinic: 'potters' | 'spinola'): Pr
     cancel_reason: '',
     reminder_sent: '',
     confirmed: '',
-    booking_source: bookingSource,
+    booking_source: effectiveSource,
     hotel,
   };
 

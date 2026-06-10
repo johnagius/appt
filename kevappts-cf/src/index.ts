@@ -22,7 +22,7 @@ import {
   apiAdminSendReviewRequests, apiAdminGetWeekOverview, apiAdminSearchAppointments,
   apiAdminGetSettings, apiAdminSaveSettings, apiAdminGetStatistics,
   apiAdminMarkAttendance, apiAdminGetPatientHistory, apiAdminDoctorOffDates,
-  apiAdminCreateTestBooking, apiAdminPurgeTestData, apiAdminTestFollowUp, apiAdminTestReview, apiAdminGetFollowUps, apiAdminToggleFollowUpHandled, apiAdminGetReferrals, apiAdminGetActivity,
+  apiAdminCreateTestBooking, apiAdminCreateTestVaccination, apiAdminPurgeTestData, apiAdminTestFollowUp, apiAdminTestReview, apiAdminGetFollowUps, apiAdminToggleFollowUpHandled, apiAdminGetReferrals, apiAdminGetActivity,
   apiAdminGetLindaStats, apiAdminGetLindaReviewPatients, apiAdminSendLindaReviewRequests, apiAdminGetLindaFollowUps, apiAdminGetLindaAppointments,
   apiAdminGetLindaConfig, apiAdminSaveLindaConfig,
   apiAdminGetRescheduleList, apiAdminRescheduleAppointment,
@@ -223,6 +223,7 @@ export default {
         if (adminPath === 'patient-history' && method === 'GET') return apiAdminGetPatientHistory(request, env);
         if (adminPath === 'doctor-off-dates' && method === 'POST') return apiAdminDoctorOffDates(request, env);
         if (adminPath === 'test-booking' && method === 'POST') return apiAdminCreateTestBooking(request, env);
+        if (adminPath === 'test-vaccination' && method === 'POST') return apiAdminCreateTestVaccination(request, env);
         if (adminPath === 'purge-test-data' && method === 'POST') return apiAdminPurgeTestData(request, env);
         if (adminPath === 'test-followup' && method === 'POST') return apiAdminTestFollowUp(request, env);
         if (adminPath === 'test-review' && method === 'POST') return apiAdminTestReview(request, env);
@@ -753,6 +754,32 @@ function testPage(sig: string): string {
 </div>
 
 <div class="card">
+  <h2>Vaccination Test (Spinola)</h2>
+  <p style="font-size:13px;color:#666;margin-bottom:12px">Books a test Spinola vaccination and sends the real patient email so you can preview it. Uses a "Test …" name so Purge always removes it. Does not touch real Spinola slots.</p>
+  <div class="row">
+    <div><label>Patient Name</label><input type="text" id="vName" value="Test John"></div>
+    <div><label>Email (receives the email)</label><input type="email" id="vEmail" value="labrint@gmail.com"></div>
+  </div>
+  <div class="row">
+    <div><label>Category</label><select id="vCategory" onchange="vToggle()"><option value="travel">Travel</option><option value="routine">Routine</option></select></div>
+    <div><label>Travel mode</label><select id="vMode" onchange="vToggle()"><option value="vaccine">Pick vaccine(s)</option><option value="destination">Destination — doctor advises</option></select></div>
+  </div>
+  <div id="vVaccineWrap"><label>Vaccine(s) — comma separated</label><input type="text" id="vVaccines" placeholder="e.g. Hepatitis A, Typhoid"></div>
+  <div id="vDestWrap" style="display:none">
+    <div class="row">
+      <div><label>Destination country</label><input type="text" id="vDest" placeholder="e.g. Thailand"></div>
+      <div><label>Travel date (optional)</label><input type="text" id="vTravelDate" placeholder="e.g. 15 Aug 2026"></div>
+    </div>
+  </div>
+  <div class="row">
+    <div><label>Date</label><input type="date" id="vDate"></div>
+    <div><label>Time</label><input type="time" id="vTime" value="10:30"></div>
+  </div>
+  <button class="btn btn-book" onclick="createVaccination('confirmation')">Book + Send Confirmation Email</button>
+  <button class="btn btn-quick" style="margin-top:8px;background:#8b5cf6" onclick="createVaccination('reminder')">Book + Send Reminder Email</button>
+</div>
+
+<div class="card">
   <h2>Purge Test Data</h2>
   <p style="font-size:13px;color:#666;margin-bottom:12px">Deletes ALL appointments with TEST- prefix. Real bookings are never affected.</p>
   <button class="btn btn-purge" onclick="purgeAll()">Purge All Test Bookings</button>
@@ -780,6 +807,45 @@ function testPage(sig: string): string {
 var SIG = ${JSON.stringify(sig)};
 var today = new Date().toISOString().split('T')[0];
 document.getElementById('tDate').value = today;
+var vDateEl = document.getElementById('vDate');
+if (vDateEl) vDateEl.value = today;
+
+function vToggle() {
+  var cat = document.getElementById('vCategory').value;
+  var mode = document.getElementById('vMode').value;
+  var isDest = cat === 'travel' && mode === 'destination';
+  document.getElementById('vDestWrap').style.display = isDest ? 'block' : 'none';
+  document.getElementById('vVaccineWrap').style.display = isDest ? 'none' : 'block';
+  // Travel mode select only matters for the travel category.
+  document.getElementById('vMode').parentElement.style.opacity = cat === 'travel' ? '1' : '0.4';
+}
+
+async function createVaccination(kind) {
+  var cat = document.getElementById('vCategory').value;
+  var mode = document.getElementById('vMode').value;
+  var vaccines = document.getElementById('vVaccines').value.split(',').map(function(s){return s.trim();}).filter(Boolean);
+  var vaccination = {
+    category: cat,
+    mode: cat === 'travel' ? mode : 'vaccine',
+    vaccines: vaccines,
+    destination: document.getElementById('vDest').value.trim(),
+    travelDate: document.getElementById('vTravelDate').value.trim()
+  };
+  var body = {
+    name: document.getElementById('vName').value.trim(),
+    email: document.getElementById('vEmail').value.trim(),
+    dateKey: document.getElementById('vDate').value,
+    startTime: document.getElementById('vTime').value,
+    kind: kind,
+    vaccination: vaccination
+  };
+  log('Creating test vaccination (' + kind + ' email)...');
+  try {
+    var res = await api('test-vaccination', body);
+    if (res.ok) log('OK: ' + res.message);
+    else log('ERROR: ' + (res.reason || 'Unknown error'));
+  } catch(e) { log('FAILED: ' + e.message); }
+}
 
 function log(msg) {
   var el = document.getElementById('log');
