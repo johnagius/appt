@@ -701,7 +701,7 @@ export function indexPage(env: Env, bookingSource?: string): string {
     .vax-check:hover{ border-color:#93c5fd; }
     .vax-check.sel{ border-color:#2563eb; background:#eff6ff; }
     .vax-check input{ width:auto; margin:0; accent-color:#2563eb; }
-    .vax-slots{ display:flex; flex-wrap:wrap; gap:8px; }
+    .vax-slots{ display:flex; flex-wrap:wrap; gap:8px; max-height:42vh; overflow-y:auto; align-content:flex-start; }
     .vax-slots .timeBtn{ flex:0 0 auto; padding:10px 14px; border:1.5px solid var(--line); border-radius:10px; background:#fff; font-weight:700; font-size:14px; cursor:pointer; color:#111827; }
     .vax-slots .timeBtn:hover{ border-color:#2563eb; }
     .vax-slots .timeBtn.sel{ background:#2563eb; color:#fff; border-color:#2563eb; }
@@ -4467,7 +4467,13 @@ export function indexPage(env: Env, bookingSource?: string): string {
           grid.innerHTML='';
           var avail = (res && res.slots ? res.slots : []).filter(function(s){ return s.available; });
           if (!res || !res.ok || !avail.length){ grid.innerHTML='<div class="vax-slots-hint">No times available on this date. Please pick another date.</div>'; return; }
-          avail.forEach(function(s){
+          // Spinola slots are every few minutes, which is far too much choice
+          // for a vaccination. Show only :00 / :30 marks so the list stays
+          // short and fits the modal. Fall back to the full list only if no
+          // half-hour mark happens to be free, so we never hide all availability.
+          var coarse = avail.filter(function(s){ return (parseInt((s.start.split(':')[1]||'0'),10) % 30) === 0; });
+          var shown = coarse.length ? coarse : avail;
+          shown.forEach(function(s){
             var b=document.createElement('button'); b.type='button'; b.className='timeBtn'; b.textContent=to12h(s.start);
             b.addEventListener('click', function(){
               vaxState.slot=s;
