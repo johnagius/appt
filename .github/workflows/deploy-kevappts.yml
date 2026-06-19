@@ -1,0 +1,55 @@
+name: Deploy kevappts-cf to Cloudflare
+
+# Deploys the Worker whenever kevappts-cf changes land on main (the repo's
+# always-push-to-main workflow), plus a manual "Run workflow" button. Auth uses
+# the CLOUDFLARE_API_TOKEN + CLOUDFLARE_ACCOUNT_ID repository secrets — wrangler
+# reads them from the environment automatically (no `wrangler login` needed).
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'kevappts-cf/**'
+      - '.github/workflows/deploy-kevappts.yml'
+  workflow_dispatch:
+
+# Never let two deploys overlap; let an in-flight one finish.
+concurrency:
+  group: deploy-kevappts
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: kevappts-cf
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # package-lock.json is gitignored, so `npm install` (not `npm ci`).
+      - name: Install dependencies
+        run: npm install
+
+      # Schema is fully idempotent (CREATE TABLE/INDEX IF NOT EXISTS, INSERT OR
+      # IGNORE seeds), so it's safe to run every deploy. Best-effort: a hiccup
+      # here (e.g. nothing to change) must never block shipping the code below.
+      - name: Apply D1 schema (idempotent, best-effort)
+        continue-on-error: true
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx wrangler d1 execute kevappts-db --remote --file=schema.sql --yes
+
+      # wrangler bundles the TypeScript entry, applies the Durable Object
+      # migration, sets crons + vars, and preserves existing Worker secrets.
+      - name: Deploy Worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx wrangler deploy
