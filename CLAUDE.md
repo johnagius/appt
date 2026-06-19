@@ -51,6 +51,14 @@ Notes for the user:
   edit) and `CLOUDFLARE_ACCOUNT_ID` are set as environment secrets. With those,
   `npx wrangler deploy` / `d1 execute` run non-interactively — no `wrangler
   login`. The network policy must allow `api.cloudflare.com`.
+- Auto-deploy (preferred): pushing `kevappts-cf/**` to `main` triggers the
+  GitHub Actions workflow `.github/workflows/deploy-kevappts.yml`, which runs the
+  idempotent D1 schema then `wrangler deploy`. It authenticates with the
+  `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` **GitHub Actions repository
+  secrets** (Settings → Secrets and variables → Actions — distinct from Claude
+  Code environment secrets). So a normal commit-to-`main` already ships
+  `kevappts-cf`; the Windows command below is only needed as a manual fallback.
+  Can also be run on demand from the Actions tab ("Run workflow").
 
 ### Reserve & Collect app (`reserve-collect-cf`)
 
