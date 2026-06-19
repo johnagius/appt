@@ -18,7 +18,7 @@ import { apiGetCancelInfo, apiCancelAppointment, apiDoctorAction, apiGetReschedu
 import {
   apiAdminGetDashboard, apiAdminGetDateAppointments, apiAdminMarkDoctorOff,
   apiAdminAddExtraSlots, apiAdminRemoveDoctorOff, apiAdminRemoveExtraSlots,
-  apiAdminProcessAppointments, apiAdminNotifyPatients, apiAdminGetReviewPatients,
+  apiAdminProcessAppointments, apiAdminCancelAppointment, apiAdminNotifyPatients, apiAdminGetReviewPatients,
   apiAdminSendReviewRequests, apiAdminGetWeekOverview, apiAdminSearchAppointments,
   apiAdminGetSettings, apiAdminSaveSettings, apiAdminGetStatistics,
   apiAdminMarkAttendance, apiAdminGetPatientHistory, apiAdminDoctorOffDates,
@@ -209,6 +209,7 @@ export default {
         if (adminPath === 'doctor-off' && method === 'POST') return apiAdminMarkDoctorOff(request, env);
         if (adminPath === 'extra-slots' && method === 'POST') return apiAdminAddExtraSlots(request, env);
         if (adminPath === 'process' && method === 'POST') return apiAdminProcessAppointments(request, env);
+        if (adminPath === 'cancel-appointment' && method === 'POST') return apiAdminCancelAppointment(request, env);
         if (adminPath === 'notify' && method === 'POST') return apiAdminNotifyPatients(request, env);
         if (adminPath === 'reviews' && method === 'GET') return apiAdminGetReviewPatients(request, env);
         if (adminPath === 'reviews/send' && method === 'POST') return apiAdminSendReviewRequests(request, env);

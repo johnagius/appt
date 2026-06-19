@@ -1534,6 +1534,7 @@ function gasCall(method, args) {
     'apiAdminGetDashboard': { ep: 'dashboard' },
     'apiAdminGetDateAppointments': { ep: 'appointments?date=' },
     'apiAdminProcessAppointments': { ep: 'process', post: true },
+    'apiAdminCancelAppointment': { ep: 'cancel-appointment', post: true },
     'apiAdminMarkDoctorOff': { ep: 'doctor-off', post: true },
     'apiAdminRemoveDoctorOff': { ep: 'doctor-off/', del: true },
     'apiAdminAddExtraSlots': { ep: 'extra-slots', post: true },
@@ -1672,6 +1673,7 @@ var google = { script: { run: null } };
   // Dynamically add all known methods
   var methods = [
     'apiAdminGetDashboard', 'apiAdminGetDateAppointments', 'apiAdminProcessAppointments',
+    'apiAdminCancelAppointment',
     'apiAdminMarkDoctorOff', 'apiAdminRemoveDoctorOff', 'apiAdminAddExtraSlots',
     'apiAdminRemoveExtraSlots', 'apiAdminNotifyPatients', 'apiAdminMarkAttendance',
     'apiAdminGetWeekOverview', 'apiAdminSearchAppointments', 'apiAdminGetStatistics',
@@ -4033,10 +4035,8 @@ function cancelSingleAppt(appointmentId, containerId) {
       var msgId = containerId === 'actionApptsList' ? 'actionMsg' : 'notifyResultMsg';
       showMsg(msgId, 'bad', 'Error: ' + (err && err.message ? err.message : String(err)));
     })
-    .apiAdminProcessAppointments(SIG, {
-      dateKey: dateKey,
-      action: 'cancel',
-      appointmentIds: [appointmentId],
+    .apiAdminCancelAppointment(SIG, {
+      appointmentId: appointmentId,
       customMessage: ''
     });
   });

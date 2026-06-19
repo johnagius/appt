@@ -689,6 +689,58 @@ export async function apiAdminProcessAppointments(req: Request, env: Env): Promi
   return json({ ok: true, message: `Processed ${results.length} appointment(s).`, processed: results.length, results });
 }
 
+// ─── Cancel a Single Appointment (any clinic) ──────────────
+
+// The per-row "Cancel" button in the schedule / quick-action tables cancels
+// ONE specific appointment by ID. Unlike the bulk doctor-availability actions
+// in apiAdminProcessAppointments (which deliberately skip Linda physio and
+// blood tests, since those aren't tied to Dr Kevin's availability), an explicit
+// single cancel must work for EVERY clinic — that's exactly what the button
+// promises. Routing it through the bulk endpoint silently dropped Linda/blood
+// rows and returned "No appointments to process" while the UI reported success.
+// Mirrors apiAdminMarkAttendance: look up by ID, update status, notify, broadcast.
+export async function apiAdminCancelAppointment(req: Request, env: Env): Promise<Response> {
+  const denied = await requireAdmin(req, env);
+  if (denied) return denied;
+
+  const payload: any = await req.json();
+  const id = (payload.appointmentId || '').trim();
+  const customMessage = (payload.customMessage || '').trim();
+  if (!id) return json({ ok: false, reason: 'Missing appointment ID.' }, 400);
+
+  const appt = await getAppointmentById(env.DB, id);
+  if (!appt) return json({ ok: false, reason: 'Appointment not found.' }, 404);
+
+  // Already cancelled / processed — report it so the UI can settle, but make it
+  // clear nothing changed rather than a misleading "cancelled" confirmation.
+  if (appt.status !== 'BOOKED' && appt.status !== 'RELOCATED_SPINOLA') {
+    return json({ ok: true, alreadyCancelled: true, message: 'This appointment is already cancelled.', appointmentId: appt.id });
+  }
+
+  const now = nowIso(env.TIMEZONE);
+
+  // Drop the calendar event on the appointment's own clinic calendar.
+  if (appt.calendar_event_id) {
+    try { await deleteCalendarEvent(env, appt.calendar_event_id, (appt.clinic as any) || 'potters'); } catch {}
+  }
+
+  await updateAppointmentStatus(env.DB, appt.id, {
+    status: 'CANCELLED_DOCTOR',
+    cancelled_at: now,
+    cancel_reason: customMessage || 'Cancelled by clinic',
+    calendar_event_id: '',
+  }, now);
+  await bumpVersion(env.DB);
+  await broadcast(env, appt.date_key);
+
+  // Notify the patient (best-effort — never block the cancel on email/calendar).
+  const msg = customMessage || 'Your appointment has been cancelled. Please rebook if needed.';
+  const ctx = (globalThis as any).__ctx;
+  if (ctx?.waitUntil) ctx.waitUntil(sendClientCancelledEmail(env, appt, msg).catch(() => {}));
+
+  return json({ ok: true, message: 'Appointment cancelled.', appointmentId: appt.id });
+}
+
 // ─── Notify Patients ───────────────────────────────────────
 
 export async function apiAdminNotifyPatients(req: Request, env: Env): Promise<Response> {
