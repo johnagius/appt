@@ -2747,9 +2747,8 @@ function lcUpdateBookBtn(){
   var ok = hasTime;
   if (lcState.bookMode === 'new'){
     var nm = document.getElementById('lcName').value.trim();
-    var ph = document.getElementById('lcPhone').value.trim();
-    var em = document.getElementById('lcEmail').value.trim();
-    ok = hasTime && nm.length > 1 && (ph.length >= 6 || em.length > 3);
+    // Contact details are optional for staff bookings — only a name is required.
+    ok = hasTime && nm.length > 1;
   }
   btn.disabled = !ok;
   btn.textContent = !hasTime ? (lcState.custom ? 'Enter a time' : 'Select a time') : (lcState.bookMode === 'reschedule' ? 'Move appointment' : 'Create booking');
@@ -2810,7 +2809,7 @@ async function lcEditDoSave(quiet){
   var name = document.getElementById('lcEditName').value.trim();
   var phone = document.getElementById('lcEditPhone').value.trim();
   var email = document.getElementById('lcEditEmail').value.trim();
-  if (!name || (!phone && !email)){ if (!quiet){ msg.style.color = '#dc2626'; msg.textContent = 'Name and phone or email required.'; } return; }
+  if (!name){ if (!quiet){ msg.style.color = '#dc2626'; msg.textContent = 'A name is required.'; } return; }
   msg.style.color = '#6b7280'; msg.textContent = 'Saving…';
   var res = await lindaApi('linda-edit-appointment', { body: {
     appointmentId: lcEditId, fullName: name, phone: phone, email: email,

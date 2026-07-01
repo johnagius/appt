@@ -789,8 +789,11 @@ export async function apiLindaNewBooking(req: Request, env: Env): Promise<Respon
   const phone = String(body.phone || '').trim();
   const comments = String(body.comments || '').trim();
 
-  if (!dateKey || !startTime || !fullName || (!email && !phone)) {
-    return json({ ok: false, reason: 'Name and at least one of email or phone are required.' }, 400);
+  // Staff-side booking: only a name is required. Linda often books people
+  // whose phone/email she doesn't have yet, so contact details are optional
+  // here (the public /physio page still requires them).
+  if (!dateKey || !startTime || !fullName) {
+    return json({ ok: false, reason: 'A name, date and time are required.' }, 400);
   }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) return json({ ok: false, reason: 'Invalid date.' }, 400);
 
@@ -998,7 +1001,7 @@ export async function apiLindaEditAppointment(req: Request, env: Env): Promise<R
   const phone = String(body.phone || '').trim();
   const comments = String(body.comments || '').trim();
   if (!id) return json({ ok: false, reason: 'Missing id.' }, 400);
-  if (!fullName || (!email && !phone)) return json({ ok: false, reason: 'Name and at least one of phone or email are required.' }, 400);
+  if (!fullName) return json({ ok: false, reason: 'A name is required.' }, 400);
 
   const appt = await getAppointmentById(env.DB, id);
   if (!appt || appt.clinic !== 'linda') return json({ ok: false, reason: 'Appointment not found.' }, 404);
@@ -1009,12 +1012,20 @@ export async function apiLindaEditAppointment(req: Request, env: Env): Promise<R
     .bind(fullName, email, phone, comments, now, id).run();
 
   let updatedFuture = 0;
-  if (body.applyToFuture === true) {
+  // Only fan out to future bookings when we have a real identifier to match on
+  // — matching on empty email AND empty phone would rewrite every contactless
+  // booking. Match on whichever of email/phone the original actually had.
+  if (body.applyToFuture === true && (oldEmail || oldPhone)) {
     const todayKey = todayKeyLocal(env.TIMEZONE);
+    const conds: string[] = [];
+    const binds: any[] = [fullName, email, phone, now, todayKey];
+    if (oldEmail) { conds.push('email = ?'); binds.push(oldEmail); }
+    if (oldPhone) { conds.push('phone = ?'); binds.push(oldPhone); }
+    binds.push(id);
     const res = await env.DB.prepare(
       "UPDATE appointments SET full_name = ?, email = ?, phone = ?, updated_at = ? " +
-      "WHERE clinic = 'linda' AND date_key >= ? AND status NOT LIKE '%CANCELLED%' AND email = ? AND phone = ? AND id != ?"
-    ).bind(fullName, email, phone, now, todayKey, oldEmail, oldPhone, id).run();
+      "WHERE clinic = 'linda' AND date_key >= ? AND status NOT LIKE '%CANCELLED%' AND (" + conds.join(' OR ') + ") AND id != ?"
+    ).bind(...binds).run();
     updatedFuture = res.meta?.changes || 0;
   }
 
@@ -1615,6 +1626,9 @@ function lindaMainPage(env: Env): string {
   .stint-when{font-size:14px;font-weight:800;}
   .stint-hours{font-size:13px;color:#065f46;font-weight:700;margin-top:3px;}
   .stint-actions{display:flex;gap:6px;justify-content:flex-end;margin-top:8px;}
+  .stint-past-toggle{width:100%;margin:4px 0 6px;background:none;border:1px dashed var(--line);color:var(--muted);border-radius:10px;font-size:12.5px;font-weight:700;padding:9px 12px;cursor:pointer;transition:background .16s ease,border-color .16s ease,color .16s ease;}
+  .stint-past-toggle:hover{background:#f8fafc;border-color:#d7dbe4;color:var(--text);}
+  #stintPastList .stint-row{opacity:.72;}
   @media (prefers-color-scheme: dark){ .stint-row{background:#0f172a;} }
 
   /* Stint editor sheet */
@@ -2522,16 +2536,33 @@ function lindaMainPage(env: Env): string {
         el.innerHTML = '<div class="empty" style="margin:0;border:none;padding:12px 0;">No stints yet. Tap + Add a stint.</div>';
         return;
       }
-      var html = '';
-      for (var i = 0; i < winCache.length; i++){
+      // Only show periods that are current or in the future (end date >= today).
+      // Past periods pile up over time, so they're tucked behind a toggle. A
+      // period that spans today counts as current and stays visible.
+      var tk = today();
+      function stintRow(i){
         var w = winCache[i];
-        html += '<div class="stint-row">';
-        html +=   '<div class="stint-when">' + esc(formatNiceShort(w.start)) + ' → ' + esc(formatNiceShort(w.end)) + (w.note ? ' · <span style="color:var(--muted);font-weight:500;">' + esc(w.note) + '</span>' : '') + '</div>';
-        html +=   '<div class="stint-hours">' + esc(stintHoursSummary(w)) + '</div>';
-        html +=   '<div class="stint-actions">';
-        html +=     '<button class="extra-edit" onclick="editStint(' + i + ')">Edit</button>';
-        html +=     '<button class="extra-del" onclick="deleteWindow(' + w.id + ')">Remove</button>';
-        html +=   '</div>';
+        var h = '<div class="stint-row">';
+        h +=   '<div class="stint-when">' + esc(formatNiceShort(w.start)) + ' → ' + esc(formatNiceShort(w.end)) + (w.note ? ' · <span style="color:var(--muted);font-weight:500;">' + esc(w.note) + '</span>' : '') + '</div>';
+        h +=   '<div class="stint-hours">' + esc(stintHoursSummary(w)) + '</div>';
+        h +=   '<div class="stint-actions">';
+        h +=     '<button class="extra-edit" onclick="editStint(' + i + ')">Edit</button>';
+        h +=     '<button class="extra-del" onclick="deleteWindow(' + w.id + ')">Remove</button>';
+        h +=   '</div>';
+        h += '</div>';
+        return h;
+      }
+      var upcoming = [], past = [];
+      for (var i = 0; i < winCache.length; i++){
+        if ((winCache[i].end || '') >= tk) upcoming.push(i); else past.push(i);
+      }
+      var html = '';
+      for (var u = 0; u < upcoming.length; u++) html += stintRow(upcoming[u]);
+      if (!upcoming.length) html += '<div class="empty" style="margin:0 0 8px;border:none;padding:12px 0;">No current or upcoming periods. Tap + Add a stint.</div>';
+      if (past.length){
+        html += '<button class="stint-past-toggle" id="stintPastToggle" onclick="togglePastStints()">Show ' + past.length + ' past period' + (past.length === 1 ? '' : 's') + ' ▾</button>';
+        html += '<div id="stintPastList" style="display:none;">';
+        for (var p = 0; p < past.length; p++) html += stintRow(past[p]);
         html += '</div>';
       }
       el.innerHTML = html;
@@ -2539,6 +2570,18 @@ function lindaMainPage(env: Env): string {
       el.innerHTML = '<div class="err" style="margin:0;">Network error.</div>';
     }
   }
+  window.togglePastStints = function(){
+    var list = $('stintPastList'), btn = $('stintPastToggle');
+    if (!list || !btn) return;
+    var show = list.style.display === 'none';
+    list.style.display = show ? '' : 'none';
+    if (show){
+      btn.textContent = 'Hide past periods ▴';
+    } else {
+      var n = list.querySelectorAll('.stint-row').length;
+      btn.textContent = 'Show ' + n + ' past period' + (n === 1 ? '' : 's') + ' ▾';
+    }
+  };
 
   window.editStint = function(i){ openStintEditor(winCache[i]); };
 
@@ -3581,7 +3624,7 @@ function lindaMainPage(env: Env): string {
   // "Done" button (close the sheet after saving).
   async function doEditSave(quiet){
     var name = $('editName').value.trim(), phone = $('editPhone').value.trim(), email = $('editEmail').value.trim();
-    if (!name || (!phone && !email)){ if (!quiet) setEditMsg('Name and phone or email required.', 'bad'); return false; }
+    if (!name){ if (!quiet) setEditMsg('A name is required.', 'bad'); return false; }
     editSaving = true;
     setEditMsg('Saving…', '');
     try {
@@ -3718,7 +3761,7 @@ function lindaMainPage(env: Env): string {
   function updateSheetSubmit(){
     var dk = $('bfDate').value;
     var hasTime = sheet.custom ? !!$('bfCustomTime').value : !!sheet.slot;
-    var hasPatient = sheet.mode === 'reschedule' || ($('bfName').value.trim() && ($('bfPhone').value.trim() || $('bfEmail').value.trim()));
+    var hasPatient = sheet.mode === 'reschedule' || !!$('bfName').value.trim();
     $('bfSubmit').disabled = !(dk && hasTime && hasPatient);
   }
   ['bfName','bfPhone','bfEmail'].forEach(function(id){ $(id).addEventListener('input', updateSheetSubmit); });
@@ -4161,9 +4204,11 @@ function lindaMainPage(env: Env): string {
     // visible instead of stacking on top of one another.
     for (var dkey in byDay){ if (byDay.hasOwnProperty(dkey)) packWeekCols(byDay[dkey].appts); }
 
-    // Crop the grid to the week's actual span so we don't render a long empty
-    // morning (or evening). Fall back to the full default window when the week
-    // is empty. Always keep ~an hour of breathing room around the content.
+    // Crop the grid to the week's ACTUAL APPOINTMENTS so it doesn't render a
+    // long empty morning. Availability windows are deliberately NOT used to
+    // extend the range — stale/legacy morning hours (e.g. an old 12:59
+    // workaround) would otherwise pull the grid up into empty space. If there
+    // genuinely are morning appointments, the grid grows to include them.
     var minMin = null, maxMin = null;
     for (var dk2 in byDay){
       if (!byDay.hasOwnProperty(dk2)) continue;
@@ -4173,16 +4218,13 @@ function lindaMainPage(env: Env): string {
         if (minMin === null || s0 < minMin) minMin = s0;
         if (maxMin === null || e0 > maxMin) maxMin = e0;
       }
-      for (var w0 = 0; w0 < dd0.windows.length; w0++){
-        var ws0 = timeToMin(dd0.windows[w0].start), we0 = timeToMin(dd0.windows[w0].end);
-        if (minMin === null || ws0 < minMin) minMin = ws0;
-        if (maxMin === null || we0 > maxMin) maxMin = we0;
-      }
     }
-    var hourStart = WG_HOUR_START, hourEnd = WG_HOUR_END;
+    var hourStart, hourEnd;
     if (minMin !== null){
       hourStart = Math.max(6, Math.floor(minMin / 60) - 1);          // ~1h of context above
-      hourEnd = Math.min(23, Math.max(hourStart + 4, Math.ceil(maxMin / 60) + 1)); // ~1h below, min 4h tall
+      hourEnd = Math.min(23, Math.max(hourStart + 5, Math.ceil(maxMin / 60) + 1)); // ~1h below, min 5h tall
+    } else {
+      hourStart = 9; hourEnd = 19;   // empty week — compact default, not 07–21
     }
 
     var html = '<div class="wg-grid">';
