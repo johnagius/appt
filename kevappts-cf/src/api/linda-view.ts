@@ -790,9 +790,19 @@ export async function apiLindaNewBooking(req: Request, env: Env): Promise<Respon
   const off = await isLindaDayOff(env.DB, dateKey);
   if (off) return json({ ok: false, reason: "That date is marked as a day off — remove the day-off first or pick another date." }, 400);
   const blocks = await getLindaBlocksForDate(env.DB, dateKey);
-  const slots = buildLindaSlots(dateKey, cfg, extras, false, blocks);
-  const slotFound = slots.find(s => s.start === startTime);
-  if (!slotFound) return json({ ok: false, reason: "No hours set for this time \u2014 open availability or remove a block first." }, 400);
+  // Custom time: staff can book an off-grid time (e.g. 18:15) that isn't a normal
+  // slot. Skips the in-hours check; day-off + clash checks still apply.
+  const customTime = body.customTime === true || body.force === true;
+  let slotFound: { start: string; end: string } | undefined;
+  if (customTime) {
+    if (!/^\d{2}:\d{2}$/.test(startTime)) return json({ ok: false, reason: 'Enter a time as HH:MM (e.g. 18:15).' }, 400);
+    const em = parseTimeToMinutes(startTime) + (cfg.slotMin || 30);
+    slotFound = { start: startTime, end: String(Math.floor(em / 60)).padStart(2, '0') + ':' + String(em % 60).padStart(2, '0') };
+  } else {
+    const slots = buildLindaSlots(dateKey, cfg, extras, false, blocks);
+    slotFound = slots.find(s => s.start === startTime);
+  }
+  if (!slotFound) return json({ ok: false, reason: 'No hours set for this time - open availability, tick custom time, or remove a block.' }, 400);
 
   if (await isSlotTaken(env.DB, dateKey, startTime, 'linda')) {
     return json({ ok: false, reason: 'That slot is already taken.' }, 400);
@@ -1500,8 +1510,9 @@ function lindaMainPage(env: Env): string {
   .se-pill{width:42px;height:42px;border-radius:50%;border:1.5px solid var(--line);background:#fff;font-size:14px;font-weight:800;color:var(--muted);cursor:pointer;transition:transform .15s var(--ease),background .15s,border-color .15s,color .15s;}
   .se-pill:active{transform:scale(.92);}
   .se-pill.on{background:#ecfdf5;border-color:var(--accent);color:#065f46;}
-  .se-seg{position:absolute;top:0;bottom:0;background:var(--accent);opacity:.62;pointer-events:auto;cursor:pointer;}
-  .se-seg.preview{opacity:.85;background:#0ea5e9;pointer-events:none;}
+  .se-seg{position:absolute;top:0;bottom:0;background:var(--accent);opacity:.62;pointer-events:none;}
+  .se-seg.preview{opacity:.85;background:#0ea5e9;}
+  .se-grip{position:absolute;top:0;bottom:0;width:5px;background:#065f46;opacity:.65;border-radius:2px;pointer-events:none;}
   .se-summary{font-size:13px;font-weight:700;color:var(--text);margin-top:9px;line-height:1.5;}
   @media (prefers-color-scheme: dark){ .se-pill{background:#0f172a;color:#94a3b8;} .se-pill.on{background:#022c22;color:#6ee7b7;} }
   .tl-action-row{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;}
@@ -1528,8 +1539,11 @@ function lindaMainPage(env: Env): string {
     .ovr-row{background:#0f172a;}
     .tl-action-btn.block{background:#450a0a;color:#fecaca;border-color:#7f1d1d;}
   }
-  .tl-ticks{display:flex;margin-top:2px;}
-  .tl-tick{flex:1 1 0;text-align:center;font-size:10px;color:var(--muted);font-weight:700;letter-spacing:.4px;}
+  /* Ticks are absolutely positioned at their true time %, so the labels line up
+     exactly with the bar (a flex row put them ~8% off, which made the drag
+     tooltip look like it disagreed with the scale). */
+  .tl-ticks{position:relative;height:14px;margin-top:2px;}
+  .tl-tick{position:absolute;font-size:10px;color:var(--muted);font-weight:700;letter-spacing:.4px;white-space:nowrap;}
   .tl-legend{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;font-size:11px;color:var(--muted);}
   .tl-legend-dot{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:middle;}
   .tl-sel-txt{font-size:13px;font-weight:700;margin-top:8px;color:var(--text);}
@@ -1863,7 +1877,7 @@ function lindaMainPage(env: Env): string {
   <div class="sheet-section">
     <div class="sheet-label">Hours (drag the bar)</div>
     <div class="tl-bar" id="seBar" style="height:60px;"></div>
-    <div class="tl-ticks" style="margin-top:3px;"><div class="tl-tick">07</div><div class="tl-tick">10</div><div class="tl-tick">13</div><div class="tl-tick">16</div><div class="tl-tick">19</div><div class="tl-tick">22</div></div>
+    <div class="tl-ticks" style="margin-top:3px;"><div class="tl-tick" style="left:0;">07</div><div class="tl-tick" style="left:20%;transform:translateX(-50%);">10</div><div class="tl-tick" style="left:40%;transform:translateX(-50%);">13</div><div class="tl-tick" style="left:60%;transform:translateX(-50%);">16</div><div class="tl-tick" style="left:80%;transform:translateX(-50%);">19</div><div class="tl-tick" style="right:0;">22</div></div>
     <div class="se-summary" id="seSummary"></div>
   </div>
   <div class="sheet-section">
@@ -1919,8 +1933,15 @@ function lindaMainPage(env: Env): string {
   </div>
 
   <div class="sheet-section">
-    <div class="sheet-label">Time</div>
-    <div id="bfSlots"><div class="sheet-msg">Pick a date first.</div></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+      <div class="sheet-label" style="margin-bottom:0;">Time</div>
+      <label id="bfCustomLabel" style="display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:800;color:#065f46;cursor:pointer;"><input type="checkbox" id="bfCustomToggle" onchange="toggleCustomTime()"> Custom time</label>
+    </div>
+    <div id="bfSlots" style="margin-top:6px;"><div class="sheet-msg">Pick a date first.</div></div>
+    <div id="bfCustomWrap" style="display:none;margin-top:6px;">
+      <input class="sheet-input" type="time" id="bfCustomTime" step="300" oninput="updateSheetSubmit()">
+      <p class="hint" style="margin-top:5px;">Any time — e.g. 18:15. Books off-grid regardless of the usual slots.</p>
+    </div>
     <div id="bfOpenPrompt" class="open-prompt" style="display:none;">
       <b>Not a working day yet.</b><br>
       Open these hours quickly so you can book:
@@ -2344,9 +2365,9 @@ function lindaMainPage(env: Env): string {
   window.openAddWindow = function(){ openStintEditor(null); };
 
   // ── Stint editor (compose hours on the bar) ──────────────────
-  var SE = { id: 0, ranges: [], days: {}, preview: null, drag: { active: false, start: 0 } };
+  var SE = { id: 0, ranges: [], days: {}, preview: null, mode: null, resizeIdx: -1, resizeEdge: '', insideIdx: -1, moved: false, drag: { active: false, start: 0 } };
   var seWired = false;
-  var SE_START = 7 * 60, SE_END = 22 * 60, SE_TOTAL = SE_END - SE_START, SE_SNAP = 15;
+  var SE_START = 7 * 60, SE_END = 22 * 60, SE_TOTAL = SE_END - SE_START, SE_SNAP = 15, SE_EDGE_PX = 12;
   function sePct(m){ var c = Math.max(SE_START, Math.min(SE_END, m)); return ((c - SE_START) / SE_TOTAL) * 100; }
   function seXToMin(x){ var bar = $('seBar'); if (!bar) return 0; var r = bar.getBoundingClientRect(); var p = Math.max(0, Math.min(1, (x - r.left) / r.width)); return Math.round((SE_START + p * SE_TOTAL) / SE_SNAP) * SE_SNAP; }
   function seMerge(){
@@ -2355,21 +2376,20 @@ function lindaMainPage(env: Env): string {
     for (var i = 0; i < SE.ranges.length; i++){ var r = SE.ranges[i]; if (out.length && r.s <= out[out.length-1].e){ out[out.length-1].e = Math.max(out[out.length-1].e, r.e); } else out.push({ s: r.s, e: r.e }); }
     SE.ranges = out;
   }
+  function seTip(s, e){ return '<div class="tl-tip" style="left:' + ((sePct(s) + sePct(e)) / 2) + '%;">' + minToTime(s) + ' – ' + minToTime(e) + '</div>'; }
   function seRenderBar(){
     var bar = $('seBar'); if (!bar) return;
     var html = '';
-    for (var i = 0; i < SE.ranges.length; i++){ var r = SE.ranges[i]; html += '<div class="se-seg" data-i="' + i + '" style="left:' + sePct(r.s) + '%;width:' + (sePct(r.e) - sePct(r.s)) + '%;"></div>'; }
-    if (SE.drag.active && SE.preview){
-      html += '<div class="se-seg preview" style="left:' + sePct(SE.preview.s) + '%;width:' + (sePct(SE.preview.e) - sePct(SE.preview.s)) + '%;"></div>';
-      html += '<div class="tl-tip" style="left:' + ((sePct(SE.preview.s) + sePct(SE.preview.e)) / 2) + '%;">' + minToTime(SE.preview.s) + ' – ' + minToTime(SE.preview.e) + '</div>';
+    for (var i = 0; i < SE.ranges.length; i++){
+      var r = SE.ranges[i], l = sePct(r.s), w = sePct(r.e) - sePct(r.s);
+      html += '<div class="se-seg" style="left:' + l + '%;width:' + w + '%;"><span class="se-grip" style="left:0;"></span><span class="se-grip" style="right:0;"></span></div>';
+    }
+    if (SE.drag.active && SE.mode === 'create' && SE.preview){
+      html += '<div class="se-seg preview" style="left:' + sePct(SE.preview.s) + '%;width:' + (sePct(SE.preview.e) - sePct(SE.preview.s)) + '%;"></div>' + seTip(SE.preview.s, SE.preview.e);
+    } else if (SE.drag.active && SE.mode === 'resize' && SE.ranges[SE.resizeIdx]){
+      var rr = SE.ranges[SE.resizeIdx]; html += seTip(rr.s, rr.e);
     }
     bar.innerHTML = html;
-    Array.prototype.forEach.call(bar.querySelectorAll('.se-seg[data-i]'), function(seg){
-      var stop = function(ev){ ev.stopPropagation(); };
-      seg.addEventListener('mousedown', stop);
-      seg.addEventListener('touchstart', stop, { passive: true });
-      seg.addEventListener('click', function(ev){ ev.stopPropagation(); SE.ranges.splice(+seg.getAttribute('data-i'), 1); seRenderBar(); seSummary(); });
-    });
     seSummary();
   }
   function seSummary(){
@@ -2377,11 +2397,42 @@ function lindaMainPage(env: Env): string {
     var days = DOW_ORDER.filter(function(k){ return SE.days[k]; });
     var rTxt = SE.ranges.length ? SE.ranges.map(function(r){ return minToTime(r.s) + '–' + minToTime(r.e); }).join(' & ') : '—';
     var dTxt = days.length === 7 ? 'Every day' : days.length ? days.map(function(k){ return k.charAt(0)+k.slice(1).toLowerCase(); }).join(', ') : 'No days';
-    el.innerHTML = SE.ranges.length ? ('<b>' + esc(dTxt) + '</b> · <b>' + esc(rTxt) + '</b>') : 'Drag on the bar to add working hours (drag again for a split shift · tap a green block to remove).';
+    el.innerHTML = SE.ranges.length ? ('<b>' + esc(dTxt) + '</b> · <b>' + esc(rTxt) + '</b>') : 'Drag across the bar to add hours · drag an edge to resize · tap a block to remove.';
   }
-  function seDown(x){ if (!$('seBar')) return; SE.drag.active = true; SE.drag.start = seXToMin(x); SE.preview = { s: SE.drag.start, e: SE.drag.start + SE_SNAP }; seRenderBar(); }
-  function seMove(x){ if (!SE.drag.active) return; var c = seXToMin(x); var s = Math.min(SE.drag.start, c), e = Math.max(SE.drag.start, c); if (e - s < SE_SNAP) e = s + SE_SNAP; SE.preview = { s: s, e: e }; seRenderBar(); }
-  function seUp(){ if (!SE.drag.active) return; SE.drag.active = false; if (SE.preview){ SE.ranges.push({ s: SE.preview.s, e: SE.preview.e }); seMerge(); SE.preview = null; } seRenderBar(); }
+  // Decide what a press at pixel x acts on: a range edge (resize), inside a range
+  // (tap-to-remove), or empty space (create).
+  function seHit(x){
+    var bar = $('seBar'); if (!bar) return null; var rect = bar.getBoundingClientRect();
+    for (var i = 0; i < SE.ranges.length; i++){ var r = SE.ranges[i];
+      var lpx = rect.left + sePct(r.s) / 100 * rect.width, rpx = rect.left + sePct(r.e) / 100 * rect.width;
+      if (Math.abs(x - lpx) <= SE_EDGE_PX) return { i: i, edge: 's' };
+      if (Math.abs(x - rpx) <= SE_EDGE_PX) return { i: i, edge: 'e' };
+    }
+    var m = seXToMin(x);
+    for (var j = 0; j < SE.ranges.length; j++){ if (m > SE.ranges[j].s && m < SE.ranges[j].e) return { i: j, edge: 'inside' }; }
+    return null;
+  }
+  function seDown(x){
+    if (!$('seBar')) return;
+    SE.drag.active = true; SE.moved = false; SE.preview = null;
+    var hit = seHit(x);
+    if (hit && (hit.edge === 's' || hit.edge === 'e')){ SE.mode = 'resize'; SE.resizeIdx = hit.i; SE.resizeEdge = hit.edge; seRenderBar(); return; }
+    if (hit && hit.edge === 'inside'){ SE.mode = 'inside'; SE.insideIdx = hit.i; return; }
+    SE.mode = 'create'; SE.drag.start = seXToMin(x); SE.preview = { s: SE.drag.start, e: SE.drag.start + SE_SNAP }; seRenderBar();
+  }
+  function seMove(x){
+    if (!SE.drag.active) return; SE.moved = true; var m = seXToMin(x);
+    if (SE.mode === 'resize'){ var r = SE.ranges[SE.resizeIdx]; if (!r) return; if (SE.resizeEdge === 's') r.s = Math.max(SE_START, Math.min(m, r.e - SE_SNAP)); else r.e = Math.min(SE_END, Math.max(m, r.s + SE_SNAP)); seRenderBar(); return; }
+    if (SE.mode === 'create'){ var s = Math.min(SE.drag.start, m), e = Math.max(SE.drag.start, m); if (e - s < SE_SNAP) e = s + SE_SNAP; SE.preview = { s: s, e: e }; seRenderBar(); }
+  }
+  function seUp(){
+    if (!SE.drag.active) return; SE.drag.active = false;
+    if (SE.mode === 'resize'){ seMerge(); }
+    else if (SE.mode === 'inside'){ if (!SE.moved) SE.ranges.splice(SE.insideIdx, 1); }
+    else if (SE.mode === 'create'){ if (SE.moved && SE.preview){ SE.ranges.push({ s: SE.preview.s, e: SE.preview.e }); seMerge(); } }
+    SE.mode = null; SE.preview = null; SE.resizeIdx = -1; SE.insideIdx = -1;
+    seRenderBar();
+  }
   function seWire(){
     if (seWired) return; seWired = true;
     window.addEventListener('mousemove', function(e){ seMove(e.clientX); });
@@ -2713,7 +2764,9 @@ function lindaMainPage(env: Env): string {
     // Ticks
     html += '<div class="tl-ticks">';
     for (var h = 7; h <= 22; h += 3){
-      html += '<div class="tl-tick">' + pad(h) + ':00</div>';
+      var lp = pctOf(h * 60);
+      var pos = h === 7 ? 'left:0;' : h === 22 ? 'right:0;' : 'left:' + lp + '%;transform:translateX(-50%);';
+      html += '<div class="tl-tick" style="' + pos + '">' + pad(h) + ':00</div>';
     }
     html += '</div>';
     html += '<div class="tl-legend">' +
@@ -3304,6 +3357,7 @@ function lindaMainPage(env: Env): string {
     $('sheetPatientSection').style.display = '';
     $('bfSubmit').textContent = 'Book';
     resetSheet();
+    resetCustomTime(true);
     if (prefill){
       if (prefill.fullName) $('bfName').value = prefill.fullName;
       if (prefill.phone) $('bfPhone').value = prefill.phone;
@@ -3384,11 +3438,27 @@ function lindaMainPage(env: Env): string {
     } catch(e){}
   };
 
+  window.toggleCustomTime = function(){
+    sheet.custom = $('bfCustomToggle').checked;
+    $('bfSlots').style.display = sheet.custom ? 'none' : '';
+    $('bfCustomWrap').style.display = sheet.custom ? 'block' : 'none';
+    var op = $('bfOpenPrompt'); if (op && sheet.custom) op.style.display = 'none';
+    sheet.slot = '';
+    updateSheetSubmit();
+  };
+  function resetCustomTime(showToggle){
+    sheet.custom = false;
+    if ($('bfCustomToggle')) $('bfCustomToggle').checked = false;
+    if ($('bfCustomTime')) $('bfCustomTime').value = '';
+    $('bfSlots').style.display = '';
+    $('bfCustomWrap').style.display = 'none';
+    if ($('bfCustomLabel')) $('bfCustomLabel').style.display = showToggle ? 'flex' : 'none';
+  }
   function updateSheetSubmit(){
     var dk = $('bfDate').value;
-    var hasSlot = !!sheet.slot;
+    var hasTime = sheet.custom ? !!$('bfCustomTime').value : !!sheet.slot;
     var hasPatient = sheet.mode === 'reschedule' || ($('bfName').value.trim() && ($('bfPhone').value.trim() || $('bfEmail').value.trim()));
-    $('bfSubmit').disabled = !(dk && hasSlot && hasPatient);
+    $('bfSubmit').disabled = !(dk && hasTime && hasPatient);
   }
   ['bfName','bfPhone','bfEmail'].forEach(function(id){ $(id).addEventListener('input', updateSheetSubmit); });
 
@@ -3440,6 +3510,7 @@ function lindaMainPage(env: Env): string {
     $('sheetPatientSection').style.display = 'none';
     $('bfSubmit').textContent = 'Reschedule';
     resetSheet();
+    resetCustomTime(false);
     openSheet();
     loadSheetSlots();
   };
@@ -3570,13 +3641,15 @@ function lindaMainPage(env: Env): string {
     $('bfSubmit').textContent = sheet.mode === 'reschedule' ? 'Rescheduling…' : 'Booking…';
     setBfMsg('', '');
     var dk = $('bfDate').value;
+    var startTime = sheet.custom ? $('bfCustomTime').value : sheet.slot;
     try {
       var endpoint = sheet.mode === 'reschedule' ? '/api/linda-reschedule' : '/api/linda-new-booking';
       var body = sheet.mode === 'reschedule'
-        ? { appointmentId: sheet.apptId, dateKey: dk, startTime: sheet.slot }
+        ? { appointmentId: sheet.apptId, dateKey: dk, startTime: startTime }
         : {
             dateKey: dk,
-            startTime: sheet.slot,
+            startTime: startTime,
+            customTime: !!sheet.custom,
             fullName: $('bfName').value.trim(),
             email: $('bfEmail').value.trim(),
             phone: $('bfPhone').value.trim(),

@@ -1247,8 +1247,15 @@ export function adminPage(sig: string, env: Env): string {
         </div>
         <div style="font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;color:#6b7280;margin:4px 0 6px;">Date</div>
         <input type="date" id="lcBookDate" onchange="lcLoadSlots()" style="width:100%;padding:11px;border:1px solid #e5e7eb;border-radius:9px;font-size:15px;margin-bottom:10px;">
-        <div style="font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;color:#6b7280;margin:4px 0 6px;">Time</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin:4px 0 6px;flex-wrap:wrap;">
+          <span style="font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;color:#6b7280;">Time</span>
+          <label id="lcCustomLabel" style="display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;color:#065f46;cursor:pointer;"><input type="checkbox" id="lcCustomToggle" onchange="lcToggleCustom()"> Custom time</label>
+        </div>
         <div id="lcSlots" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(78px,1fr));gap:6px;"><div style="color:#6b7280;font-size:13px;grid-column:1/-1;">Pick a date first.</div></div>
+        <div id="lcCustomWrap" style="display:none;">
+          <input type="time" id="lcCustomTime" step="300" oninput="lcUpdateBookBtn()" style="width:100%;padding:11px;border:1px solid #10b981;border-radius:9px;font-size:16px;">
+          <div style="font-size:12px;color:#6b7280;margin-top:5px;">Any time — e.g. 18:15. Books off-grid regardless of the usual slots.</div>
+        </div>
         <label id="lcNotifyWrap" style="display:none;align-items:center;gap:8px;font-size:13px;margin-top:12px;cursor:pointer;"><input type="checkbox" id="lcNotify" checked> Email the patient about the change</label>
         <button class="btn" id="lcBookBtn" style="background:#10b981;color:#fff;font-weight:800;width:100%;margin-top:14px;" onclick="lcSubmit()" disabled>Select a time</button>
         <div id="lcModalMsg" style="font-size:13px;margin-top:8px;"></div>
@@ -1275,13 +1282,13 @@ export function adminPage(sig: string, env: Env): string {
       <div id="lasPills" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;"></div>
       <div style="font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;color:#6b7280;margin:0 0 6px;">Hours (drag the bar)</div>
       <div id="lasBar" style="position:relative;height:58px;background:#f3f4f6;border:1px solid #e5e7eb;border-radius:10px;cursor:crosshair;overflow:visible;touch-action:none;user-select:none;-webkit-user-select:none;"></div>
-      <div style="display:flex;margin-top:3px;">
-        <div style="flex:1;text-align:center;font-size:10px;color:#6b7280;font-weight:700;">07</div>
-        <div style="flex:1;text-align:center;font-size:10px;color:#6b7280;font-weight:700;">10</div>
-        <div style="flex:1;text-align:center;font-size:10px;color:#6b7280;font-weight:700;">13</div>
-        <div style="flex:1;text-align:center;font-size:10px;color:#6b7280;font-weight:700;">16</div>
-        <div style="flex:1;text-align:center;font-size:10px;color:#6b7280;font-weight:700;">19</div>
-        <div style="flex:1;text-align:center;font-size:10px;color:#6b7280;font-weight:700;">22</div>
+      <div style="position:relative;height:14px;margin-top:3px;">
+        <span style="position:absolute;left:0;font-size:10px;color:#6b7280;font-weight:700;">07</span>
+        <span style="position:absolute;left:20%;transform:translateX(-50%);font-size:10px;color:#6b7280;font-weight:700;">10</span>
+        <span style="position:absolute;left:40%;transform:translateX(-50%);font-size:10px;color:#6b7280;font-weight:700;">13</span>
+        <span style="position:absolute;left:60%;transform:translateX(-50%);font-size:10px;color:#6b7280;font-weight:700;">16</span>
+        <span style="position:absolute;left:80%;transform:translateX(-50%);font-size:10px;color:#6b7280;font-weight:700;">19</span>
+        <span style="position:absolute;right:0;font-size:10px;color:#6b7280;font-weight:700;">22</span>
       </div>
       <div id="lasSummary" style="font-size:13px;font-weight:700;margin-top:9px;"></div>
       <input type="text" id="lasNote" placeholder="Note (optional) — e.g. 'summer visit'" style="width:100%;padding:10px;border:1px solid #e5e7eb;border-radius:9px;font-size:15px;margin-top:12px;">
@@ -2526,7 +2533,22 @@ async function loadLindaReports() {
    authenticates them (credentials:'same-origin'), so admin gets full parity
    with Linda's diary: day glance, new booking, reschedule/cancel/mark, and
    availability (stints, days off, per-day open/block). */
-var lcState = { bookMode: 'new', reschedId: '', slotIdx: -1 };
+var lcState = { bookMode: 'new', reschedId: '', slotIdx: -1, custom: false };
+function lcToggleCustom(){
+  lcState.custom = document.getElementById('lcCustomToggle').checked;
+  document.getElementById('lcSlots').style.display = lcState.custom ? 'none' : 'grid';
+  document.getElementById('lcCustomWrap').style.display = lcState.custom ? 'block' : 'none';
+  lcState.slotIdx = -1;
+  lcUpdateBookBtn();
+}
+function lcResetCustom(showToggle){
+  lcState.custom = false;
+  var t = document.getElementById('lcCustomToggle'); if (t) t.checked = false;
+  var ct = document.getElementById('lcCustomTime'); if (ct) ct.value = '';
+  document.getElementById('lcSlots').style.display = 'grid';
+  document.getElementById('lcCustomWrap').style.display = 'none';
+  var lbl = document.getElementById('lcCustomLabel'); if (lbl) lbl.style.display = showToggle ? 'flex' : 'none';
+}
 var lcAppts = [];
 var lcSlots = [];
 
@@ -2610,7 +2632,7 @@ function lcOpenNew(){
   ['lcName','lcPhone','lcEmail','lcComments'].forEach(function(id){ document.getElementById(id).value = ''; });
   document.getElementById('lcModalMsg').textContent = '';
   document.getElementById('lcBookDate').value = document.getElementById('lcDate').value || lcToday();
-  lcAcHide();
+  lcAcHide(); lcResetCustom(true);
   lcOpenModal(); lcLoadSlots();
 }
 
@@ -2659,6 +2681,7 @@ function lcReschedule(i){
   info.innerHTML = '<b>' + lcEsc(a.full_name) + '</b><br>Currently: ' + lcEsc(lcNiceDate(a.date_key)) + ' at ' + lcEsc(a.start_time) + '<br><span style="color:#6b7280;">The patient is emailed the new time automatically.</span>';
   document.getElementById('lcModalMsg').textContent = '';
   document.getElementById('lcBookDate').value = a.date_key;
+  lcResetCustom(false);
   lcOpenModal(); lcLoadSlots();
 }
 
@@ -2696,22 +2719,23 @@ function lcPickSlot(i){
 
 function lcUpdateBookBtn(){
   var btn = document.getElementById('lcBookBtn');
-  var hasSlot = lcState.slotIdx >= 0;
-  var ok = hasSlot;
+  var hasTime = lcState.custom ? !!document.getElementById('lcCustomTime').value : lcState.slotIdx >= 0;
+  var ok = hasTime;
   if (lcState.bookMode === 'new'){
     var nm = document.getElementById('lcName').value.trim();
     var ph = document.getElementById('lcPhone').value.trim();
     var em = document.getElementById('lcEmail').value.trim();
-    ok = hasSlot && nm.length > 1 && (ph.length >= 6 || em.length > 3);
+    ok = hasTime && nm.length > 1 && (ph.length >= 6 || em.length > 3);
   }
   btn.disabled = !ok;
-  btn.textContent = !hasSlot ? 'Select a time' : (lcState.bookMode === 'reschedule' ? 'Move appointment' : 'Create booking');
+  btn.textContent = !hasTime ? (lcState.custom ? 'Enter a time' : 'Select a time') : (lcState.bookMode === 'reschedule' ? 'Move appointment' : 'Create booking');
 }
 
 async function lcSubmit(){
   var dk = document.getElementById('lcBookDate').value;
-  if (lcState.slotIdx < 0 || !lcSlots[lcState.slotIdx]) return;
-  var start = lcSlots[lcState.slotIdx].start;
+  var start, custom = false;
+  if (lcState.custom){ start = document.getElementById('lcCustomTime').value; if (!start) return; custom = true; }
+  else { if (lcState.slotIdx < 0 || !lcSlots[lcState.slotIdx]) return; start = lcSlots[lcState.slotIdx].start; }
   var btn = document.getElementById('lcBookBtn'); btn.disabled = true;
   var msg = document.getElementById('lcModalMsg'); msg.style.color = '#6b7280'; msg.textContent = 'Saving…';
   var res;
@@ -2719,7 +2743,7 @@ async function lcSubmit(){
     res = await lindaApi('linda-reschedule', { body: { appointmentId: lcState.reschedId, dateKey: dk, startTime: start } });
   } else {
     res = await lindaApi('linda-new-booking', { body: {
-      dateKey: dk, startTime: start,
+      dateKey: dk, startTime: start, customTime: custom,
       fullName: document.getElementById('lcName').value.trim(),
       phone: document.getElementById('lcPhone').value.trim(),
       email: document.getElementById('lcEmail').value.trim(),
@@ -2776,29 +2800,25 @@ async function lcLoadWindows(){
 async function lcDelWindow(id){ if (!confirm('Remove this stint? Existing bookings stay; no new bookings inside it.')) return; var res = await lindaApi('linda-windows?id=' + id, { method: 'DELETE' }); if (res && res.ok) lcLoadWindows(); else alert((res && res.reason) || 'Failed.'); }
 
 /* ── Admin stint editor (compose hours on a drag bar) ── */
-var LAS = { id: 0, ranges: [], days: {}, preview: null, drag: { active: false, start: 0 }, wired: false };
-var LAS_S = 7 * 60, LAS_E = 22 * 60, LAS_T = LAS_E - LAS_S, LAS_SNAP = 15;
+var LAS = { id: 0, ranges: [], days: {}, preview: null, mode: null, resizeIdx: -1, resizeEdge: '', insideIdx: -1, moved: false, drag: { active: false, start: 0 }, wired: false };
+var LAS_S = 7 * 60, LAS_E = 22 * 60, LAS_T = LAS_E - LAS_S, LAS_SNAP = 15, LAS_EDGE_PX = 12;
 var LAS_DOW = ['MON','TUE','WED','THU','FRI','SAT','SUN'], LAS_ONE = { MON:'M', TUE:'T', WED:'W', THU:'T', FRI:'F', SAT:'S', SUN:'S' };
 function lasPct(m){ var c = Math.max(LAS_S, Math.min(LAS_E, m)); return ((c - LAS_S) / LAS_T) * 100; }
 function lasX2M(x){ var b = document.getElementById('lasBar'); if (!b) return 0; var r = b.getBoundingClientRect(); var p = Math.max(0, Math.min(1, (x - r.left) / r.width)); return Math.round((LAS_S + p * LAS_T) / LAS_SNAP) * LAS_SNAP; }
 function lasM2T(m){ return lcPad(Math.floor(m/60)) + ':' + lcPad(m%60); }
 function lasT2M(s){ var p = String(s).split(':'); return (+p[0]) * 60 + (+p[1]); }
 function lasMerge(){ LAS.ranges.sort(function(a,b){ return a.s - b.s; }); var o = []; for (var i=0;i<LAS.ranges.length;i++){ var r=LAS.ranges[i]; if (o.length && r.s<=o[o.length-1].e) o[o.length-1].e=Math.max(o[o.length-1].e,r.e); else o.push({s:r.s,e:r.e}); } LAS.ranges=o; }
+function lasTip(s, e){ return '<div style="position:absolute;top:5px;transform:translateX(-50%);background:#0f172a;color:#fff;font-size:12px;font-weight:800;padding:3px 8px;border-radius:6px;white-space:nowrap;pointer-events:none;z-index:9;left:'+((lasPct(s)+lasPct(e))/2)+'%;">'+lasM2T(s)+' – '+lasM2T(e)+'</div>'; }
 function lasRenderBar(){
   var bar = document.getElementById('lasBar'); if (!bar) return;
-  var seg = 'position:absolute;top:0;bottom:0;background:#10b981;opacity:.62;cursor:pointer;';
+  var seg = 'position:absolute;top:0;bottom:0;background:#10b981;opacity:.62;pointer-events:none;';
+  var grip = 'position:absolute;top:0;bottom:0;width:5px;background:#065f46;opacity:.65;border-radius:2px;';
   var html = '';
-  for (var i=0;i<LAS.ranges.length;i++){ var r=LAS.ranges[i]; html += '<div data-i="'+i+'" style="'+seg+'left:'+lasPct(r.s)+'%;width:'+(lasPct(r.e)-lasPct(r.s))+'%;"></div>'; }
-  if (LAS.drag.active && LAS.preview){ var pr=LAS.preview;
-    html += '<div style="position:absolute;top:0;bottom:0;background:#0ea5e9;opacity:.85;pointer-events:none;left:'+lasPct(pr.s)+'%;width:'+(lasPct(pr.e)-lasPct(pr.s))+'%;"></div>';
-    html += '<div style="position:absolute;top:5px;transform:translateX(-50%);background:#0f172a;color:#fff;font-size:12px;font-weight:800;padding:3px 8px;border-radius:6px;white-space:nowrap;pointer-events:none;z-index:9;left:'+((lasPct(pr.s)+lasPct(pr.e))/2)+'%;">'+lasM2T(pr.s)+' – '+lasM2T(pr.e)+'</div>';
-  }
+  for (var i=0;i<LAS.ranges.length;i++){ var r=LAS.ranges[i]; html += '<div style="'+seg+'left:'+lasPct(r.s)+'%;width:'+(lasPct(r.e)-lasPct(r.s))+'%;"><span style="'+grip+'left:0;"></span><span style="'+grip+'right:0;"></span></div>'; }
+  if (LAS.drag.active && LAS.mode === 'create' && LAS.preview){ var pr=LAS.preview;
+    html += '<div style="position:absolute;top:0;bottom:0;background:#0ea5e9;opacity:.85;pointer-events:none;left:'+lasPct(pr.s)+'%;width:'+(lasPct(pr.e)-lasPct(pr.s))+'%;"></div>' + lasTip(pr.s, pr.e);
+  } else if (LAS.drag.active && LAS.mode === 'resize' && LAS.ranges[LAS.resizeIdx]){ var rr=LAS.ranges[LAS.resizeIdx]; html += lasTip(rr.s, rr.e); }
   bar.innerHTML = html;
-  Array.prototype.forEach.call(bar.querySelectorAll('[data-i]'), function(s){
-    var stop = function(ev){ ev.stopPropagation(); };
-    s.addEventListener('mousedown', stop); s.addEventListener('touchstart', stop, { passive: true });
-    s.addEventListener('click', function(ev){ ev.stopPropagation(); LAS.ranges.splice(+s.getAttribute('data-i'),1); lasRenderBar(); });
-  });
   lasSummary();
 }
 function lasSummary(){
@@ -2806,11 +2826,40 @@ function lasSummary(){
   var days = LAS_DOW.filter(function(k){ return LAS.days[k]; });
   var rTxt = LAS.ranges.length ? LAS.ranges.map(function(r){ return lasM2T(r.s)+'–'+lasM2T(r.e); }).join(' & ') : '—';
   var dTxt = days.length===7 ? 'Every day' : days.length ? days.map(function(k){ return k.charAt(0)+k.slice(1).toLowerCase(); }).join(', ') : 'No days';
-  el.innerHTML = LAS.ranges.length ? ('<b>'+lcEsc(dTxt)+'</b> · <b>'+lcEsc(rTxt)+'</b>') : '<span style="color:#6b7280;">Drag on the bar to add hours (drag again for a split shift · tap a block to remove).</span>';
+  el.innerHTML = LAS.ranges.length ? ('<b>'+lcEsc(dTxt)+'</b> · <b>'+lcEsc(rTxt)+'</b>') : '<span style="color:#6b7280;">Drag across the bar to add hours · drag an edge to resize · tap a block to remove.</span>';
 }
-function lasDown(x){ if (!document.getElementById('lasBar')) return; LAS.drag.active=true; LAS.drag.start=lasX2M(x); LAS.preview={s:LAS.drag.start,e:LAS.drag.start+LAS_SNAP}; lasRenderBar(); }
-function lasMove(x){ if (!LAS.drag.active) return; var c=lasX2M(x); var s=Math.min(LAS.drag.start,c),e=Math.max(LAS.drag.start,c); if (e-s<LAS_SNAP) e=s+LAS_SNAP; LAS.preview={s:s,e:e}; lasRenderBar(); }
-function lasUp(){ if (!LAS.drag.active) return; LAS.drag.active=false; if (LAS.preview){ LAS.ranges.push({s:LAS.preview.s,e:LAS.preview.e}); lasMerge(); LAS.preview=null; } lasRenderBar(); }
+function lasHit(x){
+  var bar = document.getElementById('lasBar'); if (!bar) return null; var rect = bar.getBoundingClientRect();
+  for (var i=0;i<LAS.ranges.length;i++){ var r=LAS.ranges[i];
+    var lpx = rect.left + lasPct(r.s)/100*rect.width, rpx = rect.left + lasPct(r.e)/100*rect.width;
+    if (Math.abs(x-lpx) <= LAS_EDGE_PX) return { i:i, edge:'s' };
+    if (Math.abs(x-rpx) <= LAS_EDGE_PX) return { i:i, edge:'e' };
+  }
+  var m = lasX2M(x);
+  for (var j=0;j<LAS.ranges.length;j++){ if (m > LAS.ranges[j].s && m < LAS.ranges[j].e) return { i:j, edge:'inside' }; }
+  return null;
+}
+function lasDown(x){
+  if (!document.getElementById('lasBar')) return;
+  LAS.drag.active=true; LAS.moved=false; LAS.preview=null;
+  var hit = lasHit(x);
+  if (hit && (hit.edge==='s'||hit.edge==='e')){ LAS.mode='resize'; LAS.resizeIdx=hit.i; LAS.resizeEdge=hit.edge; lasRenderBar(); return; }
+  if (hit && hit.edge==='inside'){ LAS.mode='inside'; LAS.insideIdx=hit.i; return; }
+  LAS.mode='create'; LAS.drag.start=lasX2M(x); LAS.preview={s:LAS.drag.start,e:LAS.drag.start+LAS_SNAP}; lasRenderBar();
+}
+function lasMove(x){
+  if (!LAS.drag.active) return; LAS.moved=true; var m=lasX2M(x);
+  if (LAS.mode==='resize'){ var r=LAS.ranges[LAS.resizeIdx]; if (!r) return; if (LAS.resizeEdge==='s') r.s=Math.max(LAS_S,Math.min(m,r.e-LAS_SNAP)); else r.e=Math.min(LAS_E,Math.max(m,r.s+LAS_SNAP)); lasRenderBar(); return; }
+  if (LAS.mode==='create'){ var s=Math.min(LAS.drag.start,m),e=Math.max(LAS.drag.start,m); if (e-s<LAS_SNAP) e=s+LAS_SNAP; LAS.preview={s:s,e:e}; lasRenderBar(); }
+}
+function lasUp(){
+  if (!LAS.drag.active) return; LAS.drag.active=false;
+  if (LAS.mode==='resize'){ lasMerge(); }
+  else if (LAS.mode==='inside'){ if (!LAS.moved) LAS.ranges.splice(LAS.insideIdx,1); }
+  else if (LAS.mode==='create'){ if (LAS.moved && LAS.preview){ LAS.ranges.push({s:LAS.preview.s,e:LAS.preview.e}); lasMerge(); } }
+  LAS.mode=null; LAS.preview=null; LAS.resizeIdx=-1; LAS.insideIdx=-1;
+  lasRenderBar();
+}
 function lasWire(){ if (LAS.wired) return; LAS.wired=true; window.addEventListener('mousemove', function(e){ lasMove(e.clientX); }); window.addEventListener('mouseup', lasUp);
   var b = document.getElementById('lasBar');
   if (b){ b.addEventListener('mousedown', function(e){ lasDown(e.clientX); }); b.addEventListener('touchstart', function(e){ if (e.touches.length) lasDown(e.touches[0].clientX); }, { passive: true }); b.addEventListener('touchmove', function(e){ if (e.touches.length) lasMove(e.touches[0].clientX); }, { passive: true }); b.addEventListener('touchend', lasUp); }
