@@ -1191,18 +1191,20 @@ export function adminPage(sig: string, env: Env): string {
   <!-- Availability editor (quick settings — the diary above has full per-day control) -->
   <div class="card" style="padding:18px;margin-bottom:14px;">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
-      <h3 style="margin:0;font-size:15px;font-weight:800;">Weekly hours &amp; slot length</h3>
+      <h3 style="margin:0;font-size:15px;font-weight:800;">Booking on/off &amp; slot length</h3>
       <label style="display:flex;align-items:center;gap:8px;font-size:14px;font-weight:700;cursor:pointer;">
         <input type="checkbox" id="lindaEnabled" style="width:18px;height:18px;cursor:pointer;">
         <span id="lindaEnabledLabel">Enabled</span>
       </label>
     </div>
-    <p style="margin:0 0 12px 0;color:#6b7280;font-size:13px;">Turn Linda's booking button on/off and set her default Mon–Fri hours &amp; session length. Booking periods and days off are managed in the Availability card above; the button on the main booking page shows only while she's enabled and inside a stint.</p>
+    <p style="margin:0 0 12px 0;color:#6b7280;font-size:13px;">Turn Linda's booking button on/off and set the session length. <b>Hours are set per stint</b> (drag the bar in each stint above) — including evenings-only or mornings-only. The booking-page button shows only while she's enabled and inside a stint.</p>
 
-    <!-- Legacy single-window inputs kept (hidden) so the existing save still sends valid dates; periods are now managed via the stints card above. -->
-    <div class="form-row" style="display:none;">
-      <div class="form-group"><label>Start date</label><input type="date" id="lindaWinStart"></div>
-      <div class="form-group"><label>End date</label><input type="date" id="lindaWinEnd"></div>
+    <!-- Legacy hour/date inputs kept hidden so existing load/save code stays safe; hours are now per stint. -->
+    <div style="display:none;">
+      <input type="date" id="lindaWinStart"><input type="date" id="lindaWinEnd">
+      <input type="time" id="lindaMorningStart"><input type="time" id="lindaMorningEnd">
+      <input type="time" id="lindaAfternoonStart"><input type="time" id="lindaAfternoonEnd">
+      <input type="checkbox" id="lindaIncludeSat">
     </div>
     <div class="form-row">
       <div class="form-group">
@@ -1213,25 +1215,8 @@ export function adminPage(sig: string, env: Env): string {
       </div>
     </div>
 
-    <div style="margin-top:14px;padding:12px;border:1px solid #e5e7eb;border-radius:10px;background:#f9fafb;">
-      <p style="margin:0 0 8px 0;font-size:13px;font-weight:700;">Weekday hours (Mon–Fri)</p>
-      <p style="margin:0 0 10px 0;font-size:12px;color:#6b7280;">Leave morning or afternoon blank to skip that block. Weekends stay closed by default.</p>
-      <div class="form-row">
-        <div class="form-group"><label>Morning start</label><input type="time" id="lindaMorningStart" step="1800"></div>
-        <div class="form-group"><label>Morning end</label><input type="time" id="lindaMorningEnd" step="1800"></div>
-      </div>
-      <div class="form-row">
-        <div class="form-group"><label>Afternoon start</label><input type="time" id="lindaAfternoonStart" step="1800"></div>
-        <div class="form-group"><label>Afternoon end</label><input type="time" id="lindaAfternoonEnd" step="1800"></div>
-      </div>
-      <label style="display:flex;align-items:center;gap:8px;margin-top:8px;font-size:13px;cursor:pointer;">
-        <input type="checkbox" id="lindaIncludeSat" style="cursor:pointer;">
-        <span>Also open on Saturdays (same hours)</span>
-      </label>
-    </div>
-
     <div style="margin-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-      <button class="btn btn-primary" onclick="saveLindaConfig()">Save availability</button>
+      <button class="btn btn-primary" onclick="saveLindaConfig()">Save</button>
       <button class="btn btn-ghost" onclick="loadLindaConfig()">Reset</button>
       <span id="lindaCfgMsg" style="font-size:13px;"></span>
     </div>

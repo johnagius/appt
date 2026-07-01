@@ -140,24 +140,20 @@ export function isInLindaWindow(dateKey: string, cfg: LindaConfig): boolean {
   return false;
 }
 
-/** The effective base working ranges for a date: a covering stint's own hours
- *  (if it defines any and includes this weekday) take precedence; otherwise
- *  fall back to the global weekly hours. Legacy stints with no hours use the
- *  global weekly schedule exactly as before. */
+/** The effective base working ranges for a date: the union of the hours from
+ *  every covering stint whose weekday-set includes this date's weekday. Hours
+ *  live on stints (set with the bar) — nothing else. A stint with no hours (or
+ *  a weekday it doesn't cover) contributes nothing. The global weekly LINDA_HOURS
+ *  is intentionally NOT consulted, so a legacy value can never leak in.
+ *  Ad-hoc extras are still layered on top by buildLindaSlots. */
 export function baseRangesForDate(dateKey: string, cfg: LindaConfig): { start: string; end: string }[] {
   const dow = dayOfWeekKey(parseDateKey(dateKey));
-  const covering = cfg.windows.filter(w => dateKey >= w.start && dateKey <= w.end);
-  const withHours = covering.filter(w => w.hours && w.hours.ranges.length);
-  if (withHours.length) {
-    // Stint-specific hours are authoritative — union ranges from stints whose
-    // day-set includes this weekday (none ⇒ closed that day).
-    const out: { start: string; end: string }[] = [];
-    for (const w of withHours) {
-      if (w.hours!.days.includes(dow)) out.push(...w.hours!.ranges);
-    }
-    return out;
+  const out: { start: string; end: string }[] = [];
+  for (const w of cfg.windows) {
+    if (dateKey < w.start || dateKey > w.end) continue;
+    if (w.hours && w.hours.ranges.length && w.hours.days.includes(dow)) out.push(...w.hours.ranges);
   }
-  return cfg.hours[dow] || [];
+  return out;
 }
 
 export function buildLindaSlots(

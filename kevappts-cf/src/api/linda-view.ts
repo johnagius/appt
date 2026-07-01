@@ -1685,21 +1685,15 @@ function lindaMainPage(env: Env): string {
       <div class="avail-row"><label>Slots</label><select id="winSlotMin" onchange="saveSlotMin()"><option value="15">15 min</option><option value="20">20 min</option><option value="30" selected>30 min</option><option value="45">45 min</option><option value="60">60 min</option></select></div>
       <div class="avail-msg" id="slotMinMsg"></div>
 
-      <h3 style="margin-top:16px;">Weekly schedule</h3>
-      <p class="hint">Morning + evening hours that apply to every weekday (and optionally Saturdays). Saves to all days at once.</p>
-      <div style="font-size:12px;color:var(--muted);font-weight:800;text-transform:uppercase;letter-spacing:.4px;margin:6px 0 4px;">Morning</div>
-      <div class="avail-row"><label>Start</label><input type="time" id="wsMorningStart" step="900" onchange="markHoursDirty()"></div>
-      <div class="avail-row"><label>End</label><input type="time" id="wsMorningEnd" step="900" onchange="markHoursDirty()"></div>
-      <div style="font-size:12px;color:var(--muted);font-weight:800;text-transform:uppercase;letter-spacing:.4px;margin:10px 0 4px;">Evening (optional)</div>
-      <div class="avail-row"><label>Start</label><input type="time" id="wsEveningStart" step="900" onchange="markHoursDirty()"></div>
-      <div class="avail-row"><label>End</label><input type="time" id="wsEveningEnd" step="900" onchange="markHoursDirty()"></div>
-      <label style="display:flex;align-items:center;gap:8px;margin-top:8px;font-size:13px;cursor:pointer;">
-        <input type="checkbox" id="wsIncludeSat" onchange="markHoursDirty()" style="cursor:pointer;">
-        <span>Also open on Saturdays (same hours)</span>
-      </label>
-      <button class="avail-save" id="wsSaveBtn" style="display:none;margin-top:10px;" onclick="saveWeeklyHours()">Save weekly hours</button>
-      <div class="avail-msg" id="wsMsg"></div>
-      <div id="baseSchedule" style="margin-top:12px;"></div>
+      <h3 style="margin-top:16px;">Hours</h3>
+      <p class="hint">Hours live on each stint above — open a stint and drag the bar. Every visit can have its own hours, and you can do <b>evenings-only</b> or <b>mornings-only</b> just by dragging that one block.</p>
+      <!-- Legacy weekly-hours inputs kept hidden so existing load/save code stays safe; hours are now per stint. -->
+      <input type="hidden" id="wsMorningStart"><input type="hidden" id="wsMorningEnd">
+      <input type="hidden" id="wsEveningStart"><input type="hidden" id="wsEveningEnd">
+      <input type="hidden" id="wsIncludeSat">
+      <button id="wsSaveBtn" style="display:none;" onclick="saveWeeklyHours()"></button>
+      <div class="avail-msg" id="wsMsg" style="display:none;"></div>
+      <div id="baseSchedule" style="display:none;"></div>
     </div>
 
     <div class="avail-card">

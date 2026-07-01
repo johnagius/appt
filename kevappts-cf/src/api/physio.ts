@@ -57,10 +57,10 @@ export async function apiPhysioInit(env: Env): Promise<Response> {
       service: { id: 'physio', name: 'Physiotherapy Consultation', minutes: cfg.slotMin },
       windowStart: cfg.windowStart,
       windowEnd: cfg.windowEnd,
-      // Full data so the booking page renders availability dynamically instead of
-      // hardcoding dates/hours: the list of booking stints and the weekly hours map.
+      // Hours now live per stint and can differ by day, so there's no single
+      // weekly-hours line to show — the day picker + per-date slots are the
+      // source of truth. Still expose the stint date ranges for context.
       windows: cfg.windows.map(w => ({ start: w.start, end: w.end, note: w.note })),
-      hours: cfg.hours,
       timezone: tz,
     },
     dateOptions,
