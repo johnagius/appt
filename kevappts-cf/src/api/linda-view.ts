@@ -1375,9 +1375,17 @@ function lindaMainPage(env: Env): string {
 <meta name="theme-color" content="#10b981">
 <title>${name} — My Day</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%2310b981'/%3E%3Ctext x='50' y='68' font-size='50' font-weight='bold' text-anchor='middle' fill='white' font-family='Arial'%3EL%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
   :root{
-    --accent:#10b981;--text:#111827;--muted:#6b7280;--line:#e5e7eb;--bg:#f6f7fb;--bad:#ef4444;
+    --accent:#10b981;--accent-2:#059669;--accent-ink:#065f46;
+    --text:#0f172a;--muted:#64748b;--line:#e6e8ee;--bg:#f4f6fa;--bad:#ef4444;
+    --card:#ffffff;
+    --font:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    --sh-sm:0 1px 2px rgba(16,24,40,.06);
+    --sh-md:0 4px 12px rgba(16,24,40,.06),0 1px 3px rgba(16,24,40,.05);
+    --sh-lg:0 12px 30px rgba(16,24,40,.10),0 4px 10px rgba(16,24,40,.05);
     --ease:cubic-bezier(.22,1,.36,1);         /* "standard" ease-out */
     --ease-spring:cubic-bezier(.34,1.56,.64,1);/* overshoot spring */
   }
@@ -1406,18 +1414,22 @@ function lindaMainPage(env: Env): string {
   @media (prefers-reduced-motion: reduce){
     *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important;}
   }
-  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;line-height:1.4;-webkit-font-smoothing:antialiased;}
-  .topbar{position:sticky;top:0;background:#fff;border-bottom:1px solid var(--line);padding:10px 14px;display:flex;align-items:center;justify-content:space-between;z-index:5;}
-  .topbar h1{margin:0;font-size:17px;font-weight:900;}
-  .liveDot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#9ca3af;margin-left:6px;vertical-align:middle;transition:background-color .3s ease;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:var(--font);line-height:1.45;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;letter-spacing:-.01em;}
+  .topbar{position:sticky;top:0;background:rgba(255,255,255,.85);backdrop-filter:saturate(180%) blur(12px);-webkit-backdrop-filter:saturate(180%) blur(12px);border-bottom:1px solid var(--line);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;z-index:5;}
+  .topbar h1{margin:0;font-size:18px;font-weight:800;letter-spacing:-.02em;display:flex;align-items:center;gap:9px;}
+  .topbar h1::before{content:"";width:26px;height:26px;border-radius:8px;background:linear-gradient(135deg,#34d399,#059669);box-shadow:0 2px 6px rgba(16,185,129,.4);flex:0 0 auto;}
+  .liveDot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#cbd5e1;vertical-align:middle;transition:background-color .3s ease;}
   .liveDot.on{background:#10b981;animation:pulseDot 1.8s ease-out infinite;}
-  .logout{background:none;border:none;color:#ef4444;font-size:13px;cursor:pointer;padding:4px 8px;font-weight:700;}
+  .logout{background:none;border:1px solid var(--line);color:var(--muted);font-size:12.5px;cursor:pointer;padding:7px 13px;font-weight:600;border-radius:9px;transition:background .18s ease,color .18s ease,border-color .18s ease;}
+  .logout:hover{background:#fef2f2;color:#dc2626;border-color:#fecaca;}
 
-  .dateBar{background:#fff;padding:12px 14px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--line);position:sticky;top:41px;z-index:4;}
-  .dateBar button.nav{flex:0 0 auto;min-width:44px;height:44px;border:1px solid var(--line);background:#fff;border-radius:10px;font-size:20px;font-weight:800;cursor:pointer;color:var(--text);}
-  .dateBar button.nav:active{background:#f3f4f6;}
+  .dateBar{padding:6px 12px 8px;display:flex;align-items:center;gap:8px;}
+  .dateBar button.nav{flex:0 0 auto;min-width:46px;height:46px;border:1px solid var(--line);background:#fff;border-radius:12px;font-size:18px;font-weight:800;cursor:pointer;color:var(--text);box-shadow:var(--sh-sm);transition:background .16s ease,border-color .16s ease;}
+  .dateBar button.nav:hover{background:#f8fafc;border-color:#d7dbe4;}
+  .dateBar button.nav:active{background:#f1f5f9;}
   .dateBar input[type=date]{flex:1 1 auto;padding:12px;border:1px solid var(--line);border-radius:10px;font-size:16px;font-family:inherit;background:#fff;min-height:44px;}
-  .dateBar .today-btn{flex:0 0 auto;height:44px;padding:0 12px;border:1px solid var(--accent);background:#ecfdf5;color:#065f46;border-radius:10px;font-size:13px;font-weight:800;cursor:pointer;}
+  .dateBar .today-btn{flex:0 0 auto;height:46px;padding:0 15px;border:1px solid #6ee7b7;background:#ecfdf5;color:var(--accent-ink);border-radius:12px;font-size:13px;font-weight:700;cursor:pointer;box-shadow:var(--sh-sm);transition:background .16s ease;}
+  .dateBar .today-btn:hover{background:#d1fae5;}
 
   .dayLabel{padding:10px 14px 4px;font-size:14px;color:var(--muted);font-weight:700;}
   .summary{padding:0 14px 10px;font-size:13px;color:var(--muted);}
@@ -1435,12 +1447,13 @@ function lindaMainPage(env: Env): string {
 
   .list{padding:4px 12px 110px;}
   /* ── Appointment card — clean clinical diary style ── */
-  .appt{position:relative;background:#fff;border:1px solid var(--line);border-radius:16px;padding:15px 16px 14px 18px;margin-bottom:12px;box-shadow:0 1px 2px rgba(16,24,40,.05);animation:fadeUp .32s var(--ease) both;overflow:hidden;}
-  .appt::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--accent);}
-  .appt.is-attended::before{background:#6366f1;}
-  .appt.is-noshow::before{background:#f59e0b;}
-  .appt.is-cancelled::before{background:#ef4444;}
-  .appt.is-cancelled{opacity:.72;}
+  .appt{position:relative;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px 18px 15px 20px;margin-bottom:12px;box-shadow:var(--sh-md);animation:fadeUp .32s var(--ease) both;transition:transform .2s var(--ease),box-shadow .2s ease,border-color .2s ease;}
+  .appt::before{content:"";position:absolute;left:7px;top:16px;bottom:16px;width:4px;border-radius:999px;background:linear-gradient(180deg,#34d399,#059669);}
+  .appt.is-attended::before{background:linear-gradient(180deg,#818cf8,#4f46e5);}
+  .appt.is-noshow::before{background:linear-gradient(180deg,#fbbf24,#d97706);}
+  .appt.is-cancelled::before{background:linear-gradient(180deg,#f87171,#dc2626);}
+  .appt.is-cancelled{opacity:.66;}
+  @media (hover:hover){.appt:hover{transform:translateY(-2px);box-shadow:var(--sh-lg);border-color:#d7dbe4;}}
   .list .appt:nth-child(1){animation-delay:.02s}
   .list .appt:nth-child(2){animation-delay:.05s}
   .list .appt:nth-child(3){animation-delay:.08s}
@@ -1458,7 +1471,7 @@ function lindaMainPage(env: Env): string {
   .appt-name-row{display:flex;align-items:center;gap:8px;margin:2px 0 0;}
   .appt-name{font-size:18px;font-weight:800;color:var(--text);letter-spacing:-.3px;cursor:pointer;flex:1 1 auto;display:inline-flex;align-items:center;gap:7px;min-width:0;}
   .appt-name>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  .appt-name::after{content:"✎";font-size:12px;color:#c4b5fd;flex:0 0 auto;}
+  .appt-name::after{content:"✎";font-size:12px;color:#cbd5e1;flex:0 0 auto;}
   .appt-name:active{opacity:.6;}
   .appt-history-btn{flex:0 0 auto;background:#fff;border:1px solid var(--line);color:var(--muted);border-radius:9px;font-size:14px;line-height:1;padding:7px 9px;cursor:pointer;}
   .appt-history-btn:active{background:#f3f4f6;}
@@ -1476,11 +1489,13 @@ function lindaMainPage(env: Env): string {
   /* ── Card action toolbar ── */
   .appt-actions{margin-top:13px;padding-top:12px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:8px;}
   .btn-row{display:flex;gap:8px;}
-  .act{flex:1 1 0;display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:10px;border:1px solid var(--line);background:#fff;color:#374151;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;min-height:42px;}
-  .act:active{background:#f3f4f6;}
+  .act{flex:1 1 0;display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:10px;border:1px solid var(--line);background:#fff;color:#334155;border-radius:11px;font-size:13px;font-weight:600;cursor:pointer;min-height:42px;transition:background .16s ease,border-color .16s ease,transform .16s var(--ease),box-shadow .16s ease;}
+  .act:active{background:#f1f5f9;}
+  @media (hover:hover){.act:hover{background:#f8fafc;border-color:#d7dbe4;}}
   .act .act-ico{font-size:14px;}
-  .act.primary{border-color:var(--accent);background:var(--accent);color:#fff;box-shadow:0 1px 2px rgba(16,185,129,.35);}
-  .act.primary:active{background:#059669;}
+  .act.primary{border:none;background:linear-gradient(135deg,#34d399,#059669);color:#fff;font-weight:700;box-shadow:0 2px 8px rgba(16,185,129,.35);}
+  .act.primary:active{background:linear-gradient(135deg,#10b981,#047857);}
+  @media (hover:hover){.act.primary:hover{background:linear-gradient(135deg,#34d399,#059669);box-shadow:0 4px 14px rgba(16,185,129,.45);transform:translateY(-1px);}}
   .seg{display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;}
   .seg .act{border:none;border-right:1px solid var(--line);border-radius:0;}
   .seg .act:last-child{border-right:none;}
@@ -1489,15 +1504,16 @@ function lindaMainPage(env: Env): string {
   .act.noshow{color:#9a3412;}
   .act.noshow:active{background:#fff7ed;}
   .foot-row{display:flex;justify-content:flex-end;}
-  .act.link-danger{flex:0 0 auto;border:none;background:none;color:#b91c1c;min-height:0;padding:6px 4px;font-size:12.5px;font-weight:700;}
+  .act.link-danger{flex:0 0 auto;border:none;background:none;color:#94a3b8;min-height:0;padding:6px 4px;font-size:12.5px;font-weight:600;transition:color .16s ease;}
+  .act.link-danger:hover{color:#dc2626;}
   .act.link-danger:active{background:none;color:#7f1d1d;}
 
-  /* Day-wide actions row */
-  .day-actions{display:flex;gap:8px;padding:0 12px 6px;flex-wrap:wrap;}
-  .day-action-btn{flex:1 1 0;min-width:140px;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:#fff;color:var(--text);font-weight:800;font-size:13px;cursor:pointer;transition:background .18s ease,transform .18s var(--ease);}
-  .day-action-btn:active{transform:scale(.97);}
-  .day-action-btn.warn{border-color:#f59e0b;color:#92400e;background:#fffbeb;}
-  .day-action-btn.danger{border-color:#ef4444;color:#991b1b;background:#fef2f2;}
+  /* Day-wide actions row — quiet neutral chips so they don't dominate */
+  .day-actions{display:flex;gap:8px;padding:0 12px 8px;flex-wrap:wrap;}
+  .day-action-btn{flex:1 1 0;min-width:140px;padding:9px 12px;border-radius:11px;border:1px solid var(--line);background:#fff;color:var(--muted);font-weight:600;font-size:12.5px;cursor:pointer;box-shadow:var(--sh-sm);transition:background .18s ease,color .18s ease,border-color .18s ease,transform .18s var(--ease);}
+  .day-action-btn:active{transform:scale(.98);}
+  .day-action-btn.warn:hover{border-color:#fcd34d;color:#92400e;background:#fffbeb;}
+  .day-action-btn.danger:hover{border-color:#fca5a5;color:#991b1b;background:#fef2f2;}
   @media (prefers-color-scheme: dark){
     .day-action-btn{background:#0f172a;color:#e2e8f0;border-color:#334155;}
     .day-action-btn.warn{background:#422006;color:#fde68a;border-color:#92400e;}
@@ -1509,8 +1525,9 @@ function lindaMainPage(env: Env): string {
   .err{padding:14px;margin:10px 12px;background:#fef2f2;color:#991b1b;border-radius:10px;font-size:14px;}
 
   /* Search */
-  .searchBar{padding:10px 12px;background:#fff;border-bottom:1px solid var(--line);display:flex;gap:8px;align-items:center;}
-  .searchBar input{flex:1 1 auto;padding:12px;border:1px solid var(--line);border-radius:10px;font-size:15px;min-height:44px;background:#fff;color:var(--text);}
+  .searchBar{padding:8px 12px 4px;display:flex;gap:8px;align-items:center;}
+  .searchBar input{flex:1 1 auto;padding:12px 14px;border:1px solid var(--line);border-radius:12px;font-size:15px;min-height:46px;background:#fff;color:var(--text);box-shadow:var(--sh-sm);transition:border-color .16s ease,box-shadow .16s ease;}
+  .searchBar input:focus{outline:none;border-color:#6ee7b7;box-shadow:0 0 0 3px rgba(16,185,129,.15);}
   .searchBar .clear{background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;padding:4px 8px;min-width:32px;}
   .searchResults{padding:0 12px 110px;}
   .srow{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:8px;cursor:pointer;animation:fadeUp .25s var(--ease) both;}
@@ -1519,9 +1536,10 @@ function lindaMainPage(env: Env): string {
   .srow-dim{font-size:13px;color:var(--muted);margin-top:2px;}
 
   /* Tabs */
-  .tabBar{display:flex;gap:4px;padding:6px;background:#fff;border-bottom:1px solid var(--line);position:sticky;top:41px;z-index:4;}
-  .tabBtn{flex:1 1 0;padding:12px 8px;background:#f3f4f6;border:none;border-radius:10px;font-size:14px;font-weight:800;cursor:pointer;color:var(--muted);min-height:44px;transition:background-color .22s ease,color .22s ease,transform .22s var(--ease);}
-  .tabBtn.active{background:var(--accent);color:#fff;box-shadow:0 4px 12px rgba(16,185,129,0.3);}
+  .tabBar{display:flex;gap:4px;padding:6px;margin:10px 14px 4px;background:#eef1f6;border:1px solid var(--line);border-radius:14px;position:sticky;top:52px;z-index:4;box-shadow:inset 0 1px 2px rgba(16,24,40,.03);}
+  .tabBtn{flex:1 1 0;padding:11px 8px;background:transparent;border:none;border-radius:10px;font-size:13.5px;font-weight:700;cursor:pointer;color:var(--muted);min-height:42px;transition:background-color .22s ease,color .22s ease,box-shadow .22s ease,transform .22s var(--ease);}
+  .tabBtn:hover:not(.active){color:var(--text);}
+  .tabBtn.active{background:#fff;color:var(--accent-ink);box-shadow:var(--sh-sm);}
   #pane-day,#pane-week,#pane-avail{animation:fadeIn .22s ease both;}
 
   /* Availability tab */
@@ -1655,12 +1673,12 @@ function lindaMainPage(env: Env): string {
   .wg-cell{position:relative;border-right:1px solid #f3f4f6;border-bottom:1px solid #f3f4f6;height:32px;cursor:pointer;}
   .wg-cell.avail{background:#f0fdf4;}
   .wg-cell:active{background:#e5e7eb;}
-  .wg-block{position:absolute;left:2px;right:2px;background:var(--accent);color:#fff;border-radius:6px;padding:3px 5px;font-size:11px;font-weight:700;cursor:pointer;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.15);z-index:1;animation:fadeIn .3s ease both;transition:transform .18s var(--ease),box-shadow .18s ease;}
-  .wg-block:hover{transform:translateY(-1px);box-shadow:0 4px 10px rgba(0,0,0,0.2);}
+  .wg-block{position:absolute;left:2px;right:2px;background:linear-gradient(135deg,#34d399,#059669);color:#fff;border-radius:7px;padding:3px 5px;font-size:11px;font-weight:600;line-height:1.25;cursor:pointer;overflow:hidden;box-shadow:0 1px 3px rgba(16,24,40,0.18);z-index:1;animation:fadeIn .3s ease both;transition:transform .18s var(--ease),box-shadow .18s ease,filter .18s ease;}
+  .wg-block:hover{filter:brightness(1.05);box-shadow:0 5px 14px rgba(16,24,40,0.22);z-index:3;}
   .wg-block:active{transform:scale(.96);}
-  .wg-block.cancelled{background:#fef2f2;color:#991b1b;text-decoration:line-through;}
-  .wg-block.attended{background:#3730a3;}
-  .wg-block.no_show{background:#9a3412;}
+  .wg-block.cancelled{background:#fecdd3;background:linear-gradient(135deg,#fecaca,#fca5a5);color:#7f1d1d;text-decoration:line-through;}
+  .wg-block.attended{background:linear-gradient(135deg,#818cf8,#4f46e5);}
+  .wg-block.no_show{background:linear-gradient(135deg,#fbbf24,#d97706);}
   .wg-block .bt{font-size:10px;opacity:.85;}
   @media (prefers-color-scheme: dark){
     .weekBar{background:#1e293b;border-color:#334155;}
@@ -1756,7 +1774,8 @@ function lindaMainPage(env: Env): string {
   }
 
   /* Inline calendar (replaces ugly dd/mm/yyyy native input) */
-  .date-btn{width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--text);font-size:15px;font-family:inherit;text-align:left;min-height:44px;display:flex;align-items:center;gap:8px;cursor:pointer;}
+  .date-btn{width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:#fff;color:var(--text);font-size:15px;font-family:inherit;text-align:left;min-height:46px;display:flex;align-items:center;gap:8px;cursor:pointer;box-shadow:var(--sh-sm);transition:border-color .16s ease,box-shadow .16s ease;}
+  .dateBar .date-btn:hover{border-color:#d7dbe4;}
   .date-btn:active{background:#f3f4f6;}
   .date-btn .date-icon{font-size:17px;}
   .date-btn .date-val{flex:1 1 auto;font-weight:600;}
@@ -4019,6 +4038,42 @@ function lindaMainPage(env: Env): string {
     return parseInt(p[0], 10) * 60 + parseInt(p[1], 10);
   }
 
+  // Greedy interval-partitioning: within each cluster of transitively
+  // overlapping appointments, place each in the first free column and record
+  // how many columns the cluster needs, so the renderer can size them
+  // side-by-side. Annotates each appt with _col (index) and _cols (count).
+  function packWeekCols(list){
+    if (!list || !list.length) return;
+    var items = list.slice().sort(function(a,b){
+      var d = timeToMin(a.start_time) - timeToMin(b.start_time);
+      return d !== 0 ? d : (timeToMin(a.end_time) - timeToMin(b.end_time));
+    });
+    var i = 0;
+    while (i < items.length){
+      var cluster = [items[i]];
+      var clusterEnd = Math.max(timeToMin(items[i].end_time), timeToMin(items[i].start_time) + 15);
+      var j = i + 1;
+      while (j < items.length && timeToMin(items[j].start_time) < clusterEnd){
+        cluster.push(items[j]);
+        clusterEnd = Math.max(clusterEnd, timeToMin(items[j].end_time), timeToMin(items[j].start_time) + 15);
+        j++;
+      }
+      var colEnds = [];
+      for (var c = 0; c < cluster.length; c++){
+        var it = cluster[c];
+        var s = timeToMin(it.start_time), e = Math.max(timeToMin(it.end_time), s + 15);
+        var placed = -1;
+        for (var col = 0; col < colEnds.length; col++){
+          if (colEnds[col] <= s){ placed = col; colEnds[col] = e; break; }
+        }
+        if (placed < 0){ placed = colEnds.length; colEnds.push(e); }
+        it._col = placed;
+      }
+      for (var c = 0; c < cluster.length; c++) cluster[c]._cols = colEnds.length;
+      i = j;
+    }
+  }
+
   function renderWeek(){
     if (!week.data) return;
     $('weekLabel').textContent = weekLabelText(week.start);
@@ -4042,6 +4097,10 @@ function lindaMainPage(env: Env): string {
       var a = appts[i];
       if (byDay[a.date_key]) byDay[a.date_key].appts.push(a);
     }
+    // Assign side-by-side columns to overlapping appointments per day so that
+    // concurrent / off-grid bookings (e.g. 17:00, 17:15, 17:30) all stay
+    // visible instead of stacking on top of one another.
+    for (var dkey in byDay){ if (byDay.hasOwnProperty(dkey)) packWeekCols(byDay[dkey].appts); }
 
     var html = '<div class="wg-grid">';
     // Header row
@@ -4073,18 +4132,25 @@ function lindaMainPage(env: Env): string {
           // Only the :00 cell carries the tap; the :30 cell would double-book.
           var slotTime = pad(h) + ':' + pad(hm * 30);
           html += '<div class="' + cls + '" onclick="bookAtCell(\\'' + dk + '\\',\\'' + slotTime + '\\')">';
-          // Render blocks starting exactly at this half-hour.
+          // Render every appointment whose start falls inside this half-hour
+          // cell (not only exact :00/:30 starts), offset within the cell, and
+          // lay overlapping bookings out in side-by-side columns.
           var col = byDay[dk].appts;
           for (var b = 0; b < col.length; b++){
             var a = col[b];
-            if (timeToMin(a.start_time) !== min) continue;
-            var durMin = Math.max(timeToMin(a.end_time) - timeToMin(a.start_time), 15);
+            var startMin = timeToMin(a.start_time);
+            if (startMin < min || startMin >= min + 30) continue;
+            var durMin = Math.max(timeToMin(a.end_time) - startMin, 15);
+            var topPx = ((startMin - min) / 30) * WG_PX_PER_HALF + 1;
             var heightPx = (durMin / 30) * WG_PX_PER_HALF - 2;
+            var cols = a._cols || 1, ci = a._col || 0;
+            var widthPct = 100 / cols, leftPct = ci * widthPct;
             var bcls = 'wg-block';
             if (String(a.status).indexOf('CANCELLED') >= 0) bcls += ' cancelled';
             else if (a.status === 'ATTENDED') bcls += ' attended';
             else if (a.status === 'NO_SHOW') bcls += ' no_show';
-            html += '<div class="' + bcls + '" style="top:1px;height:' + heightPx + 'px;" onclick="event.stopPropagation();openWeekAppt(\\'' + esc(a.id) + '\\',\\'' + dk + '\\')">';
+            var stylePos = 'top:' + topPx + 'px;height:' + heightPx + 'px;left:calc(' + leftPct + '% + 1px);width:calc(' + widthPct + '% - 2px);right:auto;';
+            html += '<div class="' + bcls + '" style="' + stylePos + '" onclick="event.stopPropagation();openWeekAppt(\\'' + esc(a.id) + '\\',\\'' + dk + '\\')">';
             html +=   esc(a.start_time) + ' ' + esc(a.full_name || '').split(' ')[0];
             html +=   '<div class="bt">' + esc((a.full_name || '').split(' ').slice(1).join(' ')) + '</div>';
             html += '</div>';
