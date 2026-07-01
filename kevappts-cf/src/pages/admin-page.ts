@@ -1324,14 +1324,15 @@ export function adminPage(sig: string, env: Env): string {
     </div>
     <div style="padding:18px;">
       <div id="lcEditWhen" style="font-size:13px;color:#6b7280;margin-bottom:10px;"></div>
-      <input type="text" id="lcEditName" placeholder="Full name" style="width:100%;padding:11px;border:1px solid #e5e7eb;border-radius:9px;font-size:15px;margin-bottom:8px;">
+      <input type="text" id="lcEditName" placeholder="Full name" style="width:100%;padding:11px;border:1px solid #e5e7eb;border-radius:9px;font-size:15px;margin-bottom:8px;" oninput="lcEditAutosave()" onchange="lcEditAutosave()">
       <div style="display:flex;gap:8px;margin-bottom:8px;">
-        <input type="tel" id="lcEditPhone" placeholder="Phone" style="flex:1;padding:11px;border:1px solid #e5e7eb;border-radius:9px;font-size:15px;">
-        <input type="email" id="lcEditEmail" placeholder="Email" style="flex:1;padding:11px;border:1px solid #e5e7eb;border-radius:9px;font-size:15px;">
+        <input type="tel" id="lcEditPhone" placeholder="Phone" style="flex:1;padding:11px;border:1px solid #e5e7eb;border-radius:9px;font-size:15px;" oninput="lcEditAutosave()" onchange="lcEditAutosave()">
+        <input type="email" id="lcEditEmail" placeholder="Email" style="flex:1;padding:11px;border:1px solid #e5e7eb;border-radius:9px;font-size:15px;" oninput="lcEditAutosave()" onchange="lcEditAutosave()">
       </div>
-      <textarea id="lcEditComments" placeholder="Comments (optional)" style="width:100%;padding:11px;border:1px solid #e5e7eb;border-radius:9px;font-size:15px;min-height:52px;"></textarea>
-      <label style="display:flex;align-items:center;gap:8px;font-size:13px;margin-top:10px;cursor:pointer;"><input type="checkbox" id="lcEditApply"> Also fix all their <b>upcoming</b> appointments</label>
-      <button class="btn" style="background:#7c3aed;color:#fff;font-weight:800;width:100%;margin-top:14px;" onclick="lcEditSave()">Save changes</button>
+      <textarea id="lcEditComments" placeholder="Comments (optional)" style="width:100%;padding:11px;border:1px solid #e5e7eb;border-radius:9px;font-size:15px;min-height:52px;" oninput="lcEditAutosave()" onchange="lcEditAutosave()"></textarea>
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;margin-top:10px;cursor:pointer;"><input type="checkbox" id="lcEditApply" onchange="lcEditAutosave()"> Also fix all their <b>upcoming</b> appointments</label>
+      <div style="font-size:12px;color:#9ca3af;margin-top:8px;">Changes save automatically as you type.</div>
+      <button class="btn" style="background:#7c3aed;color:#fff;font-weight:800;width:100%;margin-top:14px;" onclick="lcEditSave()">Done</button>
       <div id="lcEditMsg" style="font-size:13px;margin-top:8px;"></div>
     </div>
   </div>
@@ -2793,15 +2794,23 @@ function lcEditOpen(i){
   document.getElementById('lcEditComments').value = a.comments || '';
   document.getElementById('lcEditApply').checked = false;
   document.getElementById('lcEditMsg').textContent = '';
+  if (lcEditTimer){ clearTimeout(lcEditTimer); lcEditTimer = null; }
   document.getElementById('lcEditBg').style.display = 'flex';
 }
-function lcEditClose(ev){ if (ev && ev.target && ev.target.id !== 'lcEditBg') return; document.getElementById('lcEditBg').style.display = 'none'; }
-async function lcEditSave(){
+function lcEditClose(ev){
+  if (ev && ev.target && ev.target.id !== 'lcEditBg') return;
+  if (lcEditTimer){ clearTimeout(lcEditTimer); lcEditTimer = null; }
+  document.getElementById('lcEditBg').style.display = 'none';
+}
+var lcEditTimer = null;
+// Shared save core. quiet=true ⇒ auto-save (keep modal open, refresh silently,
+// show a subtle "Saved ✓"). quiet=false ⇒ the explicit "Done" button (close).
+async function lcEditDoSave(quiet){
   var msg = document.getElementById('lcEditMsg');
   var name = document.getElementById('lcEditName').value.trim();
   var phone = document.getElementById('lcEditPhone').value.trim();
   var email = document.getElementById('lcEditEmail').value.trim();
-  if (!name || (!phone && !email)){ msg.style.color = '#dc2626'; msg.textContent = 'Name and phone or email required.'; return; }
+  if (!name || (!phone && !email)){ if (!quiet){ msg.style.color = '#dc2626'; msg.textContent = 'Name and phone or email required.'; } return; }
   msg.style.color = '#6b7280'; msg.textContent = 'Saving…';
   var res = await lindaApi('linda-edit-appointment', { body: {
     appointmentId: lcEditId, fullName: name, phone: phone, email: email,
@@ -2809,10 +2818,23 @@ async function lcEditSave(){
     applyToFuture: document.getElementById('lcEditApply').checked,
   } });
   if (res && res.ok){
-    document.getElementById('lcEditBg').style.display = 'none';
     lcLoadDay();
-    if (res.updatedFuture) alert('Updated this appointment and ' + res.updatedFuture + ' upcoming one' + (res.updatedFuture === 1 ? '' : 's') + '.');
+    if (quiet){ msg.style.color = '#059669'; msg.textContent = 'Saved ✓'; }
+    else {
+      document.getElementById('lcEditBg').style.display = 'none';
+      if (res.updatedFuture) alert('Updated this appointment and ' + res.updatedFuture + ' upcoming one' + (res.updatedFuture === 1 ? '' : 's') + '.');
+    }
   } else { msg.style.color = '#dc2626'; msg.textContent = (res && res.reason) || 'Failed.'; }
+}
+function lcEditAutosave(){
+  if (lcEditTimer) clearTimeout(lcEditTimer);
+  var msg = document.getElementById('lcEditMsg');
+  if (msg){ msg.style.color = '#9ca3af'; msg.textContent = 'Editing…'; }
+  lcEditTimer = setTimeout(function(){ lcEditTimer = null; lcEditDoSave(true); }, 700);
+}
+async function lcEditSave(){
+  if (lcEditTimer){ clearTimeout(lcEditTimer); lcEditTimer = null; }
+  await lcEditDoSave(false);
 }
 
 async function lcMark(i, code){

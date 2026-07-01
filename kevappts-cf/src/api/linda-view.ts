@@ -181,11 +181,20 @@ export async function apiLindaPatientHistory(req: Request, env: Env): Promise<Re
   const phone = (url.searchParams.get('phone') || '').trim();
   if (!email && !phone) return json({ ok: false, reason: 'Missing email or phone.' }, 400);
 
+  // Match ONLY on the identifiers we actually have. A blank email/phone must
+  // never be used as a match key — binding `email = ''` would pull in every
+  // other patient whose email is also blank (a cross-listing / data-protection
+  // bug that looked like "double listed" history). Build the OR dynamically.
+  const conds: string[] = [];
+  const binds: string[] = [];
+  if (email) { conds.push('email = ?'); binds.push(email); }
+  if (phone) { conds.push('phone = ?'); binds.push(phone); }
+
   const rows = await env.DB.prepare(
     "SELECT id, date_key, start_time, end_time, full_name, email, phone, comments, status " +
-    "FROM appointments WHERE clinic = 'linda' AND (email = ? OR phone = ?) " +
+    "FROM appointments WHERE clinic = 'linda' AND (" + conds.join(' OR ') + ") " +
     "ORDER BY date_key DESC, start_time DESC LIMIT 200"
-  ).bind(email, phone).all<any>();
+  ).bind(...binds).all<any>();
 
   const appts = rows.results;
   let total = 0, attended = 0, noShow = 0, cancelled = 0, upcoming = 0;
@@ -1439,8 +1448,11 @@ function lindaMainPage(env: Env): string {
   .status-ATTENDED{background:#e0e7ff;color:#3730a3;}
   .status-NO_SHOW{background:#fff7ed;color:#9a3412;}
   .status-CANCELLED{background:#fef2f2;color:#991b1b;text-decoration:line-through;}
-  .appt-name{font-size:16px;font-weight:700;margin:0 0 6px 0;color:var(--accent);text-decoration:underline;text-underline-offset:3px;cursor:pointer;}
+  .appt-name-row{display:flex;align-items:center;gap:8px;margin:0 0 6px 0;}
+  .appt-name{font-size:16px;font-weight:700;color:var(--accent);text-decoration:underline;text-underline-offset:3px;cursor:pointer;flex:1 1 auto;}
   .appt-name:active{opacity:.7;}
+  .appt-history-btn{flex:0 0 auto;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:8px;font-size:15px;line-height:1;padding:5px 8px;cursor:pointer;}
+  .appt-history-btn:active{opacity:.7;}
   .contact-row{display:flex;flex-direction:column;gap:8px;margin-top:10px;}
   .contact-btn{display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:10px;text-decoration:none;font-weight:700;font-size:15px;min-height:48px;word-break:break-all;line-height:1.3;}
   .contact-btn .icon{flex:0 0 auto;font-size:18px;}
@@ -1960,15 +1972,16 @@ function lindaMainPage(env: Env): string {
   </div>
   <div class="sheet-section">
     <div class="sheet-label" id="editWhen"></div>
-    <input class="sheet-input" id="editName" placeholder="Full name" style="margin-bottom:8px;">
+    <input class="sheet-input" id="editName" placeholder="Full name" style="margin-bottom:8px;" oninput="editAutosave()" onchange="editAutosave()">
     <div class="sheet-row">
-      <input class="sheet-input" id="editPhone" type="tel" placeholder="Phone" inputmode="tel">
-      <input class="sheet-input" id="editEmail" type="email" placeholder="Email" inputmode="email">
+      <input class="sheet-input" id="editPhone" type="tel" placeholder="Phone" inputmode="tel" oninput="editAutosave()" onchange="editAutosave()">
+      <input class="sheet-input" id="editEmail" type="email" placeholder="Email" inputmode="email" oninput="editAutosave()" onchange="editAutosave()">
     </div>
-    <textarea class="sheet-input" id="editComments" placeholder="Comments (optional)" style="margin-top:8px;min-height:56px;"></textarea>
-    <label style="display:flex;align-items:center;gap:8px;font-size:13px;margin-top:10px;cursor:pointer;"><input type="checkbox" id="editApply"> Also fix all their <b>upcoming</b> appointments</label>
+    <textarea class="sheet-input" id="editComments" placeholder="Comments (optional)" style="margin-top:8px;min-height:56px;" oninput="editAutosave()" onchange="editAutosave()"></textarea>
+    <label style="display:flex;align-items:center;gap:8px;font-size:13px;margin-top:10px;cursor:pointer;"><input type="checkbox" id="editApply" onchange="editAutosave()"> Also fix all their <b>upcoming</b> appointments</label>
+    <p class="hint" style="margin-top:8px;">Changes save automatically as you type.</p>
   </div>
-  <button class="sheet-submit" onclick="submitEdit()">Save changes</button>
+  <button class="sheet-submit" onclick="submitEdit()">Done</button>
   <div id="editMsg" class="sheet-msg" style="display:none;"></div>
 </div>
 
@@ -2190,7 +2203,13 @@ function lindaMainPage(env: Env): string {
       html +=     '<div class="appt-status ' + statusCls + '">' + statusTxt + '</div>';
       html +=   '</div>';
       var patientPayload = esc(JSON.stringify({ email: a.email || '', phone: a.phone || '', name: a.full_name || '' }));
-      html +=   '<div class="appt-name" data-patient="' + patientPayload + '" onclick="openPatientHistoryFromEl(this)">' + esc(a.full_name || 'No name') + '</div>';
+      var nameEditPayload = esc(JSON.stringify({ id: a.id, fullName: a.full_name, email: a.email, phone: a.phone, comments: a.comments || '', dateKey: a.date_key, startTime: a.start_time }));
+      // Tapping the name jumps straight into Edit (changes auto-save). The small
+      // history glyph beside it still opens the full patient timeline.
+      html +=   '<div class="appt-name-row">';
+      html +=     '<div class="appt-name" data-edit="' + nameEditPayload + '" onclick="editApptFromEl(this)">' + esc(a.full_name || 'No name') + '</div>';
+      html +=     '<button class="appt-history-btn" data-patient="' + patientPayload + '" onclick="openPatientHistoryFromEl(this)" title="Patient history" aria-label="Patient history">🕓</button>';
+      html +=   '</div>';
       if (a.service_name) html += '<div style="font-size:13px;color:var(--muted);">' + esc(a.service_name) + '</div>';
       html +=   '<div class="contact-row">';
       if (tel) html += '<a class="contact-btn call" href="tel:' + esc(tel) + '"><span class="icon">📞</span><span class="val">' + esc(a.phone) + '</span></a>';
@@ -3441,6 +3460,7 @@ function lindaMainPage(env: Env): string {
   var editState = {};
   function setEditMsg(t, k){ var m = $('editMsg'); if (!m) return; m.textContent = t || ''; m.className = 'sheet-msg' + (k ? ' ' + k : ''); m.style.display = t ? 'block' : 'none'; }
   window.editApptFromEl = function(el){ openEditSheet(readJsonAttr(el, 'data-edit')); };
+  var editSaveTimer = null, editSaving = false;
   function openEditSheet(d){
     editState = d || {};
     $('editWhen').textContent = d && d.dateKey ? (fmtDay(d.dateKey) + ' at ' + d.startTime) : '';
@@ -3449,22 +3469,48 @@ function lindaMainPage(env: Env): string {
     $('editEmail').value = (d && d.email) || '';
     $('editComments').value = (d && d.comments) || '';
     $('editApply').checked = false;
+    if (editSaveTimer){ clearTimeout(editSaveTimer); editSaveTimer = null; }
     setEditMsg('', '');
     $('editOverlay').classList.add('show'); $('editSheet').classList.add('show');
   }
-  window.closeEditSheet = function(){ $('editOverlay').classList.remove('show'); $('editSheet').classList.remove('show'); };
-  window.submitEdit = async function(){
+  window.closeEditSheet = function(){
+    if (editSaveTimer){ clearTimeout(editSaveTimer); editSaveTimer = null; }
+    $('editOverlay').classList.remove('show'); $('editSheet').classList.remove('show');
+  };
+  // Shared save core. quiet=true ⇒ auto-save (keep the sheet open, refresh the
+  // day list silently, show a subtle "Saved" tick). quiet=false ⇒ the explicit
+  // "Done" button (close the sheet after saving).
+  async function doEditSave(quiet){
     var name = $('editName').value.trim(), phone = $('editPhone').value.trim(), email = $('editEmail').value.trim();
-    if (!name || (!phone && !email)){ setEditMsg('Name and phone or email required.', 'bad'); return; }
+    if (!name || (!phone && !email)){ if (!quiet) setEditMsg('Name and phone or email required.', 'bad'); return false; }
+    editSaving = true;
     setEditMsg('Saving…', '');
     try {
       var res = await (await fetch('/api/linda-edit-appointment', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
         appointmentId: editState.id, fullName: name, phone: phone, email: email,
         comments: $('editComments').value.trim(), applyToFuture: $('editApply').checked,
       }) })).json();
-      if (res && res.ok){ closeEditSheet(); setDate(state.dateKey); }
-      else setEditMsg((res && res.reason) || 'Failed.', 'bad');
-    } catch(e){ setEditMsg('Network error.', 'bad'); }
+      editSaving = false;
+      if (res && res.ok){
+        // Keep local state in sync so a subsequent auto-save targets the same row.
+        editState.fullName = name; editState.phone = phone; editState.email = email;
+        if (quiet){ setEditMsg('Saved ✓', 'ok'); setDate(state.dateKey); }
+        else { closeEditSheet(); setDate(state.dateKey); }
+        return true;
+      }
+      setEditMsg((res && res.reason) || 'Failed.', 'bad');
+    } catch(e){ editSaving = false; setEditMsg('Network error.', 'bad'); }
+    return false;
+  }
+  // Debounced auto-save fired from field input; no button press needed.
+  window.editAutosave = function(){
+    if (editSaveTimer) clearTimeout(editSaveTimer);
+    setEditMsg('Editing…', '');
+    editSaveTimer = setTimeout(function(){ editSaveTimer = null; doEditSave(true); }, 700);
+  };
+  window.submitEdit = function(){
+    if (editSaveTimer){ clearTimeout(editSaveTimer); editSaveTimer = null; }
+    doEditSave(false);
   };
 
   window.openBookSheet = function(prefill){
