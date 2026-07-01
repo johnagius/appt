@@ -1356,6 +1356,13 @@ function lindaMainPage(env: Env): string {
   .tl-seg.off{background:var(--bad);opacity:0.65;background-image:repeating-linear-gradient(135deg,transparent,transparent 4px,rgba(255,255,255,0.35) 4px,rgba(255,255,255,0.35) 8px);}
   .tl-seg.block{background:var(--bad);opacity:0.78;background-image:repeating-linear-gradient(45deg,transparent,transparent 4px,rgba(255,255,255,0.32) 4px,rgba(255,255,255,0.32) 8px);}
   .tl-seg.sel{background:#0ea5e9;opacity:0.8;border:2px solid #0369a1;border-radius:4px;z-index:5;}
+  /* Existing extras/blocks are tappable so they can be selected & removed right on the bar. */
+  .tl-seg.extra,.tl-seg.block{pointer-events:auto;cursor:pointer;}
+  .tl-seg.picked{outline:3px solid #0369a1;outline-offset:-1px;z-index:6;box-shadow:0 0 0 3px rgba(3,105,161,.25);}
+  /* Live time tooltip shown while dragging a selection. */
+  .tl-tip{position:absolute;top:5px;transform:translateX(-50%);background:#0f172a;color:#fff;font-size:12px;font-weight:800;padding:3px 8px;border-radius:6px;white-space:nowrap;pointer-events:none;z-index:9;box-shadow:0 2px 8px rgba(0,0,0,.35);}
+  .tl-picked-bar{display:flex;align-items:center;gap:8px;margin-top:8px;padding:8px 10px;background:#e0f2fe;border:1px solid #7dd3fc;border-radius:10px;animation:fadeUp .2s var(--ease) both;}
+  @media (prefers-color-scheme: dark){ .tl-picked-bar{background:#0c2a3a;border-color:#0369a1;} }
   .tl-action-row{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;}
   .tl-action-btn{flex:1 1 0;min-width:130px;padding:13px 12px;border:none;border-radius:10px;font-size:14px;font-weight:800;cursor:pointer;min-height:46px;display:inline-flex;align-items:center;justify-content:center;gap:6px;transition:transform .18s var(--ease),opacity .18s ease;}
   .tl-action-btn:active{transform:scale(.97);}
@@ -2346,7 +2353,7 @@ function lindaMainPage(env: Env): string {
   var TL_END_MIN = 22 * 60;    // 22:00
   var TL_TOTAL_MIN = TL_END_MIN - TL_START_MIN; // 900
   var TL_SNAP_MIN = 15;
-  var tl = { sel: null, baseHours: null, extras: [], blocks: [], booked: [], dayOff: false };
+  var tl = { sel: null, baseHours: null, extras: [], blocks: [], booked: [], dayOff: false, picked: null };
   // Drag state is shared (not per-render) and the window move/up listeners are
   // bound exactly once — see wireTimelineDrag(). Re-rendering the bar mid-drag
   // used to re-add these listeners every time, leaking handlers and making the
@@ -2416,19 +2423,23 @@ function lindaMainPage(env: Env): string {
       var r = pctOf(timeToMin(b.end));
       html += '<div class="tl-seg base" style="left:' + l + '%;width:' + (r - l) + '%;"></div>';
     }
-    // Extras
+    // Extras (tappable — data attrs let a tap select & remove them)
     for (var i = 0; i < tl.extras.length; i++){
       var e = tl.extras[i];
-      var l = pctOf(timeToMin(e.start || e.start_time));
-      var r = pctOf(timeToMin(e.end || e.end_time));
-      html += '<div class="tl-seg extra" style="left:' + l + '%;width:' + (r - l) + '%;"></div>';
+      var es = e.start || e.start_time, ee = e.end || e.end_time;
+      var l = pctOf(timeToMin(es));
+      var r = pctOf(timeToMin(ee));
+      var epk = (tl.picked && tl.picked.type === 'extra' && tl.picked.id === e.id) ? ' picked' : '';
+      html += '<div class="tl-seg extra' + epk + '" data-otype="extra" data-oid="' + (e.id || '') + '" style="left:' + l + '%;width:' + (r - l) + '%;" title="Extra: ' + esc(es + '–' + ee) + '"></div>';
     }
-    // Partial blocks
+    // Partial blocks (tappable)
     for (var i = 0; i < (tl.blocks || []).length; i++){
       var b2 = tl.blocks[i];
-      var lb = pctOf(timeToMin(b2.start || b2.start_time));
-      var rb = pctOf(timeToMin(b2.end || b2.end_time));
-      html += '<div class="tl-seg block" style="left:' + lb + '%;width:' + (rb - lb) + '%;" title="Block: ' + esc((b2.start || b2.start_time) + '–' + (b2.end || b2.end_time)) + '"></div>';
+      var bs = b2.start || b2.start_time, be = b2.end || b2.end_time;
+      var lb = pctOf(timeToMin(bs));
+      var rb = pctOf(timeToMin(be));
+      var bpk = (tl.picked && tl.picked.type === 'block' && tl.picked.id === b2.id) ? ' picked' : '';
+      html += '<div class="tl-seg block' + bpk + '" data-otype="block" data-oid="' + (b2.id || '') + '" style="left:' + lb + '%;width:' + (rb - lb) + '%;" title="Block: ' + esc(bs + '–' + be) + '"></div>';
     }
     // Bookings
     for (var i = 0; i < tl.booked.length; i++){
@@ -2441,11 +2452,12 @@ function lindaMainPage(env: Env): string {
     if (tl.dayOff){
       html += '<div class="tl-seg off" style="left:0;width:100%;"></div>';
     }
-    // Selection
+    // Selection + live time tooltip
     if (tl.sel){
       var l = pctOf(tl.sel.start);
       var r = pctOf(tl.sel.end);
       html += '<div class="tl-seg sel" style="left:' + l + '%;width:' + (r - l) + '%;"></div>';
+      html += '<div class="tl-tip" id="tlTip" style="left:' + ((l + r) / 2) + '%;">' + minToTime(tl.sel.start) + ' – ' + minToTime(tl.sel.end) + '</div>';
     }
     html += '</div>';
     // Ticks
@@ -2462,11 +2474,23 @@ function lindaMainPage(env: Env): string {
       '<span><span class="tl-legend-dot" style="background:var(--bad);"></span>Day off</span>' +
       '</div>';
     html += '<div class="tl-sel-txt ' + (tl.sel ? '' : 'muted') + '" id="tlSelTxt">' +
-      (tl.sel ? 'Selected: ' + minToTime(tl.sel.start) + ' – ' + minToTime(tl.sel.end) : 'Drag on the bar to select a range.') +
+      (tl.sel ? 'Selected: ' + minToTime(tl.sel.start) + ' – ' + minToTime(tl.sel.end)
+              : (tl.picked ? 'Tap Remove to delete, or drag the bar to add.' : 'Drag on the bar to select a range. Tap an existing extra or block to remove it.')) +
       '</div>';
+    // A tapped extra/block shows an inline Remove bar right under the timeline.
+    if (tl.picked){
+      html += '<div class="tl-picked-bar">'
+        + '<span style="flex:1 1 auto;font-size:13px;font-weight:800;color:#0369a1;">' + (tl.picked.type === 'extra' ? '🟢 Extra hours' : '⛔ Block') + ' ' + minToTime(tl.picked.startMin) + ' – ' + minToTime(tl.picked.endMin) + '</span>'
+        + '<button id="tlRemoveOvr" class="tl-action-btn block" style="flex:0 0 auto;min-width:auto;padding:8px 16px;min-height:38px;">Remove</button>'
+        + '<button id="tlClearOvr" style="flex:0 0 auto;background:none;border:none;font-size:22px;line-height:1;color:#64748b;cursor:pointer;padding:0 4px;">×</button>'
+        + '</div>';
+    }
     wrap.innerHTML = html;
     var btnAdd = $('tlAddBtn'); if (btnAdd) btnAdd.disabled = !tl.sel;
     var btnBlock = $('tlBlockBtn'); if (btnBlock) btnBlock.disabled = !tl.sel;
+    // Wire the tap-to-remove bar + tappable extra/block segments.
+    var rmBtn = $('tlRemoveOvr'); if (rmBtn) rmBtn.addEventListener('click', removePickedOverride);
+    var clrBtn = $('tlClearOvr'); if (clrBtn) clrBtn.addEventListener('click', function(){ tl.picked = null; renderTimeline(); });
 
     // Wire drag. The mousedown/touchstart binding is on the freshly-rendered
     // bar (safe: the old bar element is discarded with its listener). The
@@ -2480,6 +2504,50 @@ function lindaMainPage(env: Env): string {
     bar.addEventListener('touchmove', function(ev){ if (ev.touches.length) tlDragMove(ev.touches[0].clientX); }, { passive: true });
     bar.addEventListener('touchend', tlDragUp);
     wireTimelineDrag();
+    // Tapping an existing extra/block selects it (and stops a drag from starting).
+    Array.prototype.forEach.call(bar.querySelectorAll('[data-oid]'), function(seg){
+      var stop = function(ev){ ev.stopPropagation(); };
+      seg.addEventListener('mousedown', stop);
+      seg.addEventListener('touchstart', stop, { passive: true });
+      seg.addEventListener('click', function(ev){
+        ev.stopPropagation();
+        pickTimelineOverride(seg.getAttribute('data-otype'), parseInt(seg.getAttribute('data-oid'), 10));
+      });
+    });
+  }
+
+  // Select an existing extra/block on the bar so it can be removed inline.
+  function pickTimelineOverride(type, id){
+    if (!id) return;
+    var list = type === 'extra' ? tl.extras : tl.blocks;
+    var item = null;
+    for (var i = 0; i < list.length; i++){ if (list[i].id === id){ item = list[i]; break; } }
+    if (!item) return;
+    tl.sel = null; TL_DRAG.active = false;
+    tl.picked = { type: type, id: id, startMin: timeToMin(item.start || item.start_time), endMin: timeToMin(item.end || item.end_time) };
+    renderTimeline();
+  }
+
+  async function removePickedOverride(){
+    if (!tl.picked) return;
+    var p = tl.picked;
+    var path = p.type === 'extra' ? '/api/linda-extras?id=' : '/api/linda-blocks?id=';
+    var btn = $('tlRemoveOvr'); if (btn){ btn.disabled = true; btn.textContent = 'Removing…'; }
+    try {
+      var res = await fetch(path + p.id, { method: 'DELETE' }).then(function(r){ return r.json(); });
+      if (res && res.ok){
+        tl.picked = null;
+        setTlMsg(p.type === 'extra' ? 'Extra hours removed.' : 'Block removed.', 'ok');
+        loadTimeline();
+        if (typeof loadOverrides === 'function') loadOverrides();
+      } else {
+        setTlMsg((res && res.reason) || 'Could not remove.', 'bad');
+        if (btn){ btn.disabled = false; btn.textContent = 'Remove'; }
+      }
+    } catch(e){
+      setTlMsg('Network error.', 'bad');
+      if (btn){ btn.disabled = false; btn.textContent = 'Remove'; }
+    }
   }
 
   function tlXToMin(clientX){
@@ -2493,6 +2561,7 @@ function lindaMainPage(env: Env): string {
   function tlDragDown(x){
     if (!$('tlBar')) return;
     TL_DRAG.active = true;
+    tl.picked = null; // starting a fresh selection clears any tapped override
     TL_DRAG.startMin = tlXToMin(x);
     tl.sel = { start: TL_DRAG.startMin, end: TL_DRAG.startMin + TL_SNAP_MIN };
     renderTimeline();
@@ -2509,6 +2578,8 @@ function lindaMainPage(env: Env): string {
     if (sel){
       sel.style.left = pctOf(s) + '%';
       sel.style.width = (pctOf(e) - pctOf(s)) + '%';
+      var tip = $('tlTip');
+      if (tip){ tip.style.left = ((pctOf(s) + pctOf(e)) / 2) + '%'; tip.textContent = minToTime(s) + ' – ' + minToTime(e); }
       var txt = $('tlSelTxt');
       if (txt){ txt.classList.remove('muted'); txt.textContent = 'Selected: ' + minToTime(s) + ' – ' + minToTime(e); }
     } else {
