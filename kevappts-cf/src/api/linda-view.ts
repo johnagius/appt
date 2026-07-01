@@ -2034,7 +2034,8 @@ function lindaMainPage(env: Env): string {
 <div class="sheet-overlay" id="phOverlay" onclick="closePatientHistory()"></div>
 <div class="sheet" id="phSheet" role="dialog" aria-modal="true">
   <div class="sheet-head">
-    <h3 class="ph-name" id="phName">Patient</h3>
+    <h3 class="ph-name" id="phName" style="flex:1 1 auto;">Patient</h3>
+    <button onclick="editFromHistory()" style="background:#f5f3ff;color:#5b21b6;border:1px solid #ddd6fe;border-radius:8px;font-weight:800;font-size:13px;padding:7px 12px;margin-right:8px;cursor:pointer;">✎ Edit</button>
     <button class="sheet-close" onclick="closePatientHistory()" aria-label="Close">×</button>
   </div>
   <div class="ph-last" id="phLast"></div>
@@ -3223,7 +3224,19 @@ function lindaMainPage(env: Env): string {
     $('phOverlay').classList.remove('show');
     $('phSheet').classList.remove('show');
   };
+  var phState = { appts: [] };
+  window.editFromHistory = function(){
+    var appts = phState.appts || [];
+    if (!appts.length){ return; }
+    var todayKey = today();
+    var up = appts.filter(function(a){ return a.date_key >= todayKey && (!a.status || a.status.indexOf('CANCELLED') < 0); }).sort(function(a,b){ return a.date_key < b.date_key ? -1 : 1; });
+    var a = up.length ? up[0] : appts[appts.length - 1];
+    closePatientHistory();
+    openEditSheet({ id: a.id, fullName: a.full_name, email: a.email, phone: a.phone, comments: a.comments || '', dateKey: a.date_key, startTime: a.start_time });
+    $('editApply').checked = true; // from person-level history, default to fixing them everywhere
+  };
   window.openPatientHistory = async function(patient){
+    phState.appts = [];
     $('phName').textContent = patient.name || 'Patient';
     $('phStats').innerHTML = '';
     $('phLast').textContent = 'Loading…';
@@ -3236,6 +3249,7 @@ function lindaMainPage(env: Env): string {
       if (res.status === 403) { window.location.reload(); return; }
       var data = await res.json();
       if (!data.ok) { $('phLast').textContent = data.reason || 'Failed to load.'; return; }
+      phState.appts = data.appointments || [];
       var s = data.stats;
       $('phStats').innerHTML =
         '<div class="ph-stat"><div class="num">' + s.total + '</div><div class="label">Total</div></div>' +

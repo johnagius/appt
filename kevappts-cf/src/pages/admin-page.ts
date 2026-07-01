@@ -2620,7 +2620,7 @@ async function lcLoadDay(){
     html += '<div style="border:1px solid #e5e7eb;border-radius:12px;padding:12px 14px;margin-bottom:8px;' + (cancelled?'opacity:.6;':'') + '">'
       + '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">'
       +   '<b style="font-size:16px;">' + lcEsc(a.start_time) + '</b>'
-      +   '<span style="font-size:16px;font-weight:700;flex:1 1 auto;">' + lcEsc(a.full_name) + '</span>'
+      +   '<span onclick="lcEditOpen(' + i + ')" title="Edit details" style="font-size:16px;font-weight:700;flex:1 1 auto;color:#5b21b6;cursor:pointer;text-decoration:underline;text-underline-offset:3px;">' + lcEsc(a.full_name) + '</span>'
       +   '<span style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;padding:3px 9px;border-radius:999px;background:' + badgeBg + ';color:' + badgeC + ';">' + badge + '</span>'
       + '</div>';
     var contact = [];
