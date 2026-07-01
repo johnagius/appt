@@ -13,7 +13,22 @@
 import type { Env, Appointment } from '../types';
 import { computeLindaSig, verifyLindaSig, verifyAdminSig } from '../services/crypto';
 import { todayKeyLocal, nowIso, nowMinutesLocal, parseTimeToMinutes, toDateKey, todayLocal } from '../services/utils';
-import { buildLindaSlots, getLindaBlocksForDate, getLindaExtrasForDate, isLindaDayOff, loadLindaConfig } from '../services/linda';
+import { buildLindaSlots, getLindaBlocksForDate, getLindaExtrasForDate, isLindaDayOff, loadLindaConfig, ensureWindowHoursColumn } from '../services/linda';
+
+// Validate + serialise a per-stint hours payload {days:[DOW], ranges:[{start,end}]}
+// into a JSON string for the linda_windows.hours column ('' when none/invalid).
+const DOW_SET = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+function serializeWindowHours(raw: any): string {
+  if (!raw || typeof raw !== 'object') return '';
+  const days = Array.isArray(raw.days) ? raw.days.filter((d: any) => DOW_SET.includes(d)) : [];
+  const ranges = Array.isArray(raw.ranges)
+    ? raw.ranges
+        .filter((r: any) => r && /^\d{2}:\d{2}$/.test(r.start) && /^\d{2}:\d{2}$/.test(r.end) && r.start < r.end)
+        .map((r: any) => ({ start: r.start, end: r.end }))
+    : [];
+  if (!ranges.length || !days.length) return '';
+  return JSON.stringify({ days, ranges });
+}
 import { getTakenSlots, bumpVersion, getAppointmentById, isSlotTaken, updateAppointmentStatus, insertAppointment, getOrCreateClient } from '../db/queries';
 import { generateId } from '../services/crypto';
 import { createCalendarEvent, deleteCalendarEvent } from '../services/calendar';
@@ -380,9 +395,11 @@ export async function apiLindaAddWindow(req: Request, env: Env): Promise<Respons
   if (!/^\d{4}-\d{2}-\d{2}$/.test(endDate)) return json({ ok: false, reason: 'Invalid end date.' }, 400);
   if (endDate < startDate) return json({ ok: false, reason: 'End must be on or after start.' }, 400);
 
+  const hours = serializeWindowHours(body.hours);
+  await ensureWindowHoursColumn(env.DB);
   const res = await env.DB.prepare(
-    "INSERT INTO linda_windows (start_date, end_date, note, created_at) VALUES (?, ?, ?, datetime('now'))"
-  ).bind(startDate, endDate, note).run();
+    "INSERT INTO linda_windows (start_date, end_date, note, hours, created_at) VALUES (?, ?, ?, ?, datetime('now'))"
+  ).bind(startDate, endDate, note, hours).run();
   await bumpVersion(env.DB);
   return json({ ok: true, id: res.meta?.last_row_id });
 }
@@ -403,9 +420,11 @@ export async function apiLindaUpdateWindow(req: Request, env: Env): Promise<Resp
   const existing = await env.DB.prepare('SELECT id FROM linda_windows WHERE id = ?').bind(id).first();
   if (!existing) return json({ ok: false, reason: 'Window not found.' }, 404);
 
+  const hours = serializeWindowHours(body.hours);
+  await ensureWindowHoursColumn(env.DB);
   await env.DB.prepare(
-    'UPDATE linda_windows SET start_date=?, end_date=?, note=? WHERE id=?'
-  ).bind(startDate, endDate, note, id).run();
+    'UPDATE linda_windows SET start_date=?, end_date=?, note=?, hours=? WHERE id=?'
+  ).bind(startDate, endDate, note, hours, id).run();
   await bumpVersion(env.DB);
   return json({ ok: true });
 }
@@ -1363,6 +1382,26 @@ function lindaMainPage(env: Env): string {
   .tl-tip{position:absolute;top:5px;transform:translateX(-50%);background:#0f172a;color:#fff;font-size:12px;font-weight:800;padding:3px 8px;border-radius:6px;white-space:nowrap;pointer-events:none;z-index:9;box-shadow:0 2px 8px rgba(0,0,0,.35);}
   .tl-picked-bar{display:flex;align-items:center;gap:8px;margin-top:8px;padding:8px 10px;background:#e0f2fe;border:1px solid #7dd3fc;border-radius:10px;animation:fadeUp .2s var(--ease) both;}
   @media (prefers-color-scheme: dark){ .tl-picked-bar{background:#0c2a3a;border-color:#0369a1;} }
+
+  /* Stint list rows */
+  .stint-row{background:#f9fafb;border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:8px;animation:fadeUp .25s var(--ease) both;}
+  .stint-when{font-size:14px;font-weight:800;}
+  .stint-hours{font-size:13px;color:#065f46;font-weight:700;margin-top:3px;}
+  .stint-actions{display:flex;gap:6px;justify-content:flex-end;margin-top:8px;}
+  @media (prefers-color-scheme: dark){ .stint-row{background:#0f172a;} }
+
+  /* Stint editor sheet */
+  .se-daterow{display:flex;align-items:center;gap:8px;}
+  .se-daterow .sheet-input{flex:1 1 0;}
+  .se-arrow{color:var(--muted);font-weight:800;flex:0 0 auto;}
+  .se-pills{display:flex;gap:6px;flex-wrap:wrap;}
+  .se-pill{width:42px;height:42px;border-radius:50%;border:1.5px solid var(--line);background:#fff;font-size:14px;font-weight:800;color:var(--muted);cursor:pointer;transition:transform .15s var(--ease),background .15s,border-color .15s,color .15s;}
+  .se-pill:active{transform:scale(.92);}
+  .se-pill.on{background:#ecfdf5;border-color:var(--accent);color:#065f46;}
+  .se-seg{position:absolute;top:0;bottom:0;background:var(--accent);opacity:.62;pointer-events:auto;cursor:pointer;}
+  .se-seg.preview{opacity:.85;background:#0ea5e9;pointer-events:none;}
+  .se-summary{font-size:13px;font-weight:700;color:var(--text);margin-top:9px;line-height:1.5;}
+  @media (prefers-color-scheme: dark){ .se-pill{background:#0f172a;color:#94a3b8;} .se-pill.on{background:#022c22;color:#6ee7b7;} }
   .tl-action-row{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;}
   .tl-action-btn{flex:1 1 0;min-width:130px;padding:13px 12px;border:none;border-radius:10px;font-size:14px;font-weight:800;cursor:pointer;min-height:46px;display:inline-flex;align-items:center;justify-content:center;gap:6px;transition:transform .18s var(--ease),opacity .18s ease;}
   .tl-action-btn:active{transform:scale(.97);}
@@ -1633,7 +1672,7 @@ function lindaMainPage(env: Env): string {
   <div class="avail-wrap">
     <div class="avail-card">
       <h3>Your booking periods</h3>
-      <p class="hint">Linda's visits. Add a stint for each period you'll be here — each can have its own From / To dates. Patients can book any date covered by any stint.</p>
+      <p class="hint">Each visit in one place: pick the dates, the working days, and drag the hours — that stint's hours apply to every day it covers, so you set a whole visit in seconds. Tap Edit to change dates or hours anytime.</p>
       <div id="winList"><div class="empty" style="margin:0;border:none;padding:12px 0;">Loading…</div></div>
       <button class="avail-save" style="margin-top:8px;" onclick="openAddWindow()">+ Add a stint</button>
       <div class="avail-msg" id="winListMsg"></div>
@@ -1703,6 +1742,38 @@ function lindaMainPage(env: Env): string {
       <div id="overridesList"><div class="empty" style="margin:0;border:none;padding:20px 0;">Loading…</div></div>
     </div>
   </div>
+</div>
+
+<!-- Stint editor: date range + weekday pills + compose-hours bar -->
+<div class="sheet-overlay" id="seOverlay" onclick="closeStintEditor()"></div>
+<div class="sheet" id="seSheet" role="dialog" aria-modal="true">
+  <div class="sheet-head">
+    <h3 class="sheet-title" id="seTitle">Add a stint</h3>
+    <button class="sheet-close" onclick="closeStintEditor()" aria-label="Close">×</button>
+  </div>
+  <div class="sheet-section">
+    <div class="sheet-label">Dates Linda is here</div>
+    <div class="se-daterow">
+      <input class="sheet-input" type="date" id="seFrom">
+      <span class="se-arrow">→</span>
+      <input class="sheet-input" type="date" id="seTo">
+    </div>
+  </div>
+  <div class="sheet-section">
+    <div class="sheet-label">Working days</div>
+    <div class="se-pills" id="sePills"></div>
+  </div>
+  <div class="sheet-section">
+    <div class="sheet-label">Hours (drag the bar)</div>
+    <div class="tl-bar" id="seBar" style="height:60px;"></div>
+    <div class="tl-ticks" style="margin-top:3px;"><div class="tl-tick">07</div><div class="tl-tick">10</div><div class="tl-tick">13</div><div class="tl-tick">16</div><div class="tl-tick">19</div><div class="tl-tick">22</div></div>
+    <div class="se-summary" id="seSummary"></div>
+  </div>
+  <div class="sheet-section">
+    <input class="sheet-input" type="text" id="seNote" placeholder="Note (optional) — e.g. 'summer visit'">
+  </div>
+  <button class="sheet-submit" onclick="saveStint()">Save stint</button>
+  <div class="avail-msg" id="seMsg" style="margin-top:8px;"></div>
 </div>
 
 <button class="fab" id="fabBook" onclick="openBookSheet()"><span class="fab-plus">＋</span>New Booking</button>
@@ -2096,6 +2167,23 @@ function lindaMainPage(env: Env): string {
     m.className = 'avail-msg' + (kind ? ' ' + kind : '');
   }
 
+  // Each stint now carries its own hours (days + time ranges), composed on a
+  // drag bar. winCache holds the last-loaded windows so Edit can reopen the
+  // exact stint (objects can't ride in inline onclick, so we pass an index).
+  var winCache = [];
+  var DOW_ORDER = ['MON','TUE','WED','THU','FRI','SAT','SUN'];
+  var DOW_ONE = { MON:'M', TUE:'T', WED:'W', THU:'T', FRI:'F', SAT:'S', SUN:'S' };
+
+  function stintHoursSummary(w){
+    if (!w.hours || !w.hours.ranges || !w.hours.ranges.length) return 'Uses default weekly hours';
+    var days = (w.hours.days || []);
+    var dayTxt = days.length === 7 ? 'Every day'
+      : days.slice().sort(function(a,b){return DOW_ORDER.indexOf(a)-DOW_ORDER.indexOf(b);})
+          .map(function(k){ return k.charAt(0)+k.slice(1).toLowerCase(); }).join(', ');
+    var rTxt = w.hours.ranges.map(function(r){ return r.start+'–'+r.end; }).join(' & ');
+    return dayTxt + ' · ' + rTxt;
+  }
+
   async function loadWindows(){
     var el = $('winList');
     try {
@@ -2103,30 +2191,19 @@ function lindaMainPage(env: Env): string {
       if (res.status === 403) { window.location.reload(); return; }
       var data = await res.json();
       if (!data.ok){ el.innerHTML = '<div class="err" style="margin:0;">' + esc(data.reason || 'Failed') + '</div>'; return; }
-      var wins = data.windows || [];
-      if (!wins.length){
+      winCache = data.windows || [];
+      if (!winCache.length){
         el.innerHTML = '<div class="empty" style="margin:0;border:none;padding:12px 0;">No stints yet. Tap + Add a stint.</div>';
         return;
       }
       var html = '';
-      for (var i = 0; i < wins.length; i++){
-        var w = wins[i];
-        var hsId = 'ws' + w.id, heId = 'we' + w.id, hnId = 'wn' + w.id;
-        html += '<div class="extra-row" style="flex-direction:column;align-items:stretch;">';
-        html +=   '<div class="extra-when" style="margin-bottom:6px;">' + esc(formatNiceShort(w.start)) + ' — ' + esc(formatNiceShort(w.end));
-        if (w.note) html +=     ' · <span style="color:var(--muted);font-weight:500;">' + esc(w.note) + '</span>';
-        html +=   '</div>';
-        html +=   '<div class="extra-edit-panel" id="winEdit' + w.id + '" style="display:none;">';
-        html +=     '<button type="button" class="date-btn" id="' + hsId + 'Btn" onclick="pickDate(\\'' + hsId + '\\')"><span class="date-icon">📅</span><span class="date-val" id="' + hsId + 'Label">' + esc(formatNiceShort(w.start)) + '</span></button>';
-        html +=     '<input type="hidden" id="' + hsId + '" value="' + esc(w.start) + '">';
-        html +=     '<button type="button" class="date-btn" id="' + heId + 'Btn" onclick="pickDate(\\'' + heId + '\\')"><span class="date-icon">📅</span><span class="date-val" id="' + heId + 'Label">' + esc(formatNiceShort(w.end)) + '</span></button>';
-        html +=     '<input type="hidden" id="' + heId + '" value="' + esc(w.end) + '">';
-        html +=     '<input type="text" id="' + hnId + '" placeholder="Note (optional)" value="' + esc(w.note || '') + '" style="flex:1 1 100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:14px;">';
-        html +=     '<button class="save" onclick="saveWindowRow(' + w.id + ')">Save</button>';
-        html +=     '<button class="cancel" onclick="toggleWindowEdit(' + w.id + ', false)">Cancel</button>';
-        html +=   '</div>';
-        html +=   '<div style="display:flex;gap:6px;justify-content:flex-end;">';
-        html +=     '<button class="extra-edit" onclick="toggleWindowEdit(' + w.id + ', true)">Edit</button>';
+      for (var i = 0; i < winCache.length; i++){
+        var w = winCache[i];
+        html += '<div class="stint-row">';
+        html +=   '<div class="stint-when">' + esc(formatNiceShort(w.start)) + ' → ' + esc(formatNiceShort(w.end)) + (w.note ? ' · <span style="color:var(--muted);font-weight:500;">' + esc(w.note) + '</span>' : '') + '</div>';
+        html +=   '<div class="stint-hours">' + esc(stintHoursSummary(w)) + '</div>';
+        html +=   '<div class="stint-actions">';
+        html +=     '<button class="extra-edit" onclick="editStint(' + i + ')">Edit</button>';
         html +=     '<button class="extra-del" onclick="deleteWindow(' + w.id + ')">Remove</button>';
         html +=   '</div>';
         html += '</div>';
@@ -2137,27 +2214,7 @@ function lindaMainPage(env: Env): string {
     }
   }
 
-  window.toggleWindowEdit = function(id, on){
-    var p = document.getElementById('winEdit' + id);
-    if (p) p.style.display = on ? '' : 'none';
-  };
-
-  window.saveWindowRow = async function(id){
-    var s = ($('ws' + id) || {}).value || '';
-    var e = ($('we' + id) || {}).value || '';
-    var n = ($('wn' + id) || {}).value || '';
-    if (!s || !e) { setStintMsg('Pick start and end dates.', 'bad'); return; }
-    try {
-      var res = await fetch('/api/linda-windows', {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: id, startDate: s, endDate: e, note: n }),
-      });
-      if (res.status === 403) { window.location.reload(); return; }
-      var data = await res.json();
-      if (data.ok){ setStintMsg('Saved.', 'ok'); loadWindows(); }
-      else setStintMsg(data.reason || 'Failed', 'bad');
-    } catch(err){ setStintMsg('Network error', 'bad'); }
-  };
+  window.editStint = function(i){ openStintEditor(winCache[i]); };
 
   window.deleteWindow = async function(id){
     if (!confirm('Remove this stint? Patients will no longer be able to book within it (existing bookings stay).')) return;
@@ -2170,31 +2227,110 @@ function lindaMainPage(env: Env): string {
     } catch(e){ setStintMsg('Network error', 'bad'); }
   };
 
-  window.openAddWindow = function(){
-    // Two-step prompt: pick a from-date, then a to-date, then post.
-    pickDate('stintAddFrom', function(fromDk){
-      if (!fromDk) return;
-      pickDate('stintAddTo', async function(toDk){
-        if (!toDk) return;
-        try {
-          var res = await fetch('/api/linda-windows', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ startDate: fromDk, endDate: toDk, note: '' }),
-          });
-          if (res.status === 403) { window.location.reload(); return; }
-          var data = await res.json();
-          if (data.ok){ setStintMsg('Added.', 'ok'); loadWindows(); }
-          else setStintMsg(data.reason || 'Failed', 'bad');
-        } catch(e){ setStintMsg('Network error', 'bad'); }
-      });
+  window.openAddWindow = function(){ openStintEditor(null); };
+
+  // ── Stint editor (compose hours on the bar) ──────────────────
+  var SE = { id: 0, ranges: [], days: {}, preview: null, drag: { active: false, start: 0 } };
+  var seWired = false;
+  var SE_START = 7 * 60, SE_END = 22 * 60, SE_TOTAL = SE_END - SE_START, SE_SNAP = 15;
+  function sePct(m){ var c = Math.max(SE_START, Math.min(SE_END, m)); return ((c - SE_START) / SE_TOTAL) * 100; }
+  function seXToMin(x){ var bar = $('seBar'); if (!bar) return 0; var r = bar.getBoundingClientRect(); var p = Math.max(0, Math.min(1, (x - r.left) / r.width)); return Math.round((SE_START + p * SE_TOTAL) / SE_SNAP) * SE_SNAP; }
+  function seMerge(){
+    SE.ranges.sort(function(a,b){ return a.s - b.s; });
+    var out = [];
+    for (var i = 0; i < SE.ranges.length; i++){ var r = SE.ranges[i]; if (out.length && r.s <= out[out.length-1].e){ out[out.length-1].e = Math.max(out[out.length-1].e, r.e); } else out.push({ s: r.s, e: r.e }); }
+    SE.ranges = out;
+  }
+  function seRenderBar(){
+    var bar = $('seBar'); if (!bar) return;
+    var html = '';
+    for (var i = 0; i < SE.ranges.length; i++){ var r = SE.ranges[i]; html += '<div class="se-seg" data-i="' + i + '" style="left:' + sePct(r.s) + '%;width:' + (sePct(r.e) - sePct(r.s)) + '%;"></div>'; }
+    if (SE.drag.active && SE.preview){
+      html += '<div class="se-seg preview" style="left:' + sePct(SE.preview.s) + '%;width:' + (sePct(SE.preview.e) - sePct(SE.preview.s)) + '%;"></div>';
+      html += '<div class="tl-tip" style="left:' + ((sePct(SE.preview.s) + sePct(SE.preview.e)) / 2) + '%;">' + minToTime(SE.preview.s) + ' – ' + minToTime(SE.preview.e) + '</div>';
+    }
+    bar.innerHTML = html;
+    Array.prototype.forEach.call(bar.querySelectorAll('.se-seg[data-i]'), function(seg){
+      var stop = function(ev){ ev.stopPropagation(); };
+      seg.addEventListener('mousedown', stop);
+      seg.addEventListener('touchstart', stop, { passive: true });
+      seg.addEventListener('click', function(ev){ ev.stopPropagation(); SE.ranges.splice(+seg.getAttribute('data-i'), 1); seRenderBar(); seSummary(); });
     });
+    seSummary();
+  }
+  function seSummary(){
+    var el = $('seSummary'); if (!el) return;
+    var days = DOW_ORDER.filter(function(k){ return SE.days[k]; });
+    var rTxt = SE.ranges.length ? SE.ranges.map(function(r){ return minToTime(r.s) + '–' + minToTime(r.e); }).join(' & ') : '—';
+    var dTxt = days.length === 7 ? 'Every day' : days.length ? days.map(function(k){ return k.charAt(0)+k.slice(1).toLowerCase(); }).join(', ') : 'No days';
+    el.innerHTML = SE.ranges.length ? ('<b>' + esc(dTxt) + '</b> · <b>' + esc(rTxt) + '</b>') : 'Drag on the bar to add working hours (drag again for a split shift · tap a green block to remove).';
+  }
+  function seDown(x){ if (!$('seBar')) return; SE.drag.active = true; SE.drag.start = seXToMin(x); SE.preview = { s: SE.drag.start, e: SE.drag.start + SE_SNAP }; seRenderBar(); }
+  function seMove(x){ if (!SE.drag.active) return; var c = seXToMin(x); var s = Math.min(SE.drag.start, c), e = Math.max(SE.drag.start, c); if (e - s < SE_SNAP) e = s + SE_SNAP; SE.preview = { s: s, e: e }; seRenderBar(); }
+  function seUp(){ if (!SE.drag.active) return; SE.drag.active = false; if (SE.preview){ SE.ranges.push({ s: SE.preview.s, e: SE.preview.e }); seMerge(); SE.preview = null; } seRenderBar(); }
+  function seWire(){
+    if (seWired) return; seWired = true;
+    window.addEventListener('mousemove', function(e){ seMove(e.clientX); });
+    window.addEventListener('mouseup', seUp);
+    var bar = $('seBar');
+    if (bar){
+      bar.addEventListener('mousedown', function(e){ seDown(e.clientX); });
+      bar.addEventListener('touchstart', function(e){ if (e.touches.length) seDown(e.touches[0].clientX); }, { passive: true });
+      bar.addEventListener('touchmove', function(e){ if (e.touches.length) seMove(e.touches[0].clientX); }, { passive: true });
+      bar.addEventListener('touchend', seUp);
+    }
+  }
+  function seRenderPills(){
+    var host = $('sePills'); if (!host) return;
+    host.innerHTML = DOW_ORDER.map(function(k){ return '<button type="button" class="se-pill' + (SE.days[k] ? ' on' : '') + '" data-k="' + k + '">' + DOW_ONE[k] + '</button>'; }).join('');
+    Array.prototype.forEach.call(host.children, function(b){
+      b.addEventListener('click', function(){ var k = b.getAttribute('data-k'); SE.days[k] = SE.days[k] ? 0 : 1; b.classList.toggle('on'); seSummary(); });
+    });
+  }
+  function openStintEditor(win){
+    seWire();
+    SE.id = win ? win.id : 0;
+    SE.ranges = []; SE.preview = null; SE.drag.active = false;
+    SE.days = { MON:1, TUE:1, WED:1, THU:1, FRI:1, SAT:1, SUN:0 }; // default Mon–Sat
+    $('seMsg').textContent = '';
+    if (win){
+      $('seTitle').textContent = 'Edit stint';
+      $('seFrom').value = win.start; $('seTo').value = win.end; $('seNote').value = win.note || '';
+      if (win.hours && win.hours.ranges && win.hours.ranges.length){
+        SE.ranges = win.hours.ranges.map(function(r){ return { s: timeToMin(r.start), e: timeToMin(r.end) }; });
+        var d = { MON:0, TUE:0, WED:0, THU:0, FRI:0, SAT:0, SUN:0 };
+        (win.hours.days || []).forEach(function(k){ d[k] = 1; });
+        SE.days = d;
+      }
+    } else {
+      $('seTitle').textContent = 'Add a stint';
+      $('seFrom').value = today(); $('seTo').value = ''; $('seNote').value = '';
+    }
+    seRenderPills(); seRenderBar();
+    $('seOverlay').classList.add('show'); $('seSheet').classList.add('show');
+  }
+  window.closeStintEditor = function(){ $('seOverlay').classList.remove('show'); $('seSheet').classList.remove('show'); };
+  window.saveStint = async function(){
+    var s = $('seFrom').value, e = $('seTo').value, note = $('seNote').value.trim();
+    var msg = $('seMsg');
+    if (!s || !e){ msg.textContent = 'Pick both dates.'; msg.className = 'avail-msg bad'; return; }
+    if (e < s){ msg.textContent = 'End date is before start.'; msg.className = 'avail-msg bad'; return; }
+    var days = DOW_ORDER.filter(function(k){ return SE.days[k]; });
+    var ranges = SE.ranges.map(function(r){ return { start: minToTime(r.s), end: minToTime(r.e) }; });
+    if (ranges.length && !days.length){ msg.textContent = 'Pick at least one working day (or clear the hours to use default weekly).'; msg.className = 'avail-msg bad'; return; }
+    var hours = ranges.length ? { days: days, ranges: ranges } : null;
+    var body = { startDate: s, endDate: e, note: note, hours: hours };
+    var method = 'POST';
+    if (SE.id){ method = 'PUT'; body.id = SE.id; }
+    msg.textContent = 'Saving…'; msg.className = 'avail-msg';
+    try {
+      var res = await fetch('/api/linda-windows', { method: method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      if (res.status === 403) { window.location.reload(); return; }
+      var data = await res.json();
+      if (data.ok){ closeStintEditor(); setStintMsg('Saved.', 'ok'); loadWindows(); }
+      else { msg.textContent = data.reason || 'Failed'; msg.className = 'avail-msg bad'; }
+    } catch(err){ msg.textContent = 'Network error'; msg.className = 'avail-msg bad'; }
   };
-  // Hidden inputs for the two-step add picker.
-  ['stintAddFrom', 'stintAddTo'].forEach(function(id){
-    var input = document.createElement('input'); input.type = 'hidden'; input.id = id; document.body.appendChild(input);
-    var lbl = document.createElement('span'); lbl.id = id + 'Label'; lbl.style.display = 'none'; document.body.appendChild(lbl);
-    var btn = document.createElement('span'); btn.id = id + 'Btn'; btn.style.display = 'none'; document.body.appendChild(btn);
-  });
 
   // Save slot duration in-place (no separate button — change fires save).
   window.saveSlotMin = async function(){

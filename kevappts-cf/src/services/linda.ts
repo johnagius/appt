@@ -25,12 +25,48 @@ const DEFAULT_HOURS: WorkingHours = {
   SUN: [],
 };
 
+/** Per-stint working hours: which weekdays are open and the time ranges that
+ *  apply to each of those days. When present on a window, these take precedence
+ *  over the global weekly LINDA_HOURS for dates that window covers. */
+export interface WindowHours {
+  days: string[];                               // e.g. ['MON','TUE',...]
+  ranges: { start: string; end: string }[];     // e.g. [{start:'09:00',end:'13:00'}]
+}
+
 export interface LindaWindow {
   id: number;
   start: string;
   end: string;
   note: string;
+  /** null/empty ⇒ legacy stint that uses the global weekly hours. */
+  hours: WindowHours | null;
 }
+
+const DOW_KEYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+
+function parseWindowHours(raw: string | null | undefined): WindowHours | null {
+  if (!raw) return null;
+  try {
+    const h = JSON.parse(raw);
+    if (h && Array.isArray(h.days) && Array.isArray(h.ranges) && h.ranges.length) {
+      return {
+        days: h.days.filter((d: string) => DOW_KEYS.includes(d)),
+        ranges: h.ranges
+          .filter((r: any) => /^\d{2}:\d{2}$/.test(r.start) && /^\d{2}:\d{2}$/.test(r.end) && r.start < r.end)
+          .map((r: any) => ({ start: r.start, end: r.end })),
+      };
+    }
+  } catch {}
+  return null;
+}
+
+/** One-time, idempotent migration so existing prod DBs gain the hours column
+ *  without a manual ALTER. Safe to call on every load (fails silently if the
+ *  column already exists). */
+async function ensureWindowHoursColumn(db: D1Database): Promise<void> {
+  try { await db.prepare("ALTER TABLE linda_windows ADD COLUMN hours TEXT DEFAULT ''").run(); } catch {}
+}
+export { ensureWindowHoursColumn };
 
 export interface LindaConfig {
   enabled: boolean;
@@ -57,10 +93,16 @@ export async function loadLindaConfig(db: D1Database): Promise<LindaConfig> {
 
   const slotMin = parseInt(map['LINDA_SLOT_MIN'] || String(DEFAULT_SLOT_MIN), 10) || DEFAULT_SLOT_MIN;
 
-  // Load windows; one-time migration from legacy LINDA_WINDOW_START/END.
-  let windowRows = await db.prepare(
-    'SELECT id, start_date AS s, end_date AS e, note FROM linda_windows ORDER BY start_date'
-  ).all<{ id: number; s: string; e: string; note: string }>();
+  // Load windows (with per-stint hours), tolerating older DBs that lack the
+  // hours column by adding it on first use. One-time migration from legacy
+  // LINDA_WINDOW_START/END if the table is empty.
+  type WRow = { id: number; s: string; e: string; note: string; h: string };
+  const WIN_SQL = 'SELECT id, start_date AS s, end_date AS e, note, hours AS h FROM linda_windows ORDER BY start_date';
+  const loadWinRows = async () => {
+    try { return await db.prepare(WIN_SQL).all<WRow>(); }
+    catch { await ensureWindowHoursColumn(db); return await db.prepare(WIN_SQL).all<WRow>(); }
+  };
+  let windowRows = await loadWinRows();
   if (!windowRows.results.length) {
     const legacyStart = map['LINDA_WINDOW_START'];
     const legacyEnd = map['LINDA_WINDOW_END'];
@@ -68,19 +110,17 @@ export async function loadLindaConfig(db: D1Database): Promise<LindaConfig> {
       await db.prepare(
         "INSERT INTO linda_windows (start_date, end_date, note, created_at) VALUES (?, ?, 'migrated', datetime('now'))"
       ).bind(legacyStart, legacyEnd).run();
-      windowRows = await db.prepare(
-        'SELECT id, start_date AS s, end_date AS e, note FROM linda_windows ORDER BY start_date'
-      ).all<{ id: number; s: string; e: string; note: string }>();
+      windowRows = await loadWinRows();
     }
   }
 
   const windows: LindaWindow[] = windowRows.results.map(r => ({
-    id: r.id, start: r.s, end: r.e, note: r.note || '',
+    id: r.id, start: r.s, end: r.e, note: r.note || '', hours: parseWindowHours(r.h),
   }));
 
   // Fallback single default if nothing at all exists yet.
   if (!windows.length) {
-    windows.push({ id: 0, start: DEFAULT_WINDOW_START, end: DEFAULT_WINDOW_END, note: '' });
+    windows.push({ id: 0, start: DEFAULT_WINDOW_START, end: DEFAULT_WINDOW_END, note: '', hours: null });
   }
 
   return {
@@ -100,6 +140,26 @@ export function isInLindaWindow(dateKey: string, cfg: LindaConfig): boolean {
   return false;
 }
 
+/** The effective base working ranges for a date: a covering stint's own hours
+ *  (if it defines any and includes this weekday) take precedence; otherwise
+ *  fall back to the global weekly hours. Legacy stints with no hours use the
+ *  global weekly schedule exactly as before. */
+export function baseRangesForDate(dateKey: string, cfg: LindaConfig): { start: string; end: string }[] {
+  const dow = dayOfWeekKey(parseDateKey(dateKey));
+  const covering = cfg.windows.filter(w => dateKey >= w.start && dateKey <= w.end);
+  const withHours = covering.filter(w => w.hours && w.hours.ranges.length);
+  if (withHours.length) {
+    // Stint-specific hours are authoritative — union ranges from stints whose
+    // day-set includes this weekday (none ⇒ closed that day).
+    const out: { start: string; end: string }[] = [];
+    for (const w of withHours) {
+      if (w.hours!.days.includes(dow)) out.push(...w.hours!.ranges);
+    }
+    return out;
+  }
+  return cfg.hours[dow] || [];
+}
+
 export function buildLindaSlots(
   dateKey: string,
   cfg: LindaConfig,
@@ -112,16 +172,15 @@ export function buildLindaSlots(
   if (isDayOff) return [];
   const d = parseDateKey(dateKey);
   const dow = dayOfWeekKey(d);
-  const base = cfg.hours[dow] || [];
+  const base = baseRangesForDate(dateKey, cfg);
   const hasBase = base.length > 0;
   const hasExtra = extras && extras.length > 0;
   if (!hasBase && !hasExtra) return [];
-  // buildSlotsForDate takes an hoursOverride (used for base) plus extraWindows
-  // that it merges in. If Linda has no base hours that day but has extras,
-  // pass an empty hours map but the extras will add slots on their own.
-  const hoursOverride = hasBase
-    ? cfg.hours
-    : ({ MON: [], TUE: [], WED: [], THU: [], FRI: [], SAT: [], SUN: [], [dow]: [] } as any);
+  // buildSlotsForDate takes an hoursOverride (base hours per weekday) plus
+  // extraWindows it merges in. We hand it a synthetic map with just this date's
+  // resolved base ranges so stint-specific and global hours flow through the
+  // same path.
+  const hoursOverride = ({ MON: [], TUE: [], WED: [], THU: [], FRI: [], SAT: [], SUN: [], [dow]: base } as any);
   const slots = buildSlotsForDate(d, cfg.slotMin, extras || null, hoursOverride);
   if (!blocks || !blocks.length) return slots;
   // Drop any slot whose [start,end) overlaps any block range.
@@ -175,8 +234,7 @@ export function buildLindaDateOptions(tz: string, cfg: LindaConfig): DateOption[
       const dk = toDateKey(d);
       if (!seen.has(dk)) {
         seen.add(dk);
-        const dow = dayOfWeekKey(d);
-        const hasHours = cfg.hours[dow] && cfg.hours[dow].length > 0;
+        const hasHours = baseRangesForDate(dk, cfg).length > 0;
         out.push({
           dateKey: dk,
           label: formatDateLabel(d, tz),

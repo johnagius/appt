@@ -155,6 +155,10 @@ CREATE TABLE IF NOT EXISTS linda_windows (
   start_date TEXT NOT NULL,
   end_date TEXT NOT NULL,
   note TEXT DEFAULT '',
+  -- Per-stint working hours as JSON {"days":["MON",...],"ranges":[{"start","end"}]}.
+  -- Empty ⇒ the stint uses the global weekly LINDA_HOURS. Existing DBs get this
+  -- column added automatically on first load (ensureWindowHoursColumn).
+  hours TEXT DEFAULT '',
   created_at TEXT DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS idx_linda_windows_dates ON linda_windows(start_date, end_date);
