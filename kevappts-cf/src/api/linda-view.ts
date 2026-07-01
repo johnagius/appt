@@ -156,12 +156,16 @@ export async function apiLindaClientsAutocomplete(req: Request, env: Env): Promi
   const q = (url.searchParams.get('q') || '').trim();
   if (q.length < 2) return json({ ok: true, results: [] });
   const pat = '%' + q + '%';
+  // One suggestion per person (deduped by name, case-insensitive). SQLite returns
+  // the bare columns from the row holding MAX(date_key), so each person surfaces
+  // their MOST RECENT email/phone — meaning a corrected detail on a new booking
+  // automatically becomes the suggestion next time.
   const rows = await env.DB.prepare(
-    "SELECT full_name, email, phone FROM appointments " +
+    "SELECT full_name, email, phone, MAX(date_key) AS md FROM appointments " +
     "WHERE clinic = 'linda' AND (full_name LIKE ? OR email LIKE ? OR phone LIKE ?) " +
-    "GROUP BY email, phone " +
-    "ORDER BY MAX(date_key) DESC LIMIT 8"
-  ).bind(pat, pat, pat).all<{ full_name: string; email: string; phone: string }>();
+    "GROUP BY lower(full_name) " +
+    "ORDER BY md DESC LIMIT 8"
+  ).bind(pat, pat, pat).all<{ full_name: string; email: string; phone: string; md: string }>();
 
   return json({ ok: true, results: rows.results.map(r => ({ fullName: r.full_name, email: r.email, phone: r.phone })) });
 }
