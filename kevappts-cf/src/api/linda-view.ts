@@ -1445,7 +1445,7 @@ function lindaMainPage(env: Env): string {
   .next-up.soon{background:linear-gradient(135deg,#f59e0b,#d97706);box-shadow:0 4px 14px rgba(245,158,11,0.35);}
   .next-up.now{background:linear-gradient(135deg,#dc2626,#b91c1c);box-shadow:0 4px 14px rgba(220,38,38,0.35);}
 
-  .list{padding:4px 12px 110px;}
+  .list{padding:4px 12px 4px;}
   /* ── Appointment card — clean clinical diary style ── */
   .appt{position:relative;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px 18px 15px 20px;margin-bottom:12px;box-shadow:var(--sh-md);animation:fadeUp .32s var(--ease) both;transition:transform .2s var(--ease),box-shadow .2s ease,border-color .2s ease;}
   .appt::before{content:"";position:absolute;left:7px;top:16px;bottom:16px;width:4px;border-radius:999px;background:linear-gradient(180deg,#34d399,#059669);}
@@ -1537,10 +1537,18 @@ function lindaMainPage(env: Env): string {
   .err{padding:14px;margin:10px 12px;background:#fef2f2;color:#991b1b;border-radius:10px;font-size:14px;}
 
   /* Search */
-  .searchBar{padding:8px 12px 4px;display:flex;gap:8px;align-items:center;}
-  .searchBar input{flex:1 1 auto;padding:12px 14px;border:1px solid var(--line);border-radius:12px;font-size:15px;min-height:46px;background:#fff;color:var(--text);box-shadow:var(--sh-sm);transition:border-color .16s ease,box-shadow .16s ease;}
+  .searchBar{padding:8px 12px 4px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+  .searchBar input{flex:1 1 200px;min-width:0;padding:12px 14px;border:1px solid var(--line);border-radius:12px;font-size:15px;min-height:46px;background:#fff;color:var(--text);box-shadow:var(--sh-sm);transition:border-color .16s ease,box-shadow .16s ease;}
   .searchBar input:focus{outline:none;border-color:#6ee7b7;box-shadow:0 0 0 3px rgba(16,185,129,.15);}
   .searchBar .clear{background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;padding:4px 8px;min-width:32px;}
+  /* Inline "New Booking" (top, beside Bulk) + dashed "New Booking" (list foot) */
+  .nb-inline{flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,#34d399,#059669);color:#fff;border:none;border-radius:12px;font-weight:700;font-size:13px;padding:0 16px;min-height:46px;cursor:pointer;box-shadow:0 2px 8px rgba(16,185,129,.35);white-space:nowrap;transition:box-shadow .16s ease,transform .16s ease;}
+  .nb-inline:hover{box-shadow:0 5px 16px rgba(16,185,129,.45);transform:translateY(-1px);}
+  .nb-inline .p{font-size:16px;font-weight:800;}
+  .nb-bottom-wrap{padding:2px 12px 40px;}
+  .nb-bottom{width:100%;display:inline-flex;align-items:center;justify-content:center;gap:8px;background:#fff;color:var(--accent-ink);border:1.5px dashed #6ee7b7;border-radius:14px;font-weight:700;font-size:14px;min-height:54px;cursor:pointer;transition:background .16s ease,border-color .16s ease,box-shadow .16s ease;}
+  .nb-bottom:hover{background:#ecfdf5;border-color:#34d399;box-shadow:var(--sh-sm);}
+  .nb-bottom .p{font-size:19px;font-weight:800;}
   .searchResults{padding:0 12px 110px;}
   .srow{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:8px;cursor:pointer;animation:fadeUp .25s var(--ease) both;}
   .srow:active{background:#f3f4f6;}
@@ -1853,7 +1861,7 @@ function lindaMainPage(env: Env): string {
     .dayLabel{padding:12px 22px 2px;font-size:15px;}
     .summary{padding:0 22px 12px;}
     .day-actions{padding:0 18px 8px;}
-    .list{padding:6px 18px 130px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:start;}
+    .list{padding:6px 18px 6px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:start;}
     .list .appt{margin-bottom:0;}
     .empty{grid-column:1 / -1;}
     .next-up{margin:10px 18px 4px;}
@@ -1886,7 +1894,8 @@ function lindaMainPage(env: Env): string {
   <div class="searchBar">
     <input type="search" id="searchInput" placeholder="Search name, phone or email…" autocomplete="off">
     <button class="clear" id="searchClear" onclick="clearSearch()" style="display:none;" aria-label="Clear">&times;</button>
-    <button onclick="openBulkSheet()" title="Bulk add bookings" style="flex:0 0 auto;background:#ecfdf5;border:1px solid var(--accent);color:#065f46;border-radius:10px;font-weight:800;font-size:13px;padding:0 12px;min-height:44px;cursor:pointer;">⇊ Bulk</button>
+    <button onclick="openBulkSheet()" title="Bulk add bookings" style="flex:0 0 auto;background:#ecfdf5;border:1px solid #6ee7b7;color:var(--accent-ink);border-radius:12px;font-weight:700;font-size:13px;padding:0 14px;min-height:46px;cursor:pointer;">⇊ Bulk</button>
+    <button class="nb-inline" onclick="openBookSheet()" title="New booking"><span class="p">＋</span>New Booking</button>
   </div>
   <div id="searchResults" class="searchResults" style="display:none;"></div>
   <div id="dayContent">
@@ -1905,6 +1914,7 @@ function lindaMainPage(env: Env): string {
     <button class="day-action-btn danger" onclick="cancelAllDay()">✖ Cancel all</button>
   </div>
   <div class="list" id="list"><div class="empty">Loading…</div></div>
+  <div class="nb-bottom-wrap"><button class="nb-bottom" onclick="openBookSheet()"><span class="p">＋</span>New Booking</button></div>
   </div>
 </div>
 
@@ -2058,8 +2068,6 @@ function lindaMainPage(env: Env): string {
   <button class="sheet-submit" onclick="submitEdit()">Done</button>
   <div id="editMsg" class="sheet-msg" style="display:none;"></div>
 </div>
-
-<button class="fab" id="fabBook" onclick="openBookSheet()"><span class="fab-plus">＋</span>New Booking</button>
 
 <div class="sheet-overlay" id="sheetOverlay" onclick="closeSheet()"></div>
 <div class="sheet" id="sheet" role="dialog" aria-modal="true">
@@ -4153,6 +4161,30 @@ function lindaMainPage(env: Env): string {
     // visible instead of stacking on top of one another.
     for (var dkey in byDay){ if (byDay.hasOwnProperty(dkey)) packWeekCols(byDay[dkey].appts); }
 
+    // Crop the grid to the week's actual span so we don't render a long empty
+    // morning (or evening). Fall back to the full default window when the week
+    // is empty. Always keep ~an hour of breathing room around the content.
+    var minMin = null, maxMin = null;
+    for (var dk2 in byDay){
+      if (!byDay.hasOwnProperty(dk2)) continue;
+      var dd0 = byDay[dk2];
+      for (var q0 = 0; q0 < dd0.appts.length; q0++){
+        var s0 = timeToMin(dd0.appts[q0].start_time), e0 = timeToMin(dd0.appts[q0].end_time);
+        if (minMin === null || s0 < minMin) minMin = s0;
+        if (maxMin === null || e0 > maxMin) maxMin = e0;
+      }
+      for (var w0 = 0; w0 < dd0.windows.length; w0++){
+        var ws0 = timeToMin(dd0.windows[w0].start), we0 = timeToMin(dd0.windows[w0].end);
+        if (minMin === null || ws0 < minMin) minMin = ws0;
+        if (maxMin === null || we0 > maxMin) maxMin = we0;
+      }
+    }
+    var hourStart = WG_HOUR_START, hourEnd = WG_HOUR_END;
+    if (minMin !== null){
+      hourStart = Math.max(6, Math.floor(minMin / 60) - 1);          // ~1h of context above
+      hourEnd = Math.min(23, Math.max(hourStart + 4, Math.ceil(maxMin / 60) + 1)); // ~1h below, min 4h tall
+    }
+
     var html = '<div class="wg-grid">';
     // Header row
     html += '<div class="wg-head"></div>';
@@ -4165,8 +4197,8 @@ function lindaMainPage(env: Env): string {
       html +=   '<div class="dnum">' + d.getDate() + '</div>';
       html += '</div>';
     }
-    // Body rows: 30-min increments from WG_HOUR_START to WG_HOUR_END.
-    for (var h = WG_HOUR_START; h < WG_HOUR_END; h++){
+    // Body rows: 30-min increments across the cropped span.
+    for (var h = hourStart; h < hourEnd; h++){
       for (var hm = 0; hm < 2; hm++){
         // Left column hour label (only on the :00 row)
         html += '<div class="wg-hour-lbl">' + (hm === 0 ? pad(h) + ':00' : '') + '</div>';
@@ -4211,7 +4243,9 @@ function lindaMainPage(env: Env): string {
       }
     }
     html += '</div>';
-    $('weekGrid').innerHTML = html;
+    var wrap = $('weekGrid');
+    wrap.innerHTML = html;
+    wrap.scrollTop = 0;
   }
 
   window.bookAtCell = function(dk, startTime){
