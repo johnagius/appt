@@ -1460,22 +1460,34 @@ function lindaMainPage(env: Env): string {
   .list .appt:nth-child(4){animation-delay:.11s}
   .list .appt:nth-child(5){animation-delay:.14s}
   .list .appt:nth-child(n+6){animation-delay:.17s}
-  .appt-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px;}
-  .appt-time{display:inline-flex;align-items:baseline;gap:7px;font-weight:800;font-size:15px;color:var(--text);letter-spacing:-.2px;}
-  .appt-time .clock{font-size:11px;color:var(--muted);font-weight:800;letter-spacing:.4px;text-transform:uppercase;}
-  .appt-status{font-size:10.5px;font-weight:800;text-transform:uppercase;padding:4px 9px;border-radius:999px;letter-spacing:.5px;}
+  /* Header: monogram avatar + time eyebrow + name, with status & overflow menu */
+  .ac-top{display:flex;align-items:flex-start;gap:13px;}
+  .ac-avatar{flex:0 0 auto;width:46px;height:46px;border-radius:14px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:15px;letter-spacing:.5px;box-shadow:0 4px 10px rgba(16,24,40,.18);user-select:none;}
+  .ac-id{flex:1 1 auto;min-width:0;}
+  .ac-eyebrow{font-size:12px;font-weight:800;color:var(--accent-ink);letter-spacing:.02em;margin-bottom:1px;}
+  .appt-status{font-size:10px;font-weight:800;text-transform:uppercase;padding:4px 9px;border-radius:999px;letter-spacing:.5px;white-space:nowrap;}
   .status-BOOKED{background:#ecfdf5;color:#065f46;}
   .status-ATTENDED{background:#eef2ff;color:#4338ca;}
   .status-NO_SHOW{background:#fff7ed;color:#9a3412;}
   .status-CANCELLED{background:#fef2f2;color:#991b1b;text-decoration:line-through;}
-  .appt-name-row{display:flex;align-items:center;gap:8px;margin:2px 0 0;}
-  .appt-name{font-size:18px;font-weight:800;color:var(--text);letter-spacing:-.3px;cursor:pointer;flex:1 1 auto;display:inline-flex;align-items:center;gap:7px;min-width:0;}
+  .appt-name{font-size:18px;font-weight:800;color:var(--text);letter-spacing:-.3px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;max-width:100%;}
   .appt-name>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .appt-name::after{content:"✎";font-size:12px;color:#cbd5e1;flex:0 0 auto;}
   .appt-name:active{opacity:.6;}
-  .appt-history-btn{flex:0 0 auto;background:#fff;border:1px solid var(--line);color:var(--muted);border-radius:9px;font-size:14px;line-height:1;padding:7px 9px;cursor:pointer;}
-  .appt-history-btn:active{background:#f3f4f6;}
+  .ac-top-right{flex:0 0 auto;display:flex;flex-direction:column;align-items:flex-end;gap:8px;}
+  .ac-kebab{background:#fff;border:1px solid var(--line);color:var(--muted);border-radius:9px;width:34px;height:28px;font-size:17px;line-height:1;cursor:pointer;transition:background .16s ease,border-color .16s ease;}
+  .ac-kebab:hover{background:#f8fafc;border-color:#d7dbe4;color:var(--text);}
   .appt-svc{font-size:12px;color:var(--muted);margin-top:3px;}
+  /* Overflow menu */
+  .ac-menu{position:absolute;top:58px;right:16px;min-width:210px;background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:var(--sh-lg);padding:6px;display:none;z-index:40;transform-origin:top right;animation:scalePop .13s var(--ease) both;}
+  .appt.menu-open{z-index:30;}
+  .appt.menu-open .ac-menu{display:block;}
+  .ac-menu button{display:flex;align-items:center;gap:11px;width:100%;text-align:left;background:none;border:none;padding:10px 11px;border-radius:9px;font-size:13.5px;font-weight:600;color:#334155;cursor:pointer;}
+  .ac-menu button:hover{background:#f5f7fa;}
+  .ac-menu button.danger{color:#b91c1c;}
+  .ac-menu button.danger:hover{background:#fef2f2;}
+  .ac-menu .mi-ico{font-size:14px;width:18px;text-align:center;flex:0 0 auto;}
+  .ac-menu-sep{height:1px;background:var(--line);margin:5px 6px;}
   .contact-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;}
   .contact-btn{display:inline-flex;align-items:center;gap:7px;padding:8px 13px;border-radius:999px;text-decoration:none;font-weight:700;font-size:13.5px;border:1px solid var(--line);background:#fff;color:var(--text);line-height:1.2;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .contact-btn .icon{flex:0 0 auto;font-size:13px;}
@@ -2235,6 +2247,18 @@ function lindaMainPage(env: Env): string {
     if (s === 'NO_SHOW') return 'No-show';
     return 'Booked';
   }
+  // Initials + a stable colour derived from the name, for the card avatar.
+  function monogram(name){
+    var p = (name || '').trim().split(/\\s+/);
+    var a = (p[0] && p[0][0]) || '?';
+    var b = (p.length > 1 && p[p.length - 1][0]) || '';
+    return (a + b).toUpperCase();
+  }
+  function avatarStyle(name){
+    var s = name || '', h = 0;
+    for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) % 360;
+    return 'background:linear-gradient(135deg,hsl(' + h + ',62%,58%),hsl(' + ((h + 26) % 360) + ',64%,46%));';
+  }
 
   function renderAppts(list){
     state.appointments = list;
@@ -2260,24 +2284,29 @@ function lindaMainPage(env: Env): string {
       var statusCls = statusClass(a.status);
       var statusTxt = statusLabel(a.status);
       var cancelled = a.status && a.status.indexOf('CANCELLED') >= 0;
+      var marked = (a.status === 'ATTENDED' || a.status === 'NO_SHOW');
       var cardCls = 'appt';
       if (a.status === 'ATTENDED') cardCls += ' is-attended';
       else if (a.status === 'NO_SHOW') cardCls += ' is-noshow';
       else if (cancelled) cardCls += ' is-cancelled';
-      html += '<div class="' + cardCls + '">';
-      html +=   '<div class="appt-head">';
-      html +=     '<div class="appt-time"><span class="clock">🕒</span>' + time + '</div>';
-      html +=     '<div class="appt-status ' + statusCls + '">' + statusTxt + '</div>';
-      html +=   '</div>';
       var patientPayload = esc(JSON.stringify({ email: a.email || '', phone: a.phone || '', name: a.full_name || '' }));
       var nameEditPayload = esc(JSON.stringify({ id: a.id, fullName: a.full_name, email: a.email, phone: a.phone, comments: a.comments || '', dateKey: a.date_key, startTime: a.start_time }));
-      // Tapping the name jumps straight into Edit (changes auto-save). The small
-      // history glyph beside it still opens the full patient timeline.
-      html +=   '<div class="appt-name-row">';
-      html +=     '<div class="appt-name" data-edit="' + nameEditPayload + '" onclick="editApptFromEl(this)"><span>' + esc(a.full_name || 'No name') + '</span></div>';
-      html +=     '<button class="appt-history-btn" data-patient="' + patientPayload + '" onclick="openPatientHistoryFromEl(this)" title="Patient history" aria-label="Patient history">🕓</button>';
-      html +=   '</div>';
+      var nextPayload = esc(JSON.stringify({ id: a.id, fullName: a.full_name, email: a.email, phone: a.phone, comments: a.comments || '' }));
+      var cancelInfo = esc(JSON.stringify({ id: a.id, name: a.full_name || 'this patient', dateKey: a.date_key, startTime: a.start_time }));
+      html += '<div class="' + cardCls + '">';
+      // Header — monogram avatar, time eyebrow, tappable name, status + overflow menu
+      html +=   '<div class="ac-top">';
+      html +=     '<div class="ac-avatar" style="' + avatarStyle(a.full_name) + '">' + esc(monogram(a.full_name)) + '</div>';
+      html +=     '<div class="ac-id">';
+      html +=       '<div class="ac-eyebrow">' + time + '</div>';
+      html +=       '<div class="appt-name" data-edit="' + nameEditPayload + '" onclick="editApptFromEl(this)"><span>' + esc(a.full_name || 'No name') + '</span></div>';
       if (a.service_name) html += '<div class="appt-svc">' + esc(a.service_name) + '</div>';
+      html +=     '</div>';
+      html +=     '<div class="ac-top-right">';
+      html +=       '<div class="appt-status ' + statusCls + '">' + statusTxt + '</div>';
+      if (!cancelled) html += '<button class="ac-kebab" onclick="toggleApptMenu(this)" aria-label="More actions">⋮</button>';
+      html +=     '</div>';
+      html +=   '</div>';
       html +=   '<div class="contact-row">';
       if (tel) html += '<a class="contact-btn call" href="tel:' + esc(tel) + '"><span class="icon">📞</span>' + esc(a.phone) + '</a>';
       if (email) html += '<a class="contact-btn email" href="mailto:' + esc(email) + '"><span class="icon">✉️</span>' + esc(email) + '</a>';
@@ -2286,24 +2315,26 @@ function lindaMainPage(env: Env): string {
         html += '<div class="comments"><div class="comments-label">Note from patient</div>' + esc(a.comments) + '</div>';
       }
       if (!cancelled){
-        var nextPayload = esc(JSON.stringify({ id: a.id, fullName: a.full_name, email: a.email, phone: a.phone, comments: a.comments || '' }));
-        html += '<div class="appt-actions">';
-        html +=   '<div class="btn-row">';
+        // Card face only carries the two things Linda actually does day to day.
+        html += '<div class="appt-actions"><div class="btn-row">';
         html +=     '<button class="act primary" onclick="openReschedule(\\'' + esc(a.id) + '\\')"><span class="act-ico">🔄</span>Reschedule</button>';
         html +=     '<button class="act" data-patient="' + nextPayload + '" onclick="openScheduleNextFromEl(this)"><span class="act-ico">＋</span>Next session</button>';
-        html +=   '</div>';
+        html +=   '</div></div>';
         // Attended / No-show — hide once already marked; show a tiny Reopen
         // link instead so she can undo if she tapped by mistake.
-        if (a.status === 'ATTENDED' || a.status === 'NO_SHOW'){
-          html += '<div class="btn-row"><button class="act" onclick="markStatus(\\'' + esc(a.id) + '\\',\\'BOOKED\\')">\u21a9 Reopen booking</button></div>';
+        // Everything secondary / rarely-used lives in the overflow menu.
+        html += '<div class="ac-menu">';
+        html +=   '<button data-edit="' + nameEditPayload + '" onclick="editApptFromEl(this)"><span class="mi-ico">\u270e</span>Edit details</button>';
+        html +=   '<button data-patient="' + patientPayload + '" onclick="openPatientHistoryFromEl(this)"><span class="mi-ico">\ud83d\udd53</span>Patient history</button>';
+        html +=   '<div class="ac-menu-sep"></div>';
+        if (marked){
+          html += '<button onclick="markStatus(\\'' + esc(a.id) + '\\',\\'BOOKED\\')"><span class="mi-ico">\u21a9</span>Reopen booking</button>';
         } else {
-          html += '<div class="seg">';
-          html +=   '<button class="act attended" onclick="markStatus(\\'' + esc(a.id) + '\\',\\'ATTENDED\\')">\u2713 Attended</button>';
-          html +=   '<button class="act noshow" onclick="markStatus(\\'' + esc(a.id) + '\\',\\'NO_SHOW\\')">No-show</button>';
-          html += '</div>';
+          html += '<button onclick="markStatus(\\'' + esc(a.id) + '\\',\\'ATTENDED\\')"><span class="mi-ico">\u2713</span>Mark attended</button>';
+          html += '<button onclick="markStatus(\\'' + esc(a.id) + '\\',\\'NO_SHOW\\')"><span class="mi-ico">\u2715</span>Mark no-show</button>';
         }
-        var cancelInfo = esc(JSON.stringify({ id: a.id, name: a.full_name || 'this patient', dateKey: a.date_key, startTime: a.start_time }));
-        html += '<div class="foot-row"><button class="act link-danger" data-appt="' + cancelInfo + '" onclick="cancelOneFromEl(this)">Cancel appointment</button></div>';
+        html +=   '<div class="ac-menu-sep"></div>';
+        html +=   '<button class="danger" data-appt="' + cancelInfo + '" onclick="cancelOneFromEl(this)"><span class="mi-ico">\ud83d\uddd1</span>Cancel appointment</button>';
         html += '</div>';
       }
       html += '</div>';
@@ -3846,6 +3877,26 @@ function lindaMainPage(env: Env): string {
     try { return JSON.parse(el.getAttribute('data-patient') || '{}'); } catch(e){ return {}; }
   }
   window.openPatientHistoryFromEl = function(el){ openPatientHistory(readPatientAttr(el)); };
+  // ── Appointment card ⋮ overflow menu ──
+  function closeApptMenus(){
+    var open = document.querySelectorAll('.appt.menu-open');
+    for (var i = 0; i < open.length; i++) open[i].classList.remove('menu-open');
+  }
+  window.toggleApptMenu = function(btn){
+    var card = btn.closest ? btn.closest('.appt') : null;
+    if (!card) return;
+    var wasOpen = card.classList.contains('menu-open');
+    closeApptMenus();
+    if (!wasOpen) card.classList.add('menu-open');
+  };
+  // Any click that isn't on a kebab closes open menus (menu-item clicks run
+  // their own handler first, then fall through to here and close).
+  document.addEventListener('click', function(e){
+    var t = e.target;
+    if (t && t.closest && t.closest('.ac-kebab')) return;
+    closeApptMenus();
+  });
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closeApptMenus(); });
   window.openScheduleNextFromEl = function(el){ openScheduleNext(readPatientAttr(el)); };
   window.pickAcFromEl = function(el){ pickAc(readPatientAttr(el)); };
 
