@@ -1806,6 +1806,31 @@ function lindaMainPage(env: Env): string {
   .live-toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(100px);opacity:0;background:#10b981;color:#fff;padding:12px 20px;border-radius:999px;font-weight:800;font-size:14px;box-shadow:0 8px 28px rgba(16,185,129,0.5);z-index:40;pointer-events:none;}
   .live-toast.show{animation:bounceIn .45s var(--ease-spring) both;opacity:1;transform:translateX(-50%) translateY(0);}
 
+  /* ── Desktop shell ──────────────────────────────────────
+     The diary is mobile-first, so on a wide screen everything used to stretch
+     full-bleed and read as a stretched phone page. On larger viewports we
+     centre the whole thing into a designed column on a soft canvas, and lay
+     the day out as a responsive card grid so it feels like a real product. */
+  @media (min-width:760px){
+    html{background:#e9edf3;}
+    body{max-width:1120px;margin:0 auto;background:var(--bg);min-height:100vh;box-shadow:0 0 0 1px rgba(16,24,40,.06),0 24px 70px rgba(16,24,40,.10);}
+    .topbar{padding:14px 22px;}
+    .topbar h1{font-size:19px;}
+    .tabBar{padding:8px 18px;gap:8px;}
+    .searchBar{padding:12px 18px;}
+    .dateBar{padding:12px 18px;}
+    .dayLabel{padding:12px 22px 2px;font-size:15px;}
+    .summary{padding:0 22px 12px;}
+    .day-actions{padding:0 18px 8px;}
+    .list{padding:6px 18px 130px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:start;}
+    .list .appt{margin-bottom:0;}
+    .empty{grid-column:1 / -1;}
+    .next-up{margin:10px 18px 4px;}
+  }
+  @media (min-width:1180px){
+    .list{grid-template-columns:repeat(3,minmax(0,1fr));}
+  }
+
   @media (prefers-color-scheme: dark){
     body{background:#0f172a;color:#e2e8f0;}
     .topbar,.dateBar,.appt{background:#1e293b;border-color:#334155;}
