@@ -973,6 +973,53 @@ export async function apiLindaBulkBooking(req: Request, env: Env): Promise<Respo
   return json({ ok: true, created, total: rows.length, results });
 }
 
+// ─── POST /api/linda-edit-appointment ──────────────────────
+// Correct a booking's contact details (name / phone / email / comments).
+// Body: { appointmentId, fullName, phone?, email?, comments?, applyToFuture? }
+// With applyToFuture, the same correction is applied to every upcoming
+// non-cancelled Linda booking for that person (matched by their OLD email+phone),
+// and the client record is refreshed — so the fix sticks going forward.
+
+export async function apiLindaEditAppointment(req: Request, env: Env): Promise<Response> {
+  if (!await isLindaAuthed(req, env)) return json({ ok: false, reason: 'Access denied.' }, 403);
+  const body: any = await req.json();
+  const id = String(body.appointmentId || '').trim();
+  const fullName = String(body.fullName || '').trim();
+  const email = String(body.email || '').trim().toLowerCase();
+  const phone = String(body.phone || '').trim();
+  const comments = String(body.comments || '').trim();
+  if (!id) return json({ ok: false, reason: 'Missing id.' }, 400);
+  if (!fullName || (!email && !phone)) return json({ ok: false, reason: 'Name and at least one of phone or email are required.' }, 400);
+
+  const appt = await getAppointmentById(env.DB, id);
+  if (!appt || appt.clinic !== 'linda') return json({ ok: false, reason: 'Appointment not found.' }, 404);
+
+  const oldEmail = appt.email || '', oldPhone = appt.phone || '';
+  const now = nowIso(env.TIMEZONE);
+  await env.DB.prepare('UPDATE appointments SET full_name = ?, email = ?, phone = ?, comments = ?, updated_at = ? WHERE id = ?')
+    .bind(fullName, email, phone, comments, now, id).run();
+
+  let updatedFuture = 0;
+  if (body.applyToFuture === true) {
+    const todayKey = todayKeyLocal(env.TIMEZONE);
+    const res = await env.DB.prepare(
+      "UPDATE appointments SET full_name = ?, email = ?, phone = ?, updated_at = ? " +
+      "WHERE clinic = 'linda' AND date_key >= ? AND status NOT LIKE '%CANCELLED%' AND email = ? AND phone = ? AND id != ?"
+    ).bind(fullName, email, phone, now, todayKey, oldEmail, oldPhone, id).run();
+    updatedFuture = res.meta?.changes || 0;
+  }
+
+  try { if (email) await getOrCreateClient(env.DB, fullName, email, phone, now); } catch {}
+  await bumpVersion(env.DB);
+  try {
+    const doId = env.REALTIME.idFromName('global');
+    const stub = env.REALTIME.get(doId);
+    await stub.fetch('http://internal/broadcast', { method: 'POST', body: JSON.stringify({ type: 'slots_updated', dateKey: appt.date_key, clinic: 'linda' }) });
+  } catch {}
+
+  return json({ ok: true, updatedFuture });
+}
+
 // ─── POST /api/linda-mark-status ───────────────────────────
 // Body: { appointmentId, status: 'ATTENDED' | 'NO_SHOW' | 'BOOKED' }
 // Lets Linda mark a past appointment's outcome without leaving /linda.
@@ -1904,6 +1951,27 @@ function lindaMainPage(env: Env): string {
   <div class="avail-msg" id="bulkMsg" style="margin-top:8px;"></div>
 </div>
 
+<!-- Edit appointment / client details -->
+<div class="sheet-overlay" id="editOverlay" onclick="closeEditSheet()"></div>
+<div class="sheet" id="editSheet" role="dialog" aria-modal="true">
+  <div class="sheet-head">
+    <h3 class="sheet-title">Edit details</h3>
+    <button class="sheet-close" onclick="closeEditSheet()" aria-label="Close">×</button>
+  </div>
+  <div class="sheet-section">
+    <div class="sheet-label" id="editWhen"></div>
+    <input class="sheet-input" id="editName" placeholder="Full name" style="margin-bottom:8px;">
+    <div class="sheet-row">
+      <input class="sheet-input" id="editPhone" type="tel" placeholder="Phone" inputmode="tel">
+      <input class="sheet-input" id="editEmail" type="email" placeholder="Email" inputmode="email">
+    </div>
+    <textarea class="sheet-input" id="editComments" placeholder="Comments (optional)" style="margin-top:8px;min-height:56px;"></textarea>
+    <label style="display:flex;align-items:center;gap:8px;font-size:13px;margin-top:10px;cursor:pointer;"><input type="checkbox" id="editApply"> Also fix all their <b>upcoming</b> appointments</label>
+  </div>
+  <button class="sheet-submit" onclick="submitEdit()">Save changes</button>
+  <div id="editMsg" class="sheet-msg" style="display:none;"></div>
+</div>
+
 <button class="fab" id="fabBook" onclick="openBookSheet()"><span class="fab-plus">＋</span>New Booking</button>
 
 <div class="sheet-overlay" id="sheetOverlay" onclick="closeSheet()"></div>
@@ -2133,9 +2201,13 @@ function lindaMainPage(env: Env): string {
       var cancelled = a.status && a.status.indexOf('CANCELLED') >= 0;
       if (!cancelled){
         var nextPayload = esc(JSON.stringify({ id: a.id, fullName: a.full_name, email: a.email, phone: a.phone, comments: a.comments || '' }));
+        var editPayload = esc(JSON.stringify({ id: a.id, fullName: a.full_name, email: a.email, phone: a.phone, comments: a.comments || '', dateKey: a.date_key, startTime: a.start_time }));
         html += '<div class="action-row">';
         html +=   '<button class="action-btn reschedule" onclick="openReschedule(\\'' + esc(a.id) + '\\')">Reschedule</button>';
         html +=   '<button class="action-btn next-session" data-patient="' + nextPayload + '" onclick="openScheduleNextFromEl(this)">Schedule Next Session</button>';
+        html += '</div>';
+        html += '<div class="action-row" style="margin-top:6px;">';
+        html +=   '<button class="action-btn" style="border-color:#c4b5fd;color:#5b21b6;background:#f5f3ff;" data-edit="' + editPayload + '" onclick="editApptFromEl(this)">✎ Edit details</button>';
         html += '</div>';
         // Attended / No-show — hide once already marked; show a tiny Reopen
         // link instead so she can undo if she tapped by mistake.
@@ -3349,6 +3421,36 @@ function lindaMainPage(env: Env): string {
         if (!failed.length) setTimeout(function(){ closeBulkSheet(); }, 1200); else btn.disabled = false;
       } else { msg.className='avail-msg bad'; msg.textContent = (res && res.reason) || 'Failed.'; btn.disabled = false; }
     } catch(e){ msg.className='avail-msg bad'; msg.textContent = 'Network error.'; btn.disabled = false; }
+  };
+
+  // ── Edit appointment / client details ──
+  var editState = {};
+  function setEditMsg(t, k){ var m = $('editMsg'); if (!m) return; m.textContent = t || ''; m.className = 'sheet-msg' + (k ? ' ' + k : ''); m.style.display = t ? 'block' : 'none'; }
+  window.editApptFromEl = function(el){ openEditSheet(readJsonAttr(el, 'data-edit')); };
+  function openEditSheet(d){
+    editState = d || {};
+    $('editWhen').textContent = d && d.dateKey ? (fmtDay(d.dateKey) + ' at ' + d.startTime) : '';
+    $('editName').value = (d && d.fullName) || '';
+    $('editPhone').value = (d && d.phone) || '';
+    $('editEmail').value = (d && d.email) || '';
+    $('editComments').value = (d && d.comments) || '';
+    $('editApply').checked = false;
+    setEditMsg('', '');
+    $('editOverlay').classList.add('show'); $('editSheet').classList.add('show');
+  }
+  window.closeEditSheet = function(){ $('editOverlay').classList.remove('show'); $('editSheet').classList.remove('show'); };
+  window.submitEdit = async function(){
+    var name = $('editName').value.trim(), phone = $('editPhone').value.trim(), email = $('editEmail').value.trim();
+    if (!name || (!phone && !email)){ setEditMsg('Name and phone or email required.', 'bad'); return; }
+    setEditMsg('Saving…', '');
+    try {
+      var res = await (await fetch('/api/linda-edit-appointment', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+        appointmentId: editState.id, fullName: name, phone: phone, email: email,
+        comments: $('editComments').value.trim(), applyToFuture: $('editApply').checked,
+      }) })).json();
+      if (res && res.ok){ closeEditSheet(); setDate(state.dateKey); }
+      else setEditMsg((res && res.reason) || 'Failed.', 'bad');
+    } catch(e){ setEditMsg('Network error.', 'bad'); }
   };
 
   window.openBookSheet = function(prefill){

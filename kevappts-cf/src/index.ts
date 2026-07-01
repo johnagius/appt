@@ -47,7 +47,7 @@ import {
   apiAdminBloodTestSendToSpinola,
   apiAdminListDda, apiAdminAddDda, apiAdminDeleteDda,
 } from './api/admin';
-import { apiLindaGetDay, apiLindaNextDay, apiLindaSlots, apiLindaListExtras, apiLindaAddExtra, apiLindaDeleteExtra, apiLindaUpdateExtra, apiLindaListOff, apiLindaAddOff, apiLindaDeleteOff, apiLindaListBlocks, apiLindaAddBlock, apiLindaDeleteBlock, apiLindaReschedule, apiLindaRescheduleDay, apiLindaNewBooking, apiLindaBulkBooking, apiLindaSearch, apiLindaPatientHistory, apiLindaClientsAutocomplete, apiLindaWeek, apiLindaCopyDay, apiLindaCancel, apiLindaCancelDay, apiLindaMarkStatus, apiLindaBaseSchedule, apiLindaSaveBaseSchedule, apiLindaListWindows, apiLindaAddWindow, apiLindaUpdateWindow, apiLindaDeleteWindow, handleLindaLogin, handleLindaLogout, lindaRoute } from './api/linda-view';
+import { apiLindaGetDay, apiLindaNextDay, apiLindaSlots, apiLindaListExtras, apiLindaAddExtra, apiLindaDeleteExtra, apiLindaUpdateExtra, apiLindaListOff, apiLindaAddOff, apiLindaDeleteOff, apiLindaListBlocks, apiLindaAddBlock, apiLindaDeleteBlock, apiLindaReschedule, apiLindaRescheduleDay, apiLindaNewBooking, apiLindaBulkBooking, apiLindaEditAppointment, apiLindaSearch, apiLindaPatientHistory, apiLindaClientsAutocomplete, apiLindaWeek, apiLindaCopyDay, apiLindaCancel, apiLindaCancelDay, apiLindaMarkStatus, apiLindaBaseSchedule, apiLindaSaveBaseSchedule, apiLindaListWindows, apiLindaAddWindow, apiLindaUpdateWindow, apiLindaDeleteWindow, handleLindaLogin, handleLindaLogout, lindaRoute } from './api/linda-view';
 import {
   apiTelemedicineStatus, apiBookTelemedicine,
   apiAdminListTelemedicineByDate, apiAdminAddTelemedicine, apiAdminDeleteTelemedicine,
@@ -153,6 +153,7 @@ export default {
       if (path === '/api/linda-reschedule-day' && method === 'POST') return apiLindaRescheduleDay(request, env);
       if (path === '/api/linda-new-booking' && method === 'POST') return apiLindaNewBooking(request, env);
       if (path === '/api/linda-bulk-booking' && method === 'POST') return apiLindaBulkBooking(request, env);
+      if (path === '/api/linda-edit-appointment' && method === 'POST') return apiLindaEditAppointment(request, env);
       if (path === '/api/linda-search' && method === 'GET') return apiLindaSearch(request, env);
       if (path === '/api/linda-patient-history' && method === 'GET') return apiLindaPatientHistory(request, env);
       if (path === '/api/linda-clients-autocomplete' && method === 'GET') return apiLindaClientsAutocomplete(request, env);

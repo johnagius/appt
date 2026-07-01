@@ -1315,6 +1315,28 @@ export function adminPage(sig: string, env: Env): string {
   </div>
 </div>
 
+<!-- Edit appointment / client details -->
+<div id="lcEditBg" onclick="lcEditClose(event)" style="display:none;position:fixed;inset:0;background:rgba(17,24,39,.6);z-index:9100;align-items:flex-start;justify-content:center;overflow:auto;padding:24px 12px;">
+  <div onclick="event.stopPropagation()" style="background:#fff;border-radius:16px;max-width:480px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.3);overflow:hidden;">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 18px;background:#f5f3ff;border-bottom:1px solid #ddd6fe;">
+      <b style="font-size:16px;color:#5b21b6;">Edit details</b>
+      <button onclick="lcEditClose()" style="background:none;border:none;font-size:24px;line-height:1;color:#6b7280;cursor:pointer;">×</button>
+    </div>
+    <div style="padding:18px;">
+      <div id="lcEditWhen" style="font-size:13px;color:#6b7280;margin-bottom:10px;"></div>
+      <input type="text" id="lcEditName" placeholder="Full name" style="width:100%;padding:11px;border:1px solid #e5e7eb;border-radius:9px;font-size:15px;margin-bottom:8px;">
+      <div style="display:flex;gap:8px;margin-bottom:8px;">
+        <input type="tel" id="lcEditPhone" placeholder="Phone" style="flex:1;padding:11px;border:1px solid #e5e7eb;border-radius:9px;font-size:15px;">
+        <input type="email" id="lcEditEmail" placeholder="Email" style="flex:1;padding:11px;border:1px solid #e5e7eb;border-radius:9px;font-size:15px;">
+      </div>
+      <textarea id="lcEditComments" placeholder="Comments (optional)" style="width:100%;padding:11px;border:1px solid #e5e7eb;border-radius:9px;font-size:15px;min-height:52px;"></textarea>
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;margin-top:10px;cursor:pointer;"><input type="checkbox" id="lcEditApply"> Also fix all their <b>upcoming</b> appointments</label>
+      <button class="btn" style="background:#7c3aed;color:#fff;font-weight:800;width:100%;margin-top:14px;" onclick="lcEditSave()">Save changes</button>
+      <div id="lcEditMsg" style="font-size:13px;margin-top:8px;"></div>
+    </div>
+  </div>
+</div>
+
 <!-- LINDA REPORTS TAB (stats, reviews, follow-ups — kept out of the day-to-day Linda tab) -->
 <div class="tab-content" id="tab-lindastats" style="display:none;">
   <div class="card" style="padding:18px;margin-bottom:14px;background:#ecfdf5;border-left:4px solid #10b981;">
@@ -2609,12 +2631,13 @@ async function lcLoadDay(){
     if (!cancelled){
       html += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;">'
         + '<button class="btn btn-sm" style="background:#fffbeb;color:#92400e;border:1px solid #fde68a;" onclick="lcReschedule(' + i + ')">🔄 Reschedule</button>'
+        + '<button class="btn btn-sm" style="background:#f5f3ff;color:#5b21b6;border:1px solid #ddd6fe;" onclick="lcEditOpen(' + i + ')">✎ Edit</button>'
         + '<button class="btn btn-sm" style="background:#eef2ff;color:#3730a3;border:1px solid #c7d2fe;" onclick="lcMark(' + i + ',1)">✓ Attended</button>'
         + '<button class="btn btn-sm" style="background:#fff7ed;color:#9a3412;border:1px solid #fed7aa;" onclick="lcMark(' + i + ',2)">✗ No-show</button>'
         + '<button class="btn btn-sm btn-danger" onclick="lcCancel(' + i + ')">Cancel</button>'
         + '</div>';
     } else {
-      html += '<div style="margin-top:8px;"><button class="btn btn-sm btn-ghost" onclick="lcMark(' + i + ',0)">↩ Reopen</button></div>';
+      html += '<div style="margin-top:8px;display:flex;gap:6px;"><button class="btn btn-sm" style="background:#f5f3ff;color:#5b21b6;border:1px solid #ddd6fe;" onclick="lcEditOpen(' + i + ')">✎ Edit</button><button class="btn btn-sm btn-ghost" onclick="lcMark(' + i + ',0)">↩ Reopen</button></div>';
     }
     html += '</div>';
   });
@@ -2757,6 +2780,39 @@ async function lcSubmit(){
     msg.style.color = '#dc2626'; msg.textContent = (res && res.reason) || 'Failed.';
     btn.disabled = false;
   }
+}
+
+var lcEditId = '';
+function lcEditOpen(i){
+  var a = lcAppts[i]; if (!a) return;
+  lcEditId = a.id;
+  document.getElementById('lcEditWhen').textContent = lcNiceDate(a.date_key) + ' at ' + a.start_time;
+  document.getElementById('lcEditName').value = a.full_name || '';
+  document.getElementById('lcEditPhone').value = a.phone || '';
+  document.getElementById('lcEditEmail').value = a.email || '';
+  document.getElementById('lcEditComments').value = a.comments || '';
+  document.getElementById('lcEditApply').checked = false;
+  document.getElementById('lcEditMsg').textContent = '';
+  document.getElementById('lcEditBg').style.display = 'flex';
+}
+function lcEditClose(ev){ if (ev && ev.target && ev.target.id !== 'lcEditBg') return; document.getElementById('lcEditBg').style.display = 'none'; }
+async function lcEditSave(){
+  var msg = document.getElementById('lcEditMsg');
+  var name = document.getElementById('lcEditName').value.trim();
+  var phone = document.getElementById('lcEditPhone').value.trim();
+  var email = document.getElementById('lcEditEmail').value.trim();
+  if (!name || (!phone && !email)){ msg.style.color = '#dc2626'; msg.textContent = 'Name and phone or email required.'; return; }
+  msg.style.color = '#6b7280'; msg.textContent = 'Saving…';
+  var res = await lindaApi('linda-edit-appointment', { body: {
+    appointmentId: lcEditId, fullName: name, phone: phone, email: email,
+    comments: document.getElementById('lcEditComments').value.trim(),
+    applyToFuture: document.getElementById('lcEditApply').checked,
+  } });
+  if (res && res.ok){
+    document.getElementById('lcEditBg').style.display = 'none';
+    lcLoadDay();
+    if (res.updatedFuture) alert('Updated this appointment and ' + res.updatedFuture + ' upcoming one' + (res.updatedFuture === 1 ? '' : 's') + '.');
+  } else { msg.style.color = '#dc2626'; msg.textContent = (res && res.reason) || 'Failed.'; }
 }
 
 async function lcMark(i, code){
