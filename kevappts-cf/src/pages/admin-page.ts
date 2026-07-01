@@ -1127,7 +1127,16 @@ export function adminPage(sig: string, env: Env): string {
     <p style="margin:0;color:#065f46;font-size:13px;" id="lindaIntroLine">Potter's Clinic</p>
   </div>
 
-  <!-- Availability editor -->
+  <!-- Full control center hub -->
+  <a href="/linda" target="_blank" rel="noopener" class="card" style="display:flex;align-items:center;gap:14px;padding:18px;margin-bottom:14px;text-decoration:none;background:linear-gradient(135deg,#10b981,#059669);color:#fff;box-shadow:0 6px 18px rgba(16,185,129,.3);">
+    <div style="font-size:30px;flex:0 0 auto;">🗓️</div>
+    <div style="flex:1 1 auto;min-width:0;">
+      <div style="font-size:16px;font-weight:900;">Open Linda's Diary &mdash; full control center &nbsp;&rarr;</div>
+      <div style="font-size:12.5px;font-weight:700;opacity:.95;margin-top:3px;line-height:1.45;">Day &amp; week views, <b>create a new booking</b>, <b>reschedule</b> or cancel, mark attended / no-show, set booking periods, days off, block time, and add extra hours on the fly. Opens in a new tab (your admin login already grants access).</div>
+    </div>
+  </a>
+
+  <!-- Availability editor (quick settings — the diary above has full per-day control) -->
   <div class="card" style="padding:18px;margin-bottom:14px;">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
       <h3 style="margin:0;font-size:15px;font-weight:800;">Linda Availability</h3>
@@ -1190,7 +1199,7 @@ export function adminPage(sig: string, env: Env): string {
     <p style="margin:0 0 10px 0;color:#6b7280;font-size:13px;">Send Google review requests to Linda's patients from a selected date.</p>
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;">
       <label style="font-size:13px;color:#374151;">Date:</label>
-      <input type="date" id="lindaReviewDate" min="2026-04-24" max="2026-05-07" style="padding:6px;border:1px solid #e5e7eb;border-radius:6px;">
+      <input type="date" id="lindaReviewDate" style="padding:6px;border:1px solid #e5e7eb;border-radius:6px;">
       <button class="btn" onclick="loadLindaReviews()">Load patients</button>
     </div>
     <div id="lindaReviewList"><div class="empty">Pick a date and click Load.</div></div>

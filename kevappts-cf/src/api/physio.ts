@@ -53,9 +53,14 @@ export async function apiPhysioInit(env: Env): Promise<Response> {
       doctorName: env.LINDA_DOCTOR_NAME || 'Linda',
       location: env.LINDA_LOCATION || "Potter's Clinic",
       apptMinutes: cfg.slotMin,
+      slotMin: cfg.slotMin,
       service: { id: 'physio', name: 'Physiotherapy Consultation', minutes: cfg.slotMin },
       windowStart: cfg.windowStart,
       windowEnd: cfg.windowEnd,
+      // Full data so the booking page renders availability dynamically instead of
+      // hardcoding dates/hours: the list of booking stints and the weekly hours map.
+      windows: cfg.windows.map(w => ({ start: w.start, end: w.end, note: w.note })),
+      hours: cfg.hours,
       timezone: tz,
     },
     dateOptions,
