@@ -2864,7 +2864,8 @@ async function lcLoadWindows(){
   if (!res || !res.ok){ host.innerHTML = '<div class="empty" style="padding:6px 0;">Failed to load.</div>'; return; }
   lcWindowsCache = (res.windows || []).filter(function(w){ return w.id; });
   if (!lcWindowsCache.length){ host.innerHTML = '<div class="empty" style="padding:6px 0;">No stints yet — tap “Add a stint”.</div>'; return; }
-  host.innerHTML = lcWindowsCache.map(function(w, i){
+  function stintCard(i){
+    var w = lcWindowsCache[i];
     return '<div style="padding:10px 12px;background:#f9fafb;border:1px solid #eef2f0;border-radius:10px;margin-bottom:6px;">'
       + '<div style="font-size:14px;font-weight:800;">' + lcEsc(lcNiceDate(w.start)) + ' → ' + lcEsc(lcNiceDate(w.end)) + (w.note?' <span style="color:#6b7280;font-weight:400;">· ' + lcEsc(w.note) + '</span>':'') + '</div>'
       + '<div style="font-size:13px;color:#065f46;font-weight:700;margin-top:2px;">' + lcEsc(lcStintHoursText(w)) + '</div>'
@@ -2872,7 +2873,29 @@ async function lcLoadWindows(){
       +   '<button class="btn btn-sm" style="background:#fffbeb;color:#92400e;border:1px solid #fde68a;" onclick="lasOpen(' + i + ')">Edit</button>'
       +   '<button class="btn btn-sm btn-ghost" onclick="lcDelWindow(' + w.id + ')">Remove</button>'
       + '</div></div>';
-  }).join('');
+  }
+  // Only current/upcoming stints (end date >= today) show by default; past
+  // ones pile up over time so they collapse behind a toggle.
+  var tk = lcToday(), upcoming = [], past = [];
+  for (var i = 0; i < lcWindowsCache.length; i++){ if ((lcWindowsCache[i].end || '') >= tk) upcoming.push(i); else past.push(i); }
+  var out = '';
+  for (var u = 0; u < upcoming.length; u++) out += stintCard(upcoming[u]);
+  if (!upcoming.length) out += '<div class="empty" style="padding:6px 0;">No current or upcoming periods — tap “Add a stint”.</div>';
+  if (past.length){
+    out += '<button id="lcPastStintsToggle" class="btn btn-sm btn-ghost" style="width:100%;border-style:dashed;color:#6b7280;margin:2px 0 4px;" onclick="lcTogglePastStints()">Show ' + past.length + ' past period' + (past.length===1?'':'s') + ' ▾</button>';
+    out += '<div id="lcPastStints" style="display:none;opacity:.72;">';
+    for (var p = 0; p < past.length; p++) out += stintCard(past[p]);
+    out += '</div>';
+  }
+  host.innerHTML = out;
+}
+function lcTogglePastStints(){
+  var list = document.getElementById('lcPastStints'), btn = document.getElementById('lcPastStintsToggle');
+  if (!list || !btn) return;
+  var show = list.style.display === 'none';
+  list.style.display = show ? '' : 'none';
+  if (show){ btn.textContent = 'Hide past periods ▴'; }
+  else { var n = list.querySelectorAll('button[onclick^="lasOpen"]').length; btn.textContent = 'Show ' + n + ' past period' + (n===1?'':'s') + ' ▾'; }
 }
 async function lcDelWindow(id){ if (!confirm('Remove this stint? Existing bookings stay; no new bookings inside it.')) return; var res = await lindaApi('linda-windows?id=' + id, { method: 'DELETE' }); if (res && res.ok) lcLoadWindows(); else alert((res && res.reason) || 'Failed.'); }
 
