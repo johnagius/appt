@@ -2347,6 +2347,12 @@ function lindaMainPage(env: Env): string {
   var TL_TOTAL_MIN = TL_END_MIN - TL_START_MIN; // 900
   var TL_SNAP_MIN = 15;
   var tl = { sel: null, baseHours: null, extras: [], blocks: [], booked: [], dayOff: false };
+  // Drag state is shared (not per-render) and the window move/up listeners are
+  // bound exactly once — see wireTimelineDrag(). Re-rendering the bar mid-drag
+  // used to re-add these listeners every time, leaking handlers and making the
+  // selection jump around, which broke "tweak availability on the fly".
+  var TL_DRAG = { active: false, startMin: 0 };
+  var tlWindowWired = false;
 
   function minToTime(m){ return pad(Math.floor(m/60)) + ':' + pad(m%60); }
   function timeToMin(s){ var p = String(s).split(':'); return parseInt(p[0],10)*60 + parseInt(p[1],10); }
@@ -2462,52 +2468,64 @@ function lindaMainPage(env: Env): string {
     var btnAdd = $('tlAddBtn'); if (btnAdd) btnAdd.disabled = !tl.sel;
     var btnBlock = $('tlBlockBtn'); if (btnBlock) btnBlock.disabled = !tl.sel;
 
-    // Wire drag
+    // Wire drag. The mousedown/touchstart binding is on the freshly-rendered
+    // bar (safe: the old bar element is discarded with its listener). The
+    // window-level move/up listeners are bound ONCE and read shared state +
+    // a fresh #tlBar each time, so re-rendering the bar mid-drag can't leak
+    // handlers or make the selection fight itself.
     var bar = $('tlBar');
     if (!bar) return;
-    var dragging = false;
-    var startMin = 0;
-    function xToMin(clientX){
-      var rect = bar.getBoundingClientRect();
-      var pct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
-      var m = TL_START_MIN + pct * TL_TOTAL_MIN;
-      return Math.round(m / TL_SNAP_MIN) * TL_SNAP_MIN;
-    }
-    function onDown(x){
-      dragging = true;
-      startMin = xToMin(x);
-      tl.sel = { start: startMin, end: startMin + TL_SNAP_MIN };
+    bar.addEventListener('mousedown', function(ev){ tlDragDown(ev.clientX); });
+    bar.addEventListener('touchstart', function(ev){ if (ev.touches.length) tlDragDown(ev.touches[0].clientX); }, { passive: true });
+    bar.addEventListener('touchmove', function(ev){ if (ev.touches.length) tlDragMove(ev.touches[0].clientX); }, { passive: true });
+    bar.addEventListener('touchend', tlDragUp);
+    wireTimelineDrag();
+  }
+
+  function tlXToMin(clientX){
+    var bar = $('tlBar');
+    if (!bar) return 0;
+    var rect = bar.getBoundingClientRect();
+    var pct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    var m = TL_START_MIN + pct * TL_TOTAL_MIN;
+    return Math.round(m / TL_SNAP_MIN) * TL_SNAP_MIN;
+  }
+  function tlDragDown(x){
+    if (!$('tlBar')) return;
+    TL_DRAG.active = true;
+    TL_DRAG.startMin = tlXToMin(x);
+    tl.sel = { start: TL_DRAG.startMin, end: TL_DRAG.startMin + TL_SNAP_MIN };
+    renderTimeline();
+  }
+  function tlDragMove(x){
+    if (!TL_DRAG.active) return;
+    var cur = tlXToMin(x);
+    var s = Math.min(TL_DRAG.startMin, cur), e = Math.max(TL_DRAG.startMin, cur);
+    if (e - s < TL_SNAP_MIN) e = s + TL_SNAP_MIN;
+    tl.sel = { start: s, end: e };
+    // Adjust the .sel element in place instead of re-rendering while dragging.
+    var bar = $('tlBar');
+    var sel = bar ? bar.querySelector('.tl-seg.sel') : null;
+    if (sel){
+      sel.style.left = pctOf(s) + '%';
+      sel.style.width = (pctOf(e) - pctOf(s)) + '%';
+      var txt = $('tlSelTxt');
+      if (txt){ txt.classList.remove('muted'); txt.textContent = 'Selected: ' + minToTime(s) + ' – ' + minToTime(e); }
+    } else {
       renderTimeline();
     }
-    function onMove(x){
-      if (!dragging) return;
-      var cur = xToMin(x);
-      var s = Math.min(startMin, cur), e = Math.max(startMin, cur);
-      if (e - s < TL_SNAP_MIN) e = s + TL_SNAP_MIN;
-      tl.sel = { start: s, end: e };
-      // Avoid full re-render while dragging — just adjust the .sel element width.
-      var sel = bar.querySelector('.tl-seg.sel');
-      if (sel){
-        sel.style.left = pctOf(s) + '%';
-        sel.style.width = (pctOf(e) - pctOf(s)) + '%';
-        var txt = document.getElementById('tlSelTxt');
-        if (txt){ txt.classList.remove('muted'); txt.textContent = 'Selected: ' + minToTime(s) + ' – ' + minToTime(e); }
-      } else {
-        renderTimeline();
-      }
-    }
-    function onUp(){
-      if (!dragging) return;
-      dragging = false;
-      var btnAdd = $('tlAddBtn'); if (btnAdd) btnAdd.disabled = !tl.sel;
-      var btnBlock = $('tlBlockBtn'); if (btnBlock) btnBlock.disabled = !tl.sel;
-    }
-    bar.addEventListener('mousedown', function(ev){ onDown(ev.clientX); });
-    window.addEventListener('mousemove', function(ev){ onMove(ev.clientX); });
-    window.addEventListener('mouseup', onUp);
-    bar.addEventListener('touchstart', function(ev){ if (ev.touches.length) onDown(ev.touches[0].clientX); }, { passive: true });
-    bar.addEventListener('touchmove', function(ev){ if (ev.touches.length) onMove(ev.touches[0].clientX); }, { passive: true });
-    bar.addEventListener('touchend', onUp);
+  }
+  function tlDragUp(){
+    if (!TL_DRAG.active) return;
+    TL_DRAG.active = false;
+    var btnAdd = $('tlAddBtn'); if (btnAdd) btnAdd.disabled = !tl.sel;
+    var btnBlock = $('tlBlockBtn'); if (btnBlock) btnBlock.disabled = !tl.sel;
+  }
+  function wireTimelineDrag(){
+    if (tlWindowWired) return;
+    tlWindowWired = true;
+    window.addEventListener('mousemove', function(ev){ tlDragMove(ev.clientX); });
+    window.addEventListener('mouseup', tlDragUp);
   }
 
   function setTlMsg(txt, kind){
