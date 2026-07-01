@@ -1136,18 +1136,75 @@ export function adminPage(sig: string, env: Env): string {
     </div>
   </a>
 
+  <!-- ═══ Appointments (day at a glance) + New booking ═══ -->
+  <div class="card" style="padding:0;margin-bottom:14px;overflow:hidden;border:1px solid #d1fae5;">
+    <div style="display:flex;align-items:center;gap:10px;padding:14px 16px;background:#ecfdf5;border-bottom:1px solid #d1fae5;flex-wrap:wrap;">
+      <b style="font-size:15px;color:#065f46;flex:1 1 auto;">📋 Appointments</b>
+      <button class="btn" style="background:#10b981;color:#fff;font-weight:800;" onclick="lcOpenNew()">＋ New booking</button>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px;padding:12px 16px;border-bottom:1px solid #eef2f0;flex-wrap:wrap;">
+      <button class="btn btn-ghost btn-sm" onclick="lcNavDay(-1)">‹</button>
+      <input type="date" id="lcDate" onchange="lcLoadDay()" style="padding:8px;border:1px solid #e5e7eb;border-radius:8px;font-size:14px;flex:1 1 160px;">
+      <button class="btn btn-ghost btn-sm" onclick="lcNavDay(1)">›</button>
+      <button class="btn btn-sm" style="background:#ecfdf5;color:#065f46;border:1px solid #10b981;" onclick="lcToDay()">Today</button>
+    </div>
+    <div id="lcDayList" style="padding:12px 16px;"><div class="empty">Loading…</div></div>
+  </div>
+
+  <!-- ═══ Availability: booking periods + days off + per-day open/close ═══ -->
+  <div class="card" style="padding:18px;margin-bottom:14px;border:1px solid #d1fae5;">
+    <h3 style="margin:0 0 4px 0;font-size:15px;font-weight:800;color:#065f46;">🗓 Availability</h3>
+    <p style="margin:0 0 14px 0;color:#6b7280;font-size:13px;">Set the stints Linda is in Malta, her weekly hours, days off, and open or block a specific day — all take effect instantly.</p>
+
+    <div style="font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;color:#6b7280;margin:0 0 6px;">Booking periods (stints)</div>
+    <div id="lcWindows"><div class="empty" style="padding:8px 0;">Loading…</div></div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px;">
+      <input type="date" id="lcWinStart" style="padding:8px;border:1px solid #e5e7eb;border-radius:8px;font-size:14px;">
+      <span style="color:#6b7280;">→</span>
+      <input type="date" id="lcWinEnd" style="padding:8px;border:1px solid #e5e7eb;border-radius:8px;font-size:14px;">
+      <input type="text" id="lcWinNote" placeholder="Note (optional)" style="padding:8px;border:1px solid #e5e7eb;border-radius:8px;font-size:14px;flex:1 1 120px;">
+      <button class="btn btn-sm" style="background:#10b981;color:#fff;" onclick="lcAddWindow()">Add stint</button>
+    </div>
+    <div id="lcWinMsg" style="font-size:13px;margin-top:6px;"></div>
+
+    <div style="font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;color:#6b7280;margin:18px 0 6px;">Days off</div>
+    <div id="lcOffList"><div class="empty" style="padding:8px 0;">Loading…</div></div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px;">
+      <input type="date" id="lcOffFrom" style="padding:8px;border:1px solid #e5e7eb;border-radius:8px;font-size:14px;">
+      <span style="color:#6b7280;">→</span>
+      <input type="date" id="lcOffTo" style="padding:8px;border:1px solid #e5e7eb;border-radius:8px;font-size:14px;">
+      <input type="text" id="lcOffReason" placeholder="Reason (optional)" style="padding:8px;border:1px solid #e5e7eb;border-radius:8px;font-size:14px;flex:1 1 120px;">
+      <button class="btn btn-sm btn-danger" onclick="lcAddOff()">Mark off</button>
+    </div>
+    <div id="lcOffMsg" style="font-size:13px;margin-top:6px;"></div>
+
+    <div style="font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;color:#6b7280;margin:18px 0 6px;">Open or block a specific day</div>
+    <p style="margin:0 0 8px;color:#6b7280;font-size:12.5px;">Add extra hours on a quiet day, or block part of a day. For a precise drag-to-select bar, use the diary above.</p>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+      <input type="date" id="lcPdDate" onchange="lcLoadPerDay()" style="padding:8px;border:1px solid #e5e7eb;border-radius:8px;font-size:14px;">
+      <input type="time" id="lcPdStart" step="900" value="09:00" style="padding:8px;border:1px solid #e5e7eb;border-radius:8px;font-size:14px;">
+      <span style="color:#6b7280;">→</span>
+      <input type="time" id="lcPdEnd" step="900" value="13:00" style="padding:8px;border:1px solid #e5e7eb;border-radius:8px;font-size:14px;">
+      <button class="btn btn-sm" style="background:#10b981;color:#fff;" onclick="lcAddExtra()">+ Extra hours</button>
+      <button class="btn btn-sm btn-danger" onclick="lcAddBlock()">Block this</button>
+    </div>
+    <div id="lcPdList" style="margin-top:8px;"></div>
+    <div id="lcPdMsg" style="font-size:13px;margin-top:6px;"></div>
+  </div>
+
   <!-- Availability editor (quick settings — the diary above has full per-day control) -->
   <div class="card" style="padding:18px;margin-bottom:14px;">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
-      <h3 style="margin:0;font-size:15px;font-weight:800;">Linda Availability</h3>
+      <h3 style="margin:0;font-size:15px;font-weight:800;">Weekly hours &amp; slot length</h3>
       <label style="display:flex;align-items:center;gap:8px;font-size:14px;font-weight:700;cursor:pointer;">
         <input type="checkbox" id="lindaEnabled" style="width:18px;height:18px;cursor:pointer;">
         <span id="lindaEnabledLabel">Enabled</span>
       </label>
     </div>
-    <p style="margin:0 0 12px 0;color:#6b7280;font-size:13px;">Turn Linda on/off, set the date range she's available, and edit her Mon–Fri working hours. The button on the main booking page is shown only while she's enabled and inside the window.</p>
+    <p style="margin:0 0 12px 0;color:#6b7280;font-size:13px;">Turn Linda's booking button on/off and set her default Mon–Fri hours &amp; session length. Booking periods and days off are managed in the Availability card above; the button on the main booking page shows only while she's enabled and inside a stint.</p>
 
-    <div class="form-row">
+    <!-- Legacy single-window inputs kept (hidden) so the existing save still sends valid dates; periods are now managed via the stints card above. -->
+    <div class="form-row" style="display:none;">
       <div class="form-group"><label>Start date</label><input type="date" id="lindaWinStart"></div>
       <div class="form-group"><label>End date</label><input type="date" id="lindaWinEnd"></div>
     </div>
@@ -1209,6 +1266,34 @@ export function adminPage(sig: string, env: Env): string {
   <div class="card" style="padding:18px;">
     <h3 style="margin:0 0 10px 0;font-size:15px;font-weight:800;">Follow-ups</h3>
     <div id="lindaFollowUps"><div class="empty">Loading...</div></div>
+  </div>
+
+  <!-- New booking / reschedule modal (Linda command center) -->
+  <div id="lcModalBg" onclick="lcCloseModal(event)" style="display:none;position:fixed;inset:0;background:rgba(17,24,39,.6);z-index:9000;align-items:flex-start;justify-content:center;overflow:auto;padding:24px 12px;">
+    <div onclick="event.stopPropagation()" style="background:#fff;border-radius:16px;max-width:520px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.3);overflow:hidden;">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 18px;background:#ecfdf5;border-bottom:1px solid #d1fae5;">
+        <b id="lcModalTitle" style="font-size:16px;color:#065f46;">New booking</b>
+        <button onclick="lcCloseModal()" style="background:none;border:none;font-size:24px;line-height:1;color:#6b7280;cursor:pointer;">×</button>
+      </div>
+      <div style="padding:18px;">
+        <div id="lcRescheduleInfo" style="display:none;background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:13px;"></div>
+        <div id="lcPatientFields">
+          <input type="text" id="lcName" placeholder="Full name" style="width:100%;padding:11px;border:1px solid #e5e7eb;border-radius:9px;font-size:15px;margin-bottom:8px;">
+          <div style="display:flex;gap:8px;margin-bottom:8px;">
+            <input type="tel" id="lcPhone" placeholder="Phone" style="flex:1;padding:11px;border:1px solid #e5e7eb;border-radius:9px;font-size:15px;">
+            <input type="email" id="lcEmail" placeholder="Email" style="flex:1;padding:11px;border:1px solid #e5e7eb;border-radius:9px;font-size:15px;">
+          </div>
+          <textarea id="lcComments" placeholder="Comments (optional)" style="width:100%;padding:11px;border:1px solid #e5e7eb;border-radius:9px;font-size:15px;min-height:52px;margin-bottom:8px;"></textarea>
+        </div>
+        <div style="font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;color:#6b7280;margin:4px 0 6px;">Date</div>
+        <input type="date" id="lcBookDate" onchange="lcLoadSlots()" style="width:100%;padding:11px;border:1px solid #e5e7eb;border-radius:9px;font-size:15px;margin-bottom:10px;">
+        <div style="font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;color:#6b7280;margin:4px 0 6px;">Time</div>
+        <div id="lcSlots" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(78px,1fr));gap:6px;"><div style="color:#6b7280;font-size:13px;grid-column:1/-1;">Pick a date first.</div></div>
+        <label id="lcNotifyWrap" style="display:none;align-items:center;gap:8px;font-size:13px;margin-top:12px;cursor:pointer;"><input type="checkbox" id="lcNotify" checked> Email the patient about the change</label>
+        <button class="btn" id="lcBookBtn" style="background:#10b981;color:#fff;font-weight:800;width:100%;margin-top:14px;" onclick="lcSubmit()" disabled>Select a time</button>
+        <div id="lcModalMsg" style="font-size:13px;margin-top:8px;"></div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -2381,7 +2466,290 @@ async function loadLindaData() {
   loadLindaConfig();
   loadLindaStats();
   loadLindaFollowUps();
+  lcInit();
 }
+
+/* ═══════════════ Linda Command Center ═══════════════
+   Calls the same proven /api/linda-* portal endpoints. The admin_sig cookie
+   authenticates them (credentials:'same-origin'), so admin gets full parity
+   with Linda's diary: day glance, new booking, reschedule/cancel/mark, and
+   availability (stints, days off, per-day open/block). */
+var lcState = { bookMode: 'new', reschedId: '', slotIdx: -1 };
+var lcAppts = [];
+var lcSlots = [];
+
+function lcPad(n){ return (n < 10 ? '0' : '') + n; }
+function lcToday(){ var d = new Date(); return d.getFullYear() + '-' + lcPad(d.getMonth()+1) + '-' + lcPad(d.getDate()); }
+function lcEsc(s){ return String(s==null?'':s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+function lcAddDays(dk, n){ var p = String(dk).split('-'); var d = new Date(+p[0], +p[1]-1, +p[2]); d.setDate(d.getDate()+n); return d.getFullYear()+'-'+lcPad(d.getMonth()+1)+'-'+lcPad(d.getDate()); }
+function lcNiceDate(dk){ var p = String(dk).split('-'); var d = new Date(+p[0], +p[1]-1, +p[2]); return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()]+', '+d.getDate()+' '+['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()]+' '+d.getFullYear(); }
+
+function lindaApi(path, opts){
+  opts = opts || {};
+  var f = { credentials: 'same-origin' };
+  if (opts.method) f.method = opts.method;
+  if (opts.body){ f.method = f.method || 'POST'; f.headers = { 'Content-Type': 'application/json' }; f.body = JSON.stringify(opts.body); }
+  return fetch('/api/' + path, f).then(function(r){ return r.json(); }).catch(function(){ return { ok:false, reason:'Network error.' }; });
+}
+
+function lcInit(){
+  var t = lcToday();
+  var byId = function(id){ return document.getElementById(id); };
+  if (byId('lcDate') && !byId('lcDate').value) byId('lcDate').value = t;
+  if (byId('lcPdDate') && !byId('lcPdDate').value) byId('lcPdDate').value = t;
+  if (byId('lcOffFrom') && !byId('lcOffFrom').value) byId('lcOffFrom').value = t;
+  if (byId('lcWinStart') && !byId('lcWinStart').value) byId('lcWinStart').value = t;
+  lcLoadDay(); lcLoadWindows(); lcLoadOff(); lcLoadPerDay();
+}
+
+function lcNavDay(delta){ var el = document.getElementById('lcDate'); el.value = lcAddDays(el.value || lcToday(), delta); lcLoadDay(); }
+function lcToDay(){ document.getElementById('lcDate').value = lcToday(); lcLoadDay(); }
+
+async function lcLoadDay(){
+  var dk = document.getElementById('lcDate').value;
+  var host = document.getElementById('lcDayList');
+  if (!dk){ host.innerHTML = '<div class="empty">Pick a date.</div>'; return; }
+  host.innerHTML = '<div class="empty">Loading…</div>';
+  var res = await lindaApi('linda-day?date=' + encodeURIComponent(dk));
+  if (!res || !res.ok){ host.innerHTML = '<div class="empty">Failed to load.</div>'; return; }
+  lcAppts = res.appointments || [];
+  if (!lcAppts.length){ host.innerHTML = '<div class="empty" style="padding:18px;">No appointments on ' + lcEsc(lcNiceDate(dk)) + '.</div>'; return; }
+  var html = '';
+  lcAppts.forEach(function(a, i){
+    var st = String(a.status||'BOOKED');
+    var cancelled = st.indexOf('CANCELLED') >= 0;
+    var badgeBg = cancelled ? '#fef2f2' : st==='ATTENDED' ? '#e0e7ff' : st==='NO_SHOW' ? '#fff7ed' : '#ecfdf5';
+    var badgeC = cancelled ? '#991b1b' : st==='ATTENDED' ? '#3730a3' : st==='NO_SHOW' ? '#9a3412' : '#065f46';
+    var badge = cancelled ? 'Cancelled' : st==='ATTENDED' ? 'Attended' : st==='NO_SHOW' ? 'No-show' : 'Booked';
+    html += '<div style="border:1px solid #e5e7eb;border-radius:12px;padding:12px 14px;margin-bottom:8px;' + (cancelled?'opacity:.6;':'') + '">'
+      + '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">'
+      +   '<b style="font-size:16px;">' + lcEsc(a.start_time) + '</b>'
+      +   '<span style="font-size:16px;font-weight:700;flex:1 1 auto;">' + lcEsc(a.full_name) + '</span>'
+      +   '<span style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;padding:3px 9px;border-radius:999px;background:' + badgeBg + ';color:' + badgeC + ';">' + badge + '</span>'
+      + '</div>';
+    var contact = [];
+    if (a.phone) contact.push('<a href="tel:' + lcEsc(a.phone) + '" style="color:#065f46;font-weight:700;text-decoration:none;">📞 ' + lcEsc(a.phone) + '</a>');
+    if (a.email) contact.push('<a href="mailto:' + lcEsc(a.email) + '" style="color:#2563eb;font-weight:700;text-decoration:none;">✉️ ' + lcEsc(a.email) + '</a>');
+    if (contact.length) html += '<div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:6px;font-size:13px;">' + contact.join('') + '</div>';
+    if (a.comments) html += '<div style="margin-top:6px;font-size:13px;color:#374151;background:#f9fafb;border-radius:8px;padding:8px 10px;">' + lcEsc(a.comments) + '</div>';
+    if (!cancelled){
+      html += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;">'
+        + '<button class="btn btn-sm" style="background:#fffbeb;color:#92400e;border:1px solid #fde68a;" onclick="lcReschedule(' + i + ')">🔄 Reschedule</button>'
+        + '<button class="btn btn-sm" style="background:#eef2ff;color:#3730a3;border:1px solid #c7d2fe;" onclick="lcMark(' + i + ',1)">✓ Attended</button>'
+        + '<button class="btn btn-sm" style="background:#fff7ed;color:#9a3412;border:1px solid #fed7aa;" onclick="lcMark(' + i + ',2)">✗ No-show</button>'
+        + '<button class="btn btn-sm btn-danger" onclick="lcCancel(' + i + ')">Cancel</button>'
+        + '</div>';
+    } else {
+      html += '<div style="margin-top:8px;"><button class="btn btn-sm btn-ghost" onclick="lcMark(' + i + ',0)">↩ Reopen</button></div>';
+    }
+    html += '</div>';
+  });
+  host.innerHTML = html;
+}
+
+function lcOpenModal(){ document.getElementById('lcModalBg').style.display = 'flex'; }
+function lcCloseModal(ev){ if (ev && ev.target && ev.target.id !== 'lcModalBg') return; document.getElementById('lcModalBg').style.display = 'none'; }
+
+function lcOpenNew(){
+  lcState.bookMode = 'new'; lcState.reschedId = ''; lcState.slotIdx = -1;
+  document.getElementById('lcModalTitle').textContent = 'New booking';
+  document.getElementById('lcPatientFields').style.display = '';
+  document.getElementById('lcRescheduleInfo').style.display = 'none';
+  ['lcName','lcPhone','lcEmail','lcComments'].forEach(function(id){ document.getElementById(id).value = ''; });
+  document.getElementById('lcModalMsg').textContent = '';
+  document.getElementById('lcBookDate').value = document.getElementById('lcDate').value || lcToday();
+  lcOpenModal(); lcLoadSlots();
+}
+
+function lcReschedule(i){
+  var a = lcAppts[i]; if (!a) return;
+  lcState.bookMode = 'reschedule'; lcState.reschedId = a.id; lcState.slotIdx = -1;
+  document.getElementById('lcModalTitle').textContent = 'Reschedule';
+  document.getElementById('lcPatientFields').style.display = 'none';
+  var info = document.getElementById('lcRescheduleInfo');
+  info.style.display = 'block';
+  info.innerHTML = '<b>' + lcEsc(a.full_name) + '</b><br>Currently: ' + lcEsc(lcNiceDate(a.date_key)) + ' at ' + lcEsc(a.start_time) + '<br><span style="color:#6b7280;">The patient is emailed the new time automatically.</span>';
+  document.getElementById('lcModalMsg').textContent = '';
+  document.getElementById('lcBookDate').value = a.date_key;
+  lcOpenModal(); lcLoadSlots();
+}
+
+async function lcLoadSlots(){
+  lcState.slotIdx = -1; lcUpdateBookBtn();
+  var dk = document.getElementById('lcBookDate').value;
+  var host = document.getElementById('lcSlots');
+  if (!dk){ host.innerHTML = '<div style="color:#6b7280;font-size:13px;grid-column:1/-1;">Pick a date first.</div>'; return; }
+  host.innerHTML = '<div style="color:#6b7280;font-size:13px;grid-column:1/-1;">Loading…</div>';
+  var res = await lindaApi('linda-slots?date=' + encodeURIComponent(dk));
+  if (!res || !res.ok || !res.slots || !res.slots.length){
+    var why = res && res.dayOff ? 'Marked as a day off.' : 'No hours set for this day. Open extra hours below, or pick another date.';
+    host.innerHTML = '<div style="color:#92400e;font-size:13px;grid-column:1/-1;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:10px;">' + why + '</div>';
+    lcSlots = []; return;
+  }
+  lcSlots = res.slots;
+  host.innerHTML = lcSlots.map(function(s, i){
+    var dis = !s.available;
+    return '<button type="button" ' + (dis ? 'disabled' : 'onclick="lcPickSlot(' + i + ')"')
+      + ' style="padding:10px 4px;border:1px solid ' + (dis?'#e5e7eb':'#10b981') + ';background:' + (dis?'#f9fafb':'#fff') + ';color:' + (dis?'#9ca3af':'#065f46') + ';border-radius:8px;font-weight:800;font-size:14px;cursor:' + (dis?'not-allowed':'pointer') + ';' + (dis?'text-decoration:line-through;':'') + '">' + lcEsc(s.start) + '</button>';
+  }).join('');
+}
+
+function lcPickSlot(i){
+  lcState.slotIdx = i;
+  var host = document.getElementById('lcSlots');
+  Array.prototype.forEach.call(host.children, function(c, idx){
+    if (c.disabled) return;
+    var on = idx === i;
+    c.style.background = on ? '#10b981' : '#fff';
+    c.style.color = on ? '#fff' : '#065f46';
+  });
+  lcUpdateBookBtn();
+}
+
+function lcUpdateBookBtn(){
+  var btn = document.getElementById('lcBookBtn');
+  var hasSlot = lcState.slotIdx >= 0;
+  var ok = hasSlot;
+  if (lcState.bookMode === 'new'){
+    var nm = document.getElementById('lcName').value.trim();
+    var ph = document.getElementById('lcPhone').value.trim();
+    var em = document.getElementById('lcEmail').value.trim();
+    ok = hasSlot && nm.length > 1 && (ph.length >= 6 || em.length > 3);
+  }
+  btn.disabled = !ok;
+  btn.textContent = !hasSlot ? 'Select a time' : (lcState.bookMode === 'reschedule' ? 'Move appointment' : 'Create booking');
+}
+
+async function lcSubmit(){
+  var dk = document.getElementById('lcBookDate').value;
+  if (lcState.slotIdx < 0 || !lcSlots[lcState.slotIdx]) return;
+  var start = lcSlots[lcState.slotIdx].start;
+  var btn = document.getElementById('lcBookBtn'); btn.disabled = true;
+  var msg = document.getElementById('lcModalMsg'); msg.style.color = '#6b7280'; msg.textContent = 'Saving…';
+  var res;
+  if (lcState.bookMode === 'reschedule'){
+    res = await lindaApi('linda-reschedule', { body: { appointmentId: lcState.reschedId, dateKey: dk, startTime: start } });
+  } else {
+    res = await lindaApi('linda-new-booking', { body: {
+      dateKey: dk, startTime: start,
+      fullName: document.getElementById('lcName').value.trim(),
+      phone: document.getElementById('lcPhone').value.trim(),
+      email: document.getElementById('lcEmail').value.trim(),
+      comments: document.getElementById('lcComments').value.trim(),
+    } });
+  }
+  if (res && res.ok){
+    lcCloseModal();
+    lcLoadDay(); loadLindaStats();
+  } else {
+    msg.style.color = '#dc2626'; msg.textContent = (res && res.reason) || 'Failed.';
+    btn.disabled = false;
+  }
+}
+
+async function lcMark(i, code){
+  var a = lcAppts[i]; if (!a) return;
+  var status = code === 1 ? 'ATTENDED' : code === 2 ? 'NO_SHOW' : 'BOOKED';
+  var res = await lindaApi('linda-mark-status', { body: { appointmentId: a.id, status: status } });
+  if (res && res.ok){ lcLoadDay(); loadLindaStats(); } else alert((res && res.reason) || 'Failed.');
+}
+async function lcCancel(i){
+  var a = lcAppts[i]; if (!a) return;
+  if (!confirm('Cancel ' + a.full_name + '’s appointment at ' + a.start_time + '? The patient will be emailed.')) return;
+  var res = await lindaApi('linda-cancel', { body: { appointmentId: a.id } });
+  if (res && res.ok){ lcLoadDay(); loadLindaStats(); } else alert((res && res.reason) || 'Failed.');
+}
+
+async function lcLoadWindows(){
+  var host = document.getElementById('lcWindows');
+  var res = await lindaApi('linda-windows');
+  if (!res || !res.ok){ host.innerHTML = '<div class="empty" style="padding:6px 0;">Failed to load.</div>'; return; }
+  var ws = res.windows || [];
+  if (!ws.length){ host.innerHTML = '<div class="empty" style="padding:6px 0;">No stints yet — add the dates Linda is in Malta.</div>'; return; }
+  host.innerHTML = ws.map(function(w){
+    if (!w.id) return '';
+    return '<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:#f9fafb;border-radius:8px;margin-bottom:6px;">'
+      + '<span style="flex:1 1 auto;font-size:14px;font-weight:700;">' + lcEsc(lcNiceDate(w.start)) + ' → ' + lcEsc(lcNiceDate(w.end)) + (w.note?' <span style="color:#6b7280;font-weight:400;">· ' + lcEsc(w.note) + '</span>':'') + '</span>'
+      + '<button class="btn btn-sm btn-ghost" onclick="lcDelWindow(' + w.id + ')">Remove</button></div>';
+  }).join('');
+}
+async function lcAddWindow(){
+  var s = document.getElementById('lcWinStart').value, e = document.getElementById('lcWinEnd').value, note = document.getElementById('lcWinNote').value.trim();
+  var msg = document.getElementById('lcWinMsg');
+  if (!s || !e){ msg.style.color = '#dc2626'; msg.textContent = 'Pick both dates.'; return; }
+  msg.style.color = '#6b7280'; msg.textContent = 'Saving…';
+  var res = await lindaApi('linda-windows', { body: { startDate: s, endDate: e, note: note } });
+  if (res && res.ok){ msg.textContent = ''; document.getElementById('lcWinNote').value = ''; lcLoadWindows(); }
+  else { msg.style.color = '#dc2626'; msg.textContent = (res && res.reason) || 'Failed.'; }
+}
+async function lcDelWindow(id){ var res = await lindaApi('linda-windows?id=' + id, { method: 'DELETE' }); if (res && res.ok) lcLoadWindows(); else alert((res && res.reason) || 'Failed.'); }
+
+async function lcLoadOff(){
+  var host = document.getElementById('lcOffList');
+  var res = await lindaApi('linda-off');
+  if (!res || !res.ok){ host.innerHTML = '<div class="empty" style="padding:6px 0;">Failed to load.</div>'; return; }
+  var offs = res.off || [];
+  var future = offs.filter(function(o){ return o.date_key >= lcToday(); });
+  if (!future.length){ host.innerHTML = '<div class="empty" style="padding:6px 0;">No upcoming days off.</div>'; return; }
+  host.innerHTML = future.map(function(o){
+    return '<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:#fef2f2;border-radius:8px;margin-bottom:6px;">'
+      + '<span style="flex:1 1 auto;font-size:14px;font-weight:700;color:#991b1b;">' + lcEsc(lcNiceDate(o.date_key)) + (o.reason?' <span style="color:#6b7280;font-weight:400;">· ' + lcEsc(o.reason) + '</span>':'') + '</span>'
+      + '<button class="btn btn-sm btn-ghost" onclick="lcDelOff(' + o.id + ')">Undo</button></div>';
+  }).join('');
+}
+async function lcAddOff(){
+  var from = document.getElementById('lcOffFrom').value, to = document.getElementById('lcOffTo').value || from, reason = document.getElementById('lcOffReason').value.trim();
+  var msg = document.getElementById('lcOffMsg');
+  if (!from){ msg.style.color = '#dc2626'; msg.textContent = 'Pick a date.'; return; }
+  msg.style.color = '#6b7280'; msg.textContent = 'Saving…';
+  var res = await lindaApi('linda-off', { body: { dateKey: from, dateKeyEnd: to, reason: reason } });
+  if (res && res.ok){ msg.textContent = ''; document.getElementById('lcOffReason').value = ''; lcLoadOff(); lcLoadDay(); }
+  else { msg.style.color = '#dc2626'; msg.textContent = (res && res.reason) || 'Failed.'; }
+}
+async function lcDelOff(id){ var res = await lindaApi('linda-off?id=' + id, { method: 'DELETE' }); if (res && res.ok){ lcLoadOff(); lcLoadDay(); } else alert((res && res.reason) || 'Failed.'); }
+
+async function lcLoadPerDay(){
+  var dk = document.getElementById('lcPdDate').value;
+  var host = document.getElementById('lcPdList');
+  if (!dk){ host.innerHTML = ''; return; }
+  var res = await lindaApi('linda-slots?date=' + encodeURIComponent(dk));
+  if (!res || !res.ok){ host.innerHTML = ''; return; }
+  var rows = '';
+  (res.extras || []).forEach(function(x){
+    rows += '<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:#ecfdf5;border-radius:8px;margin-bottom:5px;">'
+      + '<span style="flex:0 0 auto;font-size:11px;font-weight:800;text-transform:uppercase;color:#065f46;">Extra</span>'
+      + '<span style="flex:1 1 auto;font-size:13px;font-weight:700;">' + lcEsc(x.start_time) + ' – ' + lcEsc(x.end_time) + '</span>'
+      + '<button class="btn btn-sm btn-ghost" onclick="lcDelExtra(' + x.id + ')">Remove</button></div>';
+  });
+  (res.blocks || []).forEach(function(b){
+    rows += '<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:#fef2f2;border-radius:8px;margin-bottom:5px;">'
+      + '<span style="flex:0 0 auto;font-size:11px;font-weight:800;text-transform:uppercase;color:#991b1b;">Block</span>'
+      + '<span style="flex:1 1 auto;font-size:13px;font-weight:700;">' + lcEsc(b.start_time) + ' – ' + lcEsc(b.end_time) + '</span>'
+      + '<button class="btn btn-sm btn-ghost" onclick="lcDelBlock(' + b.id + ')">Remove</button></div>';
+  });
+  if (res.dayOff) rows = '<div style="padding:7px 10px;background:#fef2f2;border-radius:8px;margin-bottom:5px;font-size:13px;font-weight:700;color:#991b1b;">This whole day is marked off.</div>' + rows;
+  host.innerHTML = rows;
+}
+async function lcAddExtra(){
+  var dk = document.getElementById('lcPdDate').value, s = document.getElementById('lcPdStart').value, e = document.getElementById('lcPdEnd').value;
+  var msg = document.getElementById('lcPdMsg');
+  if (!dk || !s || !e){ msg.style.color = '#dc2626'; msg.textContent = 'Pick a date and times.'; return; }
+  msg.style.color = '#6b7280'; msg.textContent = 'Saving…';
+  var res = await lindaApi('linda-extras', { body: { dateKey: dk, startTime: s, endTime: e } });
+  if (res && res.ok){ msg.textContent = ''; lcLoadPerDay(); lcLoadDay(); }
+  else { msg.style.color = '#dc2626'; msg.textContent = (res && res.reason) || 'Failed.'; }
+}
+async function lcAddBlock(){
+  var dk = document.getElementById('lcPdDate').value, s = document.getElementById('lcPdStart').value, e = document.getElementById('lcPdEnd').value;
+  var msg = document.getElementById('lcPdMsg');
+  if (!dk || !s || !e){ msg.style.color = '#dc2626'; msg.textContent = 'Pick a date and times.'; return; }
+  msg.style.color = '#6b7280'; msg.textContent = 'Saving…';
+  var res = await lindaApi('linda-blocks', { body: { dateKey: dk, startTime: s, endTime: e } });
+  if (res && res.ok){ msg.textContent = ''; lcLoadPerDay(); lcLoadDay(); }
+  else { msg.style.color = '#dc2626'; msg.textContent = (res && res.reason) || 'Failed.'; }
+}
+async function lcDelExtra(id){ var res = await lindaApi('linda-extras?id=' + id, { method: 'DELETE' }); if (res && res.ok){ lcLoadPerDay(); lcLoadDay(); } else alert((res && res.reason) || 'Failed.'); }
+async function lcDelBlock(id){ var res = await lindaApi('linda-blocks?id=' + id, { method: 'DELETE' }); if (res && res.ok){ lcLoadPerDay(); lcLoadDay(); } else alert((res && res.reason) || 'Failed.'); }
 
 // ── Linda config (availability editor) ──
 async function loadLindaConfig() {
