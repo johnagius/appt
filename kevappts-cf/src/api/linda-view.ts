@@ -1433,46 +1433,64 @@ function lindaMainPage(env: Env): string {
   .next-up.soon{background:linear-gradient(135deg,#f59e0b,#d97706);box-shadow:0 4px 14px rgba(245,158,11,0.35);}
   .next-up.now{background:linear-gradient(135deg,#dc2626,#b91c1c);box-shadow:0 4px 14px rgba(220,38,38,0.35);}
 
-  .list{padding:0 12px 110px;}
-  .appt{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,0.03);animation:fadeUp .32s var(--ease) both;}
+  .list{padding:4px 12px 110px;}
+  /* ── Appointment card — clean clinical diary style ── */
+  .appt{position:relative;background:#fff;border:1px solid var(--line);border-radius:16px;padding:15px 16px 14px 18px;margin-bottom:12px;box-shadow:0 1px 2px rgba(16,24,40,.05);animation:fadeUp .32s var(--ease) both;overflow:hidden;}
+  .appt::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--accent);}
+  .appt.is-attended::before{background:#6366f1;}
+  .appt.is-noshow::before{background:#f59e0b;}
+  .appt.is-cancelled::before{background:#ef4444;}
+  .appt.is-cancelled{opacity:.72;}
   .list .appt:nth-child(1){animation-delay:.02s}
   .list .appt:nth-child(2){animation-delay:.05s}
   .list .appt:nth-child(3){animation-delay:.08s}
   .list .appt:nth-child(4){animation-delay:.11s}
   .list .appt:nth-child(5){animation-delay:.14s}
   .list .appt:nth-child(n+6){animation-delay:.17s}
-  .appt-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;gap:8px;}
-  .appt-time{font-weight:900;font-size:17px;color:var(--text);}
-  .appt-status{font-size:11px;font-weight:800;text-transform:uppercase;padding:3px 8px;border-radius:999px;letter-spacing:.4px;}
+  .appt-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px;}
+  .appt-time{display:inline-flex;align-items:baseline;gap:7px;font-weight:800;font-size:15px;color:var(--text);letter-spacing:-.2px;}
+  .appt-time .clock{font-size:11px;color:var(--muted);font-weight:800;letter-spacing:.4px;text-transform:uppercase;}
+  .appt-status{font-size:10.5px;font-weight:800;text-transform:uppercase;padding:4px 9px;border-radius:999px;letter-spacing:.5px;}
   .status-BOOKED{background:#ecfdf5;color:#065f46;}
-  .status-ATTENDED{background:#e0e7ff;color:#3730a3;}
+  .status-ATTENDED{background:#eef2ff;color:#4338ca;}
   .status-NO_SHOW{background:#fff7ed;color:#9a3412;}
   .status-CANCELLED{background:#fef2f2;color:#991b1b;text-decoration:line-through;}
-  .appt-name-row{display:flex;align-items:center;gap:8px;margin:0 0 6px 0;}
-  .appt-name{font-size:16px;font-weight:700;color:var(--accent);text-decoration:underline;text-underline-offset:3px;cursor:pointer;flex:1 1 auto;}
-  .appt-name:active{opacity:.7;}
-  .appt-history-btn{flex:0 0 auto;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:8px;font-size:15px;line-height:1;padding:5px 8px;cursor:pointer;}
-  .appt-history-btn:active{opacity:.7;}
-  .contact-row{display:flex;flex-direction:column;gap:8px;margin-top:10px;}
-  .contact-btn{display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:10px;text-decoration:none;font-weight:700;font-size:15px;min-height:48px;word-break:break-all;line-height:1.3;}
-  .contact-btn .icon{flex:0 0 auto;font-size:18px;}
-  .contact-btn .val{flex:1 1 auto;text-align:left;}
-  .call{background:#10b981;color:#fff;}
-  .call:active{background:#059669;}
-  .email{background:#2563eb;color:#fff;}
-  .email:active{background:#1d4ed8;}
-  .comments{margin-top:10px;padding:10px;background:#f9fafb;border-radius:10px;font-size:13px;color:var(--text);white-space:pre-wrap;border-left:3px solid var(--accent);}
+  .appt-name-row{display:flex;align-items:center;gap:8px;margin:2px 0 0;}
+  .appt-name{font-size:18px;font-weight:800;color:var(--text);letter-spacing:-.3px;cursor:pointer;flex:1 1 auto;display:inline-flex;align-items:center;gap:7px;min-width:0;}
+  .appt-name>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .appt-name::after{content:"✎";font-size:12px;color:#c4b5fd;flex:0 0 auto;}
+  .appt-name:active{opacity:.6;}
+  .appt-history-btn{flex:0 0 auto;background:#fff;border:1px solid var(--line);color:var(--muted);border-radius:9px;font-size:14px;line-height:1;padding:7px 9px;cursor:pointer;}
+  .appt-history-btn:active{background:#f3f4f6;}
+  .appt-svc{font-size:12px;color:var(--muted);margin-top:3px;}
+  .contact-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;}
+  .contact-btn{display:inline-flex;align-items:center;gap:7px;padding:8px 13px;border-radius:999px;text-decoration:none;font-weight:700;font-size:13.5px;border:1px solid var(--line);background:#fff;color:var(--text);line-height:1.2;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .contact-btn .icon{flex:0 0 auto;font-size:13px;}
+  .contact-btn.call{border-color:#a7f3d0;background:#ecfdf5;color:#065f46;}
+  .contact-btn.call:active{background:#d1fae5;}
+  .contact-btn.email{border-color:#bfdbfe;background:#eff6ff;color:#1e40af;}
+  .contact-btn.email:active{background:#dbeafe;}
+  .comments{margin-top:12px;padding:10px 12px;background:#f9fafb;border-radius:10px;font-size:13px;color:var(--text);white-space:pre-wrap;border-left:3px solid var(--accent);}
   .comments-label{font-size:11px;color:var(--muted);font-weight:800;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px;}
 
-  .action-row{display:flex;gap:8px;margin-top:10px;}
-  .action-btn{flex:1 1 0;padding:10px;border:1px solid var(--line);background:#fff;color:var(--text);border-radius:10px;font-size:13px;font-weight:800;cursor:pointer;min-height:40px;}
-  .action-btn:active{background:#f3f4f6;}
-  .action-btn.reschedule{border-color:#f59e0b;color:#92400e;background:#fffbeb;}
-  .action-btn.clone,.action-btn.next-session{border-color:#2563eb;color:#1e40af;background:#eff6ff;}
-  .action-btn.cancel{border-color:#ef4444;color:#991b1b;background:#fef2f2;}
-  .action-btn.attended{border-color:#3730a3;color:#312e81;background:#eef2ff;}
-  .action-btn.noshow{border-color:#9a3412;color:#7c2d12;background:#fff7ed;}
-  .action-btn.reopen{border-color:#6b7280;color:#374151;background:#f9fafb;}
+  /* ── Card action toolbar ── */
+  .appt-actions{margin-top:13px;padding-top:12px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:8px;}
+  .btn-row{display:flex;gap:8px;}
+  .act{flex:1 1 0;display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:10px;border:1px solid var(--line);background:#fff;color:#374151;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;min-height:42px;}
+  .act:active{background:#f3f4f6;}
+  .act .act-ico{font-size:14px;}
+  .act.primary{border-color:var(--accent);background:var(--accent);color:#fff;box-shadow:0 1px 2px rgba(16,185,129,.35);}
+  .act.primary:active{background:#059669;}
+  .seg{display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;}
+  .seg .act{border:none;border-right:1px solid var(--line);border-radius:0;}
+  .seg .act:last-child{border-right:none;}
+  .act.attended{color:#4338ca;}
+  .act.attended:active{background:#eef2ff;}
+  .act.noshow{color:#9a3412;}
+  .act.noshow:active{background:#fff7ed;}
+  .foot-row{display:flex;justify-content:flex-end;}
+  .act.link-danger{flex:0 0 auto;border:none;background:none;color:#b91c1c;min-height:0;padding:6px 4px;font-size:12.5px;font-weight:700;}
+  .act.link-danger:active{background:none;color:#7f1d1d;}
 
   /* Day-wide actions row */
   .day-actions{display:flex;gap:8px;padding:0 12px 6px;flex-wrap:wrap;}
@@ -2197,9 +2215,14 @@ function lindaMainPage(env: Env): string {
       var time = esc(a.start_time) + ' – ' + esc(a.end_time);
       var statusCls = statusClass(a.status);
       var statusTxt = statusLabel(a.status);
-      html += '<div class="appt">';
+      var cancelled = a.status && a.status.indexOf('CANCELLED') >= 0;
+      var cardCls = 'appt';
+      if (a.status === 'ATTENDED') cardCls += ' is-attended';
+      else if (a.status === 'NO_SHOW') cardCls += ' is-noshow';
+      else if (cancelled) cardCls += ' is-cancelled';
+      html += '<div class="' + cardCls + '">';
       html +=   '<div class="appt-head">';
-      html +=     '<div class="appt-time">' + time + '</div>';
+      html +=     '<div class="appt-time"><span class="clock">🕒</span>' + time + '</div>';
       html +=     '<div class="appt-status ' + statusCls + '">' + statusTxt + '</div>';
       html +=   '</div>';
       var patientPayload = esc(JSON.stringify({ email: a.email || '', phone: a.phone || '', name: a.full_name || '' }));
@@ -2207,43 +2230,36 @@ function lindaMainPage(env: Env): string {
       // Tapping the name jumps straight into Edit (changes auto-save). The small
       // history glyph beside it still opens the full patient timeline.
       html +=   '<div class="appt-name-row">';
-      html +=     '<div class="appt-name" data-edit="' + nameEditPayload + '" onclick="editApptFromEl(this)">' + esc(a.full_name || 'No name') + '</div>';
+      html +=     '<div class="appt-name" data-edit="' + nameEditPayload + '" onclick="editApptFromEl(this)"><span>' + esc(a.full_name || 'No name') + '</span></div>';
       html +=     '<button class="appt-history-btn" data-patient="' + patientPayload + '" onclick="openPatientHistoryFromEl(this)" title="Patient history" aria-label="Patient history">🕓</button>';
       html +=   '</div>';
-      if (a.service_name) html += '<div style="font-size:13px;color:var(--muted);">' + esc(a.service_name) + '</div>';
+      if (a.service_name) html += '<div class="appt-svc">' + esc(a.service_name) + '</div>';
       html +=   '<div class="contact-row">';
-      if (tel) html += '<a class="contact-btn call" href="tel:' + esc(tel) + '"><span class="icon">📞</span><span class="val">' + esc(a.phone) + '</span></a>';
-      if (email) html += '<a class="contact-btn email" href="mailto:' + esc(email) + '"><span class="icon">✉️</span><span class="val">' + esc(email) + '</span></a>';
+      if (tel) html += '<a class="contact-btn call" href="tel:' + esc(tel) + '"><span class="icon">📞</span>' + esc(a.phone) + '</a>';
+      if (email) html += '<a class="contact-btn email" href="mailto:' + esc(email) + '"><span class="icon">✉️</span>' + esc(email) + '</a>';
       html +=   '</div>';
       if (a.comments && a.comments.trim()){
         html += '<div class="comments"><div class="comments-label">Note from patient</div>' + esc(a.comments) + '</div>';
       }
-      var cancelled = a.status && a.status.indexOf('CANCELLED') >= 0;
       if (!cancelled){
         var nextPayload = esc(JSON.stringify({ id: a.id, fullName: a.full_name, email: a.email, phone: a.phone, comments: a.comments || '' }));
-        var editPayload = esc(JSON.stringify({ id: a.id, fullName: a.full_name, email: a.email, phone: a.phone, comments: a.comments || '', dateKey: a.date_key, startTime: a.start_time }));
-        html += '<div class="action-row">';
-        html +=   '<button class="action-btn reschedule" onclick="openReschedule(\\'' + esc(a.id) + '\\')">Reschedule</button>';
-        html +=   '<button class="action-btn next-session" data-patient="' + nextPayload + '" onclick="openScheduleNextFromEl(this)">Schedule Next Session</button>';
-        html += '</div>';
-        html += '<div class="action-row" style="margin-top:6px;">';
-        html +=   '<button class="action-btn" style="border-color:#c4b5fd;color:#5b21b6;background:#f5f3ff;" data-edit="' + editPayload + '" onclick="editApptFromEl(this)">✎ Edit details</button>';
-        html += '</div>';
+        html += '<div class="appt-actions">';
+        html +=   '<div class="btn-row">';
+        html +=     '<button class="act primary" onclick="openReschedule(\\'' + esc(a.id) + '\\')"><span class="act-ico">🔄</span>Reschedule</button>';
+        html +=     '<button class="act" data-patient="' + nextPayload + '" onclick="openScheduleNextFromEl(this)"><span class="act-ico">＋</span>Next session</button>';
+        html +=   '</div>';
         // Attended / No-show — hide once already marked; show a tiny Reopen
         // link instead so she can undo if she tapped by mistake.
         if (a.status === 'ATTENDED' || a.status === 'NO_SHOW'){
-          html += '<div class="action-row" style="margin-top:6px;">';
-          html +=   '<button class="action-btn reopen" onclick="markStatus(\\'' + esc(a.id) + '\\',\\'BOOKED\\')">Undo \u2014 reopen booking</button>';
-          html += '</div>';
+          html += '<div class="btn-row"><button class="act" onclick="markStatus(\\'' + esc(a.id) + '\\',\\'BOOKED\\')">\u21a9 Reopen booking</button></div>';
         } else {
-          html += '<div class="action-row" style="margin-top:6px;">';
-          html +=   '<button class="action-btn attended" onclick="markStatus(\\'' + esc(a.id) + '\\',\\'ATTENDED\\')">\u2713 Attended</button>';
-          html +=   '<button class="action-btn noshow" onclick="markStatus(\\'' + esc(a.id) + '\\',\\'NO_SHOW\\')">No-show</button>';
+          html += '<div class="seg">';
+          html +=   '<button class="act attended" onclick="markStatus(\\'' + esc(a.id) + '\\',\\'ATTENDED\\')">\u2713 Attended</button>';
+          html +=   '<button class="act noshow" onclick="markStatus(\\'' + esc(a.id) + '\\',\\'NO_SHOW\\')">No-show</button>';
           html += '</div>';
         }
         var cancelInfo = esc(JSON.stringify({ id: a.id, name: a.full_name || 'this patient', dateKey: a.date_key, startTime: a.start_time }));
-        html += '<div class="action-row" style="margin-top:6px;">';
-        html +=   '<button class="action-btn cancel" data-appt="' + cancelInfo + '" onclick="cancelOneFromEl(this)">Cancel</button>';
+        html += '<div class="foot-row"><button class="act link-danger" data-appt="' + cancelInfo + '" onclick="cancelOneFromEl(this)">Cancel appointment</button></div>';
         html += '</div>';
       }
       html += '</div>';
