@@ -410,6 +410,7 @@ export function adminPage(sig: string, env: Env): string {
     <div class="tab" data-tab="referrals" onclick="switchTab('referrals')">Referrals</div>
     <div class="tab" data-tab="telemedicine" onclick="switchTab('telemedicine')" style="background:#fff7ed;color:#9a3412;">Telemedicine</div>
     <div class="tab" data-tab="linda" onclick="switchTab('linda')" style="background:#ecfdf5;color:#065f46;">Linda</div>
+    <div class="tab" data-tab="lindastats" onclick="switchTab('lindastats')" style="background:#ecfdf5;color:#047857;">📊 Linda Reports</div>
     <div class="tab" data-tab="bloodtests" onclick="switchTab('bloodtests')" style="background:#fef2f2;color:#991b1b;">Blood Tests</div>
     <div class="tab" data-tab="dda" onclick="switchTab('dda')" style="background:#f5f3ff;color:#5b21b6;">&#x1F48A; DDAs</div>
     <div class="tab" data-tab="reschedule" onclick="switchTab('reschedule')" style="background:#eef2ff;color:#3730a3;">&#x1F504; Reschedule</div>
@@ -1241,32 +1242,7 @@ export function adminPage(sig: string, env: Env): string {
     </div>
   </div>
 
-  <div class="card" style="padding:18px;margin-bottom:14px;">
-    <h3 style="margin:0 0 10px 0;font-size:15px;font-weight:800;">Statistics</h3>
-    <div id="lindaStats"><div class="empty">Loading...</div></div>
-  </div>
-
-  <div class="card" style="padding:18px;margin-bottom:14px;">
-    <h3 style="margin:0 0 10px 0;font-size:15px;font-weight:800;">Upcoming Appointments</h3>
-    <div id="lindaUpcoming"><div class="empty">Loading...</div></div>
-  </div>
-
-  <div class="card" style="padding:18px;margin-bottom:14px;">
-    <h3 style="margin:0 0 6px 0;font-size:15px;font-weight:800;">Reviews</h3>
-    <p style="margin:0 0 10px 0;color:#6b7280;font-size:13px;">Send Google review requests to Linda's patients from a selected date.</p>
-    <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;">
-      <label style="font-size:13px;color:#374151;">Date:</label>
-      <input type="date" id="lindaReviewDate" style="padding:6px;border:1px solid #e5e7eb;border-radius:6px;">
-      <button class="btn" onclick="loadLindaReviews()">Load patients</button>
-    </div>
-    <div id="lindaReviewList"><div class="empty">Pick a date and click Load.</div></div>
-    <button class="btn btn-primary" id="lindaReviewSendBtn" style="display:none;margin-top:10px;" onclick="sendLindaReviews()">Send Review Requests</button>
-  </div>
-
-  <div class="card" style="padding:18px;">
-    <h3 style="margin:0 0 10px 0;font-size:15px;font-weight:800;">Follow-ups</h3>
-    <div id="lindaFollowUps"><div class="empty">Loading...</div></div>
-  </div>
+  <!-- Statistics, Reviews & Follow-ups moved to the dedicated "Linda Reports" tab. -->
 
   <!-- New booking / reschedule modal (Linda command center) -->
   <div id="lcModalBg" onclick="lcCloseModal(event)" style="display:none;position:fixed;inset:0;background:rgba(17,24,39,.6);z-index:9000;align-items:flex-start;justify-content:center;overflow:auto;padding:24px 12px;">
@@ -1294,6 +1270,41 @@ export function adminPage(sig: string, env: Env): string {
         <div id="lcModalMsg" style="font-size:13px;margin-top:8px;"></div>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- LINDA REPORTS TAB (stats, reviews, follow-ups — kept out of the day-to-day Linda tab) -->
+<div class="tab-content" id="tab-lindastats" style="display:none;">
+  <div class="card" style="padding:18px;margin-bottom:14px;background:#ecfdf5;border-left:4px solid #10b981;">
+    <h3 style="margin:0 0 4px 0;font-size:16px;font-weight:900;color:#065f46;">Linda &mdash; Reports</h3>
+    <p style="margin:0;color:#065f46;font-size:13px;">Statistics, review requests and follow-ups for the physiotherapy clinic.</p>
+  </div>
+
+  <div class="card" style="padding:18px;margin-bottom:14px;">
+    <h3 style="margin:0 0 10px 0;font-size:15px;font-weight:800;">Statistics</h3>
+    <div id="lindaStats"><div class="empty">Loading...</div></div>
+  </div>
+
+  <div class="card" style="padding:18px;margin-bottom:14px;">
+    <h3 style="margin:0 0 10px 0;font-size:15px;font-weight:800;">Upcoming Appointments</h3>
+    <div id="lindaUpcoming"><div class="empty">Loading...</div></div>
+  </div>
+
+  <div class="card" style="padding:18px;margin-bottom:14px;">
+    <h3 style="margin:0 0 6px 0;font-size:15px;font-weight:800;">Reviews</h3>
+    <p style="margin:0 0 10px 0;color:#6b7280;font-size:13px;">Send Google review requests to Linda's patients from a selected date.</p>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;">
+      <label style="font-size:13px;color:#374151;">Date:</label>
+      <input type="date" id="lindaReviewDate" style="padding:6px;border:1px solid #e5e7eb;border-radius:6px;">
+      <button class="btn" onclick="loadLindaReviews()">Load patients</button>
+    </div>
+    <div id="lindaReviewList"><div class="empty">Pick a date and click Load.</div></div>
+    <button class="btn btn-primary" id="lindaReviewSendBtn" style="display:none;margin-top:10px;" onclick="sendLindaReviews()">Send Review Requests</button>
+  </div>
+
+  <div class="card" style="padding:18px;">
+    <h3 style="margin:0 0 10px 0;font-size:15px;font-weight:800;">Follow-ups</h3>
+    <div id="lindaFollowUps"><div class="empty">Loading...</div></div>
   </div>
 </div>
 
@@ -1876,6 +1887,7 @@ function switchTab(name) {
   if (name === 'referrals') loadReferrals();
   if (name === 'telemedicine') loadTelemedicineData();
   if (name === 'linda') loadLindaData();
+  if (name === 'lindastats') loadLindaReports();
   if (name === 'bloodtests') loadBloodTestData();
   if (name === 'dda') loadDdaList();
   if (name === 'reschedule') loadRescheduleTab();
@@ -2464,9 +2476,14 @@ async function deleteTelemedicineCall(id) {
 // ─── Linda (Physiotherapy) admin ─────────────────────────────
 async function loadLindaData() {
   loadLindaConfig();
+  lcInit();
+}
+
+// Stats / reviews / follow-ups now live in the dedicated "Linda Reports" tab.
+async function loadLindaReports() {
+  loadLindaConfig();   // keeps the review-date picker bounded to the window
   loadLindaStats();
   loadLindaFollowUps();
-  lcInit();
 }
 
 /* ═══════════════ Linda Command Center ═══════════════
