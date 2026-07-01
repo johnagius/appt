@@ -1141,6 +1141,7 @@ export function adminPage(sig: string, env: Env): string {
   <div class="card" style="padding:0;margin-bottom:14px;overflow:hidden;border:1px solid #d1fae5;">
     <div style="display:flex;align-items:center;gap:10px;padding:14px 16px;background:#ecfdf5;border-bottom:1px solid #d1fae5;flex-wrap:wrap;">
       <b style="font-size:15px;color:#065f46;flex:1 1 auto;">📋 Appointments</b>
+      <button class="btn btn-sm" style="background:#ecfdf5;color:#065f46;border:1px solid #10b981;" onclick="lcBulkOpen()">⇊ Bulk add</button>
       <button class="btn" style="background:#10b981;color:#fff;font-weight:800;" onclick="lcOpenNew()">＋ New booking</button>
     </div>
     <div style="display:flex;align-items:center;gap:6px;padding:12px 16px;border-bottom:1px solid #eef2f0;flex-wrap:wrap;">
@@ -1286,6 +1287,23 @@ export function adminPage(sig: string, env: Env): string {
       <input type="text" id="lasNote" placeholder="Note (optional) — e.g. 'summer visit'" style="width:100%;padding:10px;border:1px solid #e5e7eb;border-radius:9px;font-size:15px;margin-top:12px;">
       <button class="btn" style="background:#10b981;color:#fff;font-weight:800;width:100%;margin-top:14px;" onclick="lasSave()">Save stint</button>
       <div id="lasMsg" style="font-size:13px;margin-top:8px;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Bulk booking: paste a table of Date, Time, Name, Phone, Email -->
+<div id="lcBulkBg" onclick="lcBulkClose(event)" style="display:none;position:fixed;inset:0;background:rgba(17,24,39,.6);z-index:9100;align-items:flex-start;justify-content:center;overflow:auto;padding:24px 12px;">
+  <div onclick="event.stopPropagation()" style="background:#fff;border-radius:16px;max-width:720px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.3);overflow:hidden;">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 18px;background:#ecfdf5;border-bottom:1px solid #d1fae5;">
+      <b style="font-size:16px;color:#065f46;">Bulk add bookings</b>
+      <button onclick="lcBulkClose()" style="background:none;border:none;font-size:24px;line-height:1;color:#6b7280;cursor:pointer;">×</button>
+    </div>
+    <div style="padding:18px;">
+      <p style="margin:0 0 8px;color:#6b7280;font-size:13px;">Paste rows from a spreadsheet — one booking per line, columns in this order: <b>Date, Time, Name, Phone, Email</b>. Dates like <code>2026-07-06</code> or <code>06/07/2026</code> and times like <code>16:30</code> or <code>4:30pm</code> both work. Phone or email — at least one.</p>
+      <textarea id="lcBulkText" oninput="lcBulkParse()" placeholder="2026-07-06, 16:30, Maria Camilleri, +35679123456, maria@example.com&#10;06/07/2026, 5:00pm, John Grech, +35699887766, john@example.com" style="width:100%;min-height:120px;padding:11px;border:1px solid #e5e7eb;border-radius:9px;font-size:14px;font-family:monospace;white-space:pre;overflow:auto;"></textarea>
+      <div id="lcBulkPreview" style="margin-top:12px;"></div>
+      <button class="btn" id="lcBulkBtn" style="background:#10b981;color:#fff;font-weight:800;width:100%;margin-top:12px;" onclick="lcBulkSubmit()" disabled>Book all</button>
+      <div id="lcBulkMsg" style="font-size:13px;margin-top:8px;"></div>
     </div>
   </div>
 </div>
@@ -2837,6 +2855,57 @@ async function lasSave(){
   var res = await lindaApi('linda-windows', { method: method, body: body });
   if (res && res.ok){ document.getElementById('lasBg').style.display = 'none'; lcLoadWindows(); }
   else { msg.style.color = '#dc2626'; msg.textContent = (res && res.reason) || 'Failed.'; }
+}
+
+/* ── Bulk bookings: paste a Date/Time/Name/Phone/Email table ── */
+var lcBulkRows = [];
+function lcBulkPDate(s){ s=(s||'').trim(); if(/^\\d{4}-\\d{2}-\\d{2}$/.test(s)) return s; var m=s.match(/^(\\d{1,2})[\\/\\-.](\\d{1,2})[\\/\\-.](\\d{2,4})$/); if(m){ var d=+m[1],mo=+m[2],y=+m[3]; if(y<100)y+=2000; if(mo>=1&&mo<=12&&d>=1&&d<=31) return y+'-'+lcPad(mo)+'-'+lcPad(d); } return null; }
+function lcBulkPTime(s){ s=(s||'').trim().toLowerCase().replace(/\\s+/g,''); var ap=null; var a=s.match(/(am|pm)$/); if(a){ap=a[1];s=s.replace(/(am|pm)$/,'');} var h,mi; var t=s.match(/^(\\d{1,2}):(\\d{2})$/); if(t){h=+t[1];mi=+t[2];} else { var t2=s.match(/^(\\d{1,2})$/); if(!t2) return null; h=+t2[1]; mi=0; } if(ap==='pm'&&h<12)h+=12; if(ap==='am'&&h===12)h=0; if(h>23||mi>59) return null; return lcPad(h)+':'+lcPad(mi); }
+function lcBulkParse(){
+  var txt = document.getElementById('lcBulkText').value;
+  var lines = txt.split(/\\r?\\n/).filter(function(l){ return l.trim(); });
+  lcBulkRows = lines.map(function(line){
+    var cells = (line.indexOf('\t') >= 0 ? line.split('\t') : line.split(',')).map(function(c){ return c.trim(); });
+    var row = { dateKey: cells[0]||'', startTime: cells[1]||'', fullName: cells[2]||'', phone: cells[3]||'', email: cells[4]||'' };
+    row._d = lcBulkPDate(row.dateKey); row._t = lcBulkPTime(row.startTime);
+    row._ok = !!row._d && !!row._t && row.fullName.length > 1 && (row.phone.length >= 6 || row.email.indexOf('@') > 0);
+    return row;
+  });
+  var host = document.getElementById('lcBulkPreview');
+  var btn = document.getElementById('lcBulkBtn');
+  if (!lcBulkRows.length){ host.innerHTML=''; btn.disabled=true; btn.textContent='Book all'; return; }
+  var valid = lcBulkRows.filter(function(r){ return r._ok; }).length;
+  var body = lcBulkRows.map(function(r){
+    return '<tr style="background:'+(r._ok?'#f0fdf4':'#fef2f2')+';">'
+      + '<td style="padding:5px 8px;">'+(r._ok?'✓':'✕')+'</td>'
+      + '<td style="padding:5px 8px;white-space:nowrap;">'+lcEsc(r._d||r.dateKey||'—')+'</td>'
+      + '<td style="padding:5px 8px;">'+lcEsc(r._t||r.startTime||'—')+'</td>'
+      + '<td style="padding:5px 8px;">'+lcEsc(r.fullName||'—')+'</td>'
+      + '<td style="padding:5px 8px;">'+lcEsc(r.phone||'')+'</td>'
+      + '<td style="padding:5px 8px;">'+lcEsc(r.email||'')+'</td></tr>';
+  }).join('');
+  host.innerHTML = '<div style="max-height:230px;overflow:auto;border:1px solid #eef2f0;border-radius:8px;"><table style="width:100%;border-collapse:collapse;font-size:13px;">'
+    + '<thead><tr style="background:#f9fafb;text-align:left;color:#6b7280;"><th style="padding:6px 8px;"></th><th style="padding:6px 8px;">Date</th><th style="padding:6px 8px;">Time</th><th style="padding:6px 8px;">Name</th><th style="padding:6px 8px;">Phone</th><th style="padding:6px 8px;">Email</th></tr></thead><tbody>'+body+'</tbody></table></div>'
+    + '<div style="font-size:12.5px;color:#6b7280;margin-top:6px;">'+valid+' of '+lcBulkRows.length+' rows valid'+(valid<lcBulkRows.length?' — red rows are skipped':'')+'.</div>';
+  btn.disabled = valid === 0;
+  btn.textContent = valid ? ('Book ' + valid + ' booking' + (valid===1?'':'s')) : 'Nothing valid to book';
+}
+function lcBulkOpen(){ document.getElementById('lcBulkText').value=''; document.getElementById('lcBulkPreview').innerHTML=''; document.getElementById('lcBulkMsg').textContent=''; var b=document.getElementById('lcBulkBtn'); b.disabled=true; b.textContent='Book all'; document.getElementById('lcBulkBg').style.display='flex'; }
+function lcBulkClose(ev){ if (ev && ev.target && ev.target.id !== 'lcBulkBg') return; document.getElementById('lcBulkBg').style.display='none'; }
+async function lcBulkSubmit(){
+  var valid = lcBulkRows.filter(function(r){ return r._ok; });
+  if (!valid.length) return;
+  var btn = document.getElementById('lcBulkBtn'); btn.disabled = true;
+  var msg = document.getElementById('lcBulkMsg'); msg.style.color = '#6b7280'; msg.textContent = 'Booking ' + valid.length + '…';
+  var rows = valid.map(function(r){ return { dateKey: r._d, startTime: r._t, fullName: r.fullName, phone: r.phone, email: r.email }; });
+  var res = await lindaApi('linda-bulk-booking', { body: { rows: rows } });
+  if (res && res.ok){
+    var failed = (res.results||[]).filter(function(x){ return !x.ok; });
+    msg.style.color = failed.length ? '#92400e' : '#059669';
+    msg.textContent = 'Created ' + res.created + ' of ' + res.total + '.' + (failed.length ? (' ' + failed.length + ' skipped: ' + failed.slice(0,3).map(function(f){ return (f.startTime||'') + ' — ' + f.reason; }).join('; ') + (failed.length>3?'…':'')) : '');
+    lcLoadDay(); loadLindaStats();
+    if (!failed.length) setTimeout(function(){ lcBulkClose(); }, 1200); else btn.disabled = false;
+  } else { msg.style.color = '#dc2626'; msg.textContent = (res && res.reason) || 'Failed.'; btn.disabled = false; }
 }
 
 async function lcLoadOff(){

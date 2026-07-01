@@ -865,6 +865,104 @@ export async function apiLindaNewBooking(req: Request, env: Env): Promise<Respon
   return json({ ok: true, appointmentId: appt.id, dateKey, startTime, endTime: slotFound.end });
 }
 
+// ─── POST /api/linda-bulk-booking ──────────────────────────
+// Staff bulk-entry: create many bookings at once from a pasted table.
+// Body: { rows: [{ dateKey, startTime, fullName, phone?, email?, comments? }] }
+// Dates/times are parsed leniently (accepts DD/MM/YYYY and 9:00 / 9am etc.) so a
+// spreadsheet paste just works. Force-creates regardless of set hours (staff
+// know what they're entering) but still respects the one-booking-per-slot index.
+// No confirmation emails are sent for bulk imports.
+
+function bulkNormDate(s: string): string | null {
+  s = String(s || '').trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/);
+  if (m) {
+    let d = parseInt(m[1], 10), mo = parseInt(m[2], 10), y = parseInt(m[3], 10);
+    if (y < 100) y += 2000;
+    if (mo >= 1 && mo <= 12 && d >= 1 && d <= 31) {
+      return y + '-' + String(mo).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+    }
+  }
+  return null;
+}
+function bulkNormTime(s: string): string | null {
+  s = String(s || '').trim().toLowerCase().replace(/\s+/g, '');
+  let ap: string | null = null;
+  const a = s.match(/(am|pm)$/);
+  if (a) { ap = a[1]; s = s.replace(/(am|pm)$/, ''); }
+  let h: number, mi: number;
+  const t = s.match(/^(\d{1,2}):(\d{2})$/);
+  if (t) { h = parseInt(t[1], 10); mi = parseInt(t[2], 10); }
+  else { const t2 = s.match(/^(\d{1,2})$/); if (!t2) return null; h = parseInt(t2[1], 10); mi = 0; }
+  if (ap === 'pm' && h < 12) h += 12;
+  if (ap === 'am' && h === 12) h = 0;
+  if (h > 23 || mi > 59) return null;
+  return String(h).padStart(2, '0') + ':' + String(mi).padStart(2, '0');
+}
+
+export async function apiLindaBulkBooking(req: Request, env: Env): Promise<Response> {
+  if (!await isLindaAuthed(req, env)) return json({ ok: false, reason: 'Access denied.' }, 403);
+  const body: any = await req.json();
+  const rows: any[] = Array.isArray(body.rows) ? body.rows : [];
+  if (!rows.length) return json({ ok: false, reason: 'No rows provided.' }, 400);
+  if (rows.length > 200) return json({ ok: false, reason: 'Too many rows at once (max 200).' }, 400);
+
+  const cfg = await loadLindaConfig(env.DB);
+  const slotMin = cfg.slotMin || 30;
+  const now = nowIso(env.TIMEZONE);
+  const results: any[] = [];
+  const datesTouched = new Set<string>();
+  let created = 0;
+
+  for (const r of rows) {
+    const dateKey = bulkNormDate(r.dateKey);
+    const startTime = bulkNormTime(r.startTime);
+    const fullName = String(r.fullName || '').trim();
+    const email = String(r.email || '').trim().toLowerCase();
+    const phone = String(r.phone || '').trim();
+    const comments = String(r.comments || '').trim();
+
+    if (!dateKey) { results.push({ ok: false, reason: 'Bad date' }); continue; }
+    if (!startTime) { results.push({ ok: false, reason: 'Bad time' }); continue; }
+    if (!fullName || (!email && !phone)) { results.push({ ok: false, reason: 'Need name + phone or email' }); continue; }
+
+    const endMin = parseTimeToMinutes(startTime) + slotMin;
+    const endTime = String(Math.floor(endMin / 60)).padStart(2, '0') + ':' + String(endMin % 60).padStart(2, '0');
+
+    if (await isSlotTaken(env.DB, dateKey, startTime, 'linda')) { results.push({ ok: false, reason: 'Slot already taken', dateKey, startTime }); continue; }
+
+    const appt: Appointment = {
+      id: 'A-' + generateId(), date_key: dateKey, start_time: startTime, end_time: endTime,
+      service_id: 'physio', service_name: 'Physiotherapy Consultation', full_name: fullName,
+      email: email || '', phone: phone || '', comments, status: 'BOOKED',
+      location: env.LINDA_LOCATION || "Potter's Clinic", clinic: 'linda',
+      created_at: now, updated_at: now, token: generateId(), calendar_event_id: '',
+      cancelled_at: '', cancel_reason: '', reminder_sent: '', confirmed: '',
+      booking_source: 'linda-bulk', hotel: '',
+    };
+    try {
+      if (email) await getOrCreateClient(env.DB, fullName, email, phone, now);
+      await insertAppointment(env.DB, appt);
+      created++; datesTouched.add(dateKey);
+      results.push({ ok: true, dateKey, startTime, name: fullName });
+    } catch (e: any) {
+      results.push({ ok: false, reason: String(e?.message || '').toLowerCase().includes('unique') ? 'Slot already taken' : 'Could not save', dateKey, startTime });
+    }
+  }
+
+  await bumpVersion(env.DB);
+  try {
+    const doId = env.REALTIME.idFromName('global');
+    const stub = env.REALTIME.get(doId);
+    for (const dk of datesTouched) {
+      await stub.fetch('http://internal/broadcast', { method: 'POST', body: JSON.stringify({ type: 'slots_updated', dateKey: dk, clinic: 'linda' }) });
+    }
+  } catch {}
+
+  return json({ ok: true, created, total: rows.length, results });
+}
+
 // ─── POST /api/linda-mark-status ───────────────────────────
 // Body: { appointmentId, status: 'ATTENDED' | 'NO_SHOW' | 'BOOKED' }
 // Lets Linda mark a past appointment's outcome without leaving /linda.
@@ -1641,6 +1739,7 @@ function lindaMainPage(env: Env): string {
   <div class="searchBar">
     <input type="search" id="searchInput" placeholder="Search name, phone or email…" autocomplete="off">
     <button class="clear" id="searchClear" onclick="clearSearch()" style="display:none;" aria-label="Clear">&times;</button>
+    <button onclick="openBulkSheet()" title="Bulk add bookings" style="flex:0 0 auto;background:#ecfdf5;border:1px solid var(--accent);color:#065f46;border-radius:10px;font-weight:800;font-size:13px;padding:0 12px;min-height:44px;cursor:pointer;">⇊ Bulk</button>
   </div>
   <div id="searchResults" class="searchResults" style="display:none;"></div>
   <div id="dayContent">
@@ -1772,6 +1871,23 @@ function lindaMainPage(env: Env): string {
   </div>
   <button class="sheet-submit" onclick="saveStint()">Save stint</button>
   <div class="avail-msg" id="seMsg" style="margin-top:8px;"></div>
+</div>
+
+<!-- Bulk booking sheet: paste a Date/Time/Name/Phone/Email table -->
+<div class="sheet-overlay" id="bulkOverlay" onclick="closeBulkSheet()"></div>
+<div class="sheet" id="bulkSheet" role="dialog" aria-modal="true">
+  <div class="sheet-head">
+    <h3 class="sheet-title">Bulk add bookings</h3>
+    <button class="sheet-close" onclick="closeBulkSheet()" aria-label="Close">×</button>
+  </div>
+  <div class="sheet-section">
+    <div class="sheet-label">Paste rows — Date, Time, Name, Phone, Email (one per line)</div>
+    <textarea class="sheet-input" id="bulkText" oninput="bulkParse()" placeholder="2026-07-06, 16:30, Maria Camilleri, +35679123456, maria@example.com&#10;06/07/2026, 5:00pm, John Grech, +35699887766, john@example.com" style="min-height:120px;font-family:monospace;white-space:pre;"></textarea>
+    <p class="hint" style="margin-top:6px;">Copy straight from a spreadsheet. Dates like 2026-07-06 or 06/07/2026, times like 16:30 or 4:30pm. Phone or email — at least one.</p>
+  </div>
+  <div id="bulkPreview" class="sheet-section"></div>
+  <button class="sheet-submit" id="bulkBtn" onclick="bulkSubmit()" disabled>Book all</button>
+  <div class="avail-msg" id="bulkMsg" style="margin-top:8px;"></div>
 </div>
 
 <button class="fab" id="fabBook" onclick="openBookSheet()"><span class="fab-plus">＋</span>New Booking</button>
@@ -3133,6 +3249,54 @@ function lindaMainPage(env: Env): string {
     sheet.slot = '';
     updateSheetSubmit();
   }
+
+  // ── Bulk bookings (paste a Date/Time/Name/Phone/Email table) ──
+  var bulkRows = [];
+  function bulkPDate(s){ s=(s||'').trim(); if(/^\\d{4}-\\d{2}-\\d{2}$/.test(s)) return s; var m=s.match(/^(\\d{1,2})[\\/\\-.](\\d{1,2})[\\/\\-.](\\d{2,4})$/); if(m){ var d=+m[1],mo=+m[2],y=+m[3]; if(y<100)y+=2000; if(mo>=1&&mo<=12&&d>=1&&d<=31) return y+'-'+pad(mo)+'-'+pad(d); } return null; }
+  function bulkPTime(s){ s=(s||'').trim().toLowerCase().replace(/\\s+/g,''); var ap=null; var a=s.match(/(am|pm)$/); if(a){ap=a[1];s=s.replace(/(am|pm)$/,'');} var h,mi; var t=s.match(/^(\\d{1,2}):(\\d{2})$/); if(t){h=+t[1];mi=+t[2];} else { var t2=s.match(/^(\\d{1,2})$/); if(!t2) return null; h=+t2[1]; mi=0; } if(ap==='pm'&&h<12)h+=12; if(ap==='am'&&h===12)h=0; if(h>23||mi>59) return null; return pad(h)+':'+pad(mi); }
+  window.bulkParse = function(){
+    var lines = $('bulkText').value.split(/\\r?\\n/).filter(function(l){ return l.trim(); });
+    bulkRows = lines.map(function(line){
+      var cells = (line.indexOf('\t')>=0 ? line.split('\t') : line.split(',')).map(function(c){ return c.trim(); });
+      var r = { dateKey: cells[0]||'', startTime: cells[1]||'', fullName: cells[2]||'', phone: cells[3]||'', email: cells[4]||'' };
+      r._d = bulkPDate(r.dateKey); r._t = bulkPTime(r.startTime);
+      r._ok = !!r._d && !!r._t && r.fullName.length>1 && (r.phone.length>=6 || r.email.indexOf('@')>0);
+      return r;
+    });
+    var host = $('bulkPreview'), btn = $('bulkBtn');
+    if (!bulkRows.length){ host.innerHTML=''; btn.disabled=true; btn.textContent='Book all'; return; }
+    var valid = bulkRows.filter(function(r){ return r._ok; }).length;
+    var body = bulkRows.map(function(r){
+      return '<tr style="background:'+(r._ok?'#f0fdf4':'#fef2f2')+';">'
+        + '<td style="padding:5px 6px;">'+(r._ok?'✓':'✕')+'</td>'
+        + '<td style="padding:5px 6px;white-space:nowrap;">'+esc(r._d||r.dateKey||'—')+'</td>'
+        + '<td style="padding:5px 6px;">'+esc(r._t||r.startTime||'—')+'</td>'
+        + '<td style="padding:5px 6px;">'+esc(r.fullName||'—')+'</td></tr>';
+    }).join('');
+    host.innerHTML = '<div style="max-height:220px;overflow:auto;border:1px solid var(--line);border-radius:8px;"><table style="width:100%;border-collapse:collapse;font-size:13px;">'
+      + '<thead><tr style="background:#f9fafb;text-align:left;color:var(--muted);"><th style="padding:6px;"></th><th style="padding:6px;">Date</th><th style="padding:6px;">Time</th><th style="padding:6px;">Name</th></tr></thead><tbody>'+body+'</tbody></table></div>'
+      + '<p class="hint" style="margin-top:6px;">'+valid+' of '+bulkRows.length+' valid'+(valid<bulkRows.length?' — red rows skipped':'')+'.</p>';
+    btn.disabled = valid===0;
+    btn.textContent = valid ? ('Book '+valid+' booking'+(valid===1?'':'s')) : 'Nothing valid to book';
+  };
+  window.openBulkSheet = function(){ $('bulkText').value=''; $('bulkPreview').innerHTML=''; $('bulkMsg').textContent=''; $('bulkBtn').disabled=true; $('bulkBtn').textContent='Book all'; $('bulkOverlay').classList.add('show'); $('bulkSheet').classList.add('show'); };
+  window.closeBulkSheet = function(){ $('bulkOverlay').classList.remove('show'); $('bulkSheet').classList.remove('show'); };
+  window.bulkSubmit = async function(){
+    var valid = bulkRows.filter(function(r){ return r._ok; });
+    if (!valid.length) return;
+    var btn = $('bulkBtn'); btn.disabled = true;
+    var msg = $('bulkMsg'); msg.className = 'avail-msg'; msg.textContent = 'Booking ' + valid.length + '…';
+    var rows = valid.map(function(r){ return { dateKey: r._d, startTime: r._t, fullName: r.fullName, phone: r.phone, email: r.email }; });
+    try {
+      var res = await (await fetch('/api/linda-bulk-booking', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rows: rows }) })).json();
+      if (res && res.ok){
+        var failed = (res.results||[]).filter(function(x){ return !x.ok; });
+        msg.className = 'avail-msg ' + (failed.length ? 'bad' : 'ok');
+        msg.textContent = 'Created ' + res.created + ' of ' + res.total + '.' + (failed.length ? (' ' + failed.length + ' skipped.') : '');
+        if (!failed.length) setTimeout(function(){ closeBulkSheet(); }, 1200); else btn.disabled = false;
+      } else { msg.className='avail-msg bad'; msg.textContent = (res && res.reason) || 'Failed.'; btn.disabled = false; }
+    } catch(e){ msg.className='avail-msg bad'; msg.textContent = 'Network error.'; btn.disabled = false; }
+  };
 
   window.openBookSheet = function(prefill){
     sheet.mode = 'new'; sheet.apptId = '';
