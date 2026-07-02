@@ -3531,8 +3531,9 @@ function lindaMainPage(env: Env): string {
   // ── Booking sheet (used for new booking; reschedule extension in next commit) ──
   var sheet = { mode: 'new', slot: '', apptId: '' };
 
-  function openSheet(){ $('sheetOverlay').classList.add('show'); $('sheet').classList.add('show'); }
-  window.closeSheet = function(){ $('sheetOverlay').classList.remove('show'); $('sheet').classList.remove('show'); };
+  var bookCloseTimer = null;
+  function openSheet(){ if (bookCloseTimer){ clearTimeout(bookCloseTimer); bookCloseTimer = null; } $('sheetOverlay').classList.add('show'); $('sheet').classList.add('show'); }
+  window.closeSheet = function(){ if (bookCloseTimer){ clearTimeout(bookCloseTimer); bookCloseTimer = null; } $('sheetOverlay').classList.remove('show'); $('sheet').classList.remove('show'); };
 
   function setBfDate(k){
     $('bfDate').value = k;
@@ -3764,6 +3765,12 @@ function lindaMainPage(env: Env): string {
     var hasPatient = sheet.mode === 'reschedule' || !!$('bfName').value.trim();
     $('bfSubmit').disabled = !(dk && hasTime && hasPatient);
   }
+  // These are called from inline on* handlers (the date-picker callback and the
+  // custom-time input), which run in the global scope — so they must be reachable
+  // on window, otherwise picking a date/time throws and the slots never load
+  // (leaving the Book button stuck greyed out).
+  window.updateSheetSubmit = updateSheetSubmit;
+  window.loadSheetSlots = loadSheetSlots;
   ['bfName','bfPhone','bfEmail'].forEach(function(id){ $(id).addEventListener('input', updateSheetSubmit); });
 
   // ── Patient autocomplete on the Name input ──
@@ -3983,7 +3990,9 @@ function lindaMainPage(env: Env): string {
       var data = await res.json();
       if (data.ok){
         setBfMsg(sheet.mode === 'reschedule' ? 'Rescheduled.' : 'Booked!', 'ok');
-        setTimeout(function(){
+        if (bookCloseTimer) clearTimeout(bookCloseTimer);
+        bookCloseTimer = setTimeout(function(){
+          bookCloseTimer = null;
           window.closeSheet();
           setDate(dk);  // reloads the day list + triggers renderNextUp once appointments arrive
           if ($('pane-week').style.display !== 'none') loadWeek(); // keep week grid fresh when she's on it
