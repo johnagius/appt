@@ -110,26 +110,30 @@ export function reviewSplashPage(_env: Env): string {
     /* White "Review us on Google" card with Google-coloured corners, floating
        on the teal panel. A faint tilted card peeks behind for a stacked look. */
     .gwrap{position:relative;display:inline-block;width:100%;max-width:min(94%,370px);}
-    .gwrap::before{content:"";position:absolute;inset:0;background:#ffffff;border-radius:18px;
-      transform:rotate(-5deg) translateY(8px);transform-origin:center;
+    .gwrap::before{content:"";position:absolute;inset:0;background:#ffffff;border-radius:15px;
+      transform:rotate(4.5deg) translate(-6px,4px);transform-origin:center;
       box-shadow:0 22px 44px -20px rgba(0,0,0,.55);opacity:.5;z-index:0;}
-    .gcard{position:relative;z-index:1;overflow:hidden;background:#fff;border-radius:18px;text-align:center;
-      padding:clamp(22px,3.4vw,30px) clamp(20px,3.2vw,30px) clamp(18px,2.8vw,26px);
+    .gcard{position:relative;z-index:1;overflow:hidden;background:#fff;border-radius:15px;text-align:center;transform:rotate(-2.5deg);
+      min-height:clamp(380px,54vmin,460px);display:flex;flex-direction:column;align-items:center;justify-content:center;
+      padding:clamp(30px,4.8vw,42px) clamp(30px,4.8vw,42px);
       box-shadow:0 30px 60px -22px rgba(0,0,0,.6);}
-    .corner{position:absolute;z-index:0;width:clamp(44px,8vw,66px);height:clamp(44px,8vw,66px);}
-    .c-tl{top:0;left:0;background:#EA4335;clip-path:polygon(0 0,100% 0,0 100%);}
-    .c-tr{top:0;right:0;background:#FBBC05;clip-path:polygon(0 0,100% 0,100% 100%);}
-    .c-bl{bottom:0;left:0;background:#34A853;clip-path:polygon(0 0,0 100%,100% 100%);}
-    .c-br{bottom:0;right:0;background:#4285F4;clip-path:polygon(100% 0,100% 100%,0 100%);}
+    /* Corner wedges as in the reference: diagonally-opposite pairs are congruent
+       (red≡blue, yellow≡green), the top pair meet at the top-centre and the
+       bottom pair meet at the bottom-centre — leaving a white pinwheel in the
+       middle for the content. */
+    .corner{position:absolute;inset:0;z-index:0;}
+    .c-tl{background:#EA4335;clip-path:polygon(0 0, 51% 0, 0 30%);}
+    .c-tr{background:#FBBC05;clip-path:polygon(51% 0, 100% 0, 100% 36%);}
+    .c-bl{background:#34A853;clip-path:polygon(0 100%, 49% 100%, 0 64%);}
+    .c-br{background:#1a73e8;clip-path:polygon(100% 100%, 49% 100%, 100% 70%);}
     .gcard > *:not(.corner){position:relative;z-index:1;}
     .g-kicker{font-size:clamp(11px,1.5vw,12.5px);font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#5f6368;margin:0 0 4px;}
     .glogo{font-family:"Inter",Arial,sans-serif;font-weight:700;font-size:clamp(30px,6.2vw,42px);letter-spacing:-1.5px;line-height:1.05;margin:0 0 8px;}
-    .gstars{display:flex;justify-content:center;gap:5px;margin:0 0 12px;}
-    .gstars svg{width:clamp(22px,4vw,28px);height:clamp(22px,4vw,28px);filter:drop-shadow(0 2px 4px rgba(245,179,1,.4));}
-    .g-scan{font-size:clamp(12.5px,1.7vw,14px);font-weight:600;color:#3c4043;margin:0 0 14px;line-height:1.4;}
-    .g-qr{width:clamp(150px,26vmin,206px);height:clamp(150px,26vmin,206px);margin:0 auto;}
+    .gstars{display:flex;justify-content:center;gap:5px;margin:0 0 9px;}
+    .gstars svg{width:clamp(21px,3.7vw,26px);height:clamp(21px,3.7vw,26px);filter:drop-shadow(0 2px 4px rgba(245,179,1,.4));}
+    .g-scan{font-size:clamp(12px,1.6vw,13.5px);font-weight:600;color:#3c4043;margin:0 0 10px;line-height:1.4;padding:0 8%;}
+    .g-qr{width:clamp(126px,18vmin,150px);height:clamp(126px,18vmin,150px);margin:0 auto;}
     .g-qr svg{width:100%;height:100%;display:block;}
-    .g-url{font-size:12px;color:#80868b;margin:13px 0 0;}
     .cta{display:inline-flex;align-items:center;gap:9px;background:linear-gradient(180deg,#ffce4d,#f5b301);color:#0a3f39;
       text-decoration:none;font-weight:700;font-size:clamp(14px,1.8vw,16px);padding:13px 26px;border-radius:12px;
       transition:transform .12s ease,box-shadow .12s ease;
@@ -147,10 +151,10 @@ export function reviewSplashPage(_env: Env): string {
       .points{align-items:flex-start;}
       .points li{font-size:13px;}
       .right{border-top:0;gap:16px;padding:clamp(22px,3vw,36px);}
-      .gwrap{max-width:340px;}
-      .glogo{font-size:clamp(28px,3.4vw,38px);}
-      .gstars svg{width:24px;height:24px;}
-      .g-qr{width:clamp(150px,19vw,186px);height:clamp(150px,19vw,186px);}
+      .gwrap{max-width:326px;}
+      .glogo{font-size:clamp(26px,3.2vw,36px);}
+      .gstars svg{width:23px;height:23px;}
+      .g-qr{width:clamp(118px,13vw,140px);height:clamp(118px,13vw,140px);}
       .cta{font-size:14px;padding:12px 22px;}
     }
 
@@ -192,7 +196,6 @@ export function reviewSplashPage(_env: Env): string {
               <div class="gstars" aria-hidden="true">${stars}${stars}${stars}${stars}${stars}</div>
               <p class="g-scan">Scan the QR code to leave us a review</p>
               <div class="g-qr">${qrSvg}</div>
-              <p class="g-url">&hellip; or tap the button below</p>
             </div>
           </div>
           <a class="cta" href="${hrefReview}" target="_blank" rel="noopener">
