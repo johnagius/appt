@@ -114,18 +114,17 @@ export function reviewSplashPage(_env: Env): string {
       transform:rotate(4.5deg) translate(-6px,4px);transform-origin:center;
       box-shadow:0 22px 44px -20px rgba(0,0,0,.55);opacity:.5;z-index:0;}
     .gcard{position:relative;z-index:1;overflow:hidden;background:#fff;border-radius:15px;text-align:center;transform:rotate(-2.5deg);
-      min-height:clamp(380px,54vmin,460px);display:flex;flex-direction:column;align-items:center;justify-content:center;
-      padding:clamp(30px,4.8vw,42px) clamp(30px,4.8vw,42px);
+      aspect-ratio:4/5;display:flex;flex-direction:column;align-items:center;justify-content:center;
+      padding:clamp(24px,4vw,38px) clamp(24px,4vw,36px);
       box-shadow:0 30px 60px -22px rgba(0,0,0,.6);}
-    /* Corner wedges as in the reference: diagonally-opposite pairs are congruent
-       (red≡blue, yellow≡green), the top pair meet at the top-centre and the
-       bottom pair meet at the bottom-centre — leaving a white pinwheel in the
-       middle for the content. */
+    /* Corner triangles — exact reference geometry. Each is a full-card polygon
+       layer (no border/gradient/opacity/radius). Paint order gives the overlaps:
+       orange over red at the top, blue over green at the bottom. */
     .corner{position:absolute;inset:0;z-index:0;}
-    .c-tl{background:#EA4335;clip-path:polygon(0 0, 51% 0, 0 30%);}
-    .c-tr{background:#FBBC05;clip-path:polygon(51% 0, 100% 0, 100% 36%);}
-    .c-bl{background:#34A853;clip-path:polygon(0 100%, 49% 100%, 0 64%);}
-    .c-br{background:#1a73e8;clip-path:polygon(100% 100%, 49% 100%, 100% 70%);}
+    .c-tl{background:#D82D1E;clip-path:polygon(0% 0%, 60.03% 0%, 0% 14.18%);}
+    .c-tr{background:#FEA801;clip-path:polygon(58.44% 0%, 100% 0%, 100% 10.58%);}
+    .c-bl{background:#008845;clip-path:polygon(0% 90.41%, 0% 100%, 44.84% 100%);}
+    .c-br{background:#0056E4;clip-path:polygon(34.63% 100%, 100% 100%, 100% 84.55%);}
     .gcard > *:not(.corner){position:relative;z-index:1;}
     .g-kicker{font-size:clamp(11px,1.5vw,12.5px);font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#5f6368;margin:0 0 4px;}
     .glogo{font-family:"Inter",Arial,sans-serif;font-weight:700;font-size:clamp(30px,6.2vw,42px);letter-spacing:-1.5px;line-height:1.05;margin:0 0 8px;}
