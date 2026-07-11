@@ -368,6 +368,15 @@ export default {
             return html(reviewSplashPage(env));
           }
         }
+        // The review splash closes ALL online booking — including Linda's
+        // physiotherapy page — so visitors are asked to leave a review instead
+        // of booking anything. (The doctor-unavailable splash is Dr Kevin's own
+        // status and deliberately does NOT touch Linda's separate practice.)
+        if (path === '/physio') {
+          if (await getConfigValue(env.DB, 'REVIEW_SPLASH') === '1') {
+            return html(reviewSplashPage(env));
+          }
+        }
         if (path === '/' || path === '/book') return html(indexPage(env));
         if (path.startsWith('/from/')) {
           const loc = path.slice(6).replace(/[^a-zA-Z0-9_-]/g, '');

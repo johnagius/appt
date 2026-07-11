@@ -12,7 +12,7 @@ import {
   sanitizePhone, toDateKey, todayKeyLocal, todayLocal,
 } from '../services/utils';
 import {
-  bumpVersion, getActiveAppointmentsByDate, getOrCreateClient, getTakenSlots,
+  bumpVersion, getActiveAppointmentsByDate, getConfigValue, getOrCreateClient, getTakenSlots,
   insertAppointment, isSlotTaken, personAlreadyBookedSameSlot,
 } from '../db/queries';
 import { generateId } from '../services/crypto';
@@ -25,11 +25,19 @@ import {
 
 // ─── Init ──────────────────────────────────────────────────
 
+// When the Google-review splash is on, every online booking channel is closed
+// — including Linda's physiotherapy page — so visitors are asked to leave a
+// review instead. Server-side guard so a cached page or a direct API call can't
+// slip a booking through after the toggle is flipped.
+async function reviewSplashOn(env: Env): Promise<boolean> {
+  return (await getConfigValue(env.DB, 'REVIEW_SPLASH')) === '1';
+}
+
 export async function apiPhysioInit(env: Env): Promise<Response> {
   const tz = env.TIMEZONE;
   const cfg = await loadLindaConfig(env.DB);
 
-  if (!cfg.enabled) {
+  if (await reviewSplashOn(env) || !cfg.enabled) {
     return json({
       ok: true,
       config: {
@@ -115,6 +123,14 @@ async function buildLindaAvailability(dateKey: string, env: Env, cfg: LindaConfi
 export async function apiPhysioBook(req: Request, env: Env): Promise<Response> {
   const payload: BookingPayload = await req.json();
   const tz = env.TIMEZONE;
+
+  if (await reviewSplashOn(env)) {
+    return json({
+      ok: false,
+      reason: 'Online booking is currently closed. Please try again later.',
+      bookingClosed: true,
+    }, 503);
+  }
 
   const cfg = await loadLindaConfig(env.DB);
   if (!cfg.enabled) return json({ ok: false, reason: 'Physiotherapy bookings are not currently open.' }, 400);

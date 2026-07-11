@@ -29,7 +29,7 @@ function serializeWindowHours(raw: any): string {
   if (!ranges.length || !days.length) return '';
   return JSON.stringify({ days, ranges });
 }
-import { getTakenSlots, bumpVersion, getAppointmentById, isSlotTaken, updateAppointmentStatus, insertAppointment, getOrCreateClient } from '../db/queries';
+import { getTakenSlots, bumpVersion, getAppointmentById, isSlotTaken, updateAppointmentStatus, insertAppointment, getOrCreateClient, getConfigValue } from '../db/queries';
 import { generateId } from '../services/crypto';
 import { createCalendarEvent, deleteCalendarEvent } from '../services/calendar';
 import { sendAppointmentPushedEmail, sendLindaConfirmationEmail, sendDoctorBookingEmail, sendClientCancelledEmail, sendCustomNotificationEmail } from '../services/email';
@@ -779,8 +779,25 @@ export async function apiLindaReschedule(req: Request, env: Env): Promise<Respon
 // or "clone" of an existing appointment's patient into a future slot).
 // Body: { dateKey, startTime, fullName, email, phone, comments? }
 
+// While the Google-review splash is on, ALL booking is closed — nobody can
+// create a new appointment, including staff on the private /linda page. Returns
+// a blocking response (with a note on how to re-open) when the toggle is set,
+// or null when booking is allowed.
+async function lindaBookingBlockedBySplash(env: Env): Promise<Response | null> {
+  if (await getConfigValue(env.DB, 'REVIEW_SPLASH') === '1') {
+    return json({
+      ok: false,
+      reason: 'Bookings are closed while the “Ask for a Google review” splash is on. Turn the splash off in the admin panel to add bookings again.',
+      bookingClosed: true,
+    }, 503);
+  }
+  return null;
+}
+
 export async function apiLindaNewBooking(req: Request, env: Env): Promise<Response> {
   if (!await isLindaAuthed(req, env)) return json({ ok: false, reason: 'Access denied.' }, 403);
+  const blocked = await lindaBookingBlockedBySplash(env);
+  if (blocked) return blocked;
   const body: any = await req.json();
   const dateKey = String(body.dateKey || '').trim();
   const startTime = String(body.startTime || '').trim();
@@ -925,6 +942,8 @@ function bulkNormTime(s: string): string | null {
 
 export async function apiLindaBulkBooking(req: Request, env: Env): Promise<Response> {
   if (!await isLindaAuthed(req, env)) return json({ ok: false, reason: 'Access denied.' }, 403);
+  const blocked = await lindaBookingBlockedBySplash(env);
+  if (blocked) return blocked;
   const body: any = await req.json();
   const rows: any[] = Array.isArray(body.rows) ? body.rows : [];
   if (!rows.length) return json({ ok: false, reason: 'No rows provided.' }, 400);
