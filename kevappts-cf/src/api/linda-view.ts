@@ -1407,7 +1407,6 @@ function lindaMainPage(env: Env, splashOn = false): string {
   const bulkBtnHtml = splashOn ? '' : `<button onclick="openBulkSheet()" title="Bulk add bookings" style="flex:0 0 auto;background:#ecfdf5;border:1px solid #6ee7b7;color:var(--accent-ink);border-radius:12px;font-weight:700;font-size:13px;padding:0 14px;min-height:46px;cursor:pointer;">⇊ Bulk</button>`;
   const newBtnInlineHtml = splashOn ? '' : `<button class="nb-inline" onclick="openBookSheet()" title="New booking"><span class="p">＋</span>New Booking</button>`;
   const newBtnBottomHtml = splashOn ? '' : `<div class="nb-bottom-wrap"><button class="nb-bottom" onclick="openBookSheet()"><span class="p">＋</span>New Booking</button></div>`;
-  const splashBannerHtml = splashOn ? `<div class="splash-banner">⭐ The “Ask for a Google review” splash is <b>ON</b> — online booking is closed, so new bookings are disabled. Turn the splash off in the admin panel to add bookings again.</div>` : '';
   return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <meta name="theme-color" content="#10b981">
@@ -1454,7 +1453,6 @@ function lindaMainPage(env: Env, splashOn = false): string {
   }
   html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:var(--font);line-height:1.45;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;letter-spacing:-.01em;}
   .topbar{position:sticky;top:0;background:rgba(255,255,255,.85);backdrop-filter:saturate(180%) blur(12px);-webkit-backdrop-filter:saturate(180%) blur(12px);border-bottom:1px solid var(--line);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;z-index:5;}
-  .splash-banner{margin:12px 16px 0;padding:12px 16px;background:#fef3c7;border:1px solid #fcd34d;color:#92400e;border-radius:12px;font-size:13px;font-weight:600;line-height:1.45;}
   .topbar h1{margin:0;font-size:18px;font-weight:800;letter-spacing:-.02em;display:flex;align-items:center;gap:9px;}
   .topbar h1::before{content:"";width:26px;height:26px;border-radius:8px;background:linear-gradient(135deg,#34d399,#059669);box-shadow:0 2px 6px rgba(16,185,129,.4);flex:0 0 auto;}
   .liveDot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#cbd5e1;vertical-align:middle;transition:background-color .3s ease;}
@@ -1926,7 +1924,6 @@ function lindaMainPage(env: Env, splashOn = false): string {
   <h1>${name}'s Diary <span class="liveDot" id="liveDot" title="Live status"></span></h1>
   <button class="logout" onclick="logout()">Log out</button>
 </div>
-${splashBannerHtml}
 <div class="tabBar">
   <button class="tabBtn active" id="tabDayBtn" onclick="setTab('day')">📅 Day</button>
   <button class="tabBtn" id="tabWeekBtn" onclick="setTab('week')">📆 Week</button>
