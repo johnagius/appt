@@ -545,7 +545,7 @@ export function adminPage(sig: string, env: Env): string {
       <div class="ds-head">
         <div>
           <h3 style="margin:0 0 2px;">Splash Pages</h3>
-          <p class="ds-sub">Replace the public booking page with a splash. The two modes are mutually exclusive.</p>
+          <p class="ds-sub">Replace the public booking page with a splash. The two modes are mutually exclusive. Changing a toggle requires the password. &#x1F512;</p>
         </div>
         <span class="ds-status" id="dsStatusPill">&hellip;</span>
       </div>
@@ -1660,6 +1660,21 @@ export function adminPage(sig: string, env: Env): string {
   </div>
 </div>
 
+<!-- Password modal (splash toggles) -->
+<div class="overlay" id="pwOverlay" role="dialog" aria-modal="true">
+  <div class="loadingBox" style="flex-direction:column;align-items:stretch;gap:12px;max-width:340px;">
+    <h3 id="pwTitle" style="margin:0;font-size:15px;font-weight:800;">Password required</h3>
+    <p id="pwBody" style="margin:0;font-size:13px;color:var(--muted);line-height:1.45;"></p>
+    <input type="password" id="pwInput" inputmode="numeric" autocomplete="off" placeholder="Enter password"
+      style="width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:10px;font-size:16px;box-sizing:border-box;">
+    <div id="pwErr" style="display:none;color:var(--bad);font-size:12.5px;"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:2px;">
+      <button class="btn btn-ghost" id="pwCancel">Cancel</button>
+      <button class="btn btn-dark" id="pwOk">Unlock</button>
+    </div>
+  </div>
+</div>
+
 <div class="overlay" id="loadingOverlay">
   <div class="loadingBox">
     <div class="spinner"></div>
@@ -2007,6 +2022,31 @@ document.getElementById('confirmOk').onclick = function(){
   if (_confirmCb) { _confirmCb(true); _confirmCb = null; }
 };
 
+// Password prompt (resolves to the entered string, or null if cancelled).
+var _pwCb = null;
+function styledPassword(title, body) {
+  return new Promise(function(resolve){
+    document.getElementById('pwTitle').textContent = title || 'Password required';
+    document.getElementById('pwBody').textContent = body || '';
+    var inp = document.getElementById('pwInput'); inp.value = '';
+    document.getElementById('pwErr').style.display = 'none';
+    var overlay = document.getElementById('pwOverlay');
+    overlay.style.display = 'flex';
+    requestAnimationFrame(function(){ requestAnimationFrame(function(){ overlay.classList.add('show'); }); });
+    setTimeout(function(){ inp.focus(); }, 60);
+    _pwCb = resolve;
+  });
+}
+function _pwFinish(val){
+  var overlay = document.getElementById('pwOverlay');
+  overlay.classList.remove('show');
+  setTimeout(function(){ overlay.style.display = 'none'; }, 200);
+  if (_pwCb) { var cb = _pwCb; _pwCb = null; cb(val); }
+}
+document.getElementById('pwCancel').onclick = function(){ _pwFinish(null); };
+document.getElementById('pwOk').onclick = function(){ _pwFinish(document.getElementById('pwInput').value); };
+document.getElementById('pwInput').addEventListener('keydown', function(e){ if (e.key === 'Enter') { e.preventDefault(); _pwFinish(this.value); } });
+
 function switchTab(name) {
   document.querySelectorAll('.tab-content').forEach(function(el) { el.style.display = 'none'; });
   document.querySelectorAll('.tab').forEach(function(el) { el.classList.remove('active'); });
@@ -2031,8 +2071,10 @@ function switchTab(name) {
 }
 
 // ========== Splash Pages (mutually-exclusive booking-page splashes) ==========
+var _splashMode = ''; // last confirmed mode, used to revert an unauthorised flip
 function renderSplash(mode) {
   // mode: 'doctor' | 'review' | '' (normal)
+  _splashMode = mode;
   var card = document.getElementById('dsCard');
   var pill = document.getElementById('dsStatusPill');
   var note = document.getElementById('dsNote');
@@ -2077,29 +2119,36 @@ function loadSplashSettings() {
 function setSplashMode(which, on) {
   // Build the payload. Toggles are mutually exclusive: turning one on forces
   // the other off (the server enforces this too).
-  var payload, newMode, confirmTitle, confirmBody, confirmBtn, confirmClass, okMsg;
+  var payload, newMode, what, okMsg;
   if (which === 'doctor') {
-    payload = on ? { doctorUnavailable: true } : { doctorUnavailable: false };
+    payload = { doctorUnavailable: on };
     newMode = on ? 'doctor' : '';
-    confirmTitle = 'Show the "doctor unavailable" splash?';
-    confirmBody = 'The booking page will be replaced by a splash telling visitors the doctor is unavailable and directing them to Spinola Clinic. Online booking will be closed. You can turn this off any time.';
-    confirmBtn = 'Show splash'; confirmClass = 'btn-danger';
+    what = on ? 'show the \\u201Cdoctor unavailable\\u201D splash and close online booking'
+              : 'restore the normal booking page';
     okMsg = on ? 'Doctor-unavailable splash is now showing.' : 'Booking page is live again.';
   } else {
-    payload = on ? { reviewSplash: true } : { reviewSplash: false };
+    payload = { reviewSplash: on };
     newMode = on ? 'review' : '';
-    confirmTitle = 'Show the Google-review splash?';
-    confirmBody = 'The booking page will be replaced by a splash inviting visitors to leave a Google review. Online booking will be closed. You can turn this off any time.';
-    confirmBtn = 'Show splash'; confirmClass = 'btn-dark';
+    what = on ? 'show the Google-review splash and close online booking'
+              : 'restore the normal booking page';
     okMsg = on ? 'Google-review splash is now showing.' : 'Booking page is live again.';
   }
 
-  var apply = function() {
+  // Revert the optimistic flip immediately — nothing changes without the PIN.
+  renderSplash(_splashMode);
+
+  styledPassword('Password required', 'Enter the password to ' + what + '.').then(function(pass) {
+    if (pass === null) return; // cancelled — already reverted
+    payload.splashPass = pass;
     showLoading('Updating public page...', 'Applying the change.');
     google.script.run
       .withSuccessHandler(function(res) {
         hideLoading();
-        if (!res || !res.ok) { showMsg('dsMsg', 'bad', res && res.reason ? res.reason : 'Failed to save.'); loadSplashSettings(); return; }
+        if (!res || !res.ok) {
+          showMsg('dsMsg', 'bad', res && res.reason ? res.reason : 'Failed to save.');
+          renderSplash(_splashMode); // keep toggles on the real state
+          return;
+        }
         _settingsLoaded = false; // keep the Settings tab in sync
         renderSplash(newMode);
         showMsg('dsMsg', 'good', okMsg);
@@ -2107,21 +2156,10 @@ function setSplashMode(which, on) {
       .withFailureHandler(function(err) {
         hideLoading();
         showMsg('dsMsg', 'bad', 'Error: ' + (err && err.message ? err.message : String(err)));
-        loadSplashSettings();
+        renderSplash(_splashMode);
       })
       .apiAdminSaveSettings(SIG, payload);
-  };
-
-  if (on) {
-    // Revert the optimistic flip until confirmed.
-    document.getElementById(which === 'doctor' ? 'dsToggleDoctor' : 'dsToggleReview').checked = false;
-    styledConfirm(confirmTitle, confirmBody, confirmBtn, confirmClass, 'Cancel').then(function(ok) {
-      if (!ok) { loadSplashSettings(); return; }
-      apply();
-    });
-  } else {
-    apply();
-  }
+  });
 }
 
 function loadReserveTab() {

@@ -1240,6 +1240,17 @@ export async function apiAdminSaveSettings(req: Request, env: Env): Promise<Resp
 
   const payload: any = await req.json();
 
+  // Splash toggles are protected by a short PIN so the doctor can't just flip
+  // the booking page back on. Not sensitive — overridable via env.SPLASH_PASSWORD,
+  // defaults to 6036. Checked server-side so the PIN never ships in the page.
+  const changingSplash = payload.doctorUnavailable !== undefined || payload.reviewSplash !== undefined;
+  if (changingSplash) {
+    const expected = String((env as any).SPLASH_PASSWORD || '6036');
+    if (String(payload.splashPass || '') !== expected) {
+      return json({ ok: false, reason: 'Wrong password.' }, 403);
+    }
+  }
+
   if (payload.apptDurationMin !== undefined) await setConfigValue(env.DB, 'APPT_DURATION_MIN', String(payload.apptDurationMin));
   if (payload.advanceDays !== undefined) await setConfigValue(env.DB, 'ADVANCE_DAYS', String(payload.advanceDays));
   if (payload.maxActiveApptsPerPerson !== undefined) await setConfigValue(env.DB, 'MAX_ACTIVE_APPTS_PER_PERSON', String(payload.maxActiveApptsPerPerson));
