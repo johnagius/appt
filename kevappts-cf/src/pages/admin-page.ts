@@ -4,7 +4,12 @@ import type { Env } from '../types';
  * Admin dashboard — full-featured management panel.
  * Ported from GAS Admin.html to Cloudflare Workers.
  */
-export function adminPage(sig: string, env: Env): string {
+export function adminPage(sig: string, env: Env, reviewSplashOn = false): string {
+  // When the Google-review splash is on, online booking is closed for everyone,
+  // so the admin's Linda booking controls are removed too (server-side guards in
+  // apiLindaNewBooking / apiLindaBulkBooking back this up).
+  const lcNewBtnHtml = reviewSplashOn ? '' : `<button class="btn" style="background:#10b981;color:#fff;font-weight:800;" onclick="lcOpenNew()">＋ New booking</button>`;
+  const lcBulkBtnHtml = reviewSplashOn ? '' : `<button class="btn btn-sm" style="background:#ecfdf5;color:#065f46;border:1px solid #10b981;" onclick="lcBulkOpen()">⇊ Bulk add</button>`;
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1211,8 +1216,8 @@ export function adminPage(sig: string, env: Env): string {
   <div class="card" style="padding:0;margin-bottom:14px;overflow:hidden;border:1px solid #d1fae5;">
     <div style="display:flex;align-items:center;gap:10px;padding:14px 16px;background:#ecfdf5;border-bottom:1px solid #d1fae5;flex-wrap:wrap;">
       <b style="font-size:15px;color:#065f46;flex:1 1 auto;">📋 Appointments</b>
-      <button class="btn btn-sm" style="background:#ecfdf5;color:#065f46;border:1px solid #10b981;" onclick="lcBulkOpen()">⇊ Bulk add</button>
-      <button class="btn" style="background:#10b981;color:#fff;font-weight:800;" onclick="lcOpenNew()">＋ New booking</button>
+      ${lcBulkBtnHtml}
+      ${lcNewBtnHtml}
     </div>
     <div style="display:flex;align-items:center;gap:6px;padding:12px 16px;border-bottom:1px solid #eef2f0;flex-wrap:wrap;">
       <button class="btn btn-ghost btn-sm" onclick="lcNavDay(-1)">‹</button>
@@ -3098,6 +3103,7 @@ function lcOpenModal(){ document.getElementById('lcModalBg').style.display = 'fl
 function lcCloseModal(ev){ if (ev && ev.target && ev.target.id !== 'lcModalBg') return; document.getElementById('lcModalBg').style.display = 'none'; }
 
 function lcOpenNew(){
+  if(${reviewSplashOn}){ alert('Online booking is closed while the “Ask for a Google review” splash is on. Turn the splash off first to add bookings.'); return; }
   lcState.bookMode = 'new'; lcState.reschedId = ''; lcState.slotIdx = -1;
   document.getElementById('lcModalTitle').textContent = 'New booking';
   document.getElementById('lcPatientFields').style.display = '';
@@ -3488,7 +3494,7 @@ function lcBulkParse(){
   btn.disabled = valid === 0;
   btn.textContent = valid ? ('Book ' + valid + ' booking' + (valid===1?'':'s')) : 'Nothing valid to book';
 }
-function lcBulkOpen(){ document.getElementById('lcBulkText').value=''; document.getElementById('lcBulkPreview').innerHTML=''; document.getElementById('lcBulkMsg').textContent=''; var b=document.getElementById('lcBulkBtn'); b.disabled=true; b.textContent='Book all'; document.getElementById('lcBulkBg').style.display='flex'; }
+function lcBulkOpen(){ if(${reviewSplashOn}){ alert('Online booking is closed while the “Ask for a Google review” splash is on. Turn the splash off first to add bookings.'); return; } document.getElementById('lcBulkText').value=''; document.getElementById('lcBulkPreview').innerHTML=''; document.getElementById('lcBulkMsg').textContent=''; var b=document.getElementById('lcBulkBtn'); b.disabled=true; b.textContent='Book all'; document.getElementById('lcBulkBg').style.display='flex'; }
 function lcBulkClose(ev){ if (ev && ev.target && ev.target.id !== 'lcBulkBg') return; document.getElementById('lcBulkBg').style.display='none'; }
 async function lcBulkSubmit(){
   var valid = lcBulkRows.filter(function(r){ return r._ok; });

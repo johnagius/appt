@@ -434,7 +434,8 @@ export default {
               'Cache-Control': 'no-cache, no-store, must-revalidate',
               'Set-Cookie': `admin_sig=${sig}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=31536000`,
             };
-            const page = path === '/admin' ? adminPage(sig, env) : path === '/doctor' ? doctorPage(sig) : testPage(sig);
+            const reviewSplashOn = await getConfigValue(env.DB, 'REVIEW_SPLASH') === '1';
+            const page = path === '/admin' ? adminPage(sig, env, reviewSplashOn) : path === '/doctor' ? doctorPage(sig) : testPage(sig);
             return new Response(page, { headers });
           }
           // No valid auth — show login form
