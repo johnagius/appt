@@ -234,6 +234,8 @@ INSERT OR IGNORE INTO config (key, value) VALUES ('WORKING_HOURS', '{"MON":[{"st
 INSERT OR IGNORE INTO config (key, value) VALUES ('SPINOLA_WORKING_HOURS', '{"MON":[{"start":"09:00","end":"14:00"},{"start":"16:00","end":"19:00"}],"TUE":[{"start":"09:00","end":"14:00"},{"start":"16:00","end":"19:00"}],"WED":[{"start":"09:00","end":"14:00"},{"start":"16:00","end":"19:00"}],"THU":[{"start":"09:00","end":"14:00"},{"start":"16:00","end":"19:00"}],"FRI":[{"start":"09:00","end":"14:00"},{"start":"16:00","end":"19:00"}],"SAT":[{"start":"09:30","end":"13:00"},{"start":"16:00","end":"19:00"}],"SUN":[{"start":"10:00","end":"12:00"}]}');
 INSERT OR IGNORE INTO config (key, value) VALUES ('POTTERS_LOCATION', 'Potter''s Pharmacy Clinic');
 INSERT OR IGNORE INTO config (key, value) VALUES ('SPINOLA_LOCATION', 'Spinola Clinic');
+-- Doctor-unavailable splash toggle ('1' = show splash instead of booking page)
+INSERT OR IGNORE INTO config (key, value) VALUES ('DOCTOR_UNAVAILABLE', '0');
 
 -- Linda (physiotherapy) admin-editable config
 INSERT OR IGNORE INTO config (key, value) VALUES ('LINDA_ENABLED', '1');

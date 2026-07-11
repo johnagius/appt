@@ -283,6 +283,30 @@ export function adminPage(sig: string, env: Env): string {
     .add-block-btn{margin-left:50px;margin-top:4px;border:none;background:none;color:var(--blue);cursor:pointer;font-size:12px;font-weight:600;padding:4px 8px;border-radius:6px;}
     .add-block-btn:hover{background:rgba(37,99,235,0.06);}
 
+    /* Doctor Status tab */
+    .ds-card{transition:border-color 0.2s ease,box-shadow 0.2s ease;}
+    .ds-card.on{border-color:rgba(239,68,68,0.45);box-shadow:0 0 0 3px rgba(239,68,68,0.08),var(--shadow);}
+    .ds-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:4px;}
+    .ds-sub{margin:0;color:var(--muted);font-size:13px;}
+    .ds-status{flex:0 0 auto;font-size:12px;font-weight:700;padding:6px 12px;border-radius:999px;letter-spacing:.02em;
+      background:rgba(16,185,129,0.1);color:#065f46;border:1px solid rgba(16,185,129,0.3);white-space:nowrap;}
+    .ds-status.off{background:rgba(239,68,68,0.1);color:#991b1b;border-color:rgba(239,68,68,0.3);}
+    .ds-toggle-row{display:flex;align-items:center;gap:18px;justify-content:space-between;
+      margin:16px 0 6px;padding:16px;border:1px solid var(--line);border-radius:14px;background:#fafbfc;}
+    .ds-toggle-copy{min-width:0;}
+    .ds-toggle-title{font-weight:700;font-size:14.5px;color:var(--text);margin-bottom:3px;}
+    .ds-toggle-desc{font-size:12.5px;color:var(--muted);line-height:1.5;}
+    .ds-switch{position:relative;flex:0 0 auto;width:58px;height:32px;cursor:pointer;}
+    .ds-switch input{display:none;}
+    .ds-slider{position:absolute;inset:0;background:#cbd5e1;border-radius:999px;transition:background 0.2s ease;}
+    .ds-slider::before{content:'';position:absolute;width:24px;height:24px;left:4px;top:4px;background:#fff;border-radius:50%;
+      box-shadow:0 1px 3px rgba(0,0,0,0.25);transition:transform 0.2s ease;}
+    .ds-switch input:checked + .ds-slider{background:var(--bad);}
+    .ds-switch input:checked + .ds-slider::before{transform:translateX(26px);}
+    .ds-preview-note{font-size:13px;line-height:1.5;color:var(--muted);margin:12px 2px 0;}
+    .ds-preview-note b{color:var(--text);}
+    .ds-actions{margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;}
+
     /* Statistics tab - period toggle */
     .stats-toggle{display:inline-flex;gap:0;border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-right:12px;}
     .stats-toggle-btn{border:none;background:none;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;color:var(--muted);transition:all 0.15s ease;}
@@ -414,6 +438,7 @@ export function adminPage(sig: string, env: Env): string {
     <div class="tab" data-tab="bloodtests" onclick="switchTab('bloodtests')" style="background:#fef2f2;color:#991b1b;">Blood Tests</div>
     <div class="tab" data-tab="dda" onclick="switchTab('dda')" style="background:#f5f3ff;color:#5b21b6;">&#x1F48A; DDAs</div>
     <div class="tab" data-tab="reschedule" onclick="switchTab('reschedule')" style="background:#eef2ff;color:#3730a3;">&#x1F504; Reschedule</div>
+    <div class="tab" data-tab="availability-toggle" onclick="switchTab('availability-toggle')" style="background:#fef2f2;color:#b91c1c;">&#x1F6AB; Doctor Status</div>
     <div class="tab" data-tab="settings" onclick="switchTab('settings')">Settings</div>
   </div>
 
@@ -512,6 +537,37 @@ export function adminPage(sig: string, env: Env): string {
   </div>
 
   <!-- SETTINGS TAB -->
+  <!-- DOCTOR STATUS TAB -->
+  <div class="tab-content" id="tab-availability-toggle" style="display:none;">
+    <div class="card ds-card" id="dsCard">
+      <div class="ds-head">
+        <div>
+          <h3 style="margin:0 0 2px;">Doctor Availability</h3>
+          <p class="ds-sub">Control whether patients can reach the doctor booking page.</p>
+        </div>
+        <span class="ds-status" id="dsStatusPill">&hellip;</span>
+      </div>
+
+      <div class="ds-toggle-row">
+        <div class="ds-toggle-copy">
+          <div class="ds-toggle-title">Show &ldquo;doctor unavailable&rdquo; splash page</div>
+          <div class="ds-toggle-desc">When ON, the public booking page is replaced by a splash telling patients the doctor is unavailable at Potter&rsquo;s Pharmacy and directing them to Spinola Clinic &mdash; with a live map, simple directions, and a QR code. Turn OFF to restore normal booking.</div>
+        </div>
+        <label class="ds-switch">
+          <input type="checkbox" id="dsToggle" onchange="setDoctorUnavailable(this.checked)">
+          <span class="ds-slider"></span>
+        </label>
+      </div>
+
+      <div class="ds-preview-note" id="dsNote"></div>
+      <div class="msg" id="dsMsg"></div>
+
+      <div class="ds-actions">
+        <a class="btn" href="/" target="_blank" rel="noopener" style="background:#fff;border:1px solid var(--line);color:#374151;">&#x1F441;&#xFE0F; Preview booking page</a>
+      </div>
+    </div>
+  </div>
+
   <div class="tab-content" id="tab-settings" style="display:none;">
     <div class="card">
       <h3>General Settings</h3>
@@ -1958,6 +2014,70 @@ function switchTab(name) {
   if (name === 'reschedule') loadRescheduleTab();
   if (name === 'activity') loadActivity();
   if (name === 'reserve') loadReserveTab();
+  if (name === 'availability-toggle') loadDoctorStatus();
+}
+
+// ========== Doctor Status (unavailable splash toggle) ==========
+function renderDoctorStatus(unavailable) {
+  var card = document.getElementById('dsCard');
+  var pill = document.getElementById('dsStatusPill');
+  var note = document.getElementById('dsNote');
+  document.getElementById('dsToggle').checked = !!unavailable;
+  if (unavailable) {
+    card.classList.add('on');
+    pill.textContent = '\\u25CF Booking paused';
+    pill.classList.add('off');
+    note.innerHTML = '\\u26A0\\uFE0F <b>The booking page is currently hidden.</b> Patients visiting the site see the &ldquo;doctor unavailable&rdquo; splash directing them to Spinola Clinic.';
+  } else {
+    card.classList.remove('on');
+    pill.textContent = '\\u25CF Booking live';
+    pill.classList.remove('off');
+    note.innerHTML = '\\u2705 <b>The booking page is live.</b> Patients can book appointments as normal.';
+  }
+}
+
+function loadDoctorStatus() {
+  google.script.run
+    .withSuccessHandler(function(res) {
+      if (!res || !res.ok) { showMsg('dsMsg', 'bad', 'Failed to load status.'); return; }
+      renderDoctorStatus(res.settings && res.settings.doctorUnavailable);
+    })
+    .withFailureHandler(function(err) {
+      showMsg('dsMsg', 'bad', 'Error: ' + (err && err.message ? err.message : String(err)));
+    })
+    .apiAdminGetSettings(SIG);
+}
+
+function setDoctorUnavailable(on) {
+  var apply = function() {
+    showLoading(on ? 'Pausing bookings...' : 'Restoring bookings...', 'Updating the public booking page.');
+    google.script.run
+      .withSuccessHandler(function(res) {
+        hideLoading();
+        if (!res || !res.ok) { showMsg('dsMsg', 'bad', res && res.reason ? res.reason : 'Failed to save.'); loadDoctorStatus(); return; }
+        _settingsLoaded = false; // keep the Settings tab in sync
+        renderDoctorStatus(on);
+        showMsg('dsMsg', 'good', on ? 'Booking page is now hidden \\u2014 patients see the Spinola Clinic splash.' : 'Booking page is live again.');
+      })
+      .withFailureHandler(function(err) {
+        hideLoading();
+        showMsg('dsMsg', 'bad', 'Error: ' + (err && err.message ? err.message : String(err)));
+        loadDoctorStatus();
+      })
+      .apiAdminSaveSettings(SIG, { doctorUnavailable: on });
+  };
+
+  if (on) {
+    // Revert the optimistic toggle until the admin confirms.
+    document.getElementById('dsToggle').checked = false;
+    styledConfirm('Hide the booking page?', 'Patients will no longer be able to book. They will see a splash page telling them the doctor is unavailable and directing them to Spinola Clinic. You can turn this off again at any time.', 'Hide booking page', 'btn-danger', 'Cancel').then(function(ok) {
+      if (!ok) { renderDoctorStatus(false); return; }
+      document.getElementById('dsToggle').checked = true;
+      apply();
+    });
+  } else {
+    apply();
+  }
 }
 
 function loadReserveTab() {
