@@ -69,11 +69,15 @@ export function reviewSplashPage(_env: Env): string {
       box-shadow:var(--shadow);overflow:hidden;margin-bottom:12px;}
     .card::before{content:"";position:absolute;top:0;left:0;right:0;height:4px;z-index:2;
       background:linear-gradient(90deg,var(--teal),var(--amber));}
-    /* Portrait / narrow = one centered column that fills the height. */
-    .split{flex:1 1 auto;display:flex;flex-direction:column;justify-content:center;min-height:0;}
+    /* Portrait / narrow = one column; the teal panel grows to fill the height. */
+    .split{flex:1 1 auto;display:flex;flex-direction:column;min-height:0;}
 
-    .left{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;
-      padding:clamp(24px,4.5vw,48px) clamp(22px,5vw,48px) clamp(16px,3vw,26px);}
+    .left{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;
+      padding:clamp(24px,4.5vw,48px) clamp(22px,5vw,48px) clamp(18px,3vw,28px);
+      background:linear-gradient(180deg,#ffffff 0%,#f6fbfa 100%);}
+    .left::before{content:"";position:absolute;inset:0;pointer-events:none;
+      background:radial-gradient(560px 300px at 50% -8%, rgba(245,179,1,.12), transparent 60%);}
+    .left > *{position:relative;z-index:1;}
     .badge{display:inline-flex;align-items:center;gap:7px;background:var(--teal-soft);color:#0b5c55;
       font-weight:600;font-size:12px;letter-spacing:.05em;text-transform:uppercase;padding:6px 13px;border-radius:999px;margin-bottom:14px;}
     .badge .dot{width:7px;height:7px;border-radius:50%;background:var(--amber);box-shadow:0 0 0 3px rgba(245,179,1,.22);}
@@ -91,17 +95,36 @@ export function reviewSplashPage(_env: Env): string {
     .points li .tick svg{width:12px;height:12px;color:var(--teal);}
     .points li b{color:var(--ink);font-weight:600;}
 
-    .right{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;text-align:center;
-      padding:clamp(22px,4vw,36px);background:#fbfdff;border-top:1px solid var(--line);}
-    .qrbox{width:clamp(200px,34vmin,300px);height:clamp(200px,34vmin,300px);background:#fff;border:1px solid var(--line);
-      border-radius:18px;padding:14px;box-shadow:0 14px 30px -16px rgba(15,23,42,.45);}
+    .right{position:relative;overflow:hidden;flex:1 1 auto;display:flex;flex-direction:column;align-items:center;justify-content:center;
+      gap:15px;text-align:center;padding:clamp(26px,4vw,42px);color:#eafaf7;
+      background:linear-gradient(158deg,#12776d 0%,#0c5a53 56%,#0a4e48 100%);border-top:1px solid rgba(255,255,255,.08);}
+    /* warm + cool glows and a faint dot grid give the panel depth */
+    .right::before{content:"";position:absolute;inset:0;pointer-events:none;
+      background:
+        radial-gradient(440px 300px at 82% 8%, rgba(245,179,1,.24), transparent 60%),
+        radial-gradient(460px 340px at 6% 96%, rgba(23,205,184,.30), transparent 62%);}
+    .right::after{content:"";position:absolute;inset:0;pointer-events:none;opacity:.6;
+      background-image:radial-gradient(circle at 1px 1px, rgba(255,255,255,.12) 1px, transparent 0);background-size:22px 22px;
+      -webkit-mask-image:radial-gradient(72% 68% at 50% 44%, #000, transparent);mask-image:radial-gradient(72% 68% at 50% 44%, #000, transparent);}
+    .right > *{position:relative;z-index:1;}
+    .rlabel{display:inline-flex;align-items:center;gap:9px;margin:0;font-size:12px;font-weight:700;letter-spacing:.09em;
+      text-transform:uppercase;color:#ffe4a0;}
+    .rlabel .rstars{letter-spacing:2px;color:#ffd36b;font-size:14px;text-shadow:0 2px 6px rgba(245,179,1,.5);}
+    .qrbox{position:relative;width:clamp(200px,34vmin,290px);height:clamp(200px,34vmin,290px);background:#fff;border:none;
+      border-radius:20px;padding:15px;
+      box-shadow:0 0 0 5px rgba(255,255,255,.95), 0 0 0 8px rgba(245,179,1,.55), 0 26px 52px -18px rgba(0,0,0,.55);}
+    .qrbox::after{content:"";position:absolute;inset:-7px;border-radius:26px;pointer-events:none;
+      box-shadow:0 0 0 2px rgba(245,179,1,.6);opacity:0;animation:qrpulse 2.8s ease-in-out infinite;}
+    @keyframes qrpulse{0%,100%{opacity:0;transform:scale(1);}50%{opacity:.55;transform:scale(1.03);}}
+    @media (prefers-reduced-motion:reduce){ .qrbox::after{animation:none;} }
     .qrbox svg{width:100%;height:100%;display:block;}
-    .scan{font-size:clamp(13px,1.6vw,14.5px);color:var(--muted);margin:0;line-height:1.5;}
-    .scan b{color:var(--ink);font-weight:600;}
-    .cta{display:inline-flex;align-items:center;gap:9px;background:var(--teal);color:#fff;text-decoration:none;
-      font-weight:600;font-size:clamp(14px,1.8vw,16px);padding:13px 24px;border-radius:12px;transition:transform .12s ease,box-shadow .12s ease;
-      box-shadow:0 12px 24px -12px rgba(15,118,110,.8);}
-    .cta:hover{transform:translateY(-1px);box-shadow:0 16px 30px -12px rgba(15,118,110,.85);}
+    .scan{font-size:clamp(13px,1.6vw,14.5px);color:#c9e8e3;margin:0;line-height:1.5;}
+    .scan b{color:#ffffff;font-weight:700;}
+    .cta{display:inline-flex;align-items:center;gap:9px;background:linear-gradient(180deg,#ffce4d,#f5b301);color:#0a3f39;
+      text-decoration:none;font-weight:700;font-size:clamp(14px,1.8vw,16px);padding:13px 26px;border-radius:12px;
+      transition:transform .12s ease,box-shadow .12s ease;
+      box-shadow:0 16px 30px -12px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.55);}
+    .cta:hover{transform:translateY(-1px);box-shadow:0 20px 38px -12px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.55);}
     .cta svg{width:17px;height:17px;}
 
     /* Landscape (wide & short) = two compact columns side by side. */
@@ -113,10 +136,10 @@ export function reviewSplashPage(_env: Env): string {
       .lede{font-size:clamp(14px,1.55vw,16px);}
       .points{align-items:flex-start;}
       .points li{font-size:13px;}
-      .right{border-top:0;border-left:1px solid var(--line);gap:14px;padding:clamp(18px,2.4vw,26px);}
-      .qrbox{width:clamp(150px,20vw,200px);height:clamp(150px,20vw,200px);padding:12px;border-radius:16px;}
+      .right{border-top:0;gap:14px;padding:clamp(22px,3vw,36px);}
+      .qrbox{width:clamp(160px,22vw,210px);height:clamp(160px,22vw,210px);padding:13px;border-radius:18px;}
       .scan{font-size:12.5px;}
-      .cta{font-size:14px;padding:11px 20px;}
+      .cta{font-size:14px;padding:12px 22px;}
     }
 
     .foot{flex:0 0 auto;text-align:center;padding:11px 20px;color:#8a97a4;font-size:12px;line-height:1.5;
@@ -150,10 +173,11 @@ export function reviewSplashPage(_env: Env): string {
         </div>
 
         <div class="right">
+          <p class="rlabel"><span class="rstars">&#9733;&#9733;&#9733;&#9733;&#9733;</span> on Google</p>
           <div class="qrbox">${qrSvg}</div>
           <p class="scan"><b>Scan to review</b><br>Point your phone camera at the code</p>
           <a class="cta" href="${hrefReview}" target="_blank" rel="noopener">
-            <svg viewBox="0 0 24 24" fill="#fff"><path d="M12 2l2.9 6.3 6.9.8-5.1 4.7 1.4 6.8L12 17.8 5.9 20.6l1.4-6.8L2.2 9.1l6.9-.8z"/></svg>
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.9 6.3 6.9.8-5.1 4.7 1.4 6.8L12 17.8 5.9 20.6l1.4-6.8L2.2 9.1l6.9-.8z"/></svg>
             Leave a Google review
           </a>
         </div>
