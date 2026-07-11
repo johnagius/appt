@@ -112,6 +112,26 @@ CREATE TABLE IF NOT EXISTS follow_ups (
   status TEXT NOT NULL DEFAULT 'sent'
 );
 
+-- Incident reports (staff-logged, e.g. doctor no-show). Also created lazily in
+-- code (ensureIncidentsTable) so existing DBs pick it up without a migration.
+CREATE TABLE IF NOT EXISTS incidents (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  created_at TEXT NOT NULL,
+  incident_date TEXT NOT NULL DEFAULT '',
+  incident_time TEXT DEFAULT '',
+  category TEXT NOT NULL DEFAULT 'other',
+  summary TEXT NOT NULL DEFAULT '',
+  details TEXT NOT NULL DEFAULT '',
+  appointments_missed INTEGER NOT NULL DEFAULT 0,
+  action_taken TEXT DEFAULT '',
+  reported_by TEXT NOT NULL DEFAULT '',
+  witnesses TEXT DEFAULT '',
+  reviewed_by TEXT DEFAULT '',
+  reviewed_at TEXT DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'OPEN'
+);
+CREATE INDEX IF NOT EXISTS idx_incidents_date ON incidents(incident_date);
+
 CREATE INDEX IF NOT EXISTS idx_followup_status ON follow_ups(status);
 -- Drop any pre-existing non-unique index so the UNIQUE version below takes effect
 -- in prod. Unique so INSERT OR IGNORE in the cron acts as an atomic claim —

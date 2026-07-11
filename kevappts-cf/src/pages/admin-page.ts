@@ -441,6 +441,7 @@ export function adminPage(sig: string, env: Env): string {
     <div class="tab" data-tab="dda" onclick="switchTab('dda')" style="background:#f5f3ff;color:#5b21b6;">&#x1F48A; DDAs</div>
     <div class="tab" data-tab="reschedule" onclick="switchTab('reschedule')" style="background:#eef2ff;color:#3730a3;">&#x1F504; Reschedule</div>
     <div class="tab" data-tab="splash" onclick="switchTab('splash')" style="background:#fef2f2;color:#b91c1c;">&#x1F5BC;&#xFE0F; Splash Pages</div>
+    <div class="tab" data-tab="incidents" onclick="switchTab('incidents')" style="background:#fff1f2;color:#be123c;">&#x1F6A8; Incidents</div>
     <div class="tab" data-tab="settings" onclick="switchTab('settings')">Settings</div>
   </div>
 
@@ -1535,6 +1536,63 @@ export function adminPage(sig: string, env: Env): string {
   </div>
 </div>
 
+<!-- INCIDENTS TAB -->
+<div class="tab-content" id="tab-incidents" style="display:none;">
+  <!-- Locked state until the incident password is entered -->
+  <div id="incLocked" class="card" style="text-align:center;padding:34px 20px;">
+    <div style="font-size:30px;margin-bottom:6px;">&#x1F512;</div>
+    <h3 style="margin:0 0 4px;font-size:16px;">Incident reports are password&#8209;protected</h3>
+    <p style="margin:0 0 14px;color:var(--muted);font-size:13px;">Enter the incident password to view and log reports.</p>
+    <button class="btn btn-dark" onclick="promptIncidentPass()">Unlock</button>
+    <div class="msg" id="incLockMsg"></div>
+  </div>
+
+  <div id="incMain" style="display:none;">
+    <div class="card" style="padding:18px;margin-bottom:14px;background:#fff1f2;border-left:4px solid #e11d48;">
+      <h3 style="margin:0 0 4px 0;font-size:16px;font-weight:900;color:#be123c;">&#x1F6A8; Incident Reports</h3>
+      <p style="margin:0;color:#9f1239;font-size:13px;line-height:1.5;">Log anything that disrupts the pharmacy &mdash; e.g. the doctor not showing up &mdash; with how many appointments were missed and what happened. Sign it with your name; a second staff member can review it as a witness.</p>
+    </div>
+
+    <div class="card" style="padding:18px;margin-bottom:14px;">
+      <h3 style="margin:0 0 10px 0;font-size:15px;font-weight:800;">Log a new incident</h3>
+      <div class="form-row">
+        <div class="form-group"><label>Date of incident</label><input type="date" id="incDate"></div>
+        <div class="form-group"><label>Time (optional)</label><input type="time" id="incTime"></div>
+        <div class="form-group"><label>Type</label>
+          <select id="incCategory">
+            <option value="doctor_no_show">Doctor no-show</option>
+            <option value="doctor_late">Doctor late / left early</option>
+            <option value="dispute">Patient / staff dispute</option>
+            <option value="safety">Safety / medical</option>
+            <option value="equipment">Equipment / IT</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Appointments missed</label><input type="number" id="incMissed" min="0" value="0"></div>
+      </div>
+      <div class="form-group"><label>Summary (one line)</label><input type="text" id="incSummary" placeholder="e.g. Dr Kevin did not turn up for the morning clinic"></div>
+      <div class="form-group"><label>What happened (details)</label><textarea id="incDetails" rows="4" placeholder="Describe what happened, who was affected, times, patients turned away, etc."></textarea></div>
+      <div class="form-group"><label>Action taken (optional)</label><textarea id="incAction" rows="2" placeholder="e.g. Patients rebooked / redirected to Spinola, splash page turned on"></textarea></div>
+      <div class="form-row">
+        <div class="form-group"><label>Reported by (your name) *</label><input type="text" id="incReportedBy" placeholder="Your full name"></div>
+        <div class="form-group"><label>Witnesses (other staff present)</label><input type="text" id="incWitnesses" placeholder="e.g. Jane Borg, Mark Attard"></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:6px;">
+        <button class="btn btn-dark" onclick="addIncident()">Save incident report</button>
+        <span id="incAddMsg" style="font-size:13px;"></span>
+      </div>
+    </div>
+
+    <div class="card" style="padding:18px;">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+        <h3 style="margin:0;font-size:15px;font-weight:800;flex:1;">Logged incidents</h3>
+        <button class="btn btn-ghost btn-sm" onclick="loadIncidents()">Refresh</button>
+      </div>
+      <div id="incList"><div class="empty">Loading...</div></div>
+    </div>
+  </div>
+</div>
+
 <!-- RESCHEDULE TAB -->
 <div class="tab-content" id="tab-reschedule" style="display:none;">
   <div class="card" style="background:#eef2ff;border-left:4px solid #4f46e5;margin-bottom:14px;">
@@ -2068,6 +2126,160 @@ function switchTab(name) {
   if (name === 'activity') loadActivity();
   if (name === 'reserve') loadReserveTab();
   if (name === 'splash') loadSplashSettings();
+  if (name === 'incidents') openIncidents();
+}
+
+// ========== Incident reports (password-gated) ==========
+var _incidentPass = ''; // remembered for the session once entered correctly
+function _incLock() {
+  _incidentPass = '';
+  var l = document.getElementById('incLocked'); var m = document.getElementById('incMain');
+  if (l) l.style.display = 'block';
+  if (m) m.style.display = 'none';
+}
+function _incUnlock() {
+  var l = document.getElementById('incLocked'); var m = document.getElementById('incMain');
+  if (l) l.style.display = 'none';
+  if (m) m.style.display = 'block';
+  var d = document.getElementById('incDate');
+  if (d && !d.value) d.value = new Date().toISOString().split('T')[0];
+}
+function openIncidents() {
+  if (_incidentPass) { _incUnlock(); loadIncidents(); return; }
+  _incLock();
+  promptIncidentPass();
+}
+function promptIncidentPass() {
+  styledPassword('Incident reports', 'Enter the incident-report password.').then(function(pass) {
+    if (pass === null) return; // cancelled — stays locked
+    _incidentPass = pass;
+    _incUnlock();
+    loadIncidents();
+  });
+}
+
+async function loadIncidents() {
+  var listEl = document.getElementById('incList');
+  if (!_incidentPass) { _incLock(); return; }
+  if (listEl) listEl.innerHTML = '<div class="empty">Loading...</div>';
+  try {
+    var res = await apiCall('incidents?pass=' + encodeURIComponent(_incidentPass));
+    if (res && res.locked) { _incLock(); showMsg('incLockMsg', 'bad', 'Wrong password.'); return; }
+    if (!res || !res.ok) { if (listEl) listEl.innerHTML = '<div class="empty">Failed to load.</div>'; return; }
+    renderIncidents(res.incidents || []);
+  } catch (err) {
+    if (listEl) listEl.innerHTML = '<div class="empty">Failed to load reports.</div>';
+  }
+}
+
+var INC_CATS = {
+  doctor_no_show: 'Doctor no-show', doctor_late: 'Doctor late / left early',
+  dispute: 'Dispute', safety: 'Safety / medical', equipment: 'Equipment / IT', other: 'Other'
+};
+var INC_CAT_COLOR = {
+  doctor_no_show: '#e11d48', doctor_late: '#ea580c', dispute: '#7c3aed',
+  safety: '#dc2626', equipment: '#2563eb', other: '#4b5563'
+};
+
+function renderIncidents(items) {
+  var listEl = document.getElementById('incList');
+  if (!listEl) return;
+  if (!items.length) {
+    listEl.innerHTML = '<div class="empty">No incidents logged yet.</div>';
+    return;
+  }
+  var html = '';
+  for (var i = 0; i < items.length; i++) {
+    var e = items[i];
+    var cat = INC_CATS[e.category] || 'Other';
+    var col = INC_CAT_COLOR[e.category] || '#4b5563';
+    var when = esc(e.incident_date) + (e.incident_time ? ' &middot; ' + esc(e.incident_time) : '');
+    var reviewed = (e.status === 'REVIEWED');
+    var statusBadge = reviewed
+      ? '<span style="background:#dcfce7;color:#166534;font-weight:700;font-size:11px;padding:3px 9px;border-radius:999px;">&#x2713; Reviewed</span>'
+      : '<span style="background:#fef9c3;color:#854d0e;font-weight:700;font-size:11px;padding:3px 9px;border-radius:999px;">Open</span>';
+    html += '<div class="card" style="padding:14px 16px;margin-bottom:10px;border-left:4px solid ' + col + ';">';
+    html += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;">' +
+      '<span style="background:' + col + ';color:#fff;font-weight:700;font-size:11px;padding:3px 9px;border-radius:999px;">' + esc(cat) + '</span>' +
+      '<span style="font-size:12.5px;color:var(--muted);">' + when + '</span>' +
+      (e.appointments_missed > 0 ? '<span style="font-size:12.5px;color:#b91c1c;font-weight:700;">' + esc(e.appointments_missed) + ' appt' + (e.appointments_missed == 1 ? '' : 's') + ' missed</span>' : '') +
+      '<span style="flex:1;"></span>' + statusBadge + '</div>';
+    html += '<div style="font-weight:800;font-size:14.5px;margin-bottom:4px;">' + esc(e.summary) + '</div>';
+    if (e.details) html += '<div style="font-size:13px;color:#374151;line-height:1.5;white-space:pre-wrap;margin-bottom:6px;">' + esc(e.details) + '</div>';
+    if (e.action_taken) html += '<div style="font-size:12.5px;color:#374151;line-height:1.5;margin-bottom:6px;"><b>Action taken:</b> ' + esc(e.action_taken) + '</div>';
+    html += '<div style="font-size:12px;color:var(--muted);border-top:1px solid #f1f5f9;padding-top:8px;margin-top:6px;line-height:1.6;">' +
+      '<b>Reported by:</b> ' + esc(e.reported_by) + ' &middot; ' + esc(String(e.created_at || '').replace('T', ' ').slice(0, 16));
+    if (e.witnesses) html += '<br><b>Witnesses:</b> ' + esc(e.witnesses);
+    if (reviewed) html += '<br><b>Reviewed by:</b> ' + esc(e.reviewed_by) + ' &middot; ' + esc(String(e.reviewed_at || '').replace('T', ' ').slice(0, 16));
+    html += '</div>';
+    // Actions: review sign-off (open only) + delete
+    html += '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px;">';
+    if (!reviewed) {
+      html += '<input type="text" id="incRev-' + esc(e.id) + '" placeholder="Reviewer name" style="flex:1;min-width:140px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px;">' +
+        '<button class="btn btn-sm btn-dark" onclick="reviewIncident(' + esc(e.id) + ')">Sign off review</button>';
+    }
+    html += '<button class="btn btn-sm" style="background:#ef4444;color:#fff;margin-left:auto;" onclick="deleteIncident(' + esc(e.id) + ')">Delete</button>';
+    html += '</div></div>';
+  }
+  listEl.innerHTML = html;
+}
+
+async function addIncident() {
+  var msg = document.getElementById('incAddMsg');
+  var summary = document.getElementById('incSummary').value.trim();
+  var reportedBy = document.getElementById('incReportedBy').value.trim();
+  if (!summary) { msg.style.color = '#b91c1c'; msg.textContent = 'Add a short summary first.'; return; }
+  if (!reportedBy) { msg.style.color = '#b91c1c'; msg.textContent = 'Enter your name (reported by).'; return; }
+  var body = {
+    pass: _incidentPass,
+    incidentDate: document.getElementById('incDate').value,
+    incidentTime: document.getElementById('incTime').value,
+    category: document.getElementById('incCategory').value,
+    appointmentsMissed: document.getElementById('incMissed').value,
+    summary: summary,
+    details: document.getElementById('incDetails').value.trim(),
+    actionTaken: document.getElementById('incAction').value.trim(),
+    reportedBy: reportedBy,
+    witnesses: document.getElementById('incWitnesses').value.trim()
+  };
+  msg.style.color = '#6b7280'; msg.textContent = 'Saving...';
+  try {
+    var res = await apiCall('incidents', { body: body });
+    if (res && res.locked) { _incLock(); return; }
+    if (res && res.ok) {
+      msg.style.color = '#059669'; msg.textContent = 'Incident report saved.';
+      document.getElementById('incSummary').value = '';
+      document.getElementById('incDetails').value = '';
+      document.getElementById('incAction').value = '';
+      document.getElementById('incMissed').value = '0';
+      document.getElementById('incWitnesses').value = '';
+      renderIncidents(res.incidents || []);
+    } else {
+      msg.style.color = '#b91c1c'; msg.textContent = (res && res.reason) ? res.reason : 'Failed to save.';
+    }
+  } catch (err) { msg.style.color = '#b91c1c'; msg.textContent = 'Failed to save.'; }
+}
+
+async function reviewIncident(id) {
+  var inp = document.getElementById('incRev-' + id);
+  var reviewer = inp ? inp.value.trim() : '';
+  if (!reviewer) { if (inp) inp.focus(); return; }
+  try {
+    var res = await apiCall('incident-review', { body: { pass: _incidentPass, id: id, reviewer: reviewer } });
+    if (res && res.locked) { _incLock(); return; }
+    if (res && res.ok) { renderIncidents(res.incidents || []); }
+    else { alert((res && res.reason) ? res.reason : 'Failed to sign off.'); }
+  } catch (err) { alert('Failed to sign off.'); }
+}
+
+async function deleteIncident(id) {
+  if (!confirm('Delete this incident report? This cannot be undone.')) return;
+  try {
+    var res = await apiCall('incidents/' + encodeURIComponent(id), { method: 'DELETE', body: { pass: _incidentPass } });
+    if (res && res.locked) { _incLock(); return; }
+    if (res && res.ok) { renderIncidents(res.incidents || []); }
+    else { alert((res && res.reason) ? res.reason : 'Failed to delete.'); }
+  } catch (err) { alert('Failed to delete.'); }
 }
 
 // ========== Splash Pages (mutually-exclusive booking-page splashes) ==========

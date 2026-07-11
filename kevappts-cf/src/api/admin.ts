@@ -20,6 +20,7 @@ import {
   getRecentAppointmentActivity, getRecentTelemedicineActivity,
   rescheduleAppointmentFull,
   insertDdaEntry, getDdaEntries, deleteDdaEntry, type DdaEntry,
+  insertIncident, getIncidents, reviewIncident, deleteIncident,
 } from '../db/queries';
 import { verifyAdminSig, generateId } from '../services/crypto';
 import {
@@ -2608,4 +2609,83 @@ export async function apiAdminDeleteDda(req: Request, env: Env): Promise<Respons
   // Tell every other connected admin/tablet to refresh the register instantly.
   await broadcastEvent(env, { type: 'dda_updated' });
   return json({ ok: true });
+}
+
+// ─── Incident reports ──────────────────────────────────────
+// The whole tab is behind a password so only staff who know it can view or
+// write reports (they document things like doctor no-shows). Validated
+// server-side so the data never loads without it. Default '01032023',
+// overridable via env.INCIDENT_PASSWORD.
+function incidentPassOk(provided: string, env: Env): boolean {
+  const expected = String((env as any).INCIDENT_PASSWORD || '01032023');
+  return String(provided || '') === expected;
+}
+
+export async function apiAdminListIncidents(req: Request, env: Env): Promise<Response> {
+  const denied = await requireAdmin(req, env);
+  if (denied) return denied;
+  const pass = new URL(req.url).searchParams.get('pass') || '';
+  if (!incidentPassOk(pass, env)) return json({ ok: false, reason: 'Wrong password.', locked: true }, 403);
+  const incidents = await getIncidents(env.DB);
+  return json({ ok: true, incidents });
+}
+
+export async function apiAdminAddIncident(req: Request, env: Env): Promise<Response> {
+  const denied = await requireAdmin(req, env);
+  if (denied) return denied;
+
+  const body: any = await req.json().catch(() => ({}));
+  if (!incidentPassOk(body.pass, env)) return json({ ok: false, reason: 'Wrong password.', locked: true }, 403);
+  const summary = String(body.summary || '').trim();
+  const reportedBy = String(body.reportedBy || '').trim();
+  const details = String(body.details || '').trim();
+  if (!summary) return json({ ok: false, reason: 'A short summary is required.' }, 400);
+  if (!reportedBy) return json({ ok: false, reason: 'Your name (reported by) is required.' }, 400);
+
+  const tz = env.TIMEZONE;
+  await insertIncident(env.DB, {
+    created_at: nowIso(tz),
+    incident_date: String(body.incidentDate || '').trim() || toDateKey(todayLocal(tz)),
+    incident_time: String(body.incidentTime || '').trim(),
+    category: String(body.category || 'other').trim(),
+    summary,
+    details,
+    appointments_missed: Math.max(0, parseInt(body.appointmentsMissed, 10) || 0),
+    action_taken: String(body.actionTaken || '').trim(),
+    reported_by: reportedBy,
+    witnesses: String(body.witnesses || '').trim(),
+    reviewed_by: '',
+    reviewed_at: '',
+    status: 'OPEN',
+  });
+  const incidents = await getIncidents(env.DB);
+  return json({ ok: true, incidents });
+}
+
+export async function apiAdminReviewIncident(req: Request, env: Env): Promise<Response> {
+  const denied = await requireAdmin(req, env);
+  if (denied) return denied;
+  const body: any = await req.json().catch(() => ({}));
+  if (!incidentPassOk(body.pass, env)) return json({ ok: false, reason: 'Wrong password.', locked: true }, 403);
+  const id = parseInt(body.id, 10);
+  const reviewer = String(body.reviewer || '').trim();
+  if (isNaN(id)) return json({ ok: false, reason: 'Invalid id.' }, 400);
+  if (!reviewer) return json({ ok: false, reason: 'Reviewer name is required.' }, 400);
+  await reviewIncident(env.DB, id, reviewer, nowIso(env.TIMEZONE));
+  const incidents = await getIncidents(env.DB);
+  return json({ ok: true, incidents });
+}
+
+export async function apiAdminDeleteIncident(req: Request, env: Env): Promise<Response> {
+  const denied = await requireAdmin(req, env);
+  if (denied) return denied;
+  const body: any = await req.json().catch(() => ({}));
+  // Deletion needs the incident password too (the doctor never has it).
+  if (!incidentPassOk(body.pass, env)) return json({ ok: false, reason: 'Wrong password.', locked: true }, 403);
+  const url = new URL(req.url);
+  const id = parseInt(url.pathname.split('/').pop() || '', 10);
+  if (isNaN(id)) return json({ ok: false, reason: 'Invalid id.' }, 400);
+  await deleteIncident(env.DB, id);
+  const incidents = await getIncidents(env.DB);
+  return json({ ok: true, incidents });
 }

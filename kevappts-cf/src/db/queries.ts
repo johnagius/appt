@@ -1038,3 +1038,78 @@ export async function deleteDdaEntry(db: D1Database, id: number): Promise<void> 
   await ensureDdaTable(db);
   await db.prepare('DELETE FROM dda_entries WHERE id = ?').bind(id).run();
 }
+
+// ─── Incident reports ──────────────────────────────────────
+
+export interface Incident {
+  id: number;
+  created_at: string;       // when it was logged (env timezone)
+  incident_date: string;    // when it happened (YYYY-MM-DD)
+  incident_time: string;    // optional HH:MM
+  category: string;         // doctor_no_show, doctor_late, dispute, safety, equipment, other
+  summary: string;          // one-line title
+  details: string;          // free text
+  appointments_missed: number;
+  action_taken: string;
+  reported_by: string;      // staff member who wrote it (sign-off)
+  witnesses: string;        // other staff present, free text
+  reviewed_by: string;      // staff member who reviewed/witnessed the report
+  reviewed_at: string;
+  status: string;           // OPEN | REVIEWED
+}
+
+// Idempotent create on every call so a deploy picks it up without a manual
+// migration (same approach as the DDA register).
+async function ensureIncidentsTable(db: D1Database): Promise<void> {
+  await db.prepare(
+    "CREATE TABLE IF NOT EXISTS incidents (" +
+    "id INTEGER PRIMARY KEY AUTOINCREMENT," +
+    "created_at TEXT NOT NULL," +
+    "incident_date TEXT NOT NULL DEFAULT ''," +
+    "incident_time TEXT DEFAULT ''," +
+    "category TEXT NOT NULL DEFAULT 'other'," +
+    "summary TEXT NOT NULL DEFAULT ''," +
+    "details TEXT NOT NULL DEFAULT ''," +
+    "appointments_missed INTEGER NOT NULL DEFAULT 0," +
+    "action_taken TEXT DEFAULT ''," +
+    "reported_by TEXT NOT NULL DEFAULT ''," +
+    "witnesses TEXT DEFAULT ''," +
+    "reviewed_by TEXT DEFAULT ''," +
+    "reviewed_at TEXT DEFAULT ''," +
+    "status TEXT NOT NULL DEFAULT 'OPEN'" +
+    ")"
+  ).run();
+}
+
+export async function insertIncident(db: D1Database, e: Omit<Incident, 'id'>): Promise<number> {
+  await ensureIncidentsTable(db);
+  const res = await db.prepare(
+    'INSERT INTO incidents (created_at, incident_date, incident_time, category, summary, details, appointments_missed, action_taken, reported_by, witnesses, reviewed_by, reviewed_at, status) ' +
+    'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+  ).bind(
+    e.created_at, e.incident_date, e.incident_time, e.category, e.summary, e.details,
+    e.appointments_missed, e.action_taken, e.reported_by, e.witnesses,
+    e.reviewed_by, e.reviewed_at, e.status
+  ).run();
+  return (res.meta?.last_row_id as number) || 0;
+}
+
+export async function getIncidents(db: D1Database, limit = 500): Promise<Incident[]> {
+  await ensureIncidentsTable(db);
+  const r = await db.prepare(
+    'SELECT * FROM incidents ORDER BY id DESC LIMIT ?'
+  ).bind(limit).all<Incident>();
+  return r.results;
+}
+
+export async function reviewIncident(db: D1Database, id: number, reviewer: string, at: string): Promise<void> {
+  await ensureIncidentsTable(db);
+  await db.prepare(
+    "UPDATE incidents SET reviewed_by = ?, reviewed_at = ?, status = 'REVIEWED' WHERE id = ?"
+  ).bind(reviewer, at, id).run();
+}
+
+export async function deleteIncident(db: D1Database, id: number): Promise<void> {
+  await ensureIncidentsTable(db);
+  await db.prepare('DELETE FROM incidents WHERE id = ?').bind(id).run();
+}
