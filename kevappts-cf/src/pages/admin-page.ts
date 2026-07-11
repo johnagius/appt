@@ -551,7 +551,7 @@ export function adminPage(sig: string, env: Env): string {
       <div class="ds-toggle-row">
         <div class="ds-toggle-copy">
           <div class="ds-toggle-title">Show &ldquo;doctor unavailable&rdquo; splash page</div>
-          <div class="ds-toggle-desc">When ON, the public booking page is replaced by a splash telling patients the doctor is unavailable at Potter&rsquo;s Pharmacy and directing them to Spinola Clinic &mdash; with a live map, simple directions, and a QR code. Turn OFF to restore normal booking.</div>
+          <div class="ds-toggle-desc">When ON, the public booking page is replaced by a splash telling patients the doctor is unavailable at Potter&rsquo;s Pharmacy and directing them to Spinola Clinic as walk&#8209;ins &mdash; with a live map, simple directions, and a QR code. Online booking (Potter&rsquo;s and Spinola) is closed while this is on. Turn OFF to restore normal booking.</div>
         </div>
         <label class="ds-switch">
           <input type="checkbox" id="dsToggle" onchange="setDoctorUnavailable(this.checked)">
@@ -2027,7 +2027,7 @@ function renderDoctorStatus(unavailable) {
     card.classList.add('on');
     pill.textContent = '\\u25CF Booking paused';
     pill.classList.add('off');
-    note.innerHTML = '\\u26A0\\uFE0F <b>The booking page is currently hidden.</b> Patients visiting the site see the &ldquo;doctor unavailable&rdquo; splash directing them to Spinola Clinic.';
+    note.innerHTML = '\\u26A0\\uFE0F <b>The booking page is currently hidden.</b> Patients see the &ldquo;doctor unavailable&rdquo; splash and online booking is closed \\u2014 they are directed to Spinola Clinic as walk\\u2011ins.';
   } else {
     card.classList.remove('on');
     pill.textContent = '\\u25CF Booking live';

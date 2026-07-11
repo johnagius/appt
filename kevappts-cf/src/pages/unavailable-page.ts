@@ -177,17 +177,18 @@ export function unavailablePage(env: Env): string {
         <div class="badge"><span class="dot"></span>Booking paused</div>
         <h1>The doctor is unavailable<br>at the moment</h1>
         <p class="lede">
-          We&rsquo;re sorry &mdash; <span class="soft">the doctor is unavailable at Potter&rsquo;s Pharmacy right now.</span>
-          Should you wish to see a doctor, please make your way to <span class="soft">Spinola Clinic</span>, just a short walk away.
+          We&rsquo;re sorry &mdash; <span class="soft">the doctor is unavailable at Potter&rsquo;s Pharmacy right now,</span>
+          so online booking is closed. Should you wish to see a doctor, please make your way to
+          <span class="soft">Spinola Clinic</span> &mdash; <span class="soft">no appointment needed, they are welcoming walk&#8209;in patients.</span>
         </p>
         <div class="refer">
           <span class="pin" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none"><path d="M12 2c-3.9 0-7 3.1-7 7 0 5 7 13 7 13s7-8 7-13c0-3.9-3.1-7-7-7z" fill="#f5b301"/><circle cx="12" cy="9" r="2.6" fill="#fff"/></svg>
           </span>
           <span class="rt">
-            <span class="k">Please visit</span>
+            <span class="k">Walk in at</span>
             <span class="v">Spinola Clinic</span>
-            <span class="s">St Julian&rsquo;s, Malta &middot; approx. 5&#8209;minute walk</span>
+            <span class="s">St Julian&rsquo;s, Malta &middot; no booking &middot; approx. 5&#8209;minute walk</span>
           </span>
         </div>
       </div>
