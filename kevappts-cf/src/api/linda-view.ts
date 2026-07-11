@@ -1338,7 +1338,8 @@ export async function handleLindaLogin(req: Request, env: Env): Promise<Response
 
 export async function lindaRoute(req: Request, env: Env): Promise<Response> {
   if (!await isLindaAuthed(req, env)) return html(lindaLoginPage('/linda'));
-  return html(lindaMainPage(env));
+  const splashOn = await getConfigValue(env.DB, 'REVIEW_SPLASH') === '1';
+  return html(lindaMainPage(env, splashOn));
 }
 
 // ─── GET /linda/logout ─────────────────────────────────────
@@ -1398,8 +1399,15 @@ function lindaLoginPage(redirect: string, error?: string): string {
 </body></html>`;
 }
 
-function lindaMainPage(env: Env): string {
+function lindaMainPage(env: Env, splashOn = false): string {
   const name = env.LINDA_DOCTOR_NAME || 'Linda';
+  // When the Google-review splash is on, online booking is closed for everyone
+  // — so the staff-side booking controls are removed here (and the server-side
+  // guards in apiLindaNewBooking / apiLindaBulkBooking back this up).
+  const bulkBtnHtml = splashOn ? '' : `<button onclick="openBulkSheet()" title="Bulk add bookings" style="flex:0 0 auto;background:#ecfdf5;border:1px solid #6ee7b7;color:var(--accent-ink);border-radius:12px;font-weight:700;font-size:13px;padding:0 14px;min-height:46px;cursor:pointer;">⇊ Bulk</button>`;
+  const newBtnInlineHtml = splashOn ? '' : `<button class="nb-inline" onclick="openBookSheet()" title="New booking"><span class="p">＋</span>New Booking</button>`;
+  const newBtnBottomHtml = splashOn ? '' : `<div class="nb-bottom-wrap"><button class="nb-bottom" onclick="openBookSheet()"><span class="p">＋</span>New Booking</button></div>`;
+  const splashBannerHtml = splashOn ? `<div class="splash-banner">⭐ The “Ask for a Google review” splash is <b>ON</b> — online booking is closed, so new bookings are disabled. Turn the splash off in the admin panel to add bookings again.</div>` : '';
   return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <meta name="theme-color" content="#10b981">
@@ -1446,6 +1454,7 @@ function lindaMainPage(env: Env): string {
   }
   html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:var(--font);line-height:1.45;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;letter-spacing:-.01em;}
   .topbar{position:sticky;top:0;background:rgba(255,255,255,.85);backdrop-filter:saturate(180%) blur(12px);-webkit-backdrop-filter:saturate(180%) blur(12px);border-bottom:1px solid var(--line);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;z-index:5;}
+  .splash-banner{margin:12px 16px 0;padding:12px 16px;background:#fef3c7;border:1px solid #fcd34d;color:#92400e;border-radius:12px;font-size:13px;font-weight:600;line-height:1.45;}
   .topbar h1{margin:0;font-size:18px;font-weight:800;letter-spacing:-.02em;display:flex;align-items:center;gap:9px;}
   .topbar h1::before{content:"";width:26px;height:26px;border-radius:8px;background:linear-gradient(135deg,#34d399,#059669);box-shadow:0 2px 6px rgba(16,185,129,.4);flex:0 0 auto;}
   .liveDot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#cbd5e1;vertical-align:middle;transition:background-color .3s ease;}
@@ -1917,6 +1926,7 @@ function lindaMainPage(env: Env): string {
   <h1>${name}'s Diary <span class="liveDot" id="liveDot" title="Live status"></span></h1>
   <button class="logout" onclick="logout()">Log out</button>
 </div>
+${splashBannerHtml}
 <div class="tabBar">
   <button class="tabBtn active" id="tabDayBtn" onclick="setTab('day')">📅 Day</button>
   <button class="tabBtn" id="tabWeekBtn" onclick="setTab('week')">📆 Week</button>
@@ -1927,8 +1937,8 @@ function lindaMainPage(env: Env): string {
   <div class="searchBar">
     <input type="search" id="searchInput" placeholder="Search name, phone or email…" autocomplete="off">
     <button class="clear" id="searchClear" onclick="clearSearch()" style="display:none;" aria-label="Clear">&times;</button>
-    <button onclick="openBulkSheet()" title="Bulk add bookings" style="flex:0 0 auto;background:#ecfdf5;border:1px solid #6ee7b7;color:var(--accent-ink);border-radius:12px;font-weight:700;font-size:13px;padding:0 14px;min-height:46px;cursor:pointer;">⇊ Bulk</button>
-    <button class="nb-inline" onclick="openBookSheet()" title="New booking"><span class="p">＋</span>New Booking</button>
+    ${bulkBtnHtml}
+    ${newBtnInlineHtml}
   </div>
   <div id="searchResults" class="searchResults" style="display:none;"></div>
   <div id="dayContent">
@@ -1947,7 +1957,7 @@ function lindaMainPage(env: Env): string {
     <button class="day-action-btn danger" onclick="cancelAllDay()">✖ Cancel all</button>
   </div>
   <div class="list" id="list"><div class="empty">Loading…</div></div>
-  <div class="nb-bottom-wrap"><button class="nb-bottom" onclick="openBookSheet()"><span class="p">＋</span>New Booking</button></div>
+  ${newBtnBottomHtml}
   </div>
 </div>
 
@@ -3599,7 +3609,7 @@ function lindaMainPage(env: Env): string {
     btn.disabled = valid===0;
     btn.textContent = valid ? ('Book '+valid+' booking'+(valid===1?'':'s')) : 'Nothing valid to book';
   };
-  window.openBulkSheet = function(){ $('bulkText').value=''; $('bulkPreview').innerHTML=''; $('bulkMsg').textContent=''; $('bulkBtn').disabled=true; $('bulkBtn').textContent='Book all'; $('bulkOverlay').classList.add('show'); $('bulkSheet').classList.add('show'); };
+  window.openBulkSheet = function(){ if(${splashOn}){ alert('Online booking is closed while the “Ask for a Google review” splash is on. Turn the splash off in the admin panel to add bookings.'); return; } $('bulkText').value=''; $('bulkPreview').innerHTML=''; $('bulkMsg').textContent=''; $('bulkBtn').disabled=true; $('bulkBtn').textContent='Book all'; $('bulkOverlay').classList.add('show'); $('bulkSheet').classList.add('show'); };
   window.closeBulkSheet = function(){ $('bulkOverlay').classList.remove('show'); $('bulkSheet').classList.remove('show'); };
   window.bulkSubmit = async function(){
     var valid = bulkRows.filter(function(r){ return r._ok; });
@@ -3676,6 +3686,7 @@ function lindaMainPage(env: Env): string {
   };
 
   window.openBookSheet = function(prefill){
+    if(${splashOn}){ alert('Online booking is closed while the “Ask for a Google review” splash is on. Turn the splash off in the admin panel to add bookings.'); return; }
     sheet.mode = 'new'; sheet.apptId = '';
     $('sheetTitle').textContent = 'Book appointment';
     $('sheetPatientSection').style.display = '';
