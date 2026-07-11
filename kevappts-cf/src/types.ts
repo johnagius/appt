@@ -164,4 +164,5 @@ export interface AppConfig {
   spinolaHours: WorkingHours;
   pottersLocation: string;
   spinolaLocation: string;
+  doctorUnavailable: boolean;
 }

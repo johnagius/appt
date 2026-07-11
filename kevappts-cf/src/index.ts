@@ -29,13 +29,14 @@ import {
 } from './api/admin';
 import { verifyAdminSig, computeAdminSig } from './services/crypto';
 import { todayKeyLocal, nowIso, parseTimeToMinutes, toDateKey, todayLocal, addDays, nowMinutesLocal } from './services/utils';
-import { getActiveAppointmentsByDate, getAppointmentByToken, getFollowUpEligibleAppointmentsByDate, insertFollowUp, isReviewSent, markReviewSent } from './db/queries';
+import { getActiveAppointmentsByDate, getAppointmentByToken, getFollowUpEligibleAppointmentsByDate, insertFollowUp, isReviewSent, markReviewSent, getConfigValue } from './db/queries';
 import { sendDailyDoctorSchedule, sendReminderEmail, sendFollowUpEmail, sendReviewRequestEmail } from './services/email';
 import { indexPage } from './pages/index-page';
 import { cancelPage } from './pages/cancel-page';
 import { docActionPage } from './pages/docaction-page';
 import { adminPage } from './pages/admin-page';
 import { doctorPage } from './pages/doctor-page';
+import { unavailablePage } from './pages/unavailable-page';
 import { reschedulePage } from './pages/reschedule-page';
 import { followupPage } from './pages/followup-page';
 import { physioPage } from './pages/physio-page';
@@ -347,6 +348,14 @@ export default {
 
       // ─── HTML Pages ────────────────────────────────
       if (method === 'GET') {
+        // Doctor-unavailable splash — when the admin toggle is on, the doctor
+        // booking page is replaced entirely by a splash directing patients to
+        // Spinola Clinic (map + directions + QR).
+        if (path === '/' || path === '/book' || path.startsWith('/from/')) {
+          if (await getConfigValue(env.DB, 'DOCTOR_UNAVAILABLE') === '1') {
+            return html(unavailablePage(env));
+          }
+        }
         if (path === '/' || path === '/book') return html(indexPage(env));
         if (path.startsWith('/from/')) {
           const loc = path.slice(6).replace(/[^a-zA-Z0-9_-]/g, '');

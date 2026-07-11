@@ -145,6 +145,17 @@ async function doBook(req: Request, env: Env, clinic: 'potters' | 'spinola'): Pr
   const tz = env.TIMEZONE;
   const cfg = await getConfig(env.DB);
 
+  // Doctor-unavailable mode: no appointments can be created (Potter's OR
+  // Spinola). Patients are directed to Spinola Clinic as walk-ins instead.
+  // Server-side guard so a cached page or direct API call can't slip through.
+  if (cfg.doctorUnavailable) {
+    return json({
+      ok: false,
+      reason: 'The doctor is currently unavailable, so online booking is closed. Please visit Spinola Clinic — they are welcoming walk-in patients.',
+      doctorUnavailable: true,
+    }, 503);
+  }
+
   const dateKey = (payload.dateKey || '').trim();
   const startTime = (payload.startTime || '').trim();
   const serviceId = (payload.serviceId || '').trim();

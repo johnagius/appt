@@ -1228,6 +1228,7 @@ export async function apiAdminGetSettings(req: Request, env: Env): Promise<Respo
       maxActiveApptsPerPerson: cfg.maxActiveApptsPerPerson,
       workingHours: cfg.workingHours,
       spinolaHours: cfg.spinolaHours,
+      doctorUnavailable: cfg.doctorUnavailable,
     },
   });
 }
@@ -1246,6 +1247,7 @@ export async function apiAdminSaveSettings(req: Request, env: Env): Promise<Resp
   if (payload.spinolaHours !== undefined) await setConfigValue(env.DB, 'SPINOLA_WORKING_HOURS', JSON.stringify(payload.spinolaHours));
   if (payload.pottersLocation !== undefined) await setConfigValue(env.DB, 'POTTERS_LOCATION', payload.pottersLocation);
   if (payload.spinolaLocation !== undefined) await setConfigValue(env.DB, 'SPINOLA_LOCATION', payload.spinolaLocation);
+  if (payload.doctorUnavailable !== undefined) await setConfigValue(env.DB, 'DOCTOR_UNAVAILABLE', payload.doctorUnavailable ? '1' : '0');
 
   await bumpVersion(env.DB);
   await broadcast(env, '');
