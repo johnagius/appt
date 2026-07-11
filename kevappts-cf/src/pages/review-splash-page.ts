@@ -107,19 +107,29 @@ export function reviewSplashPage(_env: Env): string {
       background-image:radial-gradient(circle at 1px 1px, rgba(255,255,255,.12) 1px, transparent 0);background-size:22px 22px;
       -webkit-mask-image:radial-gradient(72% 68% at 50% 44%, #000, transparent);mask-image:radial-gradient(72% 68% at 50% 44%, #000, transparent);}
     .right > *{position:relative;z-index:1;}
-    .rlabel{display:inline-flex;align-items:center;gap:9px;margin:0;font-size:12px;font-weight:700;letter-spacing:.09em;
-      text-transform:uppercase;color:#ffe4a0;}
-    .rlabel .rstars{letter-spacing:2px;color:#ffd36b;font-size:14px;text-shadow:0 2px 6px rgba(245,179,1,.5);}
-    .qrbox{position:relative;width:clamp(200px,34vmin,290px);height:clamp(200px,34vmin,290px);background:#fff;border:none;
-      border-radius:20px;padding:15px;
-      box-shadow:0 0 0 5px rgba(255,255,255,.95), 0 0 0 8px rgba(245,179,1,.55), 0 26px 52px -18px rgba(0,0,0,.55);}
-    .qrbox::after{content:"";position:absolute;inset:-7px;border-radius:26px;pointer-events:none;
-      box-shadow:0 0 0 2px rgba(245,179,1,.6);opacity:0;animation:qrpulse 2.8s ease-in-out infinite;}
-    @keyframes qrpulse{0%,100%{opacity:0;transform:scale(1);}50%{opacity:.55;transform:scale(1.03);}}
-    @media (prefers-reduced-motion:reduce){ .qrbox::after{animation:none;} }
-    .qrbox svg{width:100%;height:100%;display:block;}
-    .scan{font-size:clamp(13px,1.6vw,14.5px);color:#c9e8e3;margin:0;line-height:1.5;}
-    .scan b{color:#ffffff;font-weight:700;}
+    /* White "Review us on Google" card with Google-coloured corners, floating
+       on the teal panel. A faint tilted card peeks behind for a stacked look. */
+    .gwrap{position:relative;display:inline-block;width:100%;max-width:min(94%,370px);}
+    .gwrap::before{content:"";position:absolute;inset:0;background:#ffffff;border-radius:18px;
+      transform:rotate(-5deg) translateY(8px);transform-origin:center;
+      box-shadow:0 22px 44px -20px rgba(0,0,0,.55);opacity:.5;z-index:0;}
+    .gcard{position:relative;z-index:1;overflow:hidden;background:#fff;border-radius:18px;text-align:center;
+      padding:clamp(22px,3.4vw,30px) clamp(20px,3.2vw,30px) clamp(18px,2.8vw,26px);
+      box-shadow:0 30px 60px -22px rgba(0,0,0,.6);}
+    .corner{position:absolute;z-index:0;width:clamp(44px,8vw,66px);height:clamp(44px,8vw,66px);}
+    .c-tl{top:0;left:0;background:#EA4335;clip-path:polygon(0 0,100% 0,0 100%);}
+    .c-tr{top:0;right:0;background:#FBBC05;clip-path:polygon(0 0,100% 0,100% 100%);}
+    .c-bl{bottom:0;left:0;background:#34A853;clip-path:polygon(0 0,0 100%,100% 100%);}
+    .c-br{bottom:0;right:0;background:#4285F4;clip-path:polygon(100% 0,100% 100%,0 100%);}
+    .gcard > *:not(.corner){position:relative;z-index:1;}
+    .g-kicker{font-size:clamp(11px,1.5vw,12.5px);font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#5f6368;margin:0 0 4px;}
+    .glogo{font-family:"Inter",Arial,sans-serif;font-weight:700;font-size:clamp(30px,6.2vw,42px);letter-spacing:-1.5px;line-height:1.05;margin:0 0 8px;}
+    .gstars{display:flex;justify-content:center;gap:5px;margin:0 0 12px;}
+    .gstars svg{width:clamp(22px,4vw,28px);height:clamp(22px,4vw,28px);filter:drop-shadow(0 2px 4px rgba(245,179,1,.4));}
+    .g-scan{font-size:clamp(12.5px,1.7vw,14px);font-weight:600;color:#3c4043;margin:0 0 14px;line-height:1.4;}
+    .g-qr{width:clamp(150px,26vmin,206px);height:clamp(150px,26vmin,206px);margin:0 auto;}
+    .g-qr svg{width:100%;height:100%;display:block;}
+    .g-url{font-size:12px;color:#80868b;margin:13px 0 0;}
     .cta{display:inline-flex;align-items:center;gap:9px;background:linear-gradient(180deg,#ffce4d,#f5b301);color:#0a3f39;
       text-decoration:none;font-weight:700;font-size:clamp(14px,1.8vw,16px);padding:13px 26px;border-radius:12px;
       transition:transform .12s ease,box-shadow .12s ease;
@@ -136,9 +146,11 @@ export function reviewSplashPage(_env: Env): string {
       .lede{font-size:clamp(14px,1.55vw,16px);}
       .points{align-items:flex-start;}
       .points li{font-size:13px;}
-      .right{border-top:0;gap:14px;padding:clamp(22px,3vw,36px);}
-      .qrbox{width:clamp(160px,22vw,210px);height:clamp(160px,22vw,210px);padding:13px;border-radius:18px;}
-      .scan{font-size:12.5px;}
+      .right{border-top:0;gap:16px;padding:clamp(22px,3vw,36px);}
+      .gwrap{max-width:340px;}
+      .glogo{font-size:clamp(28px,3.4vw,38px);}
+      .gstars svg{width:24px;height:24px;}
+      .g-qr{width:clamp(150px,19vw,186px);height:clamp(150px,19vw,186px);}
       .cta{font-size:14px;padding:12px 22px;}
     }
 
@@ -160,7 +172,6 @@ export function reviewSplashPage(_env: Env): string {
       <div class="split">
         <div class="left">
           <div class="badge"><span class="dot"></span>We&rsquo;d love your feedback</div>
-          <div class="stars" aria-hidden="true">${stars}${stars}${stars}${stars}${stars}</div>
           <h1>Help other travellers find us</h1>
           <p class="lede">
             If we&rsquo;ve looked after you well, <span class="soft">please leave us a Google review.</span>
@@ -173,9 +184,17 @@ export function reviewSplashPage(_env: Env): string {
         </div>
 
         <div class="right">
-          <p class="rlabel"><span class="rstars">&#9733;&#9733;&#9733;&#9733;&#9733;</span> on Google</p>
-          <div class="qrbox">${qrSvg}</div>
-          <p class="scan"><b>Scan to review</b><br>Point your phone camera at the code</p>
+          <div class="gwrap">
+            <div class="gcard">
+              <span class="corner c-tl"></span><span class="corner c-tr"></span><span class="corner c-bl"></span><span class="corner c-br"></span>
+              <p class="g-kicker">Review us on</p>
+              <div class="glogo" aria-label="Google"><span style="color:#4285F4">G</span><span style="color:#EA4335">o</span><span style="color:#FBBC05">o</span><span style="color:#4285F4">g</span><span style="color:#34A853">l</span><span style="color:#EA4335">e</span></div>
+              <div class="gstars" aria-hidden="true">${stars}${stars}${stars}${stars}${stars}</div>
+              <p class="g-scan">Scan the QR code to leave us a review</p>
+              <div class="g-qr">${qrSvg}</div>
+              <p class="g-url">&hellip; or tap the button below</p>
+            </div>
+          </div>
           <a class="cta" href="${hrefReview}" target="_blank" rel="noopener">
             <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.9 6.3 6.9.8-5.1 4.7 1.4 6.8L12 17.8 5.9 20.6l1.4-6.8L2.2 9.1l6.9-.8z"/></svg>
             Leave a Google review
