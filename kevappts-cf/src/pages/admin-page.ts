@@ -1538,21 +1538,20 @@ export function adminPage(sig: string, env: Env): string {
 
 <!-- INCIDENTS TAB -->
 <div class="tab-content" id="tab-incidents" style="display:none;">
-  <!-- Locked state until the incident password is entered -->
-  <div id="incLocked" class="card" style="text-align:center;padding:34px 20px;">
-    <div style="font-size:30px;margin-bottom:6px;">&#x1F512;</div>
-    <h3 style="margin:0 0 4px;font-size:16px;">Incident reports are password&#8209;protected</h3>
-    <p style="margin:0 0 14px;color:var(--muted);font-size:13px;">Enter the incident password to view and log reports.</p>
-    <button class="btn btn-dark" onclick="promptIncidentPass()">Unlock</button>
-    <div class="msg" id="incLockMsg"></div>
+  <div class="card" style="padding:18px;margin-bottom:14px;background:#fff1f2;border-left:4px solid #e11d48;">
+    <h3 style="margin:0 0 4px 0;font-size:16px;font-weight:900;color:#be123c;">&#x1F6A8; Incident Reports</h3>
+    <p style="margin:0;color:#9f1239;font-size:13px;line-height:1.5;">A log of anything that disrupts the pharmacy &mdash; e.g. the doctor not showing up. What was written, and by whom, is hidden unless you enter the password.</p>
   </div>
 
-  <div id="incMain" style="display:none;">
-    <div class="card" style="padding:18px;margin-bottom:14px;background:#fff1f2;border-left:4px solid #e11d48;">
-      <h3 style="margin:0 0 4px 0;font-size:16px;font-weight:900;color:#be123c;">&#x1F6A8; Incident Reports</h3>
-      <p style="margin:0;color:#9f1239;font-size:13px;line-height:1.5;">Log anything that disrupts the pharmacy &mdash; e.g. the doctor not showing up &mdash; with how many appointments were missed and what happened. Sign it with your name; a second staff member can review it as a witness.</p>
-    </div>
+  <div class="card" id="incUnlockBar" style="padding:14px 16px;margin-bottom:14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+    <span id="incLockLabel" style="font-size:13px;color:var(--muted);"></span>
+    <span style="flex:1;min-width:8px;"></span>
+    <button class="btn btn-dark btn-sm" id="incUnlockBtn" onclick="promptIncidentPass()">&#x1F513; Enter password to view</button>
+    <button class="btn btn-ghost btn-sm" id="incLockBtn" style="display:none;" onclick="lockIncidents()">Hide again</button>
+    <span class="msg" id="incLockMsg" style="margin:0;"></span>
+  </div>
 
+  <div id="incForm" style="display:none;">
     <div class="card" style="padding:18px;margin-bottom:14px;">
       <h3 style="margin:0 0 10px 0;font-size:15px;font-weight:800;">Log a new incident</h3>
       <div class="form-row">
@@ -1582,14 +1581,14 @@ export function adminPage(sig: string, env: Env): string {
         <span id="incAddMsg" style="font-size:13px;"></span>
       </div>
     </div>
+  </div>
 
-    <div class="card" style="padding:18px;">
-      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
-        <h3 style="margin:0;font-size:15px;font-weight:800;flex:1;">Logged incidents</h3>
-        <button class="btn btn-ghost btn-sm" onclick="loadIncidents()">Refresh</button>
-      </div>
-      <div id="incList"><div class="empty">Loading...</div></div>
+  <div class="card" style="padding:18px;">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+      <h3 style="margin:0;font-size:15px;font-weight:800;flex:1;">Logged incidents</h3>
+      <button class="btn btn-ghost btn-sm" onclick="loadIncidents()">Refresh</button>
     </div>
+    <div id="incList"><div class="empty">Loading...</div></div>
   </div>
 </div>
 
@@ -2129,44 +2128,56 @@ function switchTab(name) {
   if (name === 'incidents') openIncidents();
 }
 
-// ========== Incident reports (password-gated) ==========
-var _incidentPass = ''; // remembered for the session once entered correctly
-function _incLock() {
-  _incidentPass = '';
-  var l = document.getElementById('incLocked'); var m = document.getElementById('incMain');
-  if (l) l.style.display = 'block';
-  if (m) m.style.display = 'none';
+// ========== Incident reports (obscured until password entered) ==========
+var _incidentPass = '';       // remembered for the session once entered correctly
+var _incidentUnlocked = false;
+
+function updateIncControls() {
+  var form = document.getElementById('incForm');
+  var unlockBtn = document.getElementById('incUnlockBtn');
+  var lockBtn = document.getElementById('incLockBtn');
+  var label = document.getElementById('incLockLabel');
+  if (form) form.style.display = _incidentUnlocked ? 'block' : 'none';
+  if (unlockBtn) unlockBtn.style.display = _incidentUnlocked ? 'none' : '';
+  if (lockBtn) lockBtn.style.display = _incidentUnlocked ? '' : 'none';
+  if (label) label.innerHTML = _incidentUnlocked
+    ? '&#x1F513; <b>Unlocked</b> &mdash; full details are visible and you can log incidents.'
+    : '&#x1F512; Details, and who logged them, are <b>hidden</b>.';
+  if (_incidentUnlocked) {
+    var d = document.getElementById('incDate');
+    if (d && !d.value) d.value = new Date().toISOString().split('T')[0];
+  }
 }
-function _incUnlock() {
-  var l = document.getElementById('incLocked'); var m = document.getElementById('incMain');
-  if (l) l.style.display = 'none';
-  if (m) m.style.display = 'block';
-  var d = document.getElementById('incDate');
-  if (d && !d.value) d.value = new Date().toISOString().split('T')[0];
-}
-function openIncidents() {
-  if (_incidentPass) { _incUnlock(); loadIncidents(); return; }
-  _incLock();
-  promptIncidentPass();
-}
+
+function openIncidents() { loadIncidents(); }
+
 function promptIncidentPass() {
-  styledPassword('Incident reports', 'Enter the incident-report password.').then(function(pass) {
-    if (pass === null) return; // cancelled — stays locked
+  styledPassword('Incident reports', 'Enter the incident-report password to reveal the details.').then(function(pass) {
+    if (pass === null) return;
     _incidentPass = pass;
-    _incUnlock();
     loadIncidents();
   });
 }
 
+function lockIncidents() {
+  _incidentPass = '';
+  _incidentUnlocked = false;
+  showMsg('incLockMsg', '', '');
+  document.getElementById('incLockMsg').className = 'msg';
+  loadIncidents();
+}
+
 async function loadIncidents() {
   var listEl = document.getElementById('incList');
-  if (!_incidentPass) { _incLock(); return; }
   if (listEl) listEl.innerHTML = '<div class="empty">Loading...</div>';
   try {
-    var res = await apiCall('incidents?pass=' + encodeURIComponent(_incidentPass));
-    if (res && res.locked) { _incLock(); showMsg('incLockMsg', 'bad', 'Wrong password.'); return; }
+    var ep = 'incidents' + (_incidentPass ? '?pass=' + encodeURIComponent(_incidentPass) : '');
+    var res = await apiCall(ep);
     if (!res || !res.ok) { if (listEl) listEl.innerHTML = '<div class="empty">Failed to load.</div>'; return; }
-    renderIncidents(res.incidents || []);
+    if (res.wrongPass) { _incidentPass = ''; showMsg('incLockMsg', 'bad', 'Wrong password.'); }
+    _incidentUnlocked = !!res.unlocked;
+    updateIncControls();
+    renderIncidents(res.incidents || [], !_incidentUnlocked);
   } catch (err) {
     if (listEl) listEl.innerHTML = '<div class="empty">Failed to load reports.</div>';
   }
@@ -2181,7 +2192,20 @@ var INC_CAT_COLOR = {
   safety: '#dc2626', equipment: '#2563eb', other: '#4b5563'
 };
 
-function renderIncidents(items) {
+function incMetaRow(e, col, cat) {
+  var when = esc(e.incident_date) + (e.incident_time ? ' &middot; ' + esc(e.incident_time) : '');
+  var reviewed = (e.status === 'REVIEWED');
+  var statusBadge = reviewed
+    ? '<span style="background:#dcfce7;color:#166534;font-weight:700;font-size:11px;padding:3px 9px;border-radius:999px;">&#x2713; Reviewed</span>'
+    : '<span style="background:#fef9c3;color:#854d0e;font-weight:700;font-size:11px;padding:3px 9px;border-radius:999px;">Open</span>';
+  return '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;">' +
+    '<span style="background:' + col + ';color:#fff;font-weight:700;font-size:11px;padding:3px 9px;border-radius:999px;">' + esc(cat) + '</span>' +
+    '<span style="font-size:12.5px;color:var(--muted);">' + when + '</span>' +
+    (e.appointments_missed > 0 ? '<span style="font-size:12.5px;color:#b91c1c;font-weight:700;">' + esc(e.appointments_missed) + ' appt' + (e.appointments_missed == 1 ? '' : 's') + ' missed</span>' : '') +
+    '<span style="flex:1;"></span>' + statusBadge + '</div>';
+}
+
+function renderIncidents(items, redacted) {
   var listEl = document.getElementById('incList');
   if (!listEl) return;
   if (!items.length) {
@@ -2193,17 +2217,29 @@ function renderIncidents(items) {
     var e = items[i];
     var cat = INC_CATS[e.category] || 'Other';
     var col = INC_CAT_COLOR[e.category] || '#4b5563';
-    var when = esc(e.incident_date) + (e.incident_time ? ' &middot; ' + esc(e.incident_time) : '');
     var reviewed = (e.status === 'REVIEWED');
-    var statusBadge = reviewed
-      ? '<span style="background:#dcfce7;color:#166534;font-weight:700;font-size:11px;padding:3px 9px;border-radius:999px;">&#x2713; Reviewed</span>'
-      : '<span style="background:#fef9c3;color:#854d0e;font-weight:700;font-size:11px;padding:3px 9px;border-radius:999px;">Open</span>';
     html += '<div class="card" style="padding:14px 16px;margin-bottom:10px;border-left:4px solid ' + col + ';">';
-    html += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;">' +
-      '<span style="background:' + col + ';color:#fff;font-weight:700;font-size:11px;padding:3px 9px;border-radius:999px;">' + esc(cat) + '</span>' +
-      '<span style="font-size:12.5px;color:var(--muted);">' + when + '</span>' +
-      (e.appointments_missed > 0 ? '<span style="font-size:12.5px;color:#b91c1c;font-weight:700;">' + esc(e.appointments_missed) + ' appt' + (e.appointments_missed == 1 ? '' : 's') + ' missed</span>' : '') +
-      '<span style="flex:1;"></span>' + statusBadge + '</div>';
+    html += incMetaRow(e, col, cat);
+
+    if (redacted) {
+      // Obscured — the type/date/count are visible, but the comment and names
+      // are shown as blurred bars with a lock hint. The real text never came
+      // down from the server.
+      var bar = 'height:12px;border-radius:6px;background:repeating-linear-gradient(90deg,#e5e7eb 0,#e5e7eb 14px,#eef1f5 14px,#eef1f5 24px);';
+      html += '<div style="margin-top:8px;filter:blur(0.6px);opacity:.85;">' +
+        '<div style="' + bar + 'width:88%;margin-bottom:8px;"></div>' +
+        '<div style="' + bar + 'width:70%;margin-bottom:8px;"></div>' +
+        '<div style="' + bar + 'width:78%;"></div>' +
+        '</div>';
+      html += '<div style="margin-top:11px;padding-top:9px;border-top:1px solid #f1f5f9;font-size:12px;color:#94a3b8;display:flex;align-items:center;gap:7px;">' +
+        '<span>&#x1F512;</span><span>Reported by <b style="filter:blur(3px);">someone</b>' +
+        (reviewed ? ' &middot; reviewed by <b style="filter:blur(3px);">someone</b>' : '') +
+        ' &mdash; enter the password to read this report.</span></div>';
+      html += '</div>';
+      continue;
+    }
+
+    // Full view
     html += '<div style="font-weight:800;font-size:14.5px;margin-bottom:4px;">' + esc(e.summary) + '</div>';
     if (e.details) html += '<div style="font-size:13px;color:#374151;line-height:1.5;white-space:pre-wrap;margin-bottom:6px;">' + esc(e.details) + '</div>';
     if (e.action_taken) html += '<div style="font-size:12.5px;color:#374151;line-height:1.5;margin-bottom:6px;"><b>Action taken:</b> ' + esc(e.action_taken) + '</div>';
@@ -2212,7 +2248,6 @@ function renderIncidents(items) {
     if (e.witnesses) html += '<br><b>Witnesses:</b> ' + esc(e.witnesses);
     if (reviewed) html += '<br><b>Reviewed by:</b> ' + esc(e.reviewed_by) + ' &middot; ' + esc(String(e.reviewed_at || '').replace('T', ' ').slice(0, 16));
     html += '</div>';
-    // Actions: review sign-off (open only) + delete
     html += '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px;">';
     if (!reviewed) {
       html += '<input type="text" id="incRev-' + esc(e.id) + '" placeholder="Reviewer name" style="flex:1;min-width:140px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px;">' +
@@ -2245,7 +2280,7 @@ async function addIncident() {
   msg.style.color = '#6b7280'; msg.textContent = 'Saving...';
   try {
     var res = await apiCall('incidents', { body: body });
-    if (res && res.locked) { _incLock(); return; }
+    if (res && res.locked) { lockIncidents(); return; }
     if (res && res.ok) {
       msg.style.color = '#059669'; msg.textContent = 'Incident report saved.';
       document.getElementById('incSummary').value = '';
@@ -2266,7 +2301,7 @@ async function reviewIncident(id) {
   if (!reviewer) { if (inp) inp.focus(); return; }
   try {
     var res = await apiCall('incident-review', { body: { pass: _incidentPass, id: id, reviewer: reviewer } });
-    if (res && res.locked) { _incLock(); return; }
+    if (res && res.locked) { lockIncidents(); return; }
     if (res && res.ok) { renderIncidents(res.incidents || []); }
     else { alert((res && res.reason) ? res.reason : 'Failed to sign off.'); }
   } catch (err) { alert('Failed to sign off.'); }
@@ -2276,7 +2311,7 @@ async function deleteIncident(id) {
   if (!confirm('Delete this incident report? This cannot be undone.')) return;
   try {
     var res = await apiCall('incidents/' + encodeURIComponent(id), { method: 'DELETE', body: { pass: _incidentPass } });
-    if (res && res.locked) { _incLock(); return; }
+    if (res && res.locked) { lockIncidents(); return; }
     if (res && res.ok) { renderIncidents(res.incidents || []); }
     else { alert((res && res.reason) ? res.reason : 'Failed to delete.'); }
   } catch (err) { alert('Failed to delete.'); }

@@ -2625,9 +2625,29 @@ export async function apiAdminListIncidents(req: Request, env: Env): Promise<Res
   const denied = await requireAdmin(req, env);
   if (denied) return denied;
   const pass = new URL(req.url).searchParams.get('pass') || '';
-  if (!incidentPassOk(pass, env)) return json({ ok: false, reason: 'Wrong password.', locked: true }, 403);
   const incidents = await getIncidents(env.DB);
-  return json({ ok: true, incidents });
+  const providedPass = pass.length > 0;
+
+  if (incidentPassOk(pass, env)) {
+    // Fully unlocked — return everything.
+    return json({ ok: true, unlocked: true, incidents });
+  }
+
+  // Redacted view: the doctor can see that incidents exist (type, date, how many
+  // appointments were missed, whether it's been reviewed) but NOT the comment or
+  // who logged/reviewed it — those fields are stripped here so they never reach
+  // the browser without the password.
+  const redacted = incidents.map((e) => ({
+    id: e.id,
+    incident_date: e.incident_date,
+    incident_time: e.incident_time,
+    category: e.category,
+    appointments_missed: e.appointments_missed,
+    status: e.status,
+  }));
+  // `wrongPass:true` lets the client tell a bad password from simply not having
+  // entered one yet.
+  return json({ ok: true, unlocked: false, wrongPass: providedPass, incidents: redacted });
 }
 
 export async function apiAdminAddIncident(req: Request, env: Env): Promise<Response> {
