@@ -1264,8 +1264,11 @@ export async function apiAdminSaveSettings(req: Request, env: Env): Promise<Resp
   // enforced here server-side regardless of what the client sends.
   if (payload.doctorUnavailable !== undefined) {
     const on = !!payload.doctorUnavailable;
+    // Detect an off→on transition so we can auto-log a no-show incident.
+    const prevUnavailable = (await getConfig(env.DB)).doctorUnavailable;
     await setConfigValue(env.DB, 'DOCTOR_UNAVAILABLE', on ? '1' : '0');
     if (on) await setConfigValue(env.DB, 'REVIEW_SPLASH', '0');
+    if (on && !prevUnavailable) await autoLogNoShow(env);
   }
   if (payload.reviewSplash !== undefined) {
     const on = !!payload.reviewSplash;
@@ -2612,6 +2615,50 @@ export async function apiAdminDeleteDda(req: Request, env: Env): Promise<Respons
 }
 
 // ─── Incident reports ──────────────────────────────────────
+
+// Marks auto-generated no-show incidents so we can dedupe them and staff can
+// tell them apart from hand-written ones.
+const AUTO_NOSHOW_MARKER = 'Auto-logged (splash)';
+
+// Auto-file a no-show incident when the doctor-unavailable splash is switched
+// on. Best-effort: any failure here must never block the splash from turning on.
+async function autoLogNoShow(env: Env): Promise<void> {
+  try {
+    const tz = env.TIMEZONE;
+    const todayKey = toDateKey(todayLocal(tz));
+
+    // One auto-incident per day — flipping the splash on/off/on won't duplicate.
+    const existing = await getIncidents(env.DB);
+    if (existing.some((e) => e.incident_date === todayKey && e.reported_by === AUTO_NOSHOW_MARKER)) {
+      return;
+    }
+
+    // Count today's affected Potter's (Dr Kevin) appointments: still-booked only,
+    // excluding Spinola, Linda and already-relocated phantoms.
+    const active = await getActiveAppointmentsByDate(env.DB, todayKey);
+    const count = active.filter((a) => a.status === 'BOOKED' && a.clinic === 'potters').length;
+
+    const now = nowIso(tz);
+    await insertIncident(env.DB, {
+      created_at: now,
+      incident_date: todayKey,
+      incident_time: (now.split(' ')[1] || '').slice(0, 5),
+      category: 'doctor_no_show',
+      summary: 'Doctor unavailable — splash activated',
+      details: 'Doctor-unavailable splash was turned on. ' + count + ' appointment(s) booked with the doctor at Potter’s today were affected; patients were directed to Spinola Clinic.',
+      appointments_missed: count,
+      action_taken: 'Booking page replaced by the “doctor unavailable” splash; patients directed to Spinola.',
+      reported_by: AUTO_NOSHOW_MARKER,
+      witnesses: '',
+      reviewed_by: '',
+      reviewed_at: '',
+      status: 'OPEN',
+    });
+  } catch (e) {
+    console.error('autoLogNoShow error:', e);
+  }
+}
+
 // The whole tab is behind a password so only staff who know it can view or
 // write reports (they document things like doctor no-shows). Validated
 // server-side so the data never loads without it. Default '01032023',
