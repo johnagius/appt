@@ -54,11 +54,11 @@ export function unavailablePage(env: Env): string {
       --teal:#0f766e;
       --teal-soft:#e6f4f1;
       --amber:#f5b301;
-      --radius:22px;
-      --shadow:0 24px 60px -20px rgba(15,23,42,.28);
+      --radius:20px;
+      --shadow:0 20px 50px -22px rgba(15,23,42,.30);
     }
     *{box-sizing:border-box;}
-    html,body{margin:0;padding:0;min-height:100%;}
+    html,body{margin:0;padding:0;height:100%;}
     body{
       font-family:"Inter",ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial;
       color:var(--ink);
@@ -68,98 +68,100 @@ export function unavailablePage(env: Env): string {
         radial-gradient(1000px 620px at 108% 4%, #fff6df 0%, rgba(255,246,223,0) 55%),
         linear-gradient(180deg,#fbfdff 0%,#f4f7fb 100%);
       display:flex;
-      align-items:flex-start;
+      align-items:center;
       justify-content:center;
-      padding:clamp(16px,4vw,48px) 16px 56px;
+      padding:clamp(8px,1.4vw,18px) clamp(10px,2vw,22px);
     }
     /* faint medical-cross texture behind everything */
     body::before{
       content:"";position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.5;
       background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60' viewBox='0 0 60 60'%3E%3Cg fill='none' stroke='%230f766e' stroke-opacity='0.05' stroke-width='2'%3E%3Cpath d='M30 22v16M22 30h16'/%3E%3C/g%3E%3C/svg%3E");
     }
-    .shell{position:relative;z-index:1;width:100%;max-width:860px;}
+    .shell{position:relative;z-index:1;width:100%;max-width:1000px;}
 
-    .brand{display:flex;align-items:center;gap:11px;justify-content:center;margin:2px 0 22px;}
-    .brand .emblem{width:38px;height:38px;border-radius:11px;background:linear-gradient(140deg,#0f766e,#12b3a1);
+    .brand{display:flex;align-items:center;gap:9px;justify-content:center;margin:0 0 7px;}
+    .brand .emblem{width:32px;height:32px;border-radius:9px;background:linear-gradient(140deg,#0f766e,#12b3a1);
       display:grid;place-items:center;box-shadow:0 8px 18px -6px rgba(15,118,110,.6);}
-    .brand .emblem svg{width:21px;height:21px;}
-    .brand .name{font-weight:700;letter-spacing:.02em;font-size:15px;color:#12433d;}
+    .brand .emblem svg{width:18px;height:18px;}
+    .brand .name{font-weight:700;letter-spacing:.02em;font-size:14px;color:#12433d;}
     .brand .name span{color:var(--amber);}
 
     .card{
       background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
       box-shadow:var(--shadow);overflow:hidden;
     }
-    .hero{
-      position:relative;padding:clamp(28px,5vw,46px) clamp(22px,5vw,52px) clamp(24px,4vw,36px);
-      text-align:center;
-      background:linear-gradient(180deg,#ffffff 0%,#f7fbfa 100%);
-      border-bottom:1px solid var(--line);
-    }
-    .hero::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:4px;
-      background:linear-gradient(90deg,var(--teal),var(--amber));opacity:.9;}
+    /* master split: message on the left, wayfinding on the right */
+    .split{display:grid;grid-template-columns:1fr;}
+    @media (min-width:800px){ .split{grid-template-columns:1.04fr 0.96fr;} }
+
+    .left{position:relative;padding:clamp(16px,2.3vw,26px) clamp(20px,3vw,34px);}
+    .left::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:4px;
+      background:linear-gradient(90deg,var(--teal),var(--amber));}
+    @media (min-width:800px){ .left::after{left:auto;top:0;bottom:0;right:-1px;width:4px;height:auto;
+      background:linear-gradient(180deg,var(--teal),var(--amber));} }
+
     .badge{
-      display:inline-flex;align-items:center;gap:8px;
-      background:var(--teal-soft);color:#0b5c55;font-weight:600;font-size:12.5px;
-      letter-spacing:.04em;text-transform:uppercase;padding:7px 14px;border-radius:999px;margin-bottom:20px;
+      display:inline-flex;align-items:center;gap:7px;
+      background:var(--teal-soft);color:#0b5c55;font-weight:600;font-size:11.5px;
+      letter-spacing:.05em;text-transform:uppercase;padding:6px 12px;border-radius:999px;margin-bottom:10px;
     }
-    .badge .dot{width:8px;height:8px;border-radius:50%;background:var(--amber);
-      box-shadow:0 0 0 4px rgba(245,179,1,.22);}
+    .badge .dot{width:7px;height:7px;border-radius:50%;background:var(--amber);box-shadow:0 0 0 3px rgba(245,179,1,.22);}
     h1{
       font-family:"Fraunces",Georgia,serif;font-weight:500;font-optical-sizing:auto;
-      font-size:clamp(28px,5.4vw,44px);line-height:1.08;margin:0 0 16px;letter-spacing:-.01em;color:#10322e;
+      font-size:clamp(23px,3.1vw,33px);line-height:1.07;margin:0 0 9px;letter-spacing:-.01em;color:#10322e;
     }
-    .lede{font-size:clamp(15px,2.1vw,17.5px);line-height:1.62;color:var(--muted);max-width:34em;margin:0 auto;}
+    .lede{font-size:clamp(13.5px,1.5vw,15.5px);line-height:1.55;color:var(--muted);margin:0;}
     .lede .soft{color:var(--ink);font-weight:500;}
     .refer{
-      margin:26px auto 4px;max-width:30em;display:flex;align-items:center;gap:14px;justify-content:center;
-      background:linear-gradient(180deg,#fffdf6,#fff8e6);border:1px solid #f4e4b5;border-radius:16px;padding:16px 20px;
+      margin:13px 0 0;display:flex;align-items:center;gap:12px;
+      background:linear-gradient(180deg,#fffdf6,#fff8e6);border:1px solid #f4e4b5;border-radius:14px;padding:12px 15px;
     }
-    .refer .pin{flex:0 0 auto;width:40px;height:40px;border-radius:12px;background:#fff;border:1px solid #f0dfa8;
+    .refer .pin{flex:0 0 auto;width:36px;height:36px;border-radius:11px;background:#fff;border:1px solid #f0dfa8;
       display:grid;place-items:center;box-shadow:0 6px 14px -8px rgba(180,140,20,.5);}
-    .refer .pin svg{width:22px;height:22px;}
-    .refer .rt{text-align:left;}
-    .refer .rt .k{font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:#a9822a;font-weight:600;}
-    .refer .rt .v{font-family:"Fraunces",Georgia,serif;font-size:21px;font-weight:600;color:#7a5a12;line-height:1.15;}
-    .refer .rt .s{font-size:12.5px;color:#9a7c34;margin-top:1px;}
+    .refer .pin svg{width:20px;height:20px;}
+    .refer .rt .k{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#a9822a;font-weight:600;}
+    .refer .rt .v{font-family:"Fraunces",Georgia,serif;font-size:18px;font-weight:600;color:#7a5a12;line-height:1.15;}
+    .refer .rt .s{font-size:12px;color:#9a7c34;margin-top:1px;}
 
-    .body{padding:clamp(20px,4vw,34px) clamp(18px,5vw,44px) clamp(26px,4vw,40px);}
-    .grid{display:grid;grid-template-columns:1fr 1fr;gap:clamp(16px,3vw,26px);align-items:stretch;}
-    @media (max-width:680px){.grid{grid-template-columns:1fr;}}
+    .qrrow{margin-top:12px;display:flex;gap:15px;align-items:center;
+      border:1px solid var(--line);border-radius:14px;padding:11px 14px;background:linear-gradient(180deg,#ffffff,#f8fbfd);}
+    @media (max-width:400px){.qrrow{flex-direction:column;text-align:center;}}
+    .qrbox{flex:0 0 auto;width:104px;height:104px;background:#fff;border:1px solid var(--line);border-radius:12px;
+      padding:8px;box-shadow:0 10px 24px -14px rgba(15,23,42,.4);}
+    .qrbox svg{width:100%;height:100%;display:block;}
+    .qrtext{flex:1;min-width:0;}
+    .qrtext h3{margin:0 0 4px;font-family:"Fraunces",Georgia,serif;font-weight:600;font-size:16.5px;color:#12332f;}
+    .qrtext p{margin:0 0 10px;font-size:12.5px;line-height:1.5;color:var(--muted);}
+    .cta{display:inline-flex;align-items:center;gap:8px;background:var(--teal);color:#fff;text-decoration:none;
+      font-weight:600;font-size:13px;padding:9px 15px;border-radius:10px;transition:transform .12s ease,box-shadow .12s ease;
+      box-shadow:0 12px 24px -12px rgba(15,118,110,.8);}
+    .cta:hover{transform:translateY(-1px);box-shadow:0 16px 30px -12px rgba(15,118,110,.85);}
+    .cta svg{width:15px;height:15px;}
 
-    .panel{border:1px solid var(--line);border-radius:18px;overflow:hidden;background:#fff;display:flex;flex-direction:column;min-height:100%;}
-    .panel h2{margin:0;font-size:12.5px;letter-spacing:.07em;text-transform:uppercase;color:#42525f;font-weight:600;
-      padding:15px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:9px;background:#fbfdff;}
-    .panel h2 .ic{width:18px;height:18px;color:var(--teal);}
+    /* right column: map + schematic route, stacked and compact */
+    .right{display:flex;flex-direction:column;gap:10px;padding:clamp(14px,2vw,20px);
+      background:#fbfdff;border-top:1px solid var(--line);}
+    @media (min-width:800px){ .right{border-top:0;border-left:1px solid var(--line);} }
+    .panel{border:1px solid var(--line);border-radius:14px;overflow:hidden;background:#fff;display:flex;flex-direction:column;}
+    .panel.mappanel{flex:1;min-height:0;}
+    .panel h2{margin:0;font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:#42525f;font-weight:600;
+      padding:10px 14px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;background:#fbfdff;}
+    .panel h2 .ic{width:16px;height:16px;color:var(--teal);}
 
-    .mapwrap{position:relative;flex:1;min-height:240px;background:#eef2f6;}
+    .mapwrap{position:relative;flex:1;min-height:150px;background:#eef2f6;}
     .mapwrap iframe{position:absolute;inset:0;width:100%;height:100%;border:0;filter:saturate(1.02);}
 
     /* schematic route */
-    .route{padding:18px;flex:1;display:flex;flex-direction:column;gap:16px;}
-    .route .diagram{width:100%;height:auto;border-radius:12px;background:linear-gradient(180deg,#f3f9f8,#eef5f9);border:1px solid #e4eef0;}
-    .steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:11px;}
-    .steps li{display:flex;gap:12px;align-items:flex-start;font-size:13.5px;color:#3a4a57;line-height:1.45;}
-    .steps li .n{flex:0 0 auto;width:24px;height:24px;border-radius:50%;background:var(--teal-soft);color:#0b5c55;
-      font-weight:700;font-size:12px;display:grid;place-items:center;margin-top:1px;}
+    .route{padding:13px 14px;display:flex;flex-direction:column;gap:11px;}
+    .route .diagram{width:100%;max-height:104px;border-radius:10px;background:linear-gradient(180deg,#f3f9f8,#eef5f9);border:1px solid #e4eef0;}
+    .steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:7px;}
+    .steps li{display:flex;gap:10px;align-items:flex-start;font-size:12.5px;color:#3a4a57;line-height:1.4;}
+    .steps li .n{flex:0 0 auto;width:21px;height:21px;border-radius:50%;background:var(--teal-soft);color:#0b5c55;
+      font-weight:700;font-size:11px;display:grid;place-items:center;margin-top:1px;}
     .steps li b{color:var(--ink);font-weight:600;}
 
-    .qrrow{margin-top:clamp(18px,3vw,26px);display:flex;gap:clamp(16px,3vw,26px);align-items:center;
-      border:1px solid var(--line);border-radius:18px;padding:clamp(16px,3vw,24px);background:linear-gradient(180deg,#ffffff,#f8fbfd);}
-    @media (max-width:520px){.qrrow{flex-direction:column;text-align:center;}}
-    .qrbox{flex:0 0 auto;width:132px;height:132px;background:#fff;border:1px solid var(--line);border-radius:14px;
-      padding:10px;box-shadow:0 10px 24px -14px rgba(15,23,42,.4);}
-    .qrbox svg{width:100%;height:100%;display:block;}
-    .qrtext{flex:1;min-width:0;}
-    .qrtext h3{margin:0 0 6px;font-family:"Fraunces",Georgia,serif;font-weight:600;font-size:20px;color:#12332f;}
-    .qrtext p{margin:0 0 14px;font-size:14px;line-height:1.55;color:var(--muted);}
-    .cta{display:inline-flex;align-items:center;gap:9px;background:var(--teal);color:#fff;text-decoration:none;
-      font-weight:600;font-size:14.5px;padding:12px 20px;border-radius:12px;transition:transform .12s ease,box-shadow .12s ease;
-      box-shadow:0 12px 24px -12px rgba(15,118,110,.8);}
-    .cta:hover{transform:translateY(-1px);box-shadow:0 16px 30px -12px rgba(15,118,110,.85);}
-    .cta svg{width:17px;height:17px;}
-
-    .foot{text-align:center;padding:20px 24px 4px;color:#8a97a4;font-size:12.5px;line-height:1.6;}
+    .foot{text-align:center;padding:9px 20px;color:#8a97a4;font-size:11.5px;line-height:1.5;
+      border-top:1px solid var(--line);background:#fff;}
     .foot b{color:#5b6b7c;font-weight:600;}
   </style>
 </head>
@@ -173,29 +175,40 @@ export function unavailablePage(env: Env): string {
     </div>
 
     <div class="card">
-      <div class="hero">
-        <div class="badge"><span class="dot"></span>Booking paused</div>
-        <h1>The doctor is unavailable<br>at the moment</h1>
-        <p class="lede">
-          We&rsquo;re sorry &mdash; <span class="soft">the doctor is unavailable at Potter&rsquo;s Pharmacy right now,</span>
-          so online booking is closed. Should you wish to see a doctor, please make your way to
-          <span class="soft">Spinola Clinic</span> &mdash; <span class="soft">no appointment needed, they are welcoming walk&#8209;in patients.</span>
-        </p>
-        <div class="refer">
-          <span class="pin" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none"><path d="M12 2c-3.9 0-7 3.1-7 7 0 5 7 13 7 13s7-8 7-13c0-3.9-3.1-7-7-7z" fill="#f5b301"/><circle cx="12" cy="9" r="2.6" fill="#fff"/></svg>
-          </span>
-          <span class="rt">
-            <span class="k">Walk in at</span>
-            <span class="v">Spinola Clinic</span>
-            <span class="s">St Julian&rsquo;s, Malta &middot; no booking &middot; approx. 5&#8209;minute walk</span>
-          </span>
+      <div class="split">
+        <div class="left">
+          <div class="badge"><span class="dot"></span>Booking paused</div>
+          <h1>The doctor is unavailable at the moment</h1>
+          <p class="lede">
+            We&rsquo;re sorry &mdash; <span class="soft">the doctor is unavailable at Potter&rsquo;s Pharmacy right now,</span>
+            so online booking is closed. Should you wish to see a doctor, please make your way to
+            <span class="soft">Spinola Clinic</span> &mdash; <span class="soft">no appointment needed, they are welcoming walk&#8209;in patients.</span>
+          </p>
+          <div class="refer">
+            <span class="pin" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M12 2c-3.9 0-7 3.1-7 7 0 5 7 13 7 13s7-8 7-13c0-3.9-3.1-7-7-7z" fill="#f5b301"/><circle cx="12" cy="9" r="2.6" fill="#fff"/></svg>
+            </span>
+            <span class="rt">
+              <span class="k">Walk in at</span>
+              <span class="v">Spinola Clinic</span>
+              <span class="s">St Julian&rsquo;s, Malta &middot; no booking &middot; approx. 5&#8209;minute walk</span>
+            </span>
+          </div>
+          <div class="qrrow">
+            <div class="qrbox">${qrSvg}</div>
+            <div class="qrtext">
+              <h3>Scan for walking directions</h3>
+              <p>Point your phone camera at the code for live, turn&#8209;by&#8209;turn directions to Spinola Clinic in Google&nbsp;Maps.</p>
+              <a class="cta" href="${hrefDirections}" target="_blank" rel="noopener">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l19-9-9 19-2-8-8-2z"/></svg>
+                Open in Google Maps
+              </a>
+            </div>
+          </div>
         </div>
-      </div>
 
-      <div class="body">
-        <div class="grid">
-          <div class="panel">
+        <div class="right">
+          <div class="panel mappanel">
             <h2><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>Live map</h2>
             <div class="mapwrap">
               <iframe src="${srcMap}" title="Map from Potter's Pharmacy to Spinola Clinic" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
@@ -205,48 +218,35 @@ export function unavailablePage(env: Env): string {
           <div class="panel">
             <h2><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-3-6-3"/><path d="M4 6h4l2 4"/><circle cx="6" cy="19" r="1.6"/></svg>How to get there</h2>
             <div class="route">
-              <svg class="diagram" viewBox="0 0 320 150" role="img" aria-label="Simple route from Potter's Pharmacy to Spinola Clinic">
-                <path d="M46 108 C 110 108, 120 44, 190 44 S 262 78, 278 50" fill="none" stroke="#0f766e" stroke-width="3.4" stroke-linecap="round" stroke-dasharray="2 9"/>
+              <svg class="diagram" viewBox="0 0 320 110" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Simple route from Potter's Pharmacy to Spinola Clinic">
+                <path d="M44 80 C 104 80, 116 30, 186 30 S 256 56, 280 36" fill="none" stroke="#0f766e" stroke-width="3.4" stroke-linecap="round" stroke-dasharray="2 9"/>
                 <g>
-                  <circle cx="46" cy="108" r="9" fill="#fff" stroke="#0f766e" stroke-width="3"/>
-                  <text x="46" y="112" text-anchor="middle" font-family="Inter,sans-serif" font-size="10" font-weight="700" fill="#0f766e">A</text>
-                  <text x="46" y="132" text-anchor="middle" font-family="Inter,sans-serif" font-size="11" font-weight="600" fill="#3a4a57">Potter&#8217;s</text>
+                  <circle cx="44" cy="80" r="9" fill="#fff" stroke="#0f766e" stroke-width="3"/>
+                  <text x="44" y="84" text-anchor="middle" font-family="Inter,sans-serif" font-size="10" font-weight="700" fill="#0f766e">A</text>
+                  <text x="44" y="102" text-anchor="middle" font-family="Inter,sans-serif" font-size="11" font-weight="600" fill="#3a4a57">Potter&#8217;s</text>
                 </g>
-                <g transform="translate(160 24)">
+                <g transform="translate(157 12)">
                   <path d="M4 8 q4 -6 8 0 q-1 4 -4 4 v6 M8 12 l-3 4 M8 12 l3 4" fill="none" stroke="#a9822a" stroke-width="1.6" stroke-linecap="round"/>
                   <circle cx="8" cy="3" r="2.4" fill="#f5b301"/>
                 </g>
                 <g>
-                  <path d="M278 42 c-5 0-9 4-9 9 0 6 9 14 9 14s9-8 9-14c0-5-4-9-9-9z" fill="#f5b301"/>
-                  <circle cx="278" cy="51" r="3.2" fill="#fff"/>
-                  <text x="278" y="88" text-anchor="middle" font-family="Inter,sans-serif" font-size="11" font-weight="600" fill="#3a4a57">Spinola</text>
+                  <path d="M280 28 c-5 0-9 4-9 9 0 6 9 14 9 14s9-8 9-14c0-5-4-9-9-9z" fill="#f5b301"/>
+                  <circle cx="280" cy="37" r="3.2" fill="#fff"/>
+                  <text x="280" y="74" text-anchor="middle" font-family="Inter,sans-serif" font-size="11" font-weight="600" fill="#3a4a57">Spinola</text>
                 </g>
               </svg>
               <ol class="steps">
                 <li><span class="n">1</span><span>Leave <b>Potter&rsquo;s Pharmacy</b> and head down towards <b>Spinola Bay</b>.</span></li>
-                <li><span class="n">2</span><span>Follow the seafront promenade &mdash; it&rsquo;s a gentle, well&#8209;signed walk.</span></li>
+                <li><span class="n">2</span><span>Follow the seafront promenade &mdash; a gentle, well&#8209;signed walk.</span></li>
                 <li><span class="n">3</span><span>Arrive at <b>Spinola Clinic</b> in roughly 5 minutes.</span></li>
               </ol>
             </div>
           </div>
         </div>
-
-        <div class="qrrow">
-          <div class="qrbox">${qrSvg}</div>
-          <div class="qrtext">
-            <h3>Scan for walking directions</h3>
-            <p>Point your phone camera at the code to open live, turn&#8209;by&#8209;turn directions to Spinola Clinic in Google&nbsp;Maps.</p>
-            <a class="cta" href="${hrefDirections}" target="_blank" rel="noopener">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l19-9-9 19-2-8-8-2z"/></svg>
-              Open directions in Google Maps
-            </a>
-          </div>
-        </div>
       </div>
 
       <div class="foot">
-        <b>Potter&rsquo;s Pharmacy</b> &middot; St Julian&rsquo;s, Malta<br>
-        Thank you for your understanding &mdash; we look forward to welcoming you back soon.
+        <b>Potter&rsquo;s Pharmacy</b> &middot; St Julian&rsquo;s, Malta &mdash; thank you for your understanding.
       </div>
     </div>
   </div>

@@ -165,4 +165,5 @@ export interface AppConfig {
   pottersLocation: string;
   spinolaLocation: string;
   doctorUnavailable: boolean;
+  reviewSplash: boolean;
 }

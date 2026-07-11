@@ -283,9 +283,10 @@ export function adminPage(sig: string, env: Env): string {
     .add-block-btn{margin-left:50px;margin-top:4px;border:none;background:none;color:var(--blue);cursor:pointer;font-size:12px;font-weight:600;padding:4px 8px;border-radius:6px;}
     .add-block-btn:hover{background:rgba(37,99,235,0.06);}
 
-    /* Doctor Status tab */
+    /* Splash Pages tab */
     .ds-card{transition:border-color 0.2s ease,box-shadow 0.2s ease;}
-    .ds-card.on{border-color:rgba(239,68,68,0.45);box-shadow:0 0 0 3px rgba(239,68,68,0.08),var(--shadow);}
+    .ds-card.on-doctor{border-color:rgba(239,68,68,0.45);box-shadow:0 0 0 3px rgba(239,68,68,0.08),var(--shadow);}
+    .ds-card.on-review{border-color:rgba(245,179,1,0.5);box-shadow:0 0 0 3px rgba(245,179,1,0.1),var(--shadow);}
     .ds-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:4px;}
     .ds-sub{margin:0;color:var(--muted);font-size:13px;}
     .ds-status{flex:0 0 auto;font-size:12px;font-weight:700;padding:6px 12px;border-radius:999px;letter-spacing:.02em;
@@ -302,6 +303,7 @@ export function adminPage(sig: string, env: Env): string {
     .ds-slider::before{content:'';position:absolute;width:24px;height:24px;left:4px;top:4px;background:#fff;border-radius:50%;
       box-shadow:0 1px 3px rgba(0,0,0,0.25);transition:transform 0.2s ease;}
     .ds-switch input:checked + .ds-slider{background:var(--bad);}
+    #dsToggleReview:checked + .ds-slider{background:var(--amber);}
     .ds-switch input:checked + .ds-slider::before{transform:translateX(26px);}
     .ds-preview-note{font-size:13px;line-height:1.5;color:var(--muted);margin:12px 2px 0;}
     .ds-preview-note b{color:var(--text);}
@@ -438,7 +440,7 @@ export function adminPage(sig: string, env: Env): string {
     <div class="tab" data-tab="bloodtests" onclick="switchTab('bloodtests')" style="background:#fef2f2;color:#991b1b;">Blood Tests</div>
     <div class="tab" data-tab="dda" onclick="switchTab('dda')" style="background:#f5f3ff;color:#5b21b6;">&#x1F48A; DDAs</div>
     <div class="tab" data-tab="reschedule" onclick="switchTab('reschedule')" style="background:#eef2ff;color:#3730a3;">&#x1F504; Reschedule</div>
-    <div class="tab" data-tab="availability-toggle" onclick="switchTab('availability-toggle')" style="background:#fef2f2;color:#b91c1c;">&#x1F6AB; Doctor Status</div>
+    <div class="tab" data-tab="splash" onclick="switchTab('splash')" style="background:#fef2f2;color:#b91c1c;">&#x1F5BC;&#xFE0F; Splash Pages</div>
     <div class="tab" data-tab="settings" onclick="switchTab('settings')">Settings</div>
   </div>
 
@@ -537,24 +539,35 @@ export function adminPage(sig: string, env: Env): string {
   </div>
 
   <!-- SETTINGS TAB -->
-  <!-- DOCTOR STATUS TAB -->
-  <div class="tab-content" id="tab-availability-toggle" style="display:none;">
+  <!-- SPLASH PAGES TAB -->
+  <div class="tab-content" id="tab-splash" style="display:none;">
     <div class="card ds-card" id="dsCard">
       <div class="ds-head">
         <div>
-          <h3 style="margin:0 0 2px;">Doctor Availability</h3>
-          <p class="ds-sub">Control whether patients can reach the doctor booking page.</p>
+          <h3 style="margin:0 0 2px;">Splash Pages</h3>
+          <p class="ds-sub">Replace the public booking page with a splash. The two modes are mutually exclusive.</p>
         </div>
         <span class="ds-status" id="dsStatusPill">&hellip;</span>
       </div>
 
-      <div class="ds-toggle-row">
+      <div class="ds-toggle-row" id="dsRowDoctor">
         <div class="ds-toggle-copy">
-          <div class="ds-toggle-title">Show &ldquo;doctor unavailable&rdquo; splash page</div>
-          <div class="ds-toggle-desc">When ON, the public booking page is replaced by a splash telling patients the doctor is unavailable at Potter&rsquo;s Pharmacy and directing them to Spinola Clinic as walk&#8209;ins &mdash; with a live map, simple directions, and a QR code. Online booking (Potter&rsquo;s and Spinola) is closed while this is on. Turn OFF to restore normal booking.</div>
+          <div class="ds-toggle-title">&#x1F6AB; Doctor unavailable &mdash; direct to Spinola</div>
+          <div class="ds-toggle-desc">Replaces the booking page with a splash telling patients the doctor is unavailable at Potter&rsquo;s Pharmacy and directing them to Spinola Clinic as walk&#8209;ins &mdash; with a live map, simple directions, and a QR code. Online booking (Potter&rsquo;s and Spinola) is closed while this is on.</div>
         </div>
         <label class="ds-switch">
-          <input type="checkbox" id="dsToggle" onchange="setDoctorUnavailable(this.checked)">
+          <input type="checkbox" id="dsToggleDoctor" onchange="setSplashMode('doctor', this.checked)">
+          <span class="ds-slider"></span>
+        </label>
+      </div>
+
+      <div class="ds-toggle-row" id="dsRowReview">
+        <div class="ds-toggle-copy">
+          <div class="ds-toggle-title">&#x2B50; Ask for a Google review</div>
+          <div class="ds-toggle-desc">Replaces the booking page with a splash inviting visitors to leave a Google review to help other travellers find us &mdash; with a QR code and tap link straight to the review form. Online booking is closed while this is on.</div>
+        </div>
+        <label class="ds-switch">
+          <input type="checkbox" id="dsToggleReview" onchange="setSplashMode('review', this.checked)">
           <span class="ds-slider"></span>
         </label>
       </div>
@@ -563,7 +576,7 @@ export function adminPage(sig: string, env: Env): string {
       <div class="msg" id="dsMsg"></div>
 
       <div class="ds-actions">
-        <a class="btn" href="/" target="_blank" rel="noopener" style="background:#fff;border:1px solid var(--line);color:#374151;">&#x1F441;&#xFE0F; Preview booking page</a>
+        <a class="btn" href="/" target="_blank" rel="noopener" style="background:#fff;border:1px solid var(--line);color:#374151;">&#x1F441;&#xFE0F; Preview public page</a>
       </div>
     </div>
   </div>
@@ -2014,33 +2027,46 @@ function switchTab(name) {
   if (name === 'reschedule') loadRescheduleTab();
   if (name === 'activity') loadActivity();
   if (name === 'reserve') loadReserveTab();
-  if (name === 'availability-toggle') loadDoctorStatus();
+  if (name === 'splash') loadSplashSettings();
 }
 
-// ========== Doctor Status (unavailable splash toggle) ==========
-function renderDoctorStatus(unavailable) {
+// ========== Splash Pages (mutually-exclusive booking-page splashes) ==========
+function renderSplash(mode) {
+  // mode: 'doctor' | 'review' | '' (normal)
   var card = document.getElementById('dsCard');
   var pill = document.getElementById('dsStatusPill');
   var note = document.getElementById('dsNote');
-  document.getElementById('dsToggle').checked = !!unavailable;
-  if (unavailable) {
-    card.classList.add('on');
-    pill.textContent = '\\u25CF Booking paused';
+  document.getElementById('dsToggleDoctor').checked = (mode === 'doctor');
+  document.getElementById('dsToggleReview').checked = (mode === 'review');
+  card.classList.remove('on-doctor', 'on-review');
+  pill.classList.remove('off');
+  if (mode === 'doctor') {
+    card.classList.add('on-doctor');
+    pill.textContent = '\\u25CF Doctor-unavailable splash';
     pill.classList.add('off');
-    note.innerHTML = '\\u26A0\\uFE0F <b>The booking page is currently hidden.</b> Patients see the &ldquo;doctor unavailable&rdquo; splash and online booking is closed \\u2014 they are directed to Spinola Clinic as walk\\u2011ins.';
+    note.innerHTML = '\\u26A0\\uFE0F <b>The booking page is hidden.</b> Visitors see the &ldquo;doctor unavailable&rdquo; splash and online booking is closed \\u2014 they are directed to Spinola Clinic as walk\\u2011ins.';
+  } else if (mode === 'review') {
+    card.classList.add('on-review');
+    pill.textContent = '\\u2B50 Google-review splash';
+    pill.classList.add('off');
+    note.innerHTML = '\\u2B50 <b>The booking page is hidden.</b> Visitors see the Google-review splash (QR + tap link) and online booking is closed.';
   } else {
-    card.classList.remove('on');
     pill.textContent = '\\u25CF Booking live';
-    pill.classList.remove('off');
-    note.innerHTML = '\\u2705 <b>The booking page is live.</b> Patients can book appointments as normal.';
+    note.innerHTML = '\\u2705 <b>The booking page is live.</b> Visitors can book appointments as normal.';
   }
 }
 
-function loadDoctorStatus() {
+function modeFromSettings(s) {
+  if (s && s.doctorUnavailable) return 'doctor';
+  if (s && s.reviewSplash) return 'review';
+  return '';
+}
+
+function loadSplashSettings() {
   google.script.run
     .withSuccessHandler(function(res) {
       if (!res || !res.ok) { showMsg('dsMsg', 'bad', 'Failed to load status.'); return; }
-      renderDoctorStatus(res.settings && res.settings.doctorUnavailable);
+      renderSplash(modeFromSettings(res.settings));
     })
     .withFailureHandler(function(err) {
       showMsg('dsMsg', 'bad', 'Error: ' + (err && err.message ? err.message : String(err)));
@@ -2048,31 +2074,49 @@ function loadDoctorStatus() {
     .apiAdminGetSettings(SIG);
 }
 
-function setDoctorUnavailable(on) {
+function setSplashMode(which, on) {
+  // Build the payload. Toggles are mutually exclusive: turning one on forces
+  // the other off (the server enforces this too).
+  var payload, newMode, confirmTitle, confirmBody, confirmBtn, confirmClass, okMsg;
+  if (which === 'doctor') {
+    payload = on ? { doctorUnavailable: true } : { doctorUnavailable: false };
+    newMode = on ? 'doctor' : '';
+    confirmTitle = 'Show the "doctor unavailable" splash?';
+    confirmBody = 'The booking page will be replaced by a splash telling visitors the doctor is unavailable and directing them to Spinola Clinic. Online booking will be closed. You can turn this off any time.';
+    confirmBtn = 'Show splash'; confirmClass = 'btn-danger';
+    okMsg = on ? 'Doctor-unavailable splash is now showing.' : 'Booking page is live again.';
+  } else {
+    payload = on ? { reviewSplash: true } : { reviewSplash: false };
+    newMode = on ? 'review' : '';
+    confirmTitle = 'Show the Google-review splash?';
+    confirmBody = 'The booking page will be replaced by a splash inviting visitors to leave a Google review. Online booking will be closed. You can turn this off any time.';
+    confirmBtn = 'Show splash'; confirmClass = 'btn-dark';
+    okMsg = on ? 'Google-review splash is now showing.' : 'Booking page is live again.';
+  }
+
   var apply = function() {
-    showLoading(on ? 'Pausing bookings...' : 'Restoring bookings...', 'Updating the public booking page.');
+    showLoading('Updating public page...', 'Applying the change.');
     google.script.run
       .withSuccessHandler(function(res) {
         hideLoading();
-        if (!res || !res.ok) { showMsg('dsMsg', 'bad', res && res.reason ? res.reason : 'Failed to save.'); loadDoctorStatus(); return; }
+        if (!res || !res.ok) { showMsg('dsMsg', 'bad', res && res.reason ? res.reason : 'Failed to save.'); loadSplashSettings(); return; }
         _settingsLoaded = false; // keep the Settings tab in sync
-        renderDoctorStatus(on);
-        showMsg('dsMsg', 'good', on ? 'Booking page is now hidden \\u2014 patients see the Spinola Clinic splash.' : 'Booking page is live again.');
+        renderSplash(newMode);
+        showMsg('dsMsg', 'good', okMsg);
       })
       .withFailureHandler(function(err) {
         hideLoading();
         showMsg('dsMsg', 'bad', 'Error: ' + (err && err.message ? err.message : String(err)));
-        loadDoctorStatus();
+        loadSplashSettings();
       })
-      .apiAdminSaveSettings(SIG, { doctorUnavailable: on });
+      .apiAdminSaveSettings(SIG, payload);
   };
 
   if (on) {
-    // Revert the optimistic toggle until the admin confirms.
-    document.getElementById('dsToggle').checked = false;
-    styledConfirm('Hide the booking page?', 'Patients will no longer be able to book. They will see a splash page telling them the doctor is unavailable and directing them to Spinola Clinic. You can turn this off again at any time.', 'Hide booking page', 'btn-danger', 'Cancel').then(function(ok) {
-      if (!ok) { renderDoctorStatus(false); return; }
-      document.getElementById('dsToggle').checked = true;
+    // Revert the optimistic flip until confirmed.
+    document.getElementById(which === 'doctor' ? 'dsToggleDoctor' : 'dsToggleReview').checked = false;
+    styledConfirm(confirmTitle, confirmBody, confirmBtn, confirmClass, 'Cancel').then(function(ok) {
+      if (!ok) { loadSplashSettings(); return; }
       apply();
     });
   } else {

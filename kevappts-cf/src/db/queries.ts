@@ -40,6 +40,7 @@ export async function getConfig(db: D1Database): Promise<AppConfig> {
     pottersLocation: map['POTTERS_LOCATION'] || "Potter's Pharmacy Clinic",
     spinolaLocation: map['SPINOLA_LOCATION'] || 'Spinola Clinic',
     doctorUnavailable: map['DOCTOR_UNAVAILABLE'] === '1',
+    reviewSplash: map['REVIEW_SPLASH'] === '1',
   };
 }
 
